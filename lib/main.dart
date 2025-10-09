@@ -75,7 +75,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   bool _isScanning = false;
   bool _hasRootAccess = false;
@@ -101,25 +101,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
-      info =
-          'Android ${androidInfo.version.release}\n'
+      info = 'Android ${androidInfo.version.release}\n'
           'Model: ${androidInfo.model}\n'
           'Security Patch: ${androidInfo.version.securityPatch ?? "Unknown"}';
     } else if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
-      info =
-          'iOS ${iosInfo.systemVersion}\n'
+      info = 'iOS ${iosInfo.systemVersion}\n'
           'Model: ${iosInfo.model}\n'
           'Device: ${iosInfo.name}';
     } else if (Platform.isMacOS) {
       final macInfo = await deviceInfo.macOsInfo;
-      info =
-          'macOS ${macInfo.osRelease}\n'
+      info = 'macOS ${macInfo.osRelease}\n'
           'Model: ${macInfo.model}';
     } else if (Platform.isWindows) {
       final windowsInfo = await deviceInfo.windowsInfo;
-      info =
-          'Windows ${windowsInfo.displayVersion}\n'
+      info = 'Windows ${windowsInfo.displayVersion}\n'
           'Build: ${windowsInfo.buildNumber}';
     }
 
@@ -139,67 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _accessLevel = 'Limited';
       });
-    }
-  }
-
-  Future<void> _requestSystemAccess() async {
-    if (Platform.isAndroid) {
-      await _requestAndroidAccess();
-    } else if (Platform.isIOS) {
-      await _requestIOSAccess();
-    } else if (Platform.isMacOS || Platform.isWindows) {
-      await _requestDesktopAccess();
-    }
-  }
-
-  Future<void> _requestAndroidAccess() async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enhanced System Access'),
-        content: const Text(
-          'For comprehensive scanning, this app needs:\n\n'
-          '1. Root Access (optional but recommended)\n'
-          '2. Accessibility Service\n'
-          '3. Usage Access\n'
-          '4. Device Admin Permission\n\n'
-          'All data stays on your device. Would you like to proceed?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _enableAndroidPermissions();
-            },
-            child: const Text('Grant Access'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _enableAndroidPermissions() async {
-    await Permission.storage.request();
-    await Permission.phone.request();
-    await Permission.sms.request();
-
-    try {
-      await platform.invokeMethod('requestAccessibilityService');
-      await platform.invokeMethod('requestUsageAccess');
-      await platform.invokeMethod('requestDeviceAdmin');
-
-      final hasRoot = await platform.invokeMethod('checkRootAccess');
-      if (!hasRoot['hasRoot']) {
-        _showRootInstructions();
-      } else {
-        await _checkSystemAccess();
-      }
-    } catch (e) {
-      _showError('Failed to enable permissions: $e');
     }
   }
 
@@ -253,17 +188,17 @@ class _HomeScreenState extends State<HomeScreen> {
         content: Text(
           Platform.isMacOS
               ? 'This app needs administrator privileges to:\n\n'
-                    '• Monitor system processes\n'
-                    '• Scan system files\n'
-                    '• Capture network traffic\n'
-                    '• Remove detected threats\n\n'
-                    'You will be prompted for your password.'
+                  '• Monitor system processes\n'
+                  '• Scan system files\n'
+                  '• Capture network traffic\n'
+                  '• Remove detected threats\n\n'
+                  'You will be prompted for your password.'
               : 'This app needs administrator privileges to:\n\n'
-                    '• Monitor system processes\n'
-                    '• Scan system files\n'
-                    '• Analyze network traffic\n'
-                    '• Remove detected threats\n\n'
-                    'Please run as administrator or grant UAC permission.',
+                  '• Monitor system processes\n'
+                  '• Scan system files\n'
+                  '• Analyze network traffic\n'
+                  '• Remove detected threats\n\n'
+                  'Please run as administrator or grant UAC permission.',
         ),
         actions: [
           TextButton(
@@ -640,9 +575,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatusCard() {
-    final criticalThreats = _threats
-        .where((t) => t.severity == 'CRITICAL')
-        .length;
+    final criticalThreats =
+        _threats.where((t) => t.severity == 'CRITICAL').length;
     final highThreats = _threats.where((t) => t.severity == 'HIGH').length;
 
     Color statusColor = Colors.green;
@@ -749,9 +683,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Chip(
                   label: Text(_accessLevel),
-                  backgroundColor: _hasRootAccess
-                      ? Colors.green
-                      : Colors.orange,
+                  backgroundColor:
+                      _hasRootAccess ? Colors.green : Colors.orange,
                 ),
               ],
             ),
@@ -778,9 +711,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildScanButton() {
     return ElevatedButton.icon(
-      onPressed: _isScanning
-          ? null
-          : () => _startScan(deepScan: _hasRootAccess),
+      onPressed:
+          _isScanning ? null : () => _startScan(deepScan: _hasRootAccess),
       icon: const Icon(Icons.search, size: 32),
       label: Text(
         _isScanning ? 'Scanning...' : 'Start Scan',
@@ -865,17 +797,15 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...(_threats
-                .take(3)
-                .map(
+            ...(_threats.take(3).map(
                   (threat) => ListTile(
                     leading: Icon(
                       Icons.error,
                       color: threat.severity == 'CRITICAL'
                           ? Colors.red
                           : threat.severity == 'HIGH'
-                          ? Colors.orange
-                          : Colors.yellow,
+                              ? Colors.orange
+                              : Colors.yellow,
                     ),
                     title: Text(threat.name),
                     subtitle: Text(threat.description),
@@ -892,6 +822,241 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _requestSystemAccess() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enhanced System Access'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choose your preferred method for deep scanning:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              _buildAccessOption(
+                '1. Shizuku (Recommended)',
+                '✅ No root required\n✅ Safe and reversible\n✅ One-time ADB setup',
+                Colors.green,
+                Icons.shield_outlined,
+                () async {
+                  Navigator.pop(context);
+                  await _setupShizuku();
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildAccessOption(
+                '2. Magisk (Advanced)',
+                '✅ Full root access\n✅ Passes SafetyNet\n⚠️ Requires unlocked bootloader',
+                Colors.blue,
+                Icons.verified_user,
+                () async {
+                  Navigator.pop(context);
+                  await _setupMagisk();
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildAccessOption(
+                '3. Auto-Detect',
+                'Let the app find the best method automatically',
+                Colors.purple,
+                Icons.auto_fix_high,
+                () async {
+                  Navigator.pop(context);
+                  await _autoDetectAccess();
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccessOption(
+    String title,
+    String description,
+    Color color,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      color: color.withOpacity(0.1),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(description, style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, color: color, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setupShizuku() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Setup Shizuku'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Steps to enable Shizuku:\n'),
+            Text(
+              '1. Install Shizuku app\n'
+              '2. Enable USB Debugging\n'
+              '3. Connect to PC via USB\n'
+              '4. Run ADB command\n'
+              '5. Return to this app',
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Or use Wireless ADB (no cable needed!)',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await platform.invokeMethod('installShizuku');
+            },
+            child: const Text('Install Shizuku'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _setupMagisk() async {
+    try {
+      final hasMagisk = await platform.invokeMethod('checkMagiskInstalled');
+
+      if (hasMagisk['installed']) {
+        _showSuccess('Magisk detected! Checking root access...');
+        await _checkSystemAccess();
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Install Magisk'),
+            content: const Text(
+              'Magisk is not installed.\n\n'
+              'Requirements:\n'
+              '1. Unlocked bootloader\n'
+              '2. Custom recovery (TWRP)\n'
+              '3. Magisk APK\n\n'
+              'This is an advanced process. Continue?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await platform.invokeMethod('openMagiskInstall');
+                },
+                child: const Text('View Guide'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _showError('Failed to check Magisk: $e');
+    }
+  }
+
+  Future<void> _autoDetectAccess() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Detecting access methods...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final result = await platform.invokeMethod('enableEasyRoot');
+
+      Navigator.pop(context); // Close loading dialog
+
+      if (result['success']) {
+        _showSuccess('${result['message']}');
+        await _checkSystemAccess();
+      } else {
+        _showCustomDialog('Access Setup', result['message'], [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _requestSystemAccess();
+            },
+            child: const Text('Try Another Method'),
+          ),
+        ]);
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      _showError('Failed to detect access method: $e');
+    }
+  }
+
+  void _showCustomDialog(String title, String message, List<Widget> actions) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: actions,
       ),
     );
   }

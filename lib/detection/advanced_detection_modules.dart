@@ -11,7 +11,7 @@ import 'package:flutter/services.dart';
 // ============================================================================
 
 class BehavioralAnomalyDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   // Baseline metrics for normal behavior
   final Map<String, dynamic> _baseline = {};
@@ -61,7 +61,7 @@ class BehavioralAnomalyDetector {
       final avg = values.reduce((a, b) => a + b) / values.length;
       final variance =
           values.map((v) => (v - avg) * (v - avg)).reduce((a, b) => a + b) /
-          values.length;
+              values.length;
       final stdDev = sqrt(variance);
 
       _baseline[metric] = {
@@ -181,7 +181,7 @@ class BehavioralAnomalyDetector {
 // ============================================================================
 
 class CertificateAnalyzer {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   /// Detect SSL certificate manipulation (MITM attacks)
   Future<List<Map<String, dynamic>>> detectCertificateThreats() async {
@@ -261,7 +261,7 @@ class CertificateAnalyzer {
 // ============================================================================
 
 class PermissionAbuseDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   // Dangerous permission combinations that indicate spyware
   static const suspiciousPermissionCombos = [
@@ -388,7 +388,7 @@ class PermissionAbuseDetector {
 // ============================================================================
 
 class AccessibilityAbuseDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   /// Detect malicious use of accessibility services
   /// (Accessibility services can read screen content, simulate touches)
@@ -471,7 +471,7 @@ class AccessibilityAbuseDetector {
 // ============================================================================
 
 class KeystrokeLoggerDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   /// Detect keyloggers by analyzing input methods and keyboard apps
   Future<List<Map<String, dynamic>>> detectKeyloggers() async {
@@ -550,7 +550,7 @@ class KeystrokeLoggerDetector {
 // ============================================================================
 
 class RootingMalwareDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   /// Detect malware that exploits root/jailbreak
   Future<List<Map<String, dynamic>>> detectRootingMalware() async {
@@ -621,7 +621,7 @@ class RootingMalwareDetector {
 // ============================================================================
 
 class GeolocationStalkerDetector {
-  static const platform = MethodChannel('com.defense.antispyware/system');
+  static const platform = MethodChannel('com.orb.guard/system');
 
   /// Detect apps that excessively track location
   Future<List<Map<String, dynamic>>> detectLocationStalkers() async {
@@ -660,9 +660,8 @@ class GeolocationStalkerDetector {
             'appName': appInfo['appName'],
             'accessCount': accesses.length,
             'lastAccess': accesses.last['timestamp'],
-            'backgroundAccess': accesses
-                .where((a) => a['isBackground'] == true)
-                .length,
+            'backgroundAccess':
+                accesses.where((a) => a['isBackground'] == true).length,
           },
         });
       }
@@ -710,13 +709,13 @@ class AdvancedDetectionManager {
   final GeolocationStalkerDetector locationDetector;
 
   AdvancedDetectionManager()
-    : behavioralDetector = BehavioralAnomalyDetector(),
-      certificateAnalyzer = CertificateAnalyzer(),
-      permissionDetector = PermissionAbuseDetector(),
-      accessibilityDetector = AccessibilityAbuseDetector(),
-      keystrokeDetector = KeystrokeLoggerDetector(),
-      rootingDetector = RootingMalwareDetector(),
-      locationDetector = GeolocationStalkerDetector();
+      : behavioralDetector = BehavioralAnomalyDetector(),
+        certificateAnalyzer = CertificateAnalyzer(),
+        permissionDetector = PermissionAbuseDetector(),
+        accessibilityDetector = AccessibilityAbuseDetector(),
+        keystrokeDetector = KeystrokeLoggerDetector(),
+        rootingDetector = RootingMalwareDetector(),
+        locationDetector = GeolocationStalkerDetector();
 
   /// Run all advanced detection modules
   Future<List<Map<String, dynamic>>> runAllModules() async {
@@ -751,8 +750,8 @@ class AdvancedDetectionManager {
 
     print('[Advanced] Running accessibility analysis...');
     try {
-      final accessibility = await accessibilityDetector
-          .detectAccessibilityAbuse();
+      final accessibility =
+          await accessibilityDetector.detectAccessibilityAbuse();
       allThreats.addAll(accessibility);
       print('[Advanced] Accessibility: ${accessibility.length} threats');
     } catch (e) {

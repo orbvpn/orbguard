@@ -6,7 +6,7 @@ import Flutter
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
-    private let CHANNEL = "com.defense.antispyware/system"
+    private let CHANNEL = "com.orb.guard/system"
     private var jailbreakAccess: JailbreakAccess?
     private var spywareScanner: IOSSpywareScanner?
     

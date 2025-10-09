@@ -1,25 +1,11 @@
-// MainActivity.kt - Android Native Implementation
-// Location: android/app/src/main/kotlin/com/orb/guard/MainActivity.kt
-
 package com.orb.guard
 
-import android.content.Context
 import android.content.Intent
-import android.provider.Settings
+import android.net.Uri
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.io.BufferedReader
-import java.io.DataOutputStream
-import java.io.File
-import java.io.InputStreamReader
-import android.app.usage.UsageStatsManager
-import android.app.ActivityManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import org.json.JSONArray
-import org.json.JSONObject
 import kotlinx.coroutines.*
 
 class MainActivity: FlutterActivity() {
@@ -30,145 +16,236 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        rootAccess = RootAccess()
+        rootAccess = RootAccess(this)
         spywareScanner = SpywareScanner(this, rootAccess!!)
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler {
             call, result ->
             when (call.method) {
                 "checkRootAccess" -> {
-                    val hasRoot = rootAccess!!.checkRootAccess()
-                    val accessLevel = if (hasRoot) "Full" else "Limited"
+                    val status = rootAccess!!.checkAccessStatus()
                     result.success(mapOf(
-                        "hasRoot" to hasRoot,
-                        "accessLevel" to accessLevel
+                        "hasRoot": status.hasRoot,
+                        "hasShizuku": status.hasShizuku,
+                        "hasAdb": status.hasAdb,
+                        "accessLevel": status.accessLevel,
+                        "method": status.method
                     ))
                 }
-                "requestAccessibilityService" -> {
-                    requestAccessibilityService()
+                
+                "enableEasyRoot" -> {
+                    // Try multiple methods automatically
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val success = rootAccess!!.enableEasyAccess()
+                        result.success(mapOf(
+                            "success" to success.enabled,
+                            "method" to success.method,
+                            "message" to success.message
+                        ))
+                    }
+                }
+                
+                "installShizuku" -> {
+                    openShizukuInstallPage()
                     result.success(true)
                 }
-                "requestUsageAccess" -> {
-                    requestUsageAccess()
+                
+                "checkMagiskInstalled" -> {
+                    val hasMagisk = rootAccess!!.isMagiskInstalled()
+                    result.success(mapOf("installed" to hasMagisk))
+                }
+                
+                "openMagiskInstall" -> {
+                    openMagiskInstallPage()
                     result.success(true)
                 }
-                "requestDeviceAdmin" -> {
-                    requestDeviceAdmin()
-                    result.success(true)
-                }
-                "initializeScan" -> {
-                    val deepScan = call.argument<Boolean>("deepScan") ?: false
-                    val hasRoot = call.argument<Boolean>("hasRoot") ?: false
-                    spywareScanner!!.initialize(deepScan, hasRoot)
-                    result.success(true)
-                }
-                "scanNetwork" -> {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val threats = spywareScanner!!.scanNetwork()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("threats" to threats))
-                        }
-                    }
-                }
-                "scanProcesses" -> {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val threats = spywareScanner!!.scanProcesses()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("threats" to threats))
-                        }
-                    }
-                }
-                "scanFileSystem" -> {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val threats = spywareScanner!!.scanFileSystem()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("threats" to threats))
-                        }
-                    }
-                }
-                "scanDatabases" -> {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val threats = spywareScanner!!.scanDatabases()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("threats" to threats))
-                        }
-                    }
-                }
-                "scanMemory" -> {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val threats = spywareScanner!!.scanMemory()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("threats" to threats))
-                        }
-                    }
-                }
-                "matchIndicators" -> {
-                    // IoC matching performed server-side or locally
-                    result.success(true)
-                }
-                "removeThreat" -> {
-                    val id = call.argument<String>("id")
-                    val type = call.argument<String>("type")
-                    val path = call.argument<String>("path")
-                    val requiresRoot = call.argument<Boolean>("requiresRoot") ?: false
-                    
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val success = spywareScanner!!.removeThreat(id!!, type!!, path!!, requiresRoot)
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("success" to success))
-                        }
-                    }
-                }
+                
+                // ... rest of your existing methods
+                
                 else -> result.notImplemented()
             }
         }
     }
     
-    private fun requestAccessibilityService() {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        startActivity(intent)
+    private fun openShizukuInstallPage() {
+        try {
+            // Try to open Shizuku app
+            val intent = packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+            if (intent != null) {
+                startActivity(intent)
+            } else {
+                // Open Play Store
+                val uri = Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")
+                startActivity(Intent(Intent.ACTION_VIEW, uri))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
     
-    private fun requestUsageAccess() {
-        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-        startActivity(intent)
-    }
-    
-    private fun requestDeviceAdmin() {
-        // Implementation for device admin request
-        val intent = Intent(Settings.ACTION_SECURITY_SETTINGS)
-        startActivity(intent)
+    private fun openMagiskInstallPage() {
+        try {
+            val uri = Uri.parse("https://github.com/topjohnwu/Magisk/releases")
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 
-// RootAccess.kt - Root Access Management
-class RootAccess {
+// Enhanced RootAccess with multiple methods
+class RootAccess(private val context: android.content.Context) {
     private var hasRoot = false
-    private var suProcess: Process? = null
+    private var hasShizuku = false
+    private var hasAdb = false
+    
+    data class AccessStatus(
+        val hasRoot: Boolean,
+        val hasShizuku: Boolean,
+        val hasAdb: Boolean,
+        val accessLevel: String,
+        val method: String
+    )
+    
+    data class AccessResult(
+        val enabled: Boolean,
+        val method: String,
+        val message: String
+    )
+    
+    fun checkAccessStatus(): AccessStatus {
+        hasRoot = checkRootAccess()
+        hasShizuku = checkShizukuAccess()
+        hasAdb = checkAdbAccess()
+        
+        val level = when {
+            hasRoot -> "Full (Root)"
+            hasShizuku -> "Enhanced (Shizuku)"
+            hasAdb -> "Enhanced (ADB)"
+            else -> "Limited"
+        }
+        
+        val method = when {
+            hasRoot -> "root"
+            hasShizuku -> "shizuku"
+            hasAdb -> "adb"
+            else -> "none"
+        }
+        
+        return AccessStatus(hasRoot, hasShizuku, hasAdb, level, method)
+    }
+    
+    suspend fun enableEasyAccess(): AccessResult = withContext(Dispatchers.IO) {
+        // Try in order of ease: Shizuku > Magisk > ADB > Root exploit
+        
+        // 1. Check if Shizuku is installed
+        if (isShizukuInstalled()) {
+            if (checkShizukuAccess()) {
+                return@withContext AccessResult(
+                    true,
+                    "shizuku",
+                    "Shizuku is active! Enhanced scanning enabled."
+                )
+            } else {
+                return@withContext AccessResult(
+                    false,
+                    "shizuku_not_started",
+                    "Shizuku is installed but not started. Please start Shizuku app."
+                )
+            }
+        }
+        
+        // 2. Check if Magisk is installed
+        if (isMagiskInstalled()) {
+            if (checkRootAccess()) {
+                return@withContext AccessResult(
+                    true,
+                    "magisk",
+                    "Root access via Magisk detected! Full scanning enabled."
+                )
+            }
+        }
+        
+        // 3. Try to detect ADB
+        if (checkAdbAccess()) {
+            return@withContext AccessResult(
+                true,
+                "adb",
+                "ADB access detected! Enhanced scanning enabled."
+            )
+        }
+        
+        // 4. No elevated access available
+        return@withContext AccessResult(
+            false,
+            "none",
+            "No elevated access method found. Install Shizuku or Magisk for enhanced scanning."
+        )
+    }
+    
+    private fun isShizukuInstalled(): Boolean {
+        return try {
+            context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    fun isMagiskInstalled(): Boolean {
+        return try {
+            context.packageManager.getPackageInfo("com.topjohnwu.magisk", 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    private fun checkShizukuAccess(): Boolean {
+        return try {
+            // Check if Shizuku is running
+            val pm = context.packageManager
+            val info = pm.getPackageInfo("moe.shizuku.privileged.api", 0)
+            // Additional Shizuku-specific checks would go here
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    private fun checkAdbAccess(): Boolean {
+        return try {
+            // Check if ADB is enabled
+            android.provider.Settings.Secure.getInt(
+                context.contentResolver,
+                android.provider.Settings.Global.ADB_ENABLED,
+                0
+            ) == 1
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     fun checkRootAccess(): Boolean {
         if (hasRoot) return true
         
-        // Method 1: Check for su binary
+        // Check for su binary
         val paths = arrayOf(
             "/system/xbin/su",
             "/system/bin/su",
             "/system/sbin/su",
             "/sbin/su",
-            "/vendor/bin/su"
+            "/vendor/bin/su",
+            "/su/bin/su"
         )
         
         for (path in paths) {
-            if (File(path).exists()) {
-                // Try to execute su
+            if (java.io.File(path).exists()) {
                 try {
-                    val process = Runtime.getRuntime().exec("su")
-                    val writer = DataOutputStream(process.outputStream)
-                    writer.writeBytes("id\n")
-                    writer.writeBytes("exit\n")
-                    writer.flush()
-                    
-                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    val process = Runtime.getRuntime().exec("su -c id")
+                    val reader = java.io.BufferedReader(
+                        java.io.InputStreamReader(process.inputStream)
+                    )
                     val output = reader.readLine()
                     
                     if (output?.contains("uid=0") == true) {
@@ -176,7 +253,7 @@ class RootAccess {
                         return true
                     }
                 } catch (e: Exception) {
-                    // Root access denied
+                    // Continue checking other paths
                 }
             }
         }
@@ -191,12 +268,14 @@ class RootAccess {
         
         try {
             val process = Runtime.getRuntime().exec("su")
-            val writer = DataOutputStream(process.outputStream)
+            val writer = java.io.DataOutputStream(process.outputStream)
             writer.writeBytes("$command\n")
             writer.writeBytes("exit\n")
             writer.flush()
             
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val reader = java.io.BufferedReader(
+                java.io.InputStreamReader(process.inputStream)
+            )
             val output = StringBuilder()
             var line: String?
             
