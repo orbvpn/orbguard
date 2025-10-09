@@ -1,4 +1,4 @@
-// lib/main.dart - Simplified Version (No External Apps Required)
+// lib/main.dart - Complete with Shizuku Method Integration
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
@@ -9,8 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/scan_results_screen.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
-
-// No external apps needed - everything works automatically!
 
 // Global instances
 late ThreatIntelligenceManager threatIntel;
@@ -73,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasRootAccess = false;
   String _deviceInfo = '';
   String _accessLevel = 'Standard';
+  String _accessMethod = 'Standard';
   List<ThreatDetection> _threats = [];
   ScanProgress _scanProgress = ScanProgress();
 
@@ -85,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initializeApp() async {
     await _checkDeviceInfo();
     await _checkSystemAccess();
-    // Request basic permissions silently
     await _requestBasicPermissions();
   }
 
@@ -116,21 +114,25 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _hasRootAccess = result['hasRoot'] ?? false;
         _accessLevel = result['accessLevel'] ?? 'Standard';
+        _accessMethod = result['method'] ?? 'Standard';
       });
+
+      // Log access method for debugging
+      if (_accessMethod != 'Standard') {
+        print('[OrbGuard] Access method detected: $_accessMethod');
+      }
     } catch (e) {
       setState(() {
         _accessLevel = 'Standard';
+        _accessMethod = 'Standard';
       });
     }
   }
 
   Future<void> _requestBasicPermissions() async {
-    // Request only essential permissions silently
     if (Platform.isAndroid) {
       await Permission.storage.request();
       await Permission.phone.request();
-    } else if (Platform.isIOS) {
-      // iOS permissions are requested as needed
     }
   }
 
@@ -580,6 +582,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAccessLevelCard() {
+    Color chipColor = Colors.blue;
+    String description = '';
+
+    switch (_accessLevel) {
+      case 'Root':
+        chipColor = Colors.green;
+        description = '✓ Root access detected\n'
+            '✓ Full system privileges\n'
+            '✓ Deep scanning enabled\n'
+            '✓ Advanced threat removal';
+        break;
+      case 'Shell':
+        chipColor = Colors.cyan;
+        description = '✓ Shell access enabled (Shizuku method)\n'
+            '✓ Elevated privileges active\n'
+            '✓ Deep scanning available\n'
+            '✓ System file access granted';
+        break;
+      case 'AppProcess':
+        chipColor = Colors.orange;
+        description = '✓ System service access\n'
+            '✓ Enhanced scanning enabled\n'
+            '✓ Process inspection active\n'
+            '✓ Network monitoring enhanced';
+        break;
+      default:
+        chipColor = Colors.blue;
+        description = '✓ Standard protection active\n'
+            '✓ Behavioral analysis enabled\n'
+            '✓ Network monitoring active\n'
+            '✓ App scanning enabled';
+    }
+
     return Card(
       color: const Color(0xFF1D1E33),
       child: Padding(
@@ -596,18 +631,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Chip(
                   label: Text(_accessLevel),
-                  backgroundColor: _hasRootAccess ? Colors.green : Colors.blue,
+                  backgroundColor: chipColor,
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              _hasRootAccess
-                  ? '✓ Enhanced access detected\n✓ Deep scanning available\n✓ Advanced threat removal enabled'
-                  : '✓ Standard protection active\n✓ Behavioral analysis enabled\n✓ Network monitoring active',
-              style: const TextStyle(fontSize: 14),
-            ),
-            if (!_hasRootAccess) ...[
+            Text(description, style: const TextStyle(fontSize: 14)),
+            if (_accessLevel == 'Standard') ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -616,7 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  '💡 Tip: Root access enables deeper scanning, but standard protection is effective for most threats.',
+                  '💡 OrbGuard automatically detects and uses the highest available access method on your device. Root or ADB shell access enables deeper scanning.',
                   style: TextStyle(fontSize: 12, color: Colors.blue),
                 ),
               ),
@@ -737,13 +767,17 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         title: const Text('About OrbGuard'),
         content: const Text(
-          'OrbGuard - Spyware Defense System\n\n'
-          'Advanced anti-spyware tool that detects and removes '
-          'sophisticated threats including Pegasus.\n\n'
-          '✓ All scanning happens locally on your device\n'
-          '✓ No data sent to external servers\n'
-          '✓ Works automatically without additional apps\n'
-          '✓ Enhanced protection with root access (optional)\n\n'
+          'OrbGuard - Advanced Spyware Defense\n\n'
+          'Detects and removes sophisticated threats including Pegasus using multiple access methods:\n\n'
+          '• Root Access (if available)\n'
+          '• Shell Access (Shizuku method integrated)\n'
+          '• System Services (app_process)\n'
+          '• Standard APIs\n\n'
+          '✓ No external apps required\n'
+          '✓ All scanning happens locally\n'
+          '✓ No data sent to servers\n'
+          '✓ Automatic privilege escalation\n'
+          '✓ Cloud threat intelligence\n\n'
           'Your privacy and security are our priority.',
         ),
         actions: [
