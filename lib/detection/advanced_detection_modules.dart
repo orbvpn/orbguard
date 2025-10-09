@@ -93,7 +93,7 @@ class BehavioralAnomalyDetector {
         threats.add({
           'id': 'anomaly_${metric}_${DateTime.now().millisecondsSinceEpoch}',
           'name': 'Behavioral Anomaly: ${_formatMetricName(metric)}',
-          'description': '$metric is ${deviation}% above normal baseline',
+          'description': '$metric is $deviation% above normal baseline',
           'severity': deviation > 100 ? 'HIGH' : 'MEDIUM',
           'type': 'behavioral',
           'path': metric,
@@ -406,7 +406,7 @@ class AccessibilityAbuseDetector {
         final appInfo = await _getAppInfo(packageName);
 
         threats.add({
-          'id': 'accessibility_${packageName}',
+          'id': 'accessibility_$packageName',
           'name': 'Accessibility Service Enabled',
           'description':
               'Third-party app has accessibility access: ${appInfo['appName']}',
@@ -489,7 +489,7 @@ class KeystrokeLoggerDetector {
 
       if (hasInternet && !_isTrustedKeyboard(packageName)) {
         threats.add({
-          'id': 'keyboard_${packageName}',
+          'id': 'keyboard_$packageName',
           'name': 'Suspicious Keyboard App',
           'description':
               'Keyboard with internet access: ${keyboard['appName']}',
@@ -647,7 +647,7 @@ class GeolocationStalkerDetector {
         final appInfo = await _getAppInfo(packageName);
 
         threats.add({
-          'id': 'location_${packageName}',
+          'id': 'location_$packageName',
           'name': 'Excessive Location Tracking',
           'description':
               '${appInfo['appName']} accessed location ${accesses.length} times',

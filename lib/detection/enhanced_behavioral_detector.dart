@@ -174,7 +174,7 @@ class EnhancedBehavioralDetector {
         // it might be running in background
         if (foregroundTime > 1000 * 60 * 60 && hoursSinceLastUse > 6) {
           threats.add({
-            'id': 'bg_abuse_${packageName}',
+            'id': 'bg_abuse_$packageName',
             'name': 'Suspicious Background Activity: $appName',
             'description':
                 'App showing activity without recent user interaction',
@@ -216,7 +216,7 @@ class EnhancedBehavioralDetector {
         // (Potential data exfiltration)
         if (totalMB > 1024) {
           threats.add({
-            'id': 'network_high_${type}',
+            'id': 'network_high_$type',
             'name': 'High Network Usage Detected',
             'description':
                 '${totalMB.toStringAsFixed(0)} MB transferred over $type in 24h',

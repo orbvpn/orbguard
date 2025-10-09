@@ -215,9 +215,9 @@ class SpecialPermissionsScreen extends StatefulWidget {
   final SpecialPermissionsManager permissionManager;
 
   const SpecialPermissionsScreen({
-    Key? key,
+    super.key,
     required this.permissionManager,
-  }) : super(key: key);
+  });
 
   @override
   State<SpecialPermissionsScreen> createState() =>

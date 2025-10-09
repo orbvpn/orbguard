@@ -42,7 +42,7 @@ void main() async {
 }
 
 class AntiSpywareApp extends StatelessWidget {
-  const AntiSpywareApp({Key? key}) : super(key: key);
+  const AntiSpywareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +64,7 @@ class AntiSpywareApp extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -78,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _deviceInfo = '';
   String _accessLevel = 'Standard';
   String _accessMethod = 'Standard';
-  List<ThreatDetection> _threats = [];
+  final List<ThreatDetection> _threats = [];
   ScanProgress _scanProgress = ScanProgress();
   double _detectionCapability = 0.0;
   bool _permissionsChecked = false;
