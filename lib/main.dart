@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/scan_results_screen.dart';
 import 'detection/advanced_detection_modules.dart';
