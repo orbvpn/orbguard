@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
+
 class RootInstructionsScreen extends StatelessWidget {
-  const RootInstructionsScreen({Key? key}) : super(key: key);
+  const RootInstructionsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

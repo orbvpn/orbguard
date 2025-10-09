@@ -1,7 +1,7 @@
 // MainActivity.kt - Android Native Implementation
-// Location: android/app/src/main/kotlin/com/defense/antispyware/MainActivity.kt
+// Location: android/app/src/main/kotlin/com/orb/guard/MainActivity.kt
 
-package com.defense.antispyware
+package com.orb.guard
 
 import android.content.Context
 import android.content.Intent
@@ -23,7 +23,7 @@ import org.json.JSONObject
 import kotlinx.coroutines.*
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.defense.antispyware/system"
+    private val CHANNEL = "com.orb.guard/system"
     private var rootAccess: RootAccess? = null
     private var spywareScanner: SpywareScanner? = null
     

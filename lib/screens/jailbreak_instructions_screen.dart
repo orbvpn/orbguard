@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
+
 class JailbreakInstructionsScreen extends StatelessWidget {
-  const JailbreakInstructionsScreen({Key? key}) : super(key: key);
+  const JailbreakInstructionsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -183,54 +185,5 @@ class JailbreakInstructionsScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// Include ThreatDetection model from previous file
-class ThreatDetection {
-  final String id;
-  final String name;
-  final String description;
-  final String severity;
-  final String type;
-  final String path;
-  final bool requiresRoot;
-  final Map<String, dynamic> metadata;
-
-  ThreatDetection({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.severity,
-    required this.type,
-    required this.path,
-    required this.requiresRoot,
-    required this.metadata,
-  });
-
-  factory ThreatDetection.fromJson(Map<String, dynamic> json) {
-    return ThreatDetection(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      severity: json['severity'] ?? 'MEDIUM',
-      type: json['type'] ?? '',
-      path: json['path'] ?? '',
-      requiresRoot: json['requiresRoot'] ?? false,
-      metadata: json['metadata'] ?? {},
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'description': description,
-      'severity': severity,
-      'type': type,
-      'path': path,
-      'requiresRoot': requiresRoot,
-      'metadata': metadata,
-    };
   }
 }

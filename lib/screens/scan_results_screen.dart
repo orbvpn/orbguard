@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../main.dart'; // Import ThreatDetection from main.dart
 
 class ScanResultsScreen extends StatelessWidget {
   final List<ThreatDetection> threats;
 
-  const ScanResultsScreen({Key? key, required this.threats}) : super(key: key);
+  const ScanResultsScreen({super.key, required this.threats});
 
   @override
   Widget build(BuildContext context) {
