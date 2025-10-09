@@ -1,15 +1,47 @@
-// main.dart - Complete Anti-Spyware Defense System
-// Platform: Flutter (iOS, Android, macOS, Windows)
-
+// lib/main.dart - Complete Main Application
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
-import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+// Import your other screens and modules
+import 'screens/scan_results_screen.dart';
+import 'screens/root_instructions_screen.dart';
+import 'screens/jailbreak_instructions_screen.dart';
+import 'detection/advanced_detection_modules.dart';
+import 'intelligence/cloud_threat_intelligence.dart';
+
+// Global instances
+late ThreatIntelligenceManager threatIntel;
+late AdvancedDetectionManager advancedDetection;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize threat intelligence
+  threatIntel = ThreatIntelligenceManager(
+    apiUrl:
+        'http://localhost:8080/api/v1/intelligence', // Change for production
+    apiKey: 'secret123',
+  );
+
+  await threatIntel.initialize();
+
+  // Start auto-updates (every 6 hours)
+  final autoUpdater = ThreatIntelligenceAutoUpdater(threatIntel);
+  autoUpdater.startAutoUpdate();
+
+  // Initialize advanced detection
+  advancedDetection = AdvancedDetectionManager();
+
+  // Learn behavioral baseline on first run (optional)
+  final prefs = await SharedPreferences.getInstance();
+  if (!prefs.containsKey('baseline_learned')) {
+    print('[Main] Will learn baseline on first scan');
+  }
+
   runApp(const AntiSpywareApp());
 }
 
@@ -98,7 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkSystemAccess() async {
     try {
-      // Check for elevated access
       final result = await platform.invokeMethod('checkRootAccess');
       setState(() {
         _hasRootAccess = result['hasRoot'] ?? false;
@@ -152,18 +183,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _enableAndroidPermissions() async {
-    // Request standard permissions first
     await Permission.storage.request();
     await Permission.phone.request();
     await Permission.sms.request();
 
-    // Guide user to enable advanced permissions
     try {
       await platform.invokeMethod('requestAccessibilityService');
       await platform.invokeMethod('requestUsageAccess');
       await platform.invokeMethod('requestDeviceAdmin');
 
-      // Check for root
       final hasRoot = await platform.invokeMethod('checkRootAccess');
       if (!hasRoot['hasRoot']) {
         _showRootInstructions();
@@ -292,19 +320,56 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Initialize scan
       await platform.invokeMethod('initializeScan', {
         'deepScan': deepScan,
         'hasRoot': _hasRootAccess,
       });
 
-      // Run scan phases
+      // Basic scans
       await _runScanPhase('Network Analysis', _scanNetwork);
       await _runScanPhase('Process Inspection', _scanProcesses);
       await _runScanPhase('File System Check', _scanFileSystem);
       await _runScanPhase('Database Analysis', _scanDatabases);
       await _runScanPhase('Memory Analysis', _scanMemory);
-      await _runScanPhase('IoC Matching', _matchIndicators);
+
+      // Advanced detection modules
+      await _runScanPhase('Behavioral Analysis', () async {
+        final behavioral = await advancedDetection.runModule('behavioral');
+        _addThreats(behavioral);
+      });
+
+      await _runScanPhase('Certificate Analysis', () async {
+        final certs = await advancedDetection.runModule('certificate');
+        _addThreats(certs);
+      });
+
+      await _runScanPhase('Permission Analysis', () async {
+        final perms = await advancedDetection.runModule('permission');
+        _addThreats(perms);
+      });
+
+      await _runScanPhase('Accessibility Check', () async {
+        final access = await advancedDetection.runModule('accessibility');
+        _addThreats(access);
+      });
+
+      await _runScanPhase('Keylogger Detection', () async {
+        final keyloggers = await advancedDetection.runModule('keylogger');
+        _addThreats(keyloggers);
+      });
+
+      await _runScanPhase('Rooting Malware', () async {
+        final rooting = await advancedDetection.runModule('rooting');
+        _addThreats(rooting);
+      });
+
+      await _runScanPhase('Location Stalker', () async {
+        final location = await advancedDetection.runModule('location');
+        _addThreats(location);
+      });
+
+      // Cloud intelligence matching
+      await _runScanPhase('Cloud Intelligence', _matchCloudIntelligence);
 
       setState(() {
         _isScanning = false;
@@ -401,16 +466,62 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _matchIndicators() async {
-    try {
-      await platform.invokeMethod('matchIndicators', {
-        'threats': _threats.map((t) => t.toJson()).toList(),
-      });
-      setState(() {
-        _scanProgress.iocComplete = true;
-      });
-    } catch (e) {
-      print('IoC matching error: $e');
+  void _addThreats(List<Map<String, dynamic>> threats) {
+    setState(() {
+      _threats.addAll(threats.map((t) => ThreatDetection.fromJson(t)));
+    });
+  }
+
+  Future<void> _matchCloudIntelligence() async {
+    for (final threat in _threats) {
+      bool isKnown = false;
+
+      switch (threat.type) {
+        case 'network':
+          isKnown = threatIntel.isDomainMalicious(threat.path);
+          break;
+        case 'process':
+          isKnown = threatIntel.isProcessMalicious(threat.path);
+          break;
+        case 'package':
+          isKnown = threatIntel.isPackageMalicious(threat.path);
+          break;
+      }
+
+      if (isKnown) {
+        threat.severity = 'CRITICAL';
+
+        final details = threatIntel.getIndicatorDetails(
+          threat.path,
+          _mapToIndicatorType(threat.type),
+        );
+
+        if (details != null) {
+          threat.metadata.addAll({
+            'verifiedByCloudIntel': true,
+            'sources': details.sources,
+            'reportCount': details.reportCount,
+            'tags': details.tags,
+          });
+        }
+      }
+    }
+
+    setState(() {
+      _scanProgress.iocComplete = true;
+    });
+  }
+
+  IndicatorType _mapToIndicatorType(String type) {
+    switch (type) {
+      case 'network':
+        return IndicatorType.domain;
+      case 'process':
+        return IndicatorType.processName;
+      case 'package':
+        return IndicatorType.packageName;
+      default:
+        return IndicatorType.domain;
     }
   }
 
@@ -512,26 +623,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Status Card
             _buildStatusCard(),
             const SizedBox(height: 16),
-
-            // Device Info Card
             _buildDeviceInfoCard(),
             const SizedBox(height: 16),
-
-            // Access Level Card
             _buildAccessLevelCard(),
             const SizedBox(height: 16),
-
-            // Scan Button
             _buildScanButton(),
             const SizedBox(height: 16),
-
-            // Scan Progress
             if (_isScanning) _buildScanProgress(),
-
-            // Threats Summary
             if (_threats.isNotEmpty) _buildThreatsSummary(),
           ],
         ),
@@ -724,7 +824,11 @@ class _HomeScreenState extends State<HomeScreen> {
               _scanProgress.databaseComplete,
             ),
             _buildProgressItem('Memory Analysis', _scanProgress.memoryComplete),
-            _buildProgressItem('IoC Matching', _scanProgress.iocComplete),
+            _buildProgressItem(
+              'Advanced Detection',
+              _scanProgress.advancedComplete,
+            ),
+            _buildProgressItem('Cloud Intelligence', _scanProgress.iocComplete),
           ],
         ),
       ),
@@ -819,9 +923,9 @@ class _HomeScreenState extends State<HomeScreen> {
 // Data Models
 class ThreatDetection {
   final String id;
-  final String name;
-  final String description;
-  final String severity;
+  String name;
+  String description;
+  String severity;
   final String type;
   final String path;
   final bool requiresRoot;
@@ -847,7 +951,7 @@ class ThreatDetection {
       type: json['type'] ?? '',
       path: json['path'] ?? '',
       requiresRoot: json['requiresRoot'] ?? false,
-      metadata: json['metadata'] ?? {},
+      metadata: Map<String, dynamic>.from(json['metadata'] ?? {}),
     );
   }
 
@@ -872,10 +976,6 @@ class ScanProgress {
   bool fileSystemComplete = false;
   bool databaseComplete = false;
   bool memoryComplete = false;
+  bool advancedComplete = false;
   bool iocComplete = false;
 }
-
-// Additional screens will be in separate files:
-// - RootInstructionsScreen
-// - JailbreakInstructionsScreen
-// - ScanResultsScreen
