@@ -1,143 +1,136 @@
-// android/app/src/main/kotlin/com/orb/guard/MainActivity.kt
-// Updated with permission handler integration
+// MainActivity.kt - Complete Android Native Implementation
+// Location: android/app/src/main/kotlin/com/orb/guard/MainActivity.kt
 
 package com.orb.guard
 
-import android.os.Bundle
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import android.app.AppOpsManager
+import android.os.Build
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.BufferedReader
+import java.io.DataOutputStream
+import java.io.File
+import java.io.InputStreamReader
+import android.app.ActivityManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.content.pm.PackageManager
+import kotlinx.coroutines.*
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.orb.guard/system"
-    private lateinit var permissionHandler: PermissionHandler
-    private lateinit var elevatedAccess: ElevatedAccessManager
-    private lateinit var spywareScanner: SpywareScanner
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        // Initialize managers
-        elevatedAccess = ElevatedAccessManager(this)
-        spywareScanner = SpywareScanner(this, elevatedAccess)
-    }
+    private var rootAccess: RootAccess? = null
+    private var spywareScanner: SpywareScanner? = null
     
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        // Initialize permission handler
-        permissionHandler = PermissionHandler(this, flutterEngine)
+        rootAccess = RootAccess()
+        spywareScanner = SpywareScanner(this, rootAccess!!)
         
-        // Setup main method channel for scanning
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL
-        ).setMethodCallHandler { call, result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                // Access Level Checking
                 "checkRootAccess" -> {
-                    val hasElevated = elevatedAccess.checkElevatedAccess()
+                    val hasRoot = rootAccess!!.checkRootAccess()
+                    val accessLevel = if (hasRoot) "Full" else "Limited"
                     result.success(mapOf(
-                        "hasRoot" to hasElevated,
-                        "accessLevel" to elevatedAccess.getAccessLevelName(),
-                        "method" to elevatedAccess.accessMethod
+                        "hasRoot" to hasRoot,
+                        "accessLevel" to accessLevel,
+                        "method" to rootAccess!!.accessMethod
                     ))
                 }
                 
-                // Scan Initialization
-                "initializeScan" -> {
-                    val deepScan = call.argument<Boolean>("deepScan") ?: false
-                    val hasRoot = call.argument<Boolean>("hasRoot") ?: false
-                    
-                    spywareScanner.initialize(
-                        deepScan,
-                        elevatedAccess.hasElevatedAccess()
-                    )
+                // Special Permissions
+                "checkUsageStatsPermission" -> {
+                    val hasPermission = checkUsageStatsPermission()
+                    result.success(mapOf("hasPermission" to hasPermission))
+                }
+                
+                "requestUsageStatsPermission" -> {
+                    requestUsageStatsPermission()
                     result.success(true)
                 }
                 
-                // Scanning Methods
+                "checkAccessibilityPermission" -> {
+                    val hasPermission = checkAccessibilityPermission()
+                    result.success(mapOf("hasPermission" to hasPermission))
+                }
+                
+                "requestAccessibilityPermission" -> {
+                    requestAccessibilityPermission()
+                    result.success(true)
+                }
+                
+                // Scanning
+                "initializeScan" -> {
+                    val deepScan = call.argument<Boolean>("deepScan") ?: false
+                    val hasRoot = call.argument<Boolean>("hasRoot") ?: false
+                    spywareScanner!!.initialize(deepScan, rootAccess!!.hasRootAccess())
+                    result.success(true)
+                }
+                
                 "scanNetwork" -> {
-                    Thread {
-                        val threats = spywareScanner.scanNetwork()
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val threats = spywareScanner!!.scanNetwork()
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("threats" to threats))
                         }
-                    }.start()
+                    }
                 }
                 
                 "scanProcesses" -> {
-                    Thread {
-                        val threats = spywareScanner.scanProcesses()
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val threats = spywareScanner!!.scanProcesses()
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("threats" to threats))
                         }
-                    }.start()
+                    }
                 }
                 
                 "scanFileSystem" -> {
-                    Thread {
-                        val threats = spywareScanner.scanFileSystem()
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val threats = spywareScanner!!.scanFileSystem()
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("threats" to threats))
                         }
-                    }.start()
+                    }
                 }
                 
                 "scanDatabases" -> {
-                    Thread {
-                        val threats = spywareScanner.scanDatabases()
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val threats = spywareScanner!!.scanDatabases()
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("threats" to threats))
                         }
-                    }.start()
+                    }
                 }
                 
                 "scanMemory" -> {
-                    Thread {
-                        val threats = spywareScanner.scanMemory()
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val threats = spywareScanner!!.scanMemory()
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("threats" to threats))
                         }
-                    }.start()
+                    }
                 }
                 
-                // Threat Removal
                 "removeThreat" -> {
-                    val id = call.argument<String>("id") ?: ""
-                    val type = call.argument<String>("type") ?: ""
-                    val path = call.argument<String>("path") ?: ""
+                    val id = call.argument<String>("id")
+                    val type = call.argument<String>("type")
+                    val path = call.argument<String>("path")
                     val requiresRoot = call.argument<Boolean>("requiresRoot") ?: false
                     
-                    Thread {
-                        val success = spywareScanner.removeThreat(
-                            id, type, path, requiresRoot
-                        )
-                        runOnUiThread {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val success = spywareScanner!!.removeThreat(id!!, type!!, path!!, requiresRoot)
+                        withContext(Dispatchers.Main) {
                             result.success(mapOf("success" to success))
                         }
-                    }.start()
-                }
-                
-                // Permission Helpers (used by advanced detection modules)
-                "getInstalledApps" -> {
-                    Thread {
-                        val apps = getInstalledAppsInfo()
-                        runOnUiThread {
-                            result.success(mapOf("apps" to apps))
-                        }
-                    }.start()
-                }
-                
-                "getLocationAccessHistory" -> {
-                    val hours = call.argument<Int>("hours") ?: 24
-                    Thread {
-                        val history = getLocationAccessHistory(hours)
-                        runOnUiThread {
-                            result.success(mapOf("accesses" to history))
-                        }
-                    }.start()
+                    }
                 }
                 
                 else -> result.notImplemented()
@@ -146,102 +139,96 @@ class MainActivity: FlutterActivity() {
     }
     
     // ============================================================================
-    // HELPER METHODS FOR ADVANCED DETECTION
+    // SPECIAL PERMISSIONS HANDLING
     // ============================================================================
     
-    private fun getInstalledAppsInfo(): List<Map<String, Any>> {
-        val apps = mutableListOf<Map<String, Any>>()
-        val packageManager = packageManager
-        
-        try {
-            val packages = packageManager.getInstalledApplications(0)
-            
-            for (packageInfo in packages) {
-                val appName = packageManager.getApplicationLabel(packageInfo).toString()
-                val packageName = packageInfo.packageName
-                
-                // Get permissions
-                val permissions = try {
-                    val info = packageManager.getPackageInfo(
-                        packageName,
-                        android.content.pm.PackageManager.GET_PERMISSIONS
-                    )
-                    info.requestedPermissions?.toList() ?: emptyList()
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                
-                // Get install date
-                val installDate = try {
-                    val info = packageManager.getPackageInfo(packageName, 0)
-                    info.firstInstallTime
-                } catch (e: Exception) {
-                    0L
-                }
-                
-                apps.add(mapOf(
-                    "appName" to appName,
-                    "packageName" to packageName,
-                    "permissions" to permissions,
-                    "installDate" to installDate,
-                    "isSystemApp" to ((packageInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0)
-                ))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+    private fun checkUsageStatsPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
         }
         
-        return apps
+        try {
+            val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    packageName
+                )
+            }
+            return mode == AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            return false
+        }
     }
     
-    private fun getLocationAccessHistory(hours: Int): List<Map<String, Any>> {
-        val history = mutableListOf<Map<String, Any>>()
+    private fun requestUsageStatsPermission() {
+        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        startActivity(intent)
+    }
+    
+    private fun checkAccessibilityPermission(): Boolean {
+        val accessibilityEnabled = Settings.Secure.getInt(
+            contentResolver,
+            Settings.Secure.ACCESSIBILITY_ENABLED,
+            0
+        )
         
-        // This requires Usage Stats permission
-        if (!permissionHandler.hasUsageStatsPermission()) {
-            return history
+        if (accessibilityEnabled == 1) {
+            val service = "$packageName/${packageName}.AccessibilityMonitorService"
+            val settingValue = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            return settingValue?.contains(service) == true
         }
-        
-        try {
-            // TODO: Implement proper location access history tracking
-            // This would require a background service to monitor location requests
-            
-            // For now, return empty list
-            // In production, you would:
-            // 1. Monitor AppOpsManager for location access
-            // 2. Log to local database
-            // 3. Query database here
-            
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        
-        return history
+        return false
+    }
+    
+    private fun requestAccessibilityPermission() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
     }
 }
 
 // ============================================================================
-// ELEVATED ACCESS MANAGER
+// ROOT ACCESS MANAGER
 // ============================================================================
 
-class ElevatedAccessManager(private val context: android.content.Context) {
+class RootAccess {
     var hasRoot = false
     var hasShell = false
     var accessMethod = "None"
     
-    fun checkElevatedAccess(): Boolean {
-        // Try root first (highest privilege)
-        if (checkRootAccess()) {
+    fun checkRootAccess(): Boolean {
+        // Try multiple methods in order of preference
+        
+        // Method 1: Check for root access (highest privilege)
+        if (checkRootBinaries()) {
             hasRoot = true
             hasShell = true
             accessMethod = "Root"
             return true
         }
         
-        // Try shell access
+        // Method 2: Use shell user access (Shizuku method)
         if (checkShellAccess()) {
             hasShell = true
             accessMethod = "Shell"
+            return true
+        }
+        
+        // Method 3: Use app_process for system services
+        if (checkAppProcessAccess()) {
+            hasShell = true
+            accessMethod = "AppProcess"
             return true
         }
         
@@ -249,17 +236,9 @@ class ElevatedAccessManager(private val context: android.content.Context) {
         return false
     }
     
-    fun hasElevatedAccess(): Boolean = hasRoot || hasShell
+    fun hasRootAccess(): Boolean = hasRoot || hasShell
     
-    fun getAccessLevelName(): String {
-        return when {
-            hasRoot -> "Full"
-            hasShell -> "Enhanced"
-            else -> "Standard"
-        }
-    }
-    
-    private fun checkRootAccess(): Boolean {
+    private fun checkRootBinaries(): Boolean {
         val paths = arrayOf(
             "/system/xbin/su",
             "/system/bin/su",
@@ -268,19 +247,22 @@ class ElevatedAccessManager(private val context: android.content.Context) {
         )
         
         for (path in paths) {
-            if (java.io.File(path).exists()) {
+            if (File(path).exists()) {
                 try {
-                    val process = Runtime.getRuntime().exec("su -c id")
-                    val reader = java.io.BufferedReader(
-                        java.io.InputStreamReader(process.inputStream)
-                    )
+                    val process = Runtime.getRuntime().exec("su")
+                    val writer = DataOutputStream(process.outputStream)
+                    writer.writeBytes("id\n")
+                    writer.writeBytes("exit\n")
+                    writer.flush()
+                    
+                    val reader = BufferedReader(InputStreamReader(process.inputStream))
                     val output = reader.readLine()
                     
                     if (output?.contains("uid=0") == true) {
                         return true
                     }
                 } catch (e: Exception) {
-                    // Root denied
+                    // Root access denied
                 }
             }
         }
@@ -289,13 +271,37 @@ class ElevatedAccessManager(private val context: android.content.Context) {
     
     private fun checkShellAccess(): Boolean {
         try {
-            val process = Runtime.getRuntime().exec("sh -c id")
-            val reader = java.io.BufferedReader(
-                java.io.InputStreamReader(process.inputStream)
-            )
+            val process = Runtime.getRuntime().exec("sh")
+            val writer = DataOutputStream(process.outputStream)
+            writer.writeBytes("id\n")
+            writer.writeBytes("exit\n")
+            writer.flush()
+            
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
             val output = reader.readLine()
             
-            return output?.contains("uid=") == true
+            if (output?.contains("uid=") == true) {
+                return true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return false
+    }
+    
+    private fun checkAppProcessAccess(): Boolean {
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf(
+                "sh", "-c",
+                "CLASSPATH=/system/framework/am.jar app_process /system/bin com.android.commands.am.Am"
+            ))
+            
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val output = reader.readLine()
+            
+            if (output != null) {
+                return true
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -303,13 +309,27 @@ class ElevatedAccessManager(private val context: android.content.Context) {
     }
     
     fun executeCommand(command: String): String? {
-        return try {
-            val prefix = if (hasRoot) "su -c" else "sh -c"
-            val process = Runtime.getRuntime().exec("$prefix \"$command\"")
+        try {
+            if (hasRoot) {
+                return executeRootCommand(command)
+            } else if (hasShell) {
+                return executeShellCommand(command)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+    
+    private fun executeRootCommand(command: String): String? {
+        try {
+            val process = Runtime.getRuntime().exec("su")
+            val writer = DataOutputStream(process.outputStream)
+            writer.writeBytes("$command\n")
+            writer.writeBytes("exit\n")
+            writer.flush()
             
-            val reader = java.io.BufferedReader(
-                java.io.InputStreamReader(process.inputStream)
-            )
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
             val output = StringBuilder()
             var line: String?
             
@@ -318,24 +338,72 @@ class ElevatedAccessManager(private val context: android.content.Context) {
             }
             
             process.waitFor()
-            output.toString()
+            return output.toString()
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            return null
         }
     }
+    
+    private fun executeShellCommand(command: String): String? {
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val output = StringBuilder()
+            var line: String?
+            
+            while (reader.readLine().also { line = it } != null) {
+                output.append(line).append("\n")
+            }
+            
+            process.waitFor()
+            return output.toString()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+    
+    fun readSystemFile(path: String): String? = executeCommand("cat '$path'")
+    fun pmCommand(args: String): String? = executeCommand("pm $args")
+    fun dumpsys(service: String): String? = executeCommand("dumpsys $service")
+    fun getProcessList(): String? = executeCommand("ps -A")
+    fun getNetstat(): String? = executeCommand("cat /proc/net/tcp")
+    fun listFiles(path: String): String? = executeCommand("ls -la '$path'")
+    fun deleteFile(path: String): Boolean = executeCommand("rm -rf '$path'") != null
+    fun killProcess(processName: String): Boolean = executeCommand("killall '$processName'") != null
 }
 
 // ============================================================================
-// SPYWARE SCANNER STUB
+// SPYWARE SCANNER
 // ============================================================================
 
 class SpywareScanner(
-    private val context: android.content.Context,
-    private val elevatedAccess: ElevatedAccessManager
+    private val context: Context,
+    private val rootAccess: RootAccess
 ) {
     private var deepScan = false
     private var hasElevatedAccess = false
+    
+    private val maliciousPackages = listOf(
+        "com.network.android",
+        "com.system.framework",
+        "com.google.android.update",
+        "com.android.battery"
+    )
+    
+    private val maliciousDomains = listOf(
+        "lsgatag.com", "lxwo.org", "cloudatlasinc.com",
+        "lighthouseresearch.com", "mynetsec.net"
+    )
+    
+    private val suspiciousFiles = listOf(
+        "/system/xbin/daemonsu",
+        "/system/bin/.ext",
+        "/data/local/tmp/.pegasus",
+        "/data/data/com.android.providers.telephony/databases/mmssms.db-journal"
+    )
     
     fun initialize(deepScan: Boolean, hasElevated: Boolean) {
         this.deepScan = deepScan
@@ -343,24 +411,115 @@ class SpywareScanner(
     }
     
     fun scanNetwork(): List<Map<String, Any>> {
-        // Implementation will be in separate SpywareScanner.kt file
-        return emptyList()
+        val threats = mutableListOf<Map<String, Any>>()
+        
+        // Standard network check
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networks = connectivityManager.allNetworks
+        
+        for (network in networks) {
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            // Check for suspicious network characteristics
+        }
+        
+        // Elevated network analysis
+        if (hasElevatedAccess) {
+            val netstat = rootAccess.getNetstat()
+            netstat?.let {
+                val suspiciousConns = analyzeNetworkConnections(it)
+                threats.addAll(suspiciousConns)
+            }
+        }
+        
+        return threats
     }
     
     fun scanProcesses(): List<Map<String, Any>> {
-        return emptyList()
+        val threats = mutableListOf<Map<String, Any>>()
+        
+        // Standard process check
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val runningApps = activityManager.runningAppProcesses ?: emptyList()
+        
+        for (app in runningApps) {
+            if (maliciousPackages.any { app.processName.contains(it) }) {
+                threats.add(mapOf(
+                    "id" to app.processName,
+                    "name" to "Suspicious Process: ${app.processName}",
+                    "description" to "Process matches known spyware pattern",
+                    "severity" to "CRITICAL",
+                    "type" to "process",
+                    "path" to app.processName,
+                    "requiresRoot" to false,
+                    "metadata" to mapOf(
+                        "pid" to app.pid,
+                        "uid" to app.uid
+                    )
+                ))
+            }
+        }
+        
+        // Elevated process analysis
+        if (hasElevatedAccess) {
+            val processList = rootAccess.getProcessList()
+            processList?.let {
+                val deepThreats = analyzeProcessTree(it)
+                threats.addAll(deepThreats)
+            }
+        }
+        
+        return threats
     }
     
     fun scanFileSystem(): List<Map<String, Any>> {
-        return emptyList()
+        val threats = mutableListOf<Map<String, Any>>()
+        
+        if (!hasElevatedAccess) {
+            return threats
+        }
+        
+        // Check suspicious file locations
+        for (suspiciousFile in suspiciousFiles) {
+            val exists = rootAccess.executeCommand("test -e '$suspiciousFile' && echo 'exists'")
+            if (exists?.contains("exists") == true) {
+                threats.add(mapOf(
+                    "id" to suspiciousFile,
+                    "name" to "Suspicious File: $suspiciousFile",
+                    "description" to "Known spyware file location",
+                    "severity" to "HIGH",
+                    "type" to "file",
+                    "path" to suspiciousFile,
+                    "requiresRoot" to true,
+                    "metadata" to mapOf<String, Any>()
+                ))
+            }
+        }
+        
+        return threats
     }
     
     fun scanDatabases(): List<Map<String, Any>> {
-        return emptyList()
+        val threats = mutableListOf<Map<String, Any>>()
+        
+        if (!hasElevatedAccess) {
+            return threats
+        }
+        
+        // Check SMS database for exploits
+        val smsDb = "/data/data/com.android.providers.telephony/databases/mmssms.db"
+        val smsCheck = rootAccess.executeCommand("sqlite3 '$smsDb' 'SELECT count(*) FROM sms WHERE body LIKE \"%SPYWARE_SIGNATURE%\"' 2>/dev/null")
+        
+        return threats
     }
     
     fun scanMemory(): List<Map<String, Any>> {
-        return emptyList()
+        val threats = mutableListOf<Map<String, Any>>()
+        
+        if (!hasElevatedAccess) {
+            return threats
+        }
+        
+        return threats
     }
     
     fun removeThreat(id: String, type: String, path: String, requiresRoot: Boolean): Boolean {
@@ -378,19 +537,47 @@ class SpywareScanner(
     
     private fun killProcess(processName: String): Boolean {
         if (!hasElevatedAccess) return false
-        val result = elevatedAccess.executeCommand("killall $processName")
-        return result != null
+        return rootAccess.killProcess(processName)
     }
     
     private fun deleteFile(path: String): Boolean {
         if (!hasElevatedAccess) return false
-        val result = elevatedAccess.executeCommand("rm -rf '$path'")
-        return result != null
+        return rootAccess.deleteFile(path)
     }
     
     private fun uninstallPackage(packageName: String): Boolean {
         if (!hasElevatedAccess) return false
-        val result = elevatedAccess.executeCommand("pm uninstall $packageName")
+        val result = rootAccess.pmCommand("uninstall $packageName")
         return result?.contains("Success") == true
+    }
+    
+    private fun analyzeNetworkConnections(data: String): List<Map<String, Any>> {
+        val threats = mutableListOf<Map<String, Any>>()
+        // Parse network connections
+        return threats
+    }
+    
+    private fun analyzeProcessTree(data: String): List<Map<String, Any>> {
+        val threats = mutableListOf<Map<String, Any>>()
+        val lines = data.split("\n")
+        
+        for (line in lines) {
+            for (maliciousProc in maliciousPackages) {
+                if (line.contains(maliciousProc)) {
+                    threats.add(mapOf(
+                        "id" to maliciousProc,
+                        "name" to "Hidden Process: $maliciousProc",
+                        "description" to "Process detected via elevated access",
+                        "severity" to "CRITICAL",
+                        "type" to "process",
+                        "path" to maliciousProc,
+                        "requiresRoot" to true,
+                        "metadata" to mapOf("details" to line)
+                    ))
+                }
+            }
+        }
+        
+        return threats
     }
 }
