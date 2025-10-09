@@ -1,0 +1,120 @@
+# Flutter & Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+generated_plugin_registrant.dart
+
+# Build outputs
+build/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/.symlinks/
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/DerivedData/
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Runner.xcworkspace/
+linux/flutter/
+windows/flutter/
+web/.dart_tool/
+web/wasm/
+.wasm_tool/
+
+# Android
+**/android/local.properties
+**/android/.gradle/
+**/android/.idea/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/build/
+*.iml
+
+# Xcode & iOS
+.DS_Store
+*.lock
+*.xcuserstate
+*.xcworkspace
+*.xcuserdata/
+DerivedData/
+.idea/
+build/
+Flutter.framework/
+Flutter.podspec
+Pods/
+Podfile.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Web
+lib/generated_plugin_registrant.dart
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Windows
+*.exe
+*.dll
+*.pdb
+*.obj
+*.lib
+*.app
+*.bat
+*.cmd
+
+# Linux
+*.so
+*.out
+
+# VS Code
+.vscode/
+.history/
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+.idea_modules/
+*.ipr
+*.iws
+
+# Environment / Secrets
+.env
+*.key
+*.pem
+*.jks
+*.keystore
+*.p12
+*.crt
+*.csr
+
+# Test folders
+test-results/
+coverage/
+test_coverage/
+
+# Temporary & Cache
+.tmp/
+temp/
+.cache/
+log/
+logs/
+*.log
+*.tmp
+
+# Firebase / Google Services
+google-services.json
+GoogleService-Info.plist
+
+# Misc
+.svn/
+.hg/
+*.swp
+*.swo
