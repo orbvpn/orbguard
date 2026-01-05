@@ -4,7 +4,7 @@
 class ApiConfig {
   /// Base URL for OrbGuard Lab API
   /// Override via environment or settings for different environments
-  static String baseUrl = 'https://api.orbguard.lab';
+  static String baseUrl = 'https://guard.orbai.world';
 
   /// API version prefix
   static const String apiVersion = '/api/v1';

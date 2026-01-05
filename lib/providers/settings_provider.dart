@@ -185,7 +185,7 @@ class ApiSettings {
   final String? apiKey;
 
   ApiSettings({
-    this.serverUrl = 'https://api.orbguard.com',
+    this.serverUrl = 'https://guard.orbai.world',
     this.useCustomServer = false,
     this.connectionTimeout = 30,
     this.enableWebSocket = true,
@@ -339,7 +339,7 @@ class SettingsProvider extends ChangeNotifier {
 
     // API settings
     _api = ApiSettings(
-      serverUrl: _prefs!.getString('api_url') ?? 'https://api.orbguard.com',
+      serverUrl: _prefs!.getString('api_url') ?? 'https://guard.orbai.world',
       useCustomServer: _prefs!.getBool('api_custom') ?? false,
       connectionTimeout: _prefs!.getInt('api_timeout') ?? 30,
       enableWebSocket: _prefs!.getBool('api_websocket') ?? true,

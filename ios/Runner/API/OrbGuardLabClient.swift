@@ -22,7 +22,7 @@ struct OrbGuardLabConfig {
     )
 
     static let production = OrbGuardLabConfig(
-        baseURL: "https://api.orbguard.com",
+        baseURL: "https://guard.orbai.world",
         apiKey: nil,
         timeout: 30,
         retryCount: 3,
