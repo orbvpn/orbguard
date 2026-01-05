@@ -19,6 +19,8 @@ dependencies:
   # Network & Security
   dio: ^5.4.0
   connectivity_plus: ^7.0.0
+  web_socket_channel: ^2.4.0
+  crypto: ^3.0.3
      
   # Database
   sqflite: ^2.3.0
@@ -26,9 +28,18 @@ dependencies:
   # UI
   flutter_svg: ^2.0.9
   intl: ^0.20.2
-     
+
   # Platform channels
   flutter_native_splash: ^2.3.5
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # State Management
+  provider: ^6.1.1
+
+  # QR Scanner
+  mobile_scanner: ^5.1.1
 
 dev_dependencies:
   flutter_test:

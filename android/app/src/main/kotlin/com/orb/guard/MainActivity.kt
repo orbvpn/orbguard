@@ -29,14 +29,26 @@ import kotlinx.coroutines.*
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.orb.guard/system"
+    private val SMS_CHANNEL = "com.orb.guard/sms"
+    private val BROWSER_CHANNEL = "com.orb.guard/browser"
     private var rootAccess: RootAccess? = null
     private var spywareScanner: SpywareScanner? = null
-    
+    private var smsAnalyzer: SMSAnalyzer? = null
+    private var browserMonitor: BrowserMonitor? = null
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         rootAccess = RootAccess()
         spywareScanner = SpywareScanner(this, rootAccess!!)
+        smsAnalyzer = SMSAnalyzer.getInstance(this)
+        browserMonitor = BrowserMonitor.getInstance(this)
+
+        // Setup SMS Method Channel
+        setupSmsChannel(flutterEngine)
+
+        // Setup Browser Method Channel
+        setupBrowserChannel(flutterEngine)
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -161,7 +173,7 @@ class MainActivity: FlutterActivity() {
                     val type = call.argument<String>("type")
                     val path = call.argument<String>("path")
                     val requiresRoot = call.argument<Boolean>("requiresRoot") ?: false
-                    
+
                     CoroutineScope(Dispatchers.IO).launch {
                         val success = spywareScanner!!.removeThreat(id!!, type!!, path!!, requiresRoot)
                         withContext(Dispatchers.Main) {
@@ -169,7 +181,43 @@ class MainActivity: FlutterActivity() {
                         }
                     }
                 }
-                
+
+                // Get installed certificates
+                "getInstalledCertificates" -> {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val certificates = getInstalledCertificates()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("certificates" to certificates))
+                        }
+                    }
+                }
+
+                // Get installed apps
+                "getInstalledApps" -> {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val apps = getInstalledApps()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("apps" to apps))
+                        }
+                    }
+                }
+
+                // Get enabled accessibility services
+                "getEnabledAccessibilityServices" -> {
+                    val services = getEnabledAccessibilityServices()
+                    result.success(mapOf("services" to services))
+                }
+
+                // Get installed keyboards
+                "getInstalledKeyboards" -> {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val keyboards = getInstalledKeyboards()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("keyboards" to keyboards))
+                        }
+                    }
+                }
+
                 else -> result.notImplemented()
             }
         }
@@ -295,6 +343,202 @@ class MainActivity: FlutterActivity() {
             checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
                 PackageManager.PERMISSION_GRANTED
         }
+    }
+
+    // ============================================================================
+    // DEVICE SECURITY INFO
+    // ============================================================================
+
+    private fun getInstalledCertificates(): List<Map<String, Any>> {
+        val certificates = mutableListOf<Map<String, Any>>()
+        try {
+            // Get user-installed certificates from KeyStore
+            val keyStore = java.security.KeyStore.getInstance("AndroidCAStore")
+            keyStore.load(null)
+
+            val aliases = keyStore.aliases()
+            while (aliases.hasMoreElements()) {
+                val alias = aliases.nextElement()
+                try {
+                    val cert = keyStore.getCertificate(alias) as? java.security.cert.X509Certificate
+                    if (cert != null) {
+                        // Check if it's a user-installed certificate (not system)
+                        val isUserInstalled = alias.startsWith("user:")
+
+                        certificates.add(mapOf(
+                            "alias" to alias,
+                            "subjectDN" to (cert.subjectDN?.name ?: "Unknown"),
+                            "issuerDN" to (cert.issuerDN?.name ?: "Unknown"),
+                            "serialNumber" to cert.serialNumber.toString(),
+                            "notBefore" to cert.notBefore.time,
+                            "notAfter" to cert.notAfter.time,
+                            "isUserInstalled" to isUserInstalled,
+                            "type" to cert.type
+                        ))
+                    }
+                } catch (e: Exception) {
+                    // Skip invalid certificates
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OrbGuard", "Error getting certificates: ${e.message}")
+        }
+        return certificates
+    }
+
+    private fun getInstalledApps(): List<Map<String, Any>> {
+        val apps = mutableListOf<Map<String, Any>>()
+        try {
+            val pm = packageManager
+            val packages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
+            }
+
+            for (packageInfo in packages) {
+                try {
+                    val appInfo = packageInfo.applicationInfo ?: continue
+                    val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                    val isUpdatedSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
+                    // Get installer package
+                    val installerPackage = try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            pm.getInstallSourceInfo(packageInfo.packageName).installingPackageName
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.getInstallerPackageName(packageInfo.packageName)
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    apps.add(mapOf(
+                        "packageName" to packageInfo.packageName,
+                        "appName" to (appInfo.loadLabel(pm)?.toString() ?: packageInfo.packageName),
+                        "versionName" to (packageInfo.versionName ?: "Unknown"),
+                        "versionCode" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            packageInfo.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageInfo.versionCode.toLong()
+                        },
+                        "isSystemApp" to isSystemApp,
+                        "isUpdatedSystemApp" to isUpdatedSystemApp,
+                        "installerPackage" to (installerPackage ?: "unknown"),
+                        "firstInstallTime" to packageInfo.firstInstallTime,
+                        "lastUpdateTime" to packageInfo.lastUpdateTime,
+                        "targetSdkVersion" to appInfo.targetSdkVersion,
+                        "minSdkVersion" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            appInfo.minSdkVersion
+                        } else {
+                            0
+                        },
+                        "permissions" to (packageInfo.requestedPermissions?.toList() ?: emptyList<String>()),
+                        "enabled" to appInfo.enabled
+                    ))
+                } catch (e: Exception) {
+                    // Skip problematic packages
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OrbGuard", "Error getting installed apps: ${e.message}")
+        }
+        return apps
+    }
+
+    private fun getEnabledAccessibilityServices(): List<Map<String, Any>> {
+        val services = mutableListOf<Map<String, Any>>()
+        try {
+            val settingValue = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+
+            if (!settingValue.isNullOrEmpty()) {
+                val enabledServices = settingValue.split(":")
+                for (serviceStr in enabledServices) {
+                    if (serviceStr.isNotEmpty()) {
+                        try {
+                            val componentName = ComponentName.unflattenFromString(serviceStr)
+                            if (componentName != null) {
+                                val packageName = componentName.packageName
+                                val className = componentName.className
+
+                                // Get app info
+                                val appName = try {
+                                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                                    appInfo.loadLabel(packageManager).toString()
+                                } catch (e: Exception) {
+                                    packageName
+                                }
+
+                                services.add(mapOf(
+                                    "packageName" to packageName,
+                                    "className" to className,
+                                    "appName" to appName,
+                                    "flattenedName" to serviceStr
+                                ))
+                            }
+                        } catch (e: Exception) {
+                            // Add raw string if parsing fails
+                            services.add(mapOf(
+                                "packageName" to serviceStr,
+                                "className" to "",
+                                "appName" to serviceStr,
+                                "flattenedName" to serviceStr
+                            ))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OrbGuard", "Error getting accessibility services: ${e.message}")
+        }
+        return services
+    }
+
+    private fun getInstalledKeyboards(): List<Map<String, Any>> {
+        val keyboards = mutableListOf<Map<String, Any>>()
+        try {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            val inputMethods = imm.inputMethodList
+
+            // Get current default keyboard
+            val defaultKeyboard = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.DEFAULT_INPUT_METHOD
+            )
+
+            for (inputMethod in inputMethods) {
+                try {
+                    val packageName = inputMethod.packageName
+                    val serviceName = inputMethod.serviceName
+
+                    // Get app info
+                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                    val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                    val isDefault = inputMethod.id == defaultKeyboard
+
+                    keyboards.add(mapOf(
+                        "id" to inputMethod.id,
+                        "packageName" to packageName,
+                        "serviceName" to serviceName,
+                        "appName" to (inputMethod.loadLabel(packageManager)?.toString() ?: packageName),
+                        "isSystemApp" to isSystemApp,
+                        "isDefault" to isDefault,
+                        "settingsActivity" to (inputMethod.settingsActivity ?: "")
+                    ))
+                } catch (e: Exception) {
+                    // Skip problematic keyboards
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OrbGuard", "Error getting keyboards: ${e.message}")
+        }
+        return keyboards
     }
 
     // ============================================================================
@@ -445,6 +689,240 @@ class MainActivity: FlutterActivity() {
                 ),
                 100
             )
+        }
+    }
+
+    // ============================================================================
+    // SMS PROTECTION CHANNEL
+    // ============================================================================
+
+    private fun setupSmsChannel(flutterEngine: FlutterEngine) {
+        val smsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SMS_CHANNEL)
+
+        // Set the method channel for the analyzer
+        smsAnalyzer?.setMethodChannel(smsChannel)
+
+        smsChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                // Check SMS permission
+                "checkSmsPermission" -> {
+                    val hasPermission = smsAnalyzer?.hasSmsPermission() ?: false
+                    result.success(mapOf("hasPermission" to hasPermission))
+                }
+
+                // Request SMS permission
+                "requestSmsPermission" -> {
+                    requestSmsPermission()
+                    result.success(true)
+                }
+
+                // Read SMS inbox
+                "readSmsInbox" -> {
+                    val limit = call.argument<Int>("limit") ?: 100
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val messages = smsAnalyzer?.readSmsInbox(limit) ?: emptyList()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("messages" to messages))
+                        }
+                    }
+                }
+
+                // Update SMS protection settings
+                "updateSettings" -> {
+                    val protectionEnabled = call.argument<Boolean>("protectionEnabled") ?: true
+                    val notifyOnThreat = call.argument<Boolean>("notifyOnThreat") ?: true
+                    val autoBlockDangerous = call.argument<Boolean>("autoBlockDangerous") ?: false
+
+                    smsAnalyzer?.updateSettings(protectionEnabled, notifyOnThreat, autoBlockDangerous)
+                    result.success(true)
+                }
+
+                // Handle analysis result from Flutter
+                "onAnalysisComplete" -> {
+                    val messageId = call.argument<String>("messageId") ?: ""
+                    val resultMap = call.argument<Map<String, Any?>>("result")
+
+                    if (resultMap != null) {
+                        val analysisResult = AnalysisResult.fromMap(resultMap + ("messageId" to messageId))
+                        smsAnalyzer?.onAnalysisResult(messageId, analysisResult)
+                    }
+                    result.success(true)
+                }
+
+                // Get analysis result for a message
+                "getAnalysisResult" -> {
+                    val messageId = call.argument<String>("messageId") ?: ""
+                    val analysisResult = smsAnalyzer?.getAnalysisResult(messageId)
+                    result.success(analysisResult?.toMap())
+                }
+
+                // Clear cache
+                "clearCache" -> {
+                    smsAnalyzer?.clearCache()
+                    result.success(true)
+                }
+
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun requestSmsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            requestPermissions(
+                arrayOf(
+                    android.Manifest.permission.READ_SMS,
+                    android.Manifest.permission.RECEIVE_SMS
+                ),
+                200
+            )
+        }
+    }
+
+    // ============================================================================
+    // BROWSER PROTECTION CHANNEL
+    // ============================================================================
+
+    private fun setupBrowserChannel(flutterEngine: FlutterEngine) {
+        val browserChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BROWSER_CHANNEL)
+
+        // Set the method channel for the monitor
+        browserMonitor?.setMethodChannel(browserChannel)
+
+        browserChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                // Check browser accessibility permission
+                "checkBrowserAccessibilityPermission" -> {
+                    val hasPermission = checkBrowserAccessibilityPermission()
+                    result.success(mapOf("hasPermission" to hasPermission))
+                }
+
+                // Request browser accessibility permission
+                "requestBrowserAccessibilityPermission" -> {
+                    requestBrowserAccessibilityPermission()
+                    result.success(true)
+                }
+
+                // Update browser protection settings
+                "updateSettings" -> {
+                    val protectionEnabled = call.argument<Boolean>("protectionEnabled") ?: true
+                    val notifyOnThreat = call.argument<Boolean>("notifyOnThreat") ?: true
+                    val blockDangerous = call.argument<Boolean>("blockDangerous") ?: false
+
+                    browserMonitor?.updateSettings(protectionEnabled, notifyOnThreat, blockDangerous)
+                    BrowserAccessibilityService.getInstance()?.updateSettings(protectionEnabled, true)
+                    result.success(true)
+                }
+
+                // Handle analysis result from Flutter
+                "onAnalysisComplete" -> {
+                    val url = call.argument<String>("url") ?: ""
+                    val resultMap = call.argument<Map<String, Any?>>("result")
+                    val browser = call.argument<String>("browser") ?: "Unknown"
+
+                    if (resultMap != null) {
+                        val analysisResult = UrlAnalysisResult.fromMap(resultMap)
+                        browserMonitor?.onAnalysisResult(url, analysisResult, browser)
+                    }
+                    result.success(true)
+                }
+
+                // Get analyzed URLs history
+                "getAnalyzedUrls" -> {
+                    val urls = browserMonitor?.getAnalyzedUrls() ?: emptyList()
+                    result.success(mapOf("urls" to urls))
+                }
+
+                // Whitelist management
+                "addToWhitelist" -> {
+                    val domain = call.argument<String>("domain") ?: ""
+                    browserMonitor?.addToWhitelist(domain)
+                    result.success(true)
+                }
+
+                "removeFromWhitelist" -> {
+                    val domain = call.argument<String>("domain") ?: ""
+                    browserMonitor?.removeFromWhitelist(domain)
+                    result.success(true)
+                }
+
+                "getWhitelist" -> {
+                    val whitelist = browserMonitor?.getWhitelist() ?: emptyList()
+                    result.success(mapOf("domains" to whitelist))
+                }
+
+                // Blacklist management
+                "addToBlacklist" -> {
+                    val domain = call.argument<String>("domain") ?: ""
+                    browserMonitor?.addToBlacklist(domain)
+                    result.success(true)
+                }
+
+                "removeFromBlacklist" -> {
+                    val domain = call.argument<String>("domain") ?: ""
+                    browserMonitor?.removeFromBlacklist(domain)
+                    result.success(true)
+                }
+
+                "getBlacklist" -> {
+                    val blacklist = browserMonitor?.getBlacklist() ?: emptyList()
+                    result.success(mapOf("domains" to blacklist))
+                }
+
+                // Clear cache
+                "clearCache" -> {
+                    browserMonitor?.clearCache()
+                    result.success(true)
+                }
+
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun checkBrowserAccessibilityPermission(): Boolean {
+        val accessibilityEnabled = Settings.Secure.getInt(
+            contentResolver,
+            Settings.Secure.ACCESSIBILITY_ENABLED,
+            0
+        )
+
+        if (accessibilityEnabled == 1) {
+            val service = "$packageName/$packageName.BrowserAccessibilityService"
+            val settingValue = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+
+            return settingValue?.contains(service) == true ||
+                    settingValue?.contains("$packageName/.BrowserAccessibilityService") == true ||
+                    settingValue?.contains("BrowserAccessibilityService") == true
+        }
+        return false
+    }
+
+    private fun requestBrowserAccessibilityPermission() {
+        try {
+            val componentName = ComponentName(packageName, "$packageName.BrowserAccessibilityService")
+
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+            val bundle = Bundle()
+            val componentNameString = componentName.flattenToString()
+            bundle.putString(":settings:fragment_args_key", componentNameString)
+            intent.putExtra(":settings:fragment_args_key", componentNameString)
+            intent.putExtra(":settings:show_fragment_args", bundle)
+
+            startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            } catch (e2: Exception) {
+                val intent = Intent(Settings.ACTION_SETTINGS)
+                startActivity(intent)
+            }
         }
     }
 }

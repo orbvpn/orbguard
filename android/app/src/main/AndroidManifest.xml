@@ -25,6 +25,7 @@
     <!-- SMS/CALL SCANNING (Pegasus exploits via SMS) -->
     <!-- ============================================ -->
     <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
     <!-- ============================================ -->
@@ -102,6 +103,30 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- SMS Broadcast Receiver for real-time SMS protection -->
+        <receiver
+            android:name=".SMSReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Browser Accessibility Service for URL protection -->
+        <service
+            android:name=".BrowserAccessibilityService"
+            android:exported="false"
+            android:label="OrbGuard Web Protection"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/browser_accessibility_config" />
         </service>
     </application>
 

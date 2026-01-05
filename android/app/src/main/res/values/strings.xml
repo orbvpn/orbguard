@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">OrbGuard</string>
     <string name="accessibility_service_description">OrbGuard uses this service to detect malicious accessibility services that could be used by spyware to monitor your device. This service does not read or collect any screen content.</string>
+    <string name="browser_accessibility_description">OrbGuard uses this service to monitor browser URLs for phishing, malware, and other web threats. URLs are checked against threat intelligence databases to protect you from dangerous websites.</string>
 </resources>

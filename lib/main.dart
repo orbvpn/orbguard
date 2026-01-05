@@ -1,17 +1,41 @@
-// lib/main.dart - Complete with Special Permissions Integration
+// lib/main.dart - OrbGuard with iOS 26 Liquid Glass Design
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:provider/provider.dart';
 
 import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
 import 'screens/elevated_access_setup_screen.dart';
 import 'screens/scanning_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/sms_protection/sms_protection_screen.dart';
+import 'screens/url_protection/url_protection_screen.dart';
+import 'screens/qr_scanner/qr_scanner_screen.dart';
+import 'screens/darkweb/darkweb_screen.dart';
+import 'screens/app_security/app_security_screen.dart';
+import 'screens/network/network_security_screen.dart';
+import 'screens/mitre/mitre_screen.dart';
+import 'screens/settings/settings_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
+
+// Glass Theme
+import 'presentation/theme/glass_theme.dart';
+import 'presentation/widgets/glass_container.dart';
+
+// Providers
+import 'providers/qr_provider.dart';
+import 'providers/sms_provider.dart';
+import 'providers/url_provider.dart';
+import 'providers/app_security_provider.dart';
+import 'providers/network_provider.dart';
+import 'providers/darkweb_provider.dart';
+import 'providers/settings_provider.dart';
+import 'providers/mitre_provider.dart';
 
 // Global instances
 late ThreatIntelligenceManager threatIntel;
@@ -48,19 +72,50 @@ class AntiSpywareApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OrbGuard',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E21),
-        primaryColor: const Color(0xFF1D1E33),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00D9FF),
-          secondary: Color(0xFFFF006E),
-          error: Color(0xFFFF006E),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => QrProvider()),
+        ChangeNotifierProvider(create: (_) => SmsProvider()),
+        ChangeNotifierProvider(create: (_) => UrlProvider()),
+        ChangeNotifierProvider(create: (_) => AppSecurityProvider()),
+        ChangeNotifierProvider(create: (_) => NetworkProvider()),
+        ChangeNotifierProvider(create: (_) => DarkWebProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => MitreProvider()),
+      ],
+      child: MaterialApp(
+        title: 'OrbGuard',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: Colors.transparent,
+          primaryColor: GlassTheme.glassColorDark,
+          colorScheme: const ColorScheme.dark(
+            primary: GlassTheme.primaryAccent,
+            secondary: GlassTheme.secondaryAccent,
+            error: GlassTheme.errorColor,
+            surface: Color(0xFF1D1E33),
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+          ),
+          cardTheme: CardThemeData(
+            color: GlassTheme.glassColorDark,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
+            ),
+          ),
         ),
+        builder: (context, child) {
+          return GlassGradientBackground(
+            isDark: true,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        home: const HomeScreen(),
       ),
-      home: const HomeScreen(),
     );
   }
 }
@@ -708,8 +763,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('OrbGuard - Spyware Defense'),
+        backgroundColor: Colors.transparent,
+        title: const Text('OrbGuard', style: TextStyle(fontWeight: FontWeight.w600)),
         elevation: 0,
         actions: [
           // Permission setup button
@@ -717,10 +775,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: Icon(
               Icons.security,
               color: _detectionCapability >= 80
-                  ? Colors.green
+                  ? GlassTheme.successColor
                   : _detectionCapability >= 50
-                      ? Colors.orange
-                      : Colors.red,
+                      ? GlassTheme.warningColor
+                      : GlassTheme.errorColor,
             ),
             onPressed: _navigateToPermissionSetup,
           ),
@@ -730,6 +788,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+      drawer: _buildNavigationDrawer(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -799,39 +858,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       statusIcon = Icons.warning;
     }
 
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(statusIcon, size: 64, color: statusColor),
-            const SizedBox(height: 12),
-            Text(
-              statusText,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: statusColor,
-              ),
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          GlassCircleButton(
+            size: 80,
+            tintColor: statusColor,
+            child: Icon(statusIcon, size: 40, color: statusColor),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            statusText,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: statusColor,
             ),
-            if (_threats.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildThreatCount('Critical', criticalThreats, Colors.red),
-                  _buildThreatCount('High', highThreats, Colors.orange),
-                  _buildThreatCount(
-                    'Medium',
-                    _threats.where((t) => t.severity == 'MEDIUM').length,
-                    Colors.yellow,
-                  ),
-                ],
-              ),
-            ],
+          ),
+          if (_threats.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildThreatCount('Critical', criticalThreats, GlassTheme.errorColor),
+                _buildThreatCount('High', highThreats, GlassTheme.warningColor),
+                _buildThreatCount(
+                  'Medium',
+                  _threats.where((t) => t.severity == 'MEDIUM').length,
+                  Colors.yellow,
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -853,102 +913,99 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildDeviceInfoCard() {
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Device Information',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(_deviceInfo, style: const TextStyle(fontSize: 14)),
-          ],
-        ),
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GlassIconBox(
+                icon: Icons.phone_android,
+                color: GlassTheme.primaryAccent,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Device Information',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(_deviceInfo, style: TextStyle(fontSize: 14, color: Colors.grey[400])),
+        ],
       ),
     );
   }
 
   Widget _buildDetectionCapabilityCard() {
     Color capabilityColor = _detectionCapability >= 80
-        ? Colors.green
+        ? GlassTheme.successColor
         : _detectionCapability >= 50
-            ? Colors.orange
-            : Colors.red;
+            ? GlassTheme.warningColor
+            : GlassTheme.errorColor;
 
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: InkWell(
-        onTap: _navigateToPermissionSetup,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return GlassCard(
+      onTap: _navigateToPermissionSetup,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _detectionCapability >= 80
-                            ? Icons.verified_user
-                            : _detectionCapability >= 50
-                                ? Icons.shield
-                                : Icons.warning,
-                        color: capabilityColor,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Detection Capability',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                  GlassIconBox(
+                    icon: _detectionCapability >= 80
+                        ? Icons.verified_user
+                        : _detectionCapability >= 50
+                            ? Icons.shield
+                            : Icons.warning,
+                    color: capabilityColor,
                   ),
-                  Text(
-                    '${_detectionCapability.round()}%',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: capabilityColor,
-                    ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Detection Capability',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: LinearProgressIndicator(
-                  value: _detectionCapability / 100,
-                  backgroundColor: Colors.grey[800],
+              Text(
+                '${_detectionCapability.round()}%',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
                   color: capabilityColor,
-                  minHeight: 8,
                 ),
-              ),
-              const SizedBox(height: 12),
-              // Status breakdown
-              _buildCapabilityBreakdown(),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _detectionCapability >= 80
-                        ? 'Full protection active'
-                        : 'Tap to configure permissions',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                  ),
-                  Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
-                ],
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: _detectionCapability / 100,
+              backgroundColor: Colors.white.withAlpha(20),
+              color: capabilityColor,
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Status breakdown
+          _buildCapabilityBreakdown(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _detectionCapability >= 80
+                    ? 'Full protection active'
+                    : 'Tap to configure permissions',
+                style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1127,6 +1184,212 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNavigationDrawer() {
+    return Drawer(
+      backgroundColor: Colors.transparent,
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: GlassTheme.blurFilter,
+          child: Container(
+            decoration: BoxDecoration(
+              color: GlassTheme.glassColorDark,
+              border: Border(
+                right: BorderSide(
+                  color: GlassTheme.glassBorderColorDark,
+                  width: GlassTheme.borderWidth,
+                ),
+              ),
+            ),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    gradient: GlassTheme.backgroundGradient(isDark: true),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GlassCircleButton(
+                        size: 60,
+                        tintColor: GlassTheme.primaryAccent,
+                        child: const Icon(
+                          Icons.shield,
+                          size: 32,
+                          color: GlassTheme.primaryAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'OrbGuard',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Mobile Security Suite',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.dashboard,
+                  title: 'Dashboard',
+                  subtitle: 'Real-time threat overview',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const DashboardScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerSection('Protection'),
+                _buildDrawerItem(
+                  icon: Icons.sms,
+                  title: 'SMS Protection',
+                  subtitle: 'Phishing & smishing detection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SmsProtectionScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.link,
+                  title: 'URL Protection',
+                  subtitle: 'Malicious link scanner',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const UrlProtectionScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.qr_code_scanner,
+                  title: 'QR Scanner',
+                  subtitle: 'Safe QR code scanning',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const QrScannerScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerSection('Security'),
+                _buildDrawerItem(
+                  icon: Icons.apps,
+                  title: 'App Security',
+                  subtitle: 'Installed app analysis',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const AppSecurityScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.wifi,
+                  title: 'Network Security',
+                  subtitle: 'Wi-Fi & network protection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const NetworkSecurityScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.dark_mode,
+                  title: 'Dark Web Monitor',
+                  subtitle: 'Credential breach detection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const DarkWebScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerSection('Intelligence'),
+                _buildDrawerItem(
+                  icon: Icons.grid_view,
+                  title: 'MITRE ATT&CK',
+                  subtitle: 'Threat framework mapping',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const MitreScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerItem(
+                  icon: Icons.settings,
+                  title: 'Settings',
+                  subtitle: 'App configuration',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ));
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerSection(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          color: Colors.grey[500],
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: GlassIconBox(
+        icon: icon,
+        color: GlassTheme.primaryAccent,
+        size: 36,
+        iconSize: 18,
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+      ),
+      onTap: onTap,
     );
   }
 
