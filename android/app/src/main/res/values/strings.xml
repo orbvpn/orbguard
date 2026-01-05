@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OrbGuard</string>
+    <string name="accessibility_service_description">OrbGuard uses this service to detect malicious accessibility services that could be used by spyware to monitor your device. This service does not read or collect any screen content.</string>
+</resources>

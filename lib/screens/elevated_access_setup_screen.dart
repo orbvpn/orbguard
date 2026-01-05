@@ -31,21 +31,25 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
 
     try {
       final result = await platform.invokeMethod('checkAccessLevel');
+      print('[AccessLevel] Result: $result');
       setState(() {
         _currentLevel = result['level'] ?? 'STANDARD';
         _description = result['description'] ?? '';
         _capabilities = List<String>.from(result['capabilities'] ?? []);
       });
+      print('[AccessLevel] Set level to: $_currentLevel');
     } catch (e) {
-      print('Error checking access: $e');
+      print('[AccessLevel] Error checking access: $e');
     } finally {
       setState(() => _isChecking = false);
     }
   }
 
   Future<void> _setupElevatedAccess() async {
+    print('[AccessLevel] Tapped Enable Shell Access');
     try {
       final result = await platform.invokeMethod('getSetupInstructions');
+      print('[AccessLevel] Got instructions: $result');
       final instructions = result as Map<dynamic, dynamic>;
 
       if (!mounted) return;

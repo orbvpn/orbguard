@@ -4,7 +4,7 @@
 import Flutter
 import UIKit
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
     private let CHANNEL = "com.defense.antispyware/system"
     private var jailbreakAccess: JailbreakAccess?

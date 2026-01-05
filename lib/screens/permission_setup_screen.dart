@@ -2,8 +2,10 @@
 // Interactive permission setup with explanations
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../permissions/permission_manager.dart';
+import 'elevated_access_setup_screen.dart';
 
 class PermissionSetupScreen extends StatefulWidget {
   const PermissionSetupScreen({super.key});
@@ -12,26 +14,61 @@ class PermissionSetupScreen extends StatefulWidget {
   State<PermissionSetupScreen> createState() => _PermissionSetupScreenState();
 }
 
-class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
+class _PermissionSetupScreenState extends State<PermissionSetupScreen>
+    with WidgetsBindingObserver {
+  static const platform = MethodChannel('com.orb.guard/system');
   final PermissionManager _permissionManager = PermissionManager();
   PermissionScanResult? _scanResult;
   bool _isChecking = false;
+  bool _hasRootAccess = false;
+  String _accessMethod = 'Standard';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh permissions when app resumes (user returns from Settings)
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
   }
 
   Future<void> _checkPermissions() async {
     setState(() => _isChecking = true);
 
     final result = await _permissionManager.checkAllPermissions();
+    await _checkSystemAccess();
 
     setState(() {
       _scanResult = result;
       _isChecking = false;
     });
+  }
+
+  Future<void> _checkSystemAccess() async {
+    try {
+      final result = await platform.invokeMethod('checkRootAccess');
+      setState(() {
+        _hasRootAccess = result['hasRoot'] ?? false;
+        _accessMethod = result['method'] ?? 'Standard';
+      });
+    } catch (e) {
+      setState(() {
+        _hasRootAccess = false;
+        _accessMethod = 'Standard';
+      });
+    }
   }
 
   @override
@@ -69,12 +106,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
           style: TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 12),
-        _buildPermissionCard(
-          'Storage Access',
-          'Scan files for malware and threats',
-          Permission.storage,
-          Icons.folder,
-        ),
+        _buildStoragePermissionCard(),
         _buildPermissionCard(
           'Phone State',
           'Monitor device for suspicious modifications',
@@ -126,8 +158,127 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
           () => _requestAccessibility(),
         ),
 
+        const SizedBox(height: 24),
+
+        // Enhanced Access
+        _buildGroupHeader('Enhanced Access', Icons.terminal),
+        const Text(
+          'Enables deep system scanning',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        _buildEnhancedAccessCard(),
+
         const SizedBox(height: 80), // Space for bottom bar
       ],
+    );
+  }
+
+  Widget _buildEnhancedAccessCard() {
+    final hasEnhancedAccess = _hasRootAccess || _accessMethod == 'Shell' || _accessMethod == 'AppProcess';
+
+    IconData accessIcon;
+    Color accessColor;
+    String accessLabel;
+    String accessDescription;
+
+    switch (_accessMethod) {
+      case 'Root':
+        accessIcon = Icons.admin_panel_settings;
+        accessColor = Colors.green;
+        accessLabel = 'Root Access';
+        accessDescription = 'Maximum protection - full system access';
+        break;
+      case 'Shell':
+        accessIcon = Icons.terminal;
+        accessColor = Colors.cyan;
+        accessLabel = 'Shell Access';
+        accessDescription = 'Enhanced scanning via Shizuku/ADB';
+        break;
+      case 'AppProcess':
+        accessIcon = Icons.settings_applications;
+        accessColor = Colors.orange;
+        accessLabel = 'Elevated Access';
+        accessDescription = 'Extended monitoring capabilities';
+        break;
+      default:
+        accessIcon = Icons.shield_outlined;
+        accessColor = Colors.grey;
+        accessLabel = 'Standard Access';
+        accessDescription = 'Tap to enable deeper scanning';
+    }
+
+    return Card(
+      color: const Color(0xFF1D1E33),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ElevatedAccessSetupScreen(),
+            ),
+          ).then((_) => _checkPermissions());
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accessColor.withAlpha(30),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(accessIcon, color: accessColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          accessLabel,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: hasEnhancedAccess ? accessColor : Colors.white,
+                          ),
+                        ),
+                        if (hasEnhancedAccess) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: accessColor.withAlpha(30),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '+${_hasRootAccess ? 15 : 10}%',
+                              style: TextStyle(fontSize: 11, color: accessColor),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      accessDescription,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              ),
+              hasEnhancedAccess
+                  ? Icon(Icons.check_circle, color: accessColor)
+                  : Icon(Icons.chevron_right, color: Colors.grey[600]),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -223,6 +374,32 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStoragePermissionCard() {
+    // Use scan result for storage status (handles Android 11+ MANAGE_EXTERNAL_STORAGE)
+    final isGranted = _scanResult?.granted.contains('Storage Access') ?? false;
+
+    return Card(
+      color: const Color(0xFF1D1E33),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(Icons.folder, color: isGranted ? Colors.green : Colors.grey),
+        title: const Text('Storage Access'),
+        subtitle: const Text('Scan files for malware and threats',
+            style: TextStyle(fontSize: 12)),
+        trailing: isGranted
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : ElevatedButton(
+                onPressed: () => _requestPermission(Permission.storage, 'Storage Access'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: const Text('Grant'),
+              ),
+      ),
     );
   }
 
@@ -409,6 +586,23 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
   }
 
   Future<void> _requestPermission(Permission permission, String name) async {
+    // For storage permission on Android 11+, use native method
+    if (permission == Permission.storage) {
+      final success = await _permissionManager.requestStoragePermission();
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enable "All files access" for OrbGuard'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        // Wait for user to return from settings
+        await Future.delayed(const Duration(seconds: 2));
+        await _checkPermissions();
+      }
+      return;
+    }
+
     final status = await _permissionManager.requestPermissionWithRationale(
       context: context,
       permission: permission,

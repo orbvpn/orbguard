@@ -71,6 +71,8 @@ class PermissionManager {
   final Map<Permission, PermissionStatus> _permissionStates = {};
   bool _hasUsageStats = false;
   bool _hasAccessibility = false;
+  bool _hasRootAccess = false;
+  String _accessMethod = 'Standard';
 
   // ============================================================================
   // PERMISSION STATUS CHECKING
@@ -83,15 +85,27 @@ class PermissionManager {
     // Check standard permissions
     for (final group in permissionGroups.values) {
       for (final permInfo in group.permissions) {
-        final status = await permInfo.permission.status;
-        _permissionStates[permInfo.permission] = status;
+        // For storage, use native check on Android 11+
+        if (permInfo.permission == Permission.storage && Platform.isAndroid) {
+          final hasStorage = await _checkStoragePermission();
+          if (hasStorage) {
+            result.granted.add(permInfo.name);
+            _permissionStates[permInfo.permission] = PermissionStatus.granted;
+          } else {
+            result.denied.add(permInfo.name);
+            _permissionStates[permInfo.permission] = PermissionStatus.denied;
+          }
+        } else {
+          final status = await permInfo.permission.status;
+          _permissionStates[permInfo.permission] = status;
 
-        if (status.isGranted) {
-          result.granted.add(permInfo.name);
-        } else if (status.isDenied) {
-          result.denied.add(permInfo.name);
-        } else if (status.isPermanentlyDenied) {
-          result.permanentlyDenied.add(permInfo.name);
+          if (status.isGranted) {
+            result.granted.add(permInfo.name);
+          } else if (status.isDenied) {
+            result.denied.add(permInfo.name);
+          } else if (status.isPermanentlyDenied) {
+            result.permanentlyDenied.add(permInfo.name);
+          }
         }
       }
     }
@@ -103,40 +117,64 @@ class PermissionManager {
     if (_hasUsageStats) result.granted.add('Usage Stats');
     if (_hasAccessibility) result.granted.add('Accessibility');
 
+    // Check root/shell access
+    await _checkSystemAccess();
+    if (_hasRootAccess) {
+      result.granted.add('Root Access');
+    } else if (_accessMethod == 'Shell' || _accessMethod == 'AppProcess') {
+      result.granted.add('Enhanced Access');
+    }
+
     // Calculate detection capability
     result.detectionCapability = _calculateDetectionCapability();
 
     return result;
   }
 
+  /// Check system access level (Root/Shell/Standard)
+  Future<void> _checkSystemAccess() async {
+    try {
+      final result = await platform.invokeMethod('checkRootAccess');
+      _hasRootAccess = result['hasRoot'] ?? false;
+      _accessMethod = result['method'] ?? 'Standard';
+    } catch (e) {
+      _hasRootAccess = false;
+      _accessMethod = 'Standard';
+    }
+  }
+
   /// Calculate detection capability percentage
+  /// Uses same formula as main.dart for consistency
   int _calculateDetectionCapability() {
-    int totalWeight = 0;
-    int grantedWeight = 0;
+    // Base capability from standard APIs
+    int capability = 25;
 
-    // Standard permissions (60% weight)
-    final standardPerms = [
-      Permission.storage,
-      Permission.phone,
-      Permission.sms,
-      Permission.location,
-    ];
-
-    for (final perm in standardPerms) {
-      totalWeight += 15;
-      if (_permissionStates[perm]?.isGranted ?? false) {
-        grantedWeight += 15;
-      }
+    // Standard permissions (30% total)
+    if (_permissionStates[Permission.phone]?.isGranted ?? false) {
+      capability += 5;
+    }
+    if (_permissionStates[Permission.sms]?.isGranted ?? false) {
+      capability += 10;
+    }
+    if (_permissionStates[Permission.location]?.isGranted ?? false) {
+      capability += 5;
+    }
+    if (_permissionStates[Permission.storage]?.isGranted ?? false) {
+      capability += 10;
     }
 
-    // Special permissions (40% weight)
-    totalWeight += 20; // Usage Stats
-    totalWeight += 20; // Accessibility
+    // Special permissions (25% total)
+    if (_hasUsageStats) capability += 15;
+    if (_hasAccessibility) capability += 10;
 
-    if (_hasUsageStats) grantedWeight += 20;
-    if (_hasAccessibility) grantedWeight += 20;
+    // Enhanced/Root access (15% total)
+    if (_hasRootAccess) {
+      capability += 15;
+    } else if (_accessMethod == 'Shell' || _accessMethod == 'AppProcess') {
+      capability += 10;
+    }
 
-    return (grantedWeight / totalWeight * 100).round();
+    return capability.clamp(0, 100);
   }
 
   // ============================================================================
@@ -146,12 +184,22 @@ class PermissionManager {
   /// Request all essential permissions at once
   Future<Map<Permission, PermissionStatus>>
       requestEssentialPermissions() async {
-    final permissions = [
-      Permission.storage,
-      Permission.phone,
-    ];
+    final results = <Permission, PermissionStatus>{};
 
-    return await permissions.request();
+    // Request storage permission via native method (Android 11+)
+    if (Platform.isAndroid) {
+      await requestStoragePermission();
+      final hasStorage = await _checkStoragePermission();
+      results[Permission.storage] = hasStorage
+          ? PermissionStatus.granted
+          : PermissionStatus.denied;
+    }
+
+    // Request phone permission
+    final phoneStatus = await Permission.phone.request();
+    results[Permission.phone] = phoneStatus;
+
+    return results;
   }
 
   /// Request advanced permissions
@@ -263,13 +311,40 @@ class PermissionManager {
   // SPECIAL PERMISSIONS
   // ============================================================================
 
+  /// Check if Storage permission is granted (Android 11+ uses MANAGE_EXTERNAL_STORAGE)
+  Future<bool> _checkStoragePermission() async {
+    if (!Platform.isAndroid) return false;
+
+    try {
+      final result = await platform.invokeMethod('checkStoragePermission');
+      return result['hasPermission'] ?? false;
+    } catch (e) {
+      // Fallback to standard permission check
+      final status = await Permission.storage.status;
+      return status.isGranted;
+    }
+  }
+
+  /// Request storage permission (uses native method for Android 11+)
+  Future<bool> requestStoragePermission() async {
+    if (!Platform.isAndroid) return false;
+
+    try {
+      await platform.invokeMethod('requestStoragePermission');
+      return true;
+    } catch (e) {
+      print('Error requesting storage permission: $e');
+      return false;
+    }
+  }
+
   /// Check if Usage Stats permission is granted
   Future<bool> _checkUsageStatsPermission() async {
     if (!Platform.isAndroid) return false;
 
     try {
       final result = await platform.invokeMethod('checkUsageStatsPermission');
-      return result ?? false;
+      return result['hasPermission'] ?? false;
     } catch (e) {
       return false;
     }
@@ -282,7 +357,7 @@ class PermissionManager {
     try {
       final result =
           await platform.invokeMethod('checkAccessibilityPermission');
-      return result ?? false;
+      return result['hasPermission'] ?? false;
     } catch (e) {
       return false;
     }

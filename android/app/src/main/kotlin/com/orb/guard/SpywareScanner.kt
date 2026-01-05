@@ -16,7 +16,7 @@ import kotlinx.coroutines.*
  */
 class SpywareScanner(
     private val context: Context,
-    private val elevatedAccess: ElevatedAccessManager
+    private val rootAccess: RootAccess
 ) {
     private var deepScan = false
     private var hasElevatedAccess = false
@@ -105,15 +105,34 @@ class SpywareScanner(
                     
                     // Check network capabilities for suspicious patterns
                     if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        // Get network type for better description
+                        val networkType = when {
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile Data"
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+                            else -> "Unknown"
+                        }
+
+                        // Get link properties for more details
+                        val linkProps = connectivityManager.getLinkProperties(network)
+                        val interfaceName = linkProps?.interfaceName ?: "unknown"
+                        val dnsServers = linkProps?.dnsServers?.joinToString(", ") { it.hostAddress ?: "" } ?: "none"
+
                         threats.add(mapOf(
                             "id" to "network_unvalidated_${System.currentTimeMillis()}",
-                            "name" to "Unvalidated Network Connection",
-                            "description" to "Network connection not validated by system",
+                            "name" to "Unvalidated $networkType Connection",
+                            "description" to "Your $networkType connection ($interfaceName) hasn't been verified by Android's connectivity check. This could indicate a captive portal, network interception, or connectivity issues.",
                             "severity" to "LOW",
                             "type" to "network",
-                            "path" to network.toString(),
+                            "path" to interfaceName,
                             "requiresRoot" to false,
-                            "metadata" to emptyMap<String, Any>()
+                            "metadata" to mapOf(
+                                "networkType" to networkType,
+                                "interface" to interfaceName,
+                                "dnsServers" to dnsServers,
+                                "consequence" to "Traffic may be intercepted or redirected. Avoid sensitive activities until resolved.",
+                                "recommendation" to "Disconnect and reconnect to the network, or try a different network."
+                            )
                         ))
                     }
                 }
@@ -122,14 +141,14 @@ class SpywareScanner(
             // Elevated network analysis
             if (hasElevatedAccess) {
                 // Get network connections using elevated access
-                val netstat = elevatedAccess.getNetstat()
+                val netstat = rootAccess.getNetstat()
                 netstat?.let {
                     val suspiciousConns = analyzeNetworkConnections(it)
                     threats.addAll(suspiciousConns)
                 }
-                
+
                 // Check routing table
-                val routeTable = elevatedAccess.executeCommand("cat /proc/net/route")
+                val routeTable = rootAccess.executeCommand("cat /proc/net/route")
                 routeTable?.let {
                     // Analyze for suspicious routes (e.g., traffic redirection)
                     if (it.contains("0.0.0.0") && !it.contains("wlan") && !it.contains("eth")) {
@@ -145,9 +164,9 @@ class SpywareScanner(
                         ))
                     }
                 }
-                
+
                 // Check iptables rules
-                val iptables = elevatedAccess.executeCommand("iptables -L -n")
+                val iptables = rootAccess.executeCommand("iptables -L -n")
                 iptables?.let {
                     if (it.contains("REDIRECT") || it.contains("MASQUERADE")) {
                         threats.add(mapOf(
@@ -218,14 +237,14 @@ class SpywareScanner(
             
             // Elevated process analysis
             if (hasElevatedAccess) {
-                val processList = elevatedAccess.getProcessList()
+                val processList = rootAccess.getProcessList()
                 processList?.let {
                     val deepThreats = analyzeProcessTree(it)
                     threats.addAll(deepThreats)
                 }
-                
+
                 // Check for hidden processes not visible to standard APIs
-                val hiddenProcs = elevatedAccess.executeCommand("ps -A -o pid,ppid,name,cmd")
+                val hiddenProcs = rootAccess.executeCommand("ps -A -o pid,ppid,name,cmd")
                 hiddenProcs?.let {
                     val lines = it.split("\n")
                     for (line in lines) {
@@ -268,9 +287,10 @@ class SpywareScanner(
         try {
             // Check suspicious file locations
             for (suspiciousFile in suspiciousFiles) {
-                if (elevatedAccess.fileExists(suspiciousFile)) {
-                    val fileInfo = elevatedAccess.getFileInfo(suspiciousFile)
-                    
+                val exists = rootAccess.executeCommand("test -e '$suspiciousFile' && echo 'exists'")
+                if (exists?.contains("exists") == true) {
+                    val fileInfo = rootAccess.listFiles(suspiciousFile)
+
                     threats.add(mapOf(
                         "id" to suspiciousFile,
                         "name" to "Suspicious File: ${suspiciousFile.split("/").last()}",
@@ -283,7 +303,7 @@ class SpywareScanner(
                     ))
                 }
             }
-            
+
             // Scan critical system directories
             val systemDirs = listOf(
                 "/system/app",
@@ -291,17 +311,17 @@ class SpywareScanner(
                 "/data/app",
                 "/data/local/tmp"
             )
-            
+
             for (dir in systemDirs) {
-                val files = elevatedAccess.listFiles(dir)
+                val files = rootAccess.listFiles(dir)
                 files?.let {
                     val fileThreats = analyzeSystemFiles(it, dir)
                     threats.addAll(fileThreats)
                 }
             }
-            
+
             // Check for hidden files in suspicious locations
-            val hiddenFiles = elevatedAccess.findFiles("/data/local/tmp", ".*")
+            val hiddenFiles = rootAccess.executeCommand("find /data/local/tmp -name '.*' 2>/dev/null")
             hiddenFiles?.let {
                 val lines = it.split("\n")
                 for (line in lines) {
@@ -340,17 +360,14 @@ class SpywareScanner(
         try {
             // Check SMS database for Pegasus SMS exploits
             val smsDb = "/data/data/com.android.providers.telephony/databases/mmssms.db"
-            if (elevatedAccess.fileExists(smsDb)) {
-                // Check for suspicious SMS patterns
-                val smsCount = elevatedAccess.sqliteQuery(smsDb, "SELECT COUNT(*) FROM sms")
-                
+            val smsDbExists = rootAccess.executeCommand("test -e '$smsDb' && echo 'exists'")
+            if (smsDbExists?.contains("exists") == true) {
                 // Check for deleted SMS (potential exploit cleanup)
-                val deletedSms = elevatedAccess.sqliteQuery(
-                    smsDb,
-                    "SELECT COUNT(*) FROM sms WHERE type=3"
+                val deletedSms = rootAccess.executeCommand(
+                    "sqlite3 '$smsDb' 'SELECT COUNT(*) FROM sms WHERE type=3' 2>/dev/null"
                 )
-                
-                if (deletedSms != null && deletedSms.toIntOrNull() ?: 0 > 100) {
+
+                if (deletedSms != null && (deletedSms.trim().toIntOrNull() ?: 0) > 100) {
                     threats.add(mapOf(
                         "id" to "db_sms_deleted",
                         "name" to "Suspicious SMS Deletions",
@@ -359,13 +376,13 @@ class SpywareScanner(
                         "type" to "database",
                         "path" to smsDb,
                         "requiresRoot" to true,
-                        "metadata" to mapOf("deletedCount" to deletedSms)
+                        "metadata" to mapOf("deletedCount" to deletedSms.trim())
                     ))
                 }
             }
-            
+
             // Check package manager database
-            val packagesXml = elevatedAccess.readSystemFile("/data/system/packages.xml")
+            val packagesXml = rootAccess.readSystemFile("/data/system/packages.xml")
             packagesXml?.let {
                 // Check for suspicious package installations
                 for (maliciousPkg in maliciousPackages) {
@@ -383,11 +400,11 @@ class SpywareScanner(
                     }
                 }
             }
-            
+
             // Check for modified system settings
-            val settings = elevatedAccess.sqliteQuery(
-                "/data/data/com.android.providers.settings/databases/settings.db",
-                "SELECT * FROM secure WHERE name LIKE '%adb%' OR name LIKE '%debug%'"
+            val settings = rootAccess.executeCommand(
+                "sqlite3 '/data/data/com.android.providers.settings/databases/settings.db' " +
+                "'SELECT * FROM secure WHERE name LIKE \"%adb%\" OR name LIKE \"%debug%\"' 2>/dev/null"
             )
             settings?.let {
                 if (it.contains("1") && !it.contains("0")) {
@@ -423,7 +440,7 @@ class SpywareScanner(
         
         try {
             // Get memory maps of suspicious processes
-            val processList = elevatedAccess.getProcessList()
+            val processList = rootAccess.getProcessList()
             processList?.let {
                 val lines = it.split("\n")
                 for (line in lines) {
@@ -433,7 +450,7 @@ class SpywareScanner(
                             val pid = extractPid(line)
                             pid?.let { processId ->
                                 // Dump memory maps
-                                val memMaps = elevatedAccess.readSystemFile("/proc/$processId/maps")
+                                val memMaps = rootAccess.readSystemFile("/proc/$processId/maps")
                                 memMaps?.let { maps ->
                                     // Check for executable regions in unusual locations
                                     if (maps.contains("/data/local/tmp") && maps.contains("x")) {
@@ -567,17 +584,17 @@ class SpywareScanner(
     
     private fun killProcess(processName: String): Boolean {
         if (!hasElevatedAccess) return false
-        return elevatedAccess.killProcess(processName)
+        return rootAccess.killProcess(processName)
     }
-    
+
     private fun deleteFile(path: String): Boolean {
         if (!hasElevatedAccess) return false
-        return elevatedAccess.deleteFile(path)
+        return rootAccess.deleteFile(path)
     }
-    
+
     private fun uninstallPackage(packageName: String): Boolean {
         if (!hasElevatedAccess) return false
-        val result = elevatedAccess.pmCommand("uninstall $packageName")
+        val result = rootAccess.pmCommand("uninstall $packageName")
         return result?.contains("Success") == true
     }
 }

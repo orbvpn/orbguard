@@ -8,6 +8,8 @@ import android.content.Intent
 import android.provider.Settings
 import android.app.AppOpsManager
 import android.os.Build
+import android.os.Environment
+import android.net.Uri
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,6 +22,9 @@ import android.app.ActivityManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.content.pm.PackageManager
+import android.content.ComponentName
+import android.os.Bundle
+import android.text.TextUtils
 import kotlinx.coroutines.*
 
 class MainActivity: FlutterActivity() {
@@ -65,7 +70,39 @@ class MainActivity: FlutterActivity() {
                     requestAccessibilityPermission()
                     result.success(true)
                 }
-                
+
+                "openUsageStatsSettings" -> {
+                    requestUsageStatsPermission()
+                    result.success(true)
+                }
+
+                "openAccessibilitySettings" -> {
+                    requestAccessibilityPermission()
+                    result.success(true)
+                }
+
+                // Storage Permission (Android 11+)
+                "checkStoragePermission" -> {
+                    val hasPermission = checkStoragePermission()
+                    result.success(mapOf("hasPermission" to hasPermission))
+                }
+
+                "requestStoragePermission" -> {
+                    requestStoragePermission()
+                    result.success(true)
+                }
+
+                // Access Level
+                "checkAccessLevel" -> {
+                    val accessInfo = getAccessLevelInfo()
+                    result.success(accessInfo)
+                }
+
+                "getSetupInstructions" -> {
+                    val instructions = getSetupInstructions()
+                    result.success(instructions)
+                }
+
                 // Scanning
                 "initializeScan" -> {
                     val deepScan = call.argument<Boolean>("deepScan") ?: false
@@ -170,8 +207,22 @@ class MainActivity: FlutterActivity() {
     }
     
     private fun requestUsageStatsPermission() {
-        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-        startActivity(intent)
+        try {
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+            // Add extras to highlight our app in the list
+            val bundle = Bundle()
+            bundle.putString(":settings:fragment_args_key", packageName)
+            intent.putExtra(":settings:fragment_args_key", packageName)
+            intent.putExtra(":settings:show_fragment_args", bundle)
+
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback without highlight
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            startActivity(intent)
+        }
     }
     
     private fun checkAccessibilityPermission(): Boolean {
@@ -180,21 +231,221 @@ class MainActivity: FlutterActivity() {
             Settings.Secure.ACCESSIBILITY_ENABLED,
             0
         )
-        
+
         if (accessibilityEnabled == 1) {
-            val service = "$packageName/${packageName}.AccessibilityMonitorService"
+            val service = "$packageName/$packageName.AccessibilityMonitorService"
             val settingValue = Settings.Secure.getString(
                 contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             )
-            return settingValue?.contains(service) == true
+
+            // Log for debugging
+            android.util.Log.d("OrbGuard", "Looking for service: $service")
+            android.util.Log.d("OrbGuard", "Enabled services: $settingValue")
+
+            // Check both possible formats
+            val found = settingValue?.contains(service) == true ||
+                        settingValue?.contains("$packageName/.AccessibilityMonitorService") == true ||
+                        settingValue?.contains("AccessibilityMonitorService") == true
+
+            android.util.Log.d("OrbGuard", "Accessibility found: $found")
+            return found
         }
         return false
     }
     
     private fun requestAccessibilityPermission() {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        startActivity(intent)
+        try {
+            // Create the component name for our accessibility service
+            val componentName = ComponentName(packageName, "$packageName.AccessibilityMonitorService")
+
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+            // Add extras to highlight our service in the list
+            val bundle = Bundle()
+            val componentNameString = componentName.flattenToString()
+            bundle.putString(":settings:fragment_args_key", componentNameString)
+            intent.putExtra(":settings:fragment_args_key", componentNameString)
+            intent.putExtra(":settings:show_fragment_args", bundle)
+
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to general accessibility settings
+            try {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            } catch (e2: Exception) {
+                val intent = Intent(Settings.ACTION_SETTINGS)
+                startActivity(intent)
+            }
+        }
+    }
+
+    // ============================================================================
+    // STORAGE PERMISSION (Android 11+)
+    // ============================================================================
+
+    private fun checkStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ needs MANAGE_EXTERNAL_STORAGE
+            Environment.isExternalStorageManager()
+        } else {
+            // Android 10 and below use regular storage permission
+            checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    // ============================================================================
+    // ACCESS LEVEL INFO
+    // ============================================================================
+
+    private fun getAccessLevelInfo(): Map<String, Any> {
+        val hasRoot = rootAccess?.hasRootAccess() ?: false
+        val accessMethod = rootAccess?.accessMethod ?: "Standard"
+
+        val level: String
+        val description: String
+        val capabilities: List<String>
+
+        when (accessMethod) {
+            "Root" -> {
+                level = "ROOT"
+                description = "Full root access detected. Maximum threat detection and removal capabilities enabled."
+                capabilities = listOf(
+                    "Deep system file scanning",
+                    "Hidden process detection",
+                    "Kernel-level threat analysis",
+                    "Complete threat removal",
+                    "System modification detection"
+                )
+            }
+            "Shell" -> {
+                level = "SHELL"
+                description = "Shell access enabled via Shizuku or ADB. Enhanced scanning capabilities available."
+                capabilities = listOf(
+                    "System file scanning",
+                    "Process inspection",
+                    "Network connection analysis",
+                    "App data access",
+                    "Service monitoring"
+                )
+            }
+            "AppProcess" -> {
+                level = "ELEVATED"
+                description = "App process access available. Enhanced monitoring enabled."
+                capabilities = listOf(
+                    "Enhanced process monitoring",
+                    "System service inspection",
+                    "Network analysis",
+                    "App behavior tracking"
+                )
+            }
+            else -> {
+                level = "STANDARD"
+                description = "Standard access level. Basic threat detection active."
+                capabilities = listOf(
+                    "App scanning",
+                    "Behavioral analysis",
+                    "Network monitoring",
+                    "Permission analysis"
+                )
+            }
+        }
+
+        return mapOf(
+            "level" to level,
+            "description" to description,
+            "capabilities" to capabilities,
+            "hasRoot" to hasRoot,
+            "method" to accessMethod
+        )
+    }
+
+    private fun getSetupInstructions(): Map<String, Any> {
+        return mapOf(
+            "title" to "Elevated Access Setup",
+            "description" to "To enable deeper threat detection, you can grant elevated access using one of these methods:",
+            "methods" to listOf(
+                mapOf(
+                    "name" to "Shizuku",
+                    "description" to "Use Shizuku app for shell-level access without root",
+                    "steps" to listOf(
+                        "Install Shizuku from Play Store",
+                        "Start Shizuku via ADB or Wireless debugging",
+                        "Grant OrbGuard permission in Shizuku",
+                        "Return here and tap 'Re-check Access Level'"
+                    ),
+                    "difficulty" to "Easy"
+                ),
+                mapOf(
+                    "name" to "ADB Wireless",
+                    "description" to "Use ADB over WiFi for temporary elevated access",
+                    "steps" to listOf(
+                        "Enable Developer Options on your device",
+                        "Enable Wireless Debugging",
+                        "Pair with a computer using ADB",
+                        "Run: adb shell pm grant com.orb.guard android.permission.DUMP"
+                    ),
+                    "difficulty" to "Medium"
+                ),
+                mapOf(
+                    "name" to "Root Access",
+                    "description" to "If your device is rooted, grant root access to OrbGuard",
+                    "steps" to listOf(
+                        "Ensure your device is rooted (Magisk recommended)",
+                        "Open OrbGuard and grant root access when prompted",
+                        "Root manager will show permission request"
+                    ),
+                    "difficulty" to "Requires rooted device"
+                )
+            )
+        )
+    }
+
+    private fun requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ - open special app access settings
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                // Add extras to highlight our app
+                val bundle = Bundle()
+                bundle.putString(":settings:fragment_args_key", packageName)
+                intent.putExtra(":settings:fragment_args_key", packageName)
+                intent.putExtra(":settings:show_fragment_args", bundle)
+
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to general file access settings with highlight
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                    val bundle = Bundle()
+                    bundle.putString(":settings:fragment_args_key", packageName)
+                    intent.putExtra(":settings:fragment_args_key", packageName)
+                    intent.putExtra(":settings:show_fragment_args", bundle)
+
+                    startActivity(intent)
+                } catch (e2: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+            }
+        } else {
+            // Android 10 and below - request through standard permission flow
+            requestPermissions(
+                arrayOf(
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ),
+                100
+            )
+        }
     }
 }
 
@@ -375,209 +626,3 @@ class RootAccess {
     fun killProcess(processName: String): Boolean = executeCommand("killall '$processName'") != null
 }
 
-// ============================================================================
-// SPYWARE SCANNER
-// ============================================================================
-
-class SpywareScanner(
-    private val context: Context,
-    private val rootAccess: RootAccess
-) {
-    private var deepScan = false
-    private var hasElevatedAccess = false
-    
-    private val maliciousPackages = listOf(
-        "com.network.android",
-        "com.system.framework",
-        "com.google.android.update",
-        "com.android.battery"
-    )
-    
-    private val maliciousDomains = listOf(
-        "lsgatag.com", "lxwo.org", "cloudatlasinc.com",
-        "lighthouseresearch.com", "mynetsec.net"
-    )
-    
-    private val suspiciousFiles = listOf(
-        "/system/xbin/daemonsu",
-        "/system/bin/.ext",
-        "/data/local/tmp/.pegasus",
-        "/data/data/com.android.providers.telephony/databases/mmssms.db-journal"
-    )
-    
-    fun initialize(deepScan: Boolean, hasElevated: Boolean) {
-        this.deepScan = deepScan
-        this.hasElevatedAccess = hasElevated
-    }
-    
-    fun scanNetwork(): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        
-        // Standard network check
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networks = connectivityManager.allNetworks
-        
-        for (network in networks) {
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            // Check for suspicious network characteristics
-        }
-        
-        // Elevated network analysis
-        if (hasElevatedAccess) {
-            val netstat = rootAccess.getNetstat()
-            netstat?.let {
-                val suspiciousConns = analyzeNetworkConnections(it)
-                threats.addAll(suspiciousConns)
-            }
-        }
-        
-        return threats
-    }
-    
-    fun scanProcesses(): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        
-        // Standard process check
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val runningApps = activityManager.runningAppProcesses ?: emptyList()
-        
-        for (app in runningApps) {
-            if (maliciousPackages.any { app.processName.contains(it) }) {
-                threats.add(mapOf(
-                    "id" to app.processName,
-                    "name" to "Suspicious Process: ${app.processName}",
-                    "description" to "Process matches known spyware pattern",
-                    "severity" to "CRITICAL",
-                    "type" to "process",
-                    "path" to app.processName,
-                    "requiresRoot" to false,
-                    "metadata" to mapOf(
-                        "pid" to app.pid,
-                        "uid" to app.uid
-                    )
-                ))
-            }
-        }
-        
-        // Elevated process analysis
-        if (hasElevatedAccess) {
-            val processList = rootAccess.getProcessList()
-            processList?.let {
-                val deepThreats = analyzeProcessTree(it)
-                threats.addAll(deepThreats)
-            }
-        }
-        
-        return threats
-    }
-    
-    fun scanFileSystem(): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        
-        if (!hasElevatedAccess) {
-            return threats
-        }
-        
-        // Check suspicious file locations
-        for (suspiciousFile in suspiciousFiles) {
-            val exists = rootAccess.executeCommand("test -e '$suspiciousFile' && echo 'exists'")
-            if (exists?.contains("exists") == true) {
-                threats.add(mapOf(
-                    "id" to suspiciousFile,
-                    "name" to "Suspicious File: $suspiciousFile",
-                    "description" to "Known spyware file location",
-                    "severity" to "HIGH",
-                    "type" to "file",
-                    "path" to suspiciousFile,
-                    "requiresRoot" to true,
-                    "metadata" to mapOf<String, Any>()
-                ))
-            }
-        }
-        
-        return threats
-    }
-    
-    fun scanDatabases(): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        
-        if (!hasElevatedAccess) {
-            return threats
-        }
-        
-        // Check SMS database for exploits
-        val smsDb = "/data/data/com.android.providers.telephony/databases/mmssms.db"
-        val smsCheck = rootAccess.executeCommand("sqlite3 '$smsDb' 'SELECT count(*) FROM sms WHERE body LIKE \"%SPYWARE_SIGNATURE%\"' 2>/dev/null")
-        
-        return threats
-    }
-    
-    fun scanMemory(): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        
-        if (!hasElevatedAccess) {
-            return threats
-        }
-        
-        return threats
-    }
-    
-    fun removeThreat(id: String, type: String, path: String, requiresRoot: Boolean): Boolean {
-        if (requiresRoot && !hasElevatedAccess) {
-            return false
-        }
-        
-        return when (type) {
-            "process" -> killProcess(id)
-            "file" -> deleteFile(path)
-            "package" -> uninstallPackage(id)
-            else -> false
-        }
-    }
-    
-    private fun killProcess(processName: String): Boolean {
-        if (!hasElevatedAccess) return false
-        return rootAccess.killProcess(processName)
-    }
-    
-    private fun deleteFile(path: String): Boolean {
-        if (!hasElevatedAccess) return false
-        return rootAccess.deleteFile(path)
-    }
-    
-    private fun uninstallPackage(packageName: String): Boolean {
-        if (!hasElevatedAccess) return false
-        val result = rootAccess.pmCommand("uninstall $packageName")
-        return result?.contains("Success") == true
-    }
-    
-    private fun analyzeNetworkConnections(data: String): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        // Parse network connections
-        return threats
-    }
-    
-    private fun analyzeProcessTree(data: String): List<Map<String, Any>> {
-        val threats = mutableListOf<Map<String, Any>>()
-        val lines = data.split("\n")
-        
-        for (line in lines) {
-            for (maliciousProc in maliciousPackages) {
-                if (line.contains(maliciousProc)) {
-                    threats.add(mapOf(
-                        "id" to maliciousProc,
-                        "name" to "Hidden Process: $maliciousProc",
-                        "description" to "Process detected via elevated access",
-                        "severity" to "CRITICAL",
-                        "type" to "process",
-                        "path" to maliciousProc,
-                        "requiresRoot" to true,
-                        "metadata" to mapOf("details" to line)
-                    ))
-                }
-            }
-        }
-        
-        return threats
-    }
-}

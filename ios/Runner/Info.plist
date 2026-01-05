@@ -10,5 +10,9 @@
 
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Required for file system scanning</string>
-	</dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+</dict>
 </plist>

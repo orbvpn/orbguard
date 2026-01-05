@@ -14,7 +14,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+        tools:ignore="ScopedStorage" />
 
     <!-- ============================================ -->
     <!-- DEVICE INFO (For spyware detection) -->
@@ -89,6 +89,20 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Accessibility Service for detecting malicious services -->
+        <service
+            android:name=".AccessibilityMonitorService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 
     <!-- Queries for Package Visibility (Android 11+) -->

@@ -7,6 +7,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
+import 'screens/elevated_access_setup_screen.dart';
+import 'screens/scanning_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -70,7 +72,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const platform = MethodChannel('com.orb.guard/system');
 
   bool _isScanning = false;
@@ -86,7 +88,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh permissions when app returns to foreground
+    if (state == AppLifecycleState.resumed) {
+      _refreshPermissions();
+    }
+  }
+
+  Future<void> _refreshPermissions() async {
+    await specialPermissions.checkPermissions();
+    await _calculateDetectionCapability();
+    setState(() {});
   }
 
   Future<void> _initializeApp() async {
@@ -146,26 +169,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _calculateDetectionCapability() async {
     // Base capability from standard APIs
-    double capability = 30.0;
+    double capability = 25.0;
 
-    // Add capability based on granted permissions
+    // Add capability based on granted permissions (45% total)
     if (await Permission.phone.isGranted) capability += 5;
-    if (await Permission.sms.isGranted) capability += 5;
-    if (await Permission.contacts.isGranted) capability += 5;
+    if (await Permission.sms.isGranted) capability += 10;
     if (await Permission.location.isGranted) capability += 5;
-    if (await Permission.storage.isGranted) capability += 10;
 
-    // Special permissions
+    // Storage - check via native method for Android 11+
+    try {
+      final storageResult = await platform.invokeMethod('checkStoragePermission');
+      if (storageResult['hasPermission'] == true) capability += 10;
+    } catch (e) {
+      if (await Permission.storage.isGranted) capability += 10;
+    }
+
+    // Special permissions (25% total)
     if (specialPermissions.hasUsageStats) capability += 15;
     if (specialPermissions.hasAccessibility) capability += 10;
 
-    // Root/elevated access
-    if (_hasRootAccess) capability += 15;
+    // Enhanced/Root access (15% total)
+    if (_hasRootAccess) {
+      capability += 15;
+    } else if (_accessMethod == 'Shell' || _accessMethod == 'AppProcess') {
+      capability += 10;
+    }
 
     setState(() {
       _detectionCapability = capability.clamp(0, 100);
     });
   }
+
+  // Track scan metadata for results display
+  int _lastScanItemsScanned = 0;
+  Duration _lastScanDuration = Duration.zero;
 
   Future<void> _startScan({bool deepScan = false}) async {
     // Check if we have enough permissions
@@ -174,94 +211,224 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    setState(() {
-      _isScanning = true;
-      _threats.clear();
-      _scanProgress = ScanProgress();
-    });
+    // Navigate to scanning screen
+    final scanResult = await Navigator.push<ScanResult>(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
+          onScan: () => _performScan(deepScan: deepScan),
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+
+    if (scanResult != null && scanResult.threats.isNotEmpty) {
+      print('[OrbGuard] Received ${scanResult.threats.length} threats from scan');
+      setState(() {
+        _threats.clear();
+        for (var t in scanResult.threats) {
+          final converted = ThreatDetection.fromJson(t);
+          print('[OrbGuard] Converted: ${converted.name} (${converted.severity})');
+          _threats.add(converted);
+        }
+        _lastScanItemsScanned = scanResult.itemsScanned;
+        _lastScanDuration = scanResult.scanDuration;
+      });
+      print('[OrbGuard] Showing results with ${_threats.length} threats');
+      _showScanResults();
+    } else if (scanResult != null) {
+      // Scan completed with no threats
+      print('[OrbGuard] Scan completed with no threats');
+      setState(() {
+        _lastScanItemsScanned = scanResult.itemsScanned;
+        _lastScanDuration = scanResult.scanDuration;
+      });
+      _showNoThreatsDialog();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _performScan({bool deepScan = false}) async {
+    List<Map<String, dynamic>> allThreats = [];
 
     try {
       await platform.invokeMethod('initializeScan', {
         'deepScan': deepScan || _hasRootAccess,
         'hasRoot': _hasRootAccess,
       });
-
-      // Run all scan phases
-      await _runScanPhase('Network Analysis', _scanNetwork);
-      await _runScanPhase('Process Inspection', _scanProcesses);
-      await _runScanPhase('File System Check', _scanFileSystem);
-      await _runScanPhase('Database Analysis', _scanDatabases);
-      await _runScanPhase('Memory Analysis', _scanMemory);
-
-      // Advanced detection modules
-      await _runScanPhase('Behavioral Analysis', () async {
-        try {
-          final behavioral = await advancedDetection.runModule('behavioral');
-          _addThreats(behavioral);
-        } catch (e) {
-          print('Behavioral analysis error: $e');
-        }
-      });
-
-      await _runScanPhase('Certificate Analysis', () async {
-        try {
-          final certs = await advancedDetection.runModule('certificate');
-          _addThreats(certs);
-        } catch (e) {
-          print('Certificate analysis error: $e');
-        }
-      });
-
-      await _runScanPhase('Permission Analysis', () async {
-        try {
-          final perms = await advancedDetection.runModule('permission');
-          _addThreats(perms);
-        } catch (e) {
-          print('Permission analysis error: $e');
-        }
-      });
-
-      await _runScanPhase('Accessibility Check', () async {
-        try {
-          final access = await advancedDetection.runModule('accessibility');
-          _addThreats(access);
-        } catch (e) {
-          print('Accessibility check error: $e');
-        }
-      });
-
-      await _runScanPhase('Keylogger Detection', () async {
-        try {
-          final keyloggers = await advancedDetection.runModule('keylogger');
-          _addThreats(keyloggers);
-        } catch (e) {
-          print('Keylogger detection error: $e');
-        }
-      });
-
-      await _runScanPhase('Location Stalker', () async {
-        try {
-          final location = await advancedDetection.runModule('location');
-          _addThreats(location);
-        } catch (e) {
-          print('Location stalker detection error: $e');
-        }
-      });
-
-      // Cloud intelligence matching
-      await _runScanPhase('Cloud Intelligence', _matchCloudIntelligence);
-
-      setState(() {
-        _isScanning = false;
-      });
-
-      _showScanResults();
     } catch (e) {
-      setState(() {
-        _isScanning = false;
-      });
-      _showError('Scan failed: $e');
+      print('Initialize scan error: $e');
     }
+
+    // Run native scans
+    try {
+      final result = await platform.invokeMethod('scanNetwork');
+      if (result['threats'] != null) {
+        for (var threat in result['threats']) {
+          allThreats.add(Map<String, dynamic>.from(threat));
+        }
+      }
+    } catch (e) {
+      print('Network scan error: $e');
+    }
+
+    try {
+      final result = await platform.invokeMethod('scanProcesses');
+      if (result['threats'] != null) {
+        for (var threat in result['threats']) {
+          allThreats.add(Map<String, dynamic>.from(threat));
+        }
+      }
+    } catch (e) {
+      print('Process scan error: $e');
+    }
+
+    try {
+      final result = await platform.invokeMethod('scanFileSystem');
+      if (result['threats'] != null) {
+        for (var threat in result['threats']) {
+          allThreats.add(Map<String, dynamic>.from(threat));
+        }
+      }
+    } catch (e) {
+      print('File system scan error: $e');
+    }
+
+    try {
+      final result = await platform.invokeMethod('scanDatabases');
+      if (result['threats'] != null) {
+        for (var threat in result['threats']) {
+          allThreats.add(Map<String, dynamic>.from(threat));
+        }
+      }
+    } catch (e) {
+      print('Database scan error: $e');
+    }
+
+    try {
+      final result = await platform.invokeMethod('scanMemory');
+      if (result['threats'] != null) {
+        for (var threat in result['threats']) {
+          allThreats.add(Map<String, dynamic>.from(threat));
+        }
+      }
+    } catch (e) {
+      print('Memory scan error: $e');
+    }
+
+    // Advanced detection modules
+    try {
+      final behavioral = await advancedDetection.runModule('behavioral');
+      allThreats.addAll(behavioral);
+    } catch (e) {
+      print('Behavioral analysis error: $e');
+    }
+
+    try {
+      final certs = await advancedDetection.runModule('certificate');
+      allThreats.addAll(certs);
+    } catch (e) {
+      print('Certificate analysis error: $e');
+    }
+
+    try {
+      final perms = await advancedDetection.runModule('permission');
+      allThreats.addAll(perms);
+    } catch (e) {
+      print('Permission analysis error: $e');
+    }
+
+    try {
+      final access = await advancedDetection.runModule('accessibility');
+      allThreats.addAll(access);
+    } catch (e) {
+      print('Accessibility check error: $e');
+    }
+
+    try {
+      final keyloggers = await advancedDetection.runModule('keylogger');
+      allThreats.addAll(keyloggers);
+    } catch (e) {
+      print('Keylogger detection error: $e');
+    }
+
+    try {
+      final location = await advancedDetection.runModule('location');
+      allThreats.addAll(location);
+    } catch (e) {
+      print('Location stalker detection error: $e');
+    }
+
+    // Debug: Log scan results
+    print('[OrbGuard] Scan complete: ${allThreats.length} threats detected');
+    for (var threat in allThreats) {
+      print('[OrbGuard] Threat: ${threat['name']} (${threat['severity']})');
+    }
+
+    return allThreats;
+  }
+
+  void _showNoThreatsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1D1E33),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.green.withOpacity(0.2),
+              ),
+              child: const Icon(
+                Icons.verified_user,
+                size: 48,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'All Clear!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No threats were detected on your device. Your device appears to be secure.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Great!'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _runScanPhase(
@@ -425,7 +592,11 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ScanResultsScreen(threats: _threats),
+        builder: (context) => ScanResultsScreen(
+          threats: _threats,
+          itemsScanned: _lastScanItemsScanned,
+          scanDuration: _lastScanDuration,
+        ),
       ),
     );
   }
@@ -571,13 +742,10 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             _buildDeviceInfoCard(),
             const SizedBox(height: 16),
-            _buildAccessLevelCard(),
-            const SizedBox(height: 16),
             _buildDetectionCapabilityCard(),
             const SizedBox(height: 16),
             _buildScanButton(),
             const SizedBox(height: 16),
-            if (_isScanning) _buildScanProgress(),
             if (_threats.isNotEmpty) _buildThreatsSummary(),
           ],
         ),
@@ -704,68 +872,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAccessLevelCard() {
-    Color chipColor = Colors.blue;
-    String description = '';
-
-    switch (_accessLevel) {
-      case 'Root':
-        chipColor = Colors.green;
-        description = '✓ Root access detected\n'
-            '✓ Full system privileges\n'
-            '✓ Deep scanning enabled\n'
-            '✓ Advanced threat removal';
-        break;
-      case 'Shell':
-        chipColor = Colors.cyan;
-        description = '✓ Shell access enabled (Shizuku method)\n'
-            '✓ Elevated privileges active\n'
-            '✓ Deep scanning available\n'
-            '✓ System file access granted';
-        break;
-      case 'AppProcess':
-        chipColor = Colors.orange;
-        description = '✓ System service access\n'
-            '✓ Enhanced scanning enabled\n'
-            '✓ Process inspection active\n'
-            '✓ Network monitoring enhanced';
-        break;
-      default:
-        chipColor = Colors.blue;
-        description = '✓ Standard protection active\n'
-            '✓ Behavioral analysis enabled\n'
-            '✓ Network monitoring active\n'
-            '✓ App scanning enabled';
-    }
-
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'System Access Level',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Chip(
-                  label: Text(_accessLevel),
-                  backgroundColor: chipColor,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(description, style: const TextStyle(fontSize: 14)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildDetectionCapabilityCard() {
     Color capabilityColor = _detectionCapability >= 80
         ? Colors.green
@@ -775,48 +881,149 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Card(
       color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Detection Capability',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '${_detectionCapability.round()}%',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: capabilityColor,
+      child: InkWell(
+        onTap: _navigateToPermissionSetup,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _detectionCapability >= 80
+                            ? Icons.verified_user
+                            : _detectionCapability >= 50
+                                ? Icons.shield
+                                : Icons.warning,
+                        color: capabilityColor,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Detection Capability',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
+                  Text(
+                    '${_detectionCapability.round()}%',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: capabilityColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: LinearProgressIndicator(
+                  value: _detectionCapability / 100,
+                  backgroundColor: Colors.grey[800],
+                  color: capabilityColor,
+                  minHeight: 8,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: _detectionCapability / 100,
-              backgroundColor: Colors.grey[800],
-              color: capabilityColor,
-              minHeight: 10,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _detectionCapability >= 80
-                  ? '✓ Full protection active'
-                  : _detectionCapability >= 50
-                      ? '⚠️ Partial protection - grant more permissions'
-                      : '❌ Limited protection - setup required',
-              style: TextStyle(fontSize: 12, color: capabilityColor),
-            ),
-          ],
+              ),
+              const SizedBox(height: 12),
+              // Status breakdown
+              _buildCapabilityBreakdown(),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _detectionCapability >= 80
+                        ? 'Full protection active'
+                        : 'Tap to configure permissions',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildCapabilityBreakdown() {
+    return FutureBuilder<List<_CapabilityItem>>(
+      future: _getCapabilityItems(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final items = snapshot.data!;
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: items.map((item) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: item.enabled
+                    ? Colors.green.withAlpha(30)
+                    : Colors.grey.withAlpha(30),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: item.enabled
+                      ? Colors.green.withAlpha(100)
+                      : Colors.grey.withAlpha(50),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    item.enabled ? Icons.check_circle : Icons.radio_button_unchecked,
+                    size: 14,
+                    color: item.enabled ? Colors.green : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    item.name,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: item.enabled ? Colors.green[300] : Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Future<List<_CapabilityItem>> _getCapabilityItems() async {
+    bool hasStorage = false;
+    try {
+      final storageResult = await platform.invokeMethod('checkStoragePermission');
+      hasStorage = storageResult['hasPermission'] == true;
+    } catch (e) {
+      hasStorage = await Permission.storage.isGranted;
+    }
+
+    final hasEnhanced = _hasRootAccess || _accessMethod == 'Shell' || _accessMethod == 'AppProcess';
+    final enhancedLabel = _hasRootAccess ? 'Root' : (_accessMethod == 'Shell' ? 'Shell' : 'Enhanced');
+
+    return [
+      _CapabilityItem('Storage', hasStorage),
+      _CapabilityItem('SMS', await Permission.sms.isGranted),
+      _CapabilityItem('Phone', await Permission.phone.isGranted),
+      _CapabilityItem('Location', await Permission.location.isGranted),
+      _CapabilityItem('Usage', specialPermissions.hasUsageStats),
+      _CapabilityItem('Accessibility', specialPermissions.hasAccessibility),
+      _CapabilityItem(enhancedLabel, hasEnhanced),
+    ];
   }
 
   Widget _buildScanButton() {
@@ -1012,4 +1219,11 @@ class ScanProgress {
   bool memoryComplete = false;
   bool advancedComplete = false;
   bool iocComplete = false;
+}
+
+class _CapabilityItem {
+  final String name;
+  final bool enabled;
+
+  _CapabilityItem(this.name, this.enabled);
 }
