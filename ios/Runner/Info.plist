@@ -1,18 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+<dict>
+	<!-- Privacy Usage Descriptions -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Required for network threat detection and Wi-Fi security analysis</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Required for location-based threat analysis and anti-theft features</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Required for continuous location tracking in anti-theft mode</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Required for file system scanning</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Required for thief selfie capture in anti-theft mode</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Required for contact-based threat detection</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to secure the app</string>
+
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>remote-notification</string>
+		<string>network-authentication</string>
+	</array>
+
+	<!-- BGTaskScheduler Permitted Identifiers -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.orb.guard.threat-intel-sync</string>
+		<string>com.orb.guard.background-scan</string>
+		<string>com.orb.guard.deep-scan</string>
+	</array>
+
+	<!-- Network Extension Bundle Identifier -->
+	<key>NEProviderClasses</key>
 	<dict>
-		<key>NSLocalNetworkUsageDescription</key>
-		<string>Required for network threat detection</string>
+		<key>com.apple.networkextension.packet-tunnel</key>
+		<string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
+		<key>com.apple.networkextension.dns-proxy</key>
+		<string>$(PRODUCT_MODULE_NAME).DNSProxyProvider</string>
+	</dict>
 
-		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Required for location-based threat analysis</string>
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 
-		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Required for file system scanning</string>
-		<key>CADisableMinimumFrameDurationOnPhone</key>
+	<!-- UI Configuration -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- Bundle Configuration -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>OrbGuard</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>OrbGuard</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
 	<true/>
 </dict>
 </plist>
