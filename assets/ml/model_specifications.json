@@ -1,0 +1,272 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-07",
+  "models": [
+    {
+      "id": "scam_classifier",
+      "name": "Scam/Phishing Text Classifier",
+      "filename": "scam_classifier.tflite",
+      "version": "1.0.0",
+      "architecture": {
+        "type": "text_classification",
+        "framework": "tensorflow",
+        "model_type": "bidirectional_lstm",
+        "layers": [
+          {"type": "embedding", "input_dim": 10000, "output_dim": 128},
+          {"type": "bidirectional_lstm", "units": 64, "return_sequences": false},
+          {"type": "dropout", "rate": 0.3},
+          {"type": "dense", "units": 32, "activation": "relu"},
+          {"type": "dropout", "rate": 0.2},
+          {"type": "dense", "units": 2, "activation": "softmax"}
+        ],
+        "input_shape": [128],
+        "output_shape": [2],
+        "max_sequence_length": 128,
+        "vocab_size": 10000
+      },
+      "training": {
+        "dataset": "combined_scam_sms_dataset",
+        "sources": [
+          "SMS Spam Collection Dataset",
+          "Kaggle Fraud SMS Dataset",
+          "Custom curated phishing samples"
+        ],
+        "preprocessing": [
+          "lowercase",
+          "remove_special_chars",
+          "tokenize",
+          "pad_sequences"
+        ],
+        "augmentation": [
+          "synonym_replacement",
+          "random_deletion",
+          "random_swap"
+        ],
+        "train_test_split": 0.8,
+        "epochs": 50,
+        "batch_size": 32,
+        "optimizer": "adam",
+        "learning_rate": 0.001,
+        "loss": "categorical_crossentropy",
+        "metrics": ["accuracy", "precision", "recall", "f1"]
+      },
+      "output_classes": ["legitimate", "scam"],
+      "quantization": "float16",
+      "target_size_mb": 5,
+      "min_accuracy": 0.92,
+      "fallback": "heuristic_patterns"
+    },
+    {
+      "id": "url_classifier",
+      "name": "Malicious URL Classifier",
+      "filename": "url_classifier.tflite",
+      "version": "1.0.0",
+      "architecture": {
+        "type": "url_classification",
+        "framework": "tensorflow",
+        "model_type": "cnn_1d",
+        "layers": [
+          {"type": "embedding", "input_dim": 256, "output_dim": 64},
+          {"type": "conv1d", "filters": 128, "kernel_size": 3, "activation": "relu"},
+          {"type": "max_pooling1d", "pool_size": 2},
+          {"type": "conv1d", "filters": 64, "kernel_size": 3, "activation": "relu"},
+          {"type": "global_max_pooling1d"},
+          {"type": "dense", "units": 64, "activation": "relu"},
+          {"type": "dropout", "rate": 0.3},
+          {"type": "dense", "units": 4, "activation": "softmax"}
+        ],
+        "input_shape": [200],
+        "output_shape": [4],
+        "max_url_length": 200
+      },
+      "training": {
+        "dataset": "combined_url_dataset",
+        "sources": [
+          "PhishTank",
+          "URLhaus",
+          "OpenPhish",
+          "Alexa Top 1M (benign)"
+        ],
+        "preprocessing": [
+          "url_tokenization",
+          "character_level_encoding"
+        ],
+        "train_test_split": 0.8,
+        "epochs": 30,
+        "batch_size": 64,
+        "optimizer": "adam",
+        "learning_rate": 0.001
+      },
+      "output_classes": ["benign", "phishing", "malware", "spam"],
+      "quantization": "float16",
+      "target_size_mb": 3,
+      "min_accuracy": 0.95,
+      "fallback": "pattern_matching"
+    },
+    {
+      "id": "app_risk",
+      "name": "App Risk Assessment Model",
+      "filename": "app_risk.tflite",
+      "version": "1.0.0",
+      "architecture": {
+        "type": "tabular_classification",
+        "framework": "tensorflow",
+        "model_type": "feedforward_nn",
+        "layers": [
+          {"type": "dense", "units": 256, "activation": "relu"},
+          {"type": "batch_normalization"},
+          {"type": "dropout", "rate": 0.3},
+          {"type": "dense", "units": 128, "activation": "relu"},
+          {"type": "batch_normalization"},
+          {"type": "dropout", "rate": 0.2},
+          {"type": "dense", "units": 64, "activation": "relu"},
+          {"type": "dense", "units": 5, "activation": "softmax"}
+        ],
+        "input_shape": [50],
+        "output_shape": [5]
+      },
+      "training": {
+        "dataset": "app_metadata_dataset",
+        "features": [
+          "permission_count",
+          "dangerous_permission_count",
+          "tracker_count",
+          "ad_network_count",
+          "has_accessibility_service",
+          "has_device_admin",
+          "certificate_info",
+          "install_source",
+          "app_size",
+          "min_sdk_version",
+          "target_sdk_version",
+          "native_code_present",
+          "uses_reflection",
+          "uses_crypto_apis",
+          "network_security_config"
+        ],
+        "train_test_split": 0.8,
+        "epochs": 100,
+        "batch_size": 128
+      },
+      "output_classes": ["safe", "low_risk", "medium_risk", "high_risk", "malicious"],
+      "quantization": "int8",
+      "target_size_mb": 10,
+      "min_accuracy": 0.90,
+      "fallback": "rule_based_scoring"
+    },
+    {
+      "id": "image_classifier",
+      "name": "Phishing Screenshot Detector",
+      "filename": "image_classifier.tflite",
+      "version": "1.0.0",
+      "architecture": {
+        "type": "image_classification",
+        "framework": "tensorflow",
+        "model_type": "mobilenet_v3_small",
+        "base_model": "MobileNetV3Small",
+        "layers": [
+          {"type": "mobilenet_v3_small", "include_top": false, "weights": "imagenet"},
+          {"type": "global_average_pooling2d"},
+          {"type": "dense", "units": 128, "activation": "relu"},
+          {"type": "dropout", "rate": 0.3},
+          {"type": "dense", "units": 3, "activation": "softmax"}
+        ],
+        "input_shape": [224, 224, 3],
+        "output_shape": [3]
+      },
+      "training": {
+        "dataset": "phishing_screenshots_dataset",
+        "sources": [
+          "PhishIntention dataset",
+          "Custom collected login pages",
+          "Legitimate app screenshots"
+        ],
+        "preprocessing": [
+          "resize_224x224",
+          "normalize_0_1"
+        ],
+        "augmentation": [
+          "random_rotation",
+          "random_zoom",
+          "random_brightness"
+        ],
+        "train_test_split": 0.8,
+        "epochs": 20,
+        "batch_size": 16,
+        "fine_tuning_epochs": 10
+      },
+      "output_classes": ["legitimate", "phishing", "unknown"],
+      "quantization": "float16",
+      "target_size_mb": 15,
+      "min_accuracy": 0.88,
+      "fallback": "logo_detection"
+    },
+    {
+      "id": "intent_model",
+      "name": "NLP Intent Extraction Model",
+      "filename": "intent_model.tflite",
+      "version": "1.0.0",
+      "architecture": {
+        "type": "sequence_labeling",
+        "framework": "tensorflow",
+        "model_type": "bert_tiny",
+        "layers": [
+          {"type": "bert_encoder", "variant": "tiny", "hidden_size": 128, "num_layers": 2},
+          {"type": "dense", "units": 64, "activation": "relu"},
+          {"type": "dense", "units": 10, "activation": "softmax"}
+        ],
+        "input_shape": [64],
+        "output_shape": [10],
+        "max_sequence_length": 64
+      },
+      "training": {
+        "dataset": "intent_classification_dataset",
+        "intents": [
+          "request_money",
+          "request_credentials",
+          "request_personal_info",
+          "urgency_pressure",
+          "threat_warning",
+          "prize_offer",
+          "investment_offer",
+          "tech_support",
+          "verification_request",
+          "benign"
+        ],
+        "train_test_split": 0.8,
+        "epochs": 30,
+        "batch_size": 32
+      },
+      "output_classes": [
+        "request_money",
+        "request_credentials",
+        "request_personal_info",
+        "urgency_pressure",
+        "threat_warning",
+        "prize_offer",
+        "investment_offer",
+        "tech_support",
+        "verification_request",
+        "benign"
+      ],
+      "quantization": "float16",
+      "target_size_mb": 20,
+      "min_accuracy": 0.85,
+      "fallback": "keyword_extraction"
+    }
+  ],
+  "deployment": {
+    "download_url": "https://api.orbguard.io/v1/ml/models",
+    "checksum_verification": true,
+    "delta_updates": true,
+    "auto_update": true,
+    "wifi_only_download": true,
+    "max_cache_age_days": 30
+  },
+  "notes": {
+    "training_requirements": "Models should be trained on balanced datasets with proper validation",
+    "conversion": "Use tf.lite.TFLiteConverter with optimization for mobile deployment",
+    "testing": "Models must pass accuracy thresholds on held-out test set before deployment",
+    "privacy": "All inference runs on-device, no data sent to servers"
+  }
+}
