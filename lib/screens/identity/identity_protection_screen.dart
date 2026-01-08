@@ -52,7 +52,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(GlassTheme.primaryAccent),
+                      color: GlassTheme.primaryAccent,
                     ),
                   ),
                 )
@@ -68,7 +68,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             ],
             bottom: TabBar(
               controller: _tabController,
-              indicatorColor: const Color(GlassTheme.primaryAccent),
+              indicatorColor: GlassTheme.primaryAccent,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white54,
               tabs: const [
@@ -82,7 +82,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 )
               : TabBarView(
@@ -237,7 +237,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
         Text(
           value,
           style: const TextStyle(
-            color: Color(GlassTheme.primaryAccent),
+            color: GlassTheme.primaryAccent,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -260,14 +260,14 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           'Critical Alerts',
           provider.criticalAlerts.length.toString(),
           Icons.error,
-          const Color(GlassTheme.errorColor),
+          GlassTheme.errorColor,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'Active Alerts',
           provider.activeAlerts.length.toString(),
           Icons.warning,
-          const Color(GlassTheme.warningColor),
+          GlassTheme.warningColor,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
@@ -326,7 +326,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
               children: [
                 const Icon(
                   Icons.ac_unit,
-                  color: Color(GlassTheme.primaryAccent),
+                  color: GlassTheme.primaryAccent,
                 ),
                 const SizedBox(width: 8),
                 const Text(
@@ -342,7 +342,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                   '${provider.frozenBureausCount}/3 Frozen',
                   style: TextStyle(
                     color: provider.frozenBureausCount == 3
-                        ? const Color(GlassTheme.successColor)
+                        ? GlassTheme.successColor
                         : Colors.white54,
                     fontSize: 12,
                   ),
@@ -400,8 +400,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                         isFrozen ? 'Unfreeze' : 'Freeze',
                         style: TextStyle(
                           color: isFrozen
-                              ? const Color(GlassTheme.warningColor)
-                              : const Color(GlassTheme.primaryAccent),
+                              ? GlassTheme.warningColor
+                              : GlassTheme.primaryAccent,
                         ),
                       ),
                     ),
@@ -423,12 +423,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(GlassTheme.primaryAccent).withOpacity(0.2),
+            color: GlassTheme.primaryAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(
             Icons.lightbulb_outline,
-            color: Color(GlassTheme.primaryAccent),
+            color: GlassTheme.primaryAccent,
             size: 20,
           ),
         ),
@@ -480,7 +480,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                   Icon(
                     _getAssetIcon(entry.key),
                     size: 18,
-                    color: const Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -551,13 +551,13 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(GlassTheme.errorColor).withOpacity(0.2),
+                  color: GlassTheme.errorColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${asset.alertCount} alerts',
                   style: const TextStyle(
-                    color: Color(GlassTheme.errorColor),
+                    color: GlassTheme.errorColor,
                     fontSize: 10,
                   ),
                 ),
@@ -579,7 +579,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
         icon: Icons.notifications_none,
         title: 'No Alerts',
         subtitle: 'Your identity appears to be safe',
-        color: const Color(GlassTheme.successColor),
+        color: GlassTheme.successColor,
       );
     }
 
@@ -676,7 +676,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                   ),
                   decoration: BoxDecoration(
                     color: alert.isResolved
-                        ? const Color(GlassTheme.successColor)
+                        ? GlassTheme.successColor
                         : severityColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -718,7 +718,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                         const Text(
                           '• ',
                           style: TextStyle(
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                         ),
                         Expanded(
@@ -891,8 +891,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                       score.changeDescription,
                       style: TextStyle(
                         color: score.change > 0
-                            ? const Color(GlassTheme.successColor)
-                            : const Color(GlassTheme.errorColor),
+                            ? GlassTheme.successColor
+                            : GlassTheme.errorColor,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -902,7 +902,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             ] else
               const Icon(
                 Icons.add_circle_outline,
-                color: Color(GlassTheme.primaryAccent),
+                color: GlassTheme.primaryAccent,
               ),
           ],
         ),
@@ -914,7 +914,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
     required IconData icon,
     required String title,
     required String subtitle,
-    Color color = const Color(GlassTheme.primaryAccent),
+    Color color = GlassTheme.primaryAccent,
     Widget? action,
   }) {
     return Center(
@@ -1048,8 +1048,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(GlassTheme.gradientTop),
-                Color(GlassTheme.gradientBottom),
+                GlassTheme.gradientTop,
+                GlassTheme.gradientBottom,
               ],
             ),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1098,17 +1098,17 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                         size: 18,
                         color: isSelected
                             ? Colors.white
-                            : const Color(GlassTheme.primaryAccent),
+                            : GlassTheme.primaryAccent,
                       ),
                       label: Text(type.displayName),
                       selected: isSelected,
-                      selectedColor: const Color(GlassTheme.primaryAccent),
+                      selectedColor: GlassTheme.primaryAccent,
                       backgroundColor:
-                          const Color(GlassTheme.primaryAccent).withOpacity(0.2),
+                          GlassTheme.primaryAccent.withOpacity(0.2),
                       labelStyle: TextStyle(
                         color: isSelected
                             ? Colors.white
-                            : const Color(GlassTheme.primaryAccent),
+                            : GlassTheme.primaryAccent,
                         fontSize: 12,
                       ),
                       onSelected: (selected) {
@@ -1136,7 +1136,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                     ),
                     focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                     disabledBorder: const OutlineInputBorder(
@@ -1159,7 +1159,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(GlassTheme.primaryAccent),
+                      backgroundColor: GlassTheme.primaryAccent,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.white12,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1193,7 +1193,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Remove Asset?',
           style: TextStyle(color: Colors.white),
@@ -1214,7 +1214,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             },
             child: const Text(
               'Remove',
-              style: TextStyle(color: Color(GlassTheme.errorColor)),
+              style: TextStyle(color: GlassTheme.errorColor),
             ),
           ),
         ],

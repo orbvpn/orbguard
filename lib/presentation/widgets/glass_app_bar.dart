@@ -12,6 +12,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? titleWidget;
   final List<Widget>? actions;
   final Widget? leading;
+  final PreferredSizeWidget? bottom;
   final bool centerTitle;
   final bool isDark;
   final double height;
@@ -24,6 +25,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleWidget,
     this.actions,
     this.leading,
+    this.bottom,
     this.centerTitle = true,
     this.isDark = true,
     this.height = 56,
@@ -32,15 +34,21 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => Size.fromHeight(height);
+  Size get preferredSize => Size.fromHeight(
+    height + (bottom?.preferredSize.height ?? 0),
+  );
 
   @override
   Widget build(BuildContext context) {
+    final totalHeight = height +
+        (bottom?.preferredSize.height ?? 0) +
+        MediaQuery.of(context).padding.top;
+
     return ClipRect(
       child: BackdropFilter(
         filter: GlassTheme.blurFilter,
         child: Container(
-          height: height + MediaQuery.of(context).padding.top,
+          height: totalHeight,
           padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
           decoration: BoxDecoration(
             color: GlassTheme.glassColor(isDark),
@@ -51,31 +59,40 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
-              // Leading widget
-              if (leading != null)
-                leading!
-              else if (showBackButton)
-                _buildBackButton(context)
-              else
-                const SizedBox(width: 16),
+              SizedBox(
+                height: height,
+                child: Row(
+                  children: [
+                    // Leading widget
+                    if (leading != null)
+                      leading!
+                    else if (showBackButton)
+                      _buildBackButton(context)
+                    else
+                      const SizedBox(width: 16),
 
-              // Title
-              Expanded(
-                child: centerTitle
-                    ? Center(child: _buildTitle())
-                    : _buildTitle(),
+                    // Title
+                    Expanded(
+                      child: centerTitle
+                          ? Center(child: _buildTitle())
+                          : _buildTitle(),
+                    ),
+
+                    // Actions
+                    if (actions != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: actions!,
+                      )
+                    else
+                      const SizedBox(width: 16),
+                  ],
+                ),
               ),
-
-              // Actions
-              if (actions != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions!,
-                )
-              else
-                const SizedBox(width: 16),
+              // Bottom widget (TabBar, etc.)
+              if (bottom != null) bottom!,
             ],
           ),
         ),

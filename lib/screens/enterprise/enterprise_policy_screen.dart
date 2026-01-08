@@ -54,7 +54,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
             ],
             bottom: TabBar(
               controller: _tabController,
-              indicatorColor: const Color(GlassTheme.primaryAccent),
+              indicatorColor: GlassTheme.primaryAccent,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white54,
               tabs: const [
@@ -68,7 +68,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 )
               : Column(
@@ -102,22 +102,22 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
           _buildStatItem(
             'Policies',
             provider.policies.length.toString(),
-            const Color(GlassTheme.primaryAccent),
+            GlassTheme.primaryAccent,
           ),
           _buildStatItem(
             'Enabled',
             provider.enabledPolicies.length.toString(),
-            const Color(GlassTheme.successColor),
+            GlassTheme.successColor,
           ),
           _buildStatItem(
             'Violations',
             provider.unresolvedViolations.toString(),
-            const Color(GlassTheme.warningColor),
+            GlassTheme.warningColor,
           ),
           _buildStatItem(
             'Critical',
             provider.criticalViolations.toString(),
-            const Color(GlassTheme.errorColor),
+            GlassTheme.errorColor,
           ),
         ],
       ),
@@ -257,14 +257,14 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(GlassTheme.primaryAccent)
+                                  color: GlassTheme.primaryAccent
                                       .withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Text(
                                   'DEFAULT',
                                   style: TextStyle(
-                                    color: Color(GlassTheme.primaryAccent),
+                                    color: GlassTheme.primaryAccent,
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -289,7 +289,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     value: policy.isEnabled,
                     onChanged: (value) =>
                         provider.togglePolicyEnabled(policy.id, value),
-                    activeColor: const Color(GlassTheme.primaryAccent),
+                    activeColor: GlassTheme.primaryAccent,
                   ),
                 ],
               ),
@@ -359,7 +359,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
         icon: Icons.check_circle,
         title: 'No Violations',
         subtitle: 'All devices are compliant',
-        color: const Color(GlassTheme.successColor),
+        color: GlassTheme.successColor,
       );
     }
 
@@ -559,7 +559,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
         trailing: IconButton(
           icon: const Icon(
             Icons.add_circle_outline,
-            color: Color(GlassTheme.primaryAccent),
+            color: GlassTheme.primaryAccent,
           ),
           onPressed: () =>
               _showCreateFromTemplateDialog(context, template, provider),
@@ -626,12 +626,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(GlassTheme.successColor).withOpacity(0.2),
+                    color: GlassTheme.successColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.phone_android,
-                    color: Color(GlassTheme.successColor),
+                    color: GlassTheme.successColor,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -671,7 +671,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                 ),
                 _buildPolicyBadge(
                   template.category,
-                  const Color(GlassTheme.primaryAccent),
+                  GlassTheme.primaryAccent,
                 ),
               ],
             ),
@@ -684,9 +684,9 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                 icon: const Icon(Icons.add),
                 label: const Text('Create Policy'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(GlassTheme.primaryAccent),
+                  foregroundColor: GlassTheme.primaryAccent,
                   side: const BorderSide(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 ),
               ),
@@ -701,7 +701,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
     required IconData icon,
     required String title,
     required String subtitle,
-    Color color = const Color(GlassTheme.primaryAccent),
+    Color color = GlassTheme.primaryAccent,
     Widget? action,
   }) {
     return Center(
@@ -788,8 +788,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(GlassTheme.gradientTop),
-                Color(GlassTheme.gradientBottom),
+                GlassTheme.gradientTop,
+                GlassTheme.gradientBottom,
               ],
             ),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -825,7 +825,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -843,7 +843,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -924,7 +924,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(GlassTheme.primaryAccent),
+                      backgroundColor: GlassTheme.primaryAccent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -958,8 +958,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(GlassTheme.gradientTop),
-                Color(GlassTheme.gradientBottom),
+                GlassTheme.gradientTop,
+                GlassTheme.gradientBottom,
               ],
             ),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1012,7 +1012,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     policy.isEnabled ? 'Enabled' : 'Disabled',
                     style: TextStyle(
                       color: policy.isEnabled
-                          ? const Color(GlassTheme.successColor)
+                          ? GlassTheme.successColor
                           : Colors.white54,
                     ),
                   ),
@@ -1045,7 +1045,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                                 : Icons.cancel,
                             size: 20,
                             color: rule.isEnabled
-                                ? const Color(GlassTheme.successColor)
+                                ? GlassTheme.successColor
                                 : Colors.white38,
                           ),
                           const SizedBox(width: 12),
@@ -1113,7 +1113,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Create from Template',
           style: TextStyle(color: Colors.white),
@@ -1137,7 +1137,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 ),
               ),
@@ -1176,7 +1176,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Resolve Violation',
           style: TextStyle(color: Colors.white),
@@ -1202,7 +1202,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 ),
               ),
@@ -1239,7 +1239,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Delete Policy?',
           style: TextStyle(color: Colors.white),
@@ -1260,7 +1260,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
             },
             child: const Text(
               'Delete',
-              style: TextStyle(color: Color(GlassTheme.errorColor)),
+              style: TextStyle(color: GlassTheme.errorColor),
             ),
           ),
         ],

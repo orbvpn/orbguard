@@ -19,6 +19,19 @@ import 'screens/app_security/app_security_screen.dart';
 import 'screens/network/network_security_screen.dart';
 import 'screens/mitre/mitre_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/identity/identity_protection_screen.dart';
+import 'screens/enterprise/executive_protection_screen.dart';
+import 'screens/security/threat_hunting_screen.dart';
+import 'screens/supply_chain/supply_chain_screen.dart';
+import 'screens/network/network_firewall_screen.dart';
+import 'screens/social_media/social_media_screen.dart';
+import 'screens/rogue_ap/rogue_ap_screen.dart';
+import 'screens/enterprise/enterprise_policy_screen.dart';
+import 'screens/enterprise/enterprise_overview_screen.dart';
+import 'screens/enterprise/siem_integration_screen.dart';
+import 'screens/enterprise/compliance_reporting_screen.dart';
+import 'screens/enterprise/stix_taxii_screen.dart';
+import 'screens/intelligence/intelligence_core_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -36,6 +49,14 @@ import 'providers/network_provider.dart';
 import 'providers/darkweb_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/mitre_provider.dart';
+import 'providers/identity_protection_provider.dart';
+import 'providers/executive_protection_provider.dart';
+import 'providers/threat_hunting_provider.dart';
+import 'providers/supply_chain_provider.dart';
+import 'providers/network_firewall_provider.dart';
+import 'providers/social_media_provider.dart';
+import 'providers/rogue_ap_provider.dart' show RogueAPProvider;
+import 'providers/enterprise_policy_provider.dart';
 
 // Global instances
 late ThreatIntelligenceManager threatIntel;
@@ -82,6 +103,14 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DarkWebProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => MitreProvider()),
+        ChangeNotifierProvider(create: (_) => IdentityProtectionProvider()),
+        ChangeNotifierProvider(create: (_) => ExecutiveProtectionProvider()),
+        ChangeNotifierProvider(create: (_) => ThreatHuntingProvider()),
+        ChangeNotifierProvider(create: (_) => SupplyChainProvider()),
+        ChangeNotifierProvider(create: (_) => NetworkFirewallProvider()),
+        ChangeNotifierProvider(create: (_) => SocialMediaProvider()),
+        ChangeNotifierProvider(create: (_) => RogueAPProvider()),
+        ChangeNotifierProvider(create: (_) => EnterprisePolicyProvider()),
       ],
       child: MaterialApp(
         title: 'OrbGuard',
@@ -1323,8 +1352,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ));
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.wifi_tethering,
+                  title: 'Rogue AP Detection',
+                  subtitle: 'Evil twin & fake hotspots',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const RogueAPScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.shield,
+                  title: 'Network Firewall',
+                  subtitle: 'Per-app network rules',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const NetworkFirewallScreen(),
+                    ));
+                  },
+                ),
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Intelligence'),
+                _buildDrawerItem(
+                  icon: Icons.hub,
+                  title: 'Intelligence Core',
+                  subtitle: 'Threat intel browsing & IOC check',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const IntelligenceCoreScreen(),
+                    ));
+                  },
+                ),
                 _buildDrawerItem(
                   icon: Icons.grid_view,
                   title: 'MITRE ATT&CK',
@@ -1333,6 +1395,120 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (context) => const MitreScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.search,
+                  title: 'Threat Hunting',
+                  subtitle: 'Proactive threat detection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ThreatHuntingScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.inventory_2,
+                  title: 'Supply Chain',
+                  subtitle: 'Dependency vulnerabilities',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SupplyChainScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerSection('Identity & Privacy'),
+                _buildDrawerItem(
+                  icon: Icons.person_pin,
+                  title: 'Identity Protection',
+                  subtitle: 'Credit & identity monitoring',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const IdentityProtectionScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.share,
+                  title: 'Social Media',
+                  subtitle: 'Account security monitoring',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SocialMediaScreen(),
+                    ));
+                  },
+                ),
+                const GlassDivider(isDark: true),
+                _buildDrawerSection('Enterprise'),
+                _buildDrawerItem(
+                  icon: Icons.admin_panel_settings,
+                  title: 'Executive Protection',
+                  subtitle: 'VIP & BEC fraud detection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ExecutiveProtectionScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.policy,
+                  title: 'Enterprise Policy',
+                  subtitle: 'MDM & compliance policies',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const EnterprisePolicyScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.dashboard_customize,
+                  title: 'Enterprise Overview',
+                  subtitle: 'Organization security status',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const EnterpriseOverviewScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.integration_instructions,
+                  title: 'SIEM Integration',
+                  subtitle: 'Splunk, ELK, ArcSight',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SiemIntegrationScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.gavel,
+                  title: 'Compliance Reports',
+                  subtitle: 'SOC2, GDPR, HIPAA, PCI-DSS',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ComplianceReportingScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.share,
+                  title: 'STIX/TAXII',
+                  subtitle: 'Threat intelligence sharing',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const StixTaxiiScreen(),
                     ));
                   },
                 ),

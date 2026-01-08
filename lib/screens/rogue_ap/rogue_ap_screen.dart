@@ -50,7 +50,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(GlassTheme.primaryAccent),
+                      color: GlassTheme.primaryAccent,
                     ),
                   ),
                 )
@@ -66,7 +66,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
             ],
             bottom: TabBar(
               controller: _tabController,
-              indicatorColor: const Color(GlassTheme.primaryAccent),
+              indicatorColor: GlassTheme.primaryAccent,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white54,
               tabs: const [
@@ -79,7 +79,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 )
               : Column(
@@ -122,7 +122,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(GlassTheme.primaryAccent),
+                  color: GlassTheme.primaryAccent,
                 ),
               ),
               const SizedBox(width: 12),
@@ -135,7 +135,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
               Text(
                 '${(provider.scanProgress * 100).toInt()}%',
                 style: const TextStyle(
-                  color: Color(GlassTheme.primaryAccent),
+                  color: GlassTheme.primaryAccent,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -148,7 +148,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
               value: provider.scanProgress,
               backgroundColor: Colors.white12,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(GlassTheme.primaryAccent),
+                GlassTheme.primaryAccent,
               ),
             ),
           ),
@@ -224,7 +224,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           ),
           Icon(
             _getSignalIcon(ap.signalStrength),
-            color: const Color(GlassTheme.primaryAccent),
+            color: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -240,22 +240,22 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           _buildStatItem(
             'Total',
             stats.totalAPs.toString(),
-            const Color(GlassTheme.primaryAccent),
+            GlassTheme.primaryAccent,
           ),
           _buildStatItem(
             'Rogue',
             stats.rogueAPs.toString(),
-            const Color(GlassTheme.errorColor),
+            GlassTheme.errorColor,
           ),
           _buildStatItem(
             'Suspicious',
             stats.suspiciousAPs.toString(),
-            const Color(GlassTheme.warningColor),
+            GlassTheme.warningColor,
           ),
           _buildStatItem(
             'Safe',
             stats.safeAPs.toString(),
-            const Color(GlassTheme.successColor),
+            GlassTheme.successColor,
           ),
         ],
       ),
@@ -324,7 +324,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
         icon: Icons.verified_user,
         title: 'No Threats Detected',
         subtitle: 'Your WiFi environment appears safe',
-        color: const Color(GlassTheme.successColor),
+        color: GlassTheme.successColor,
       );
     }
 
@@ -390,10 +390,10 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                           width: 12,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: const Color(GlassTheme.successColor),
+                            color: GlassTheme.successColor,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(GlassTheme.gradientTop),
+                              color: GlassTheme.gradientTop,
                               width: 2,
                             ),
                           ),
@@ -423,7 +423,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                           const Icon(
                             Icons.verified,
                             size: 16,
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                       ],
                     ),
@@ -623,9 +623,9 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                     icon: const Icon(Icons.block, size: 18),
                     label: const Text('Block'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(GlassTheme.errorColor),
+                      foregroundColor: GlassTheme.errorColor,
                       side: const BorderSide(
-                        color: Color(GlassTheme.errorColor),
+                        color: GlassTheme.errorColor,
                       ),
                     ),
                   ),
@@ -637,9 +637,9 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                     icon: const Icon(Icons.verified_user, size: 18),
                     label: const Text('Trust'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(GlassTheme.primaryAccent),
+                      foregroundColor: GlassTheme.primaryAccent,
                       side: const BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -660,12 +660,12 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: const Color(GlassTheme.primaryAccent).withOpacity(0.2),
+            color: GlassTheme.primaryAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(
             Icons.verified,
-            color: Color(GlassTheme.primaryAccent),
+            color: GlassTheme.primaryAccent,
           ),
         ),
         title: Text(
@@ -685,7 +685,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
         trailing: IconButton(
           icon: const Icon(
             Icons.remove_circle_outline,
-            color: Color(GlassTheme.errorColor),
+            color: GlassTheme.errorColor,
           ),
           onPressed: () => _confirmRemoveTrusted(context, ap, provider),
         ),
@@ -695,8 +695,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
 
   Widget _buildSecurityBadge(WiFiSecurity security) {
     final color = security.isSecure
-        ? const Color(GlassTheme.successColor)
-        : const Color(GlassTheme.warningColor);
+        ? GlassTheme.successColor
+        : GlassTheme.warningColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -730,7 +730,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
     required IconData icon,
     required String title,
     required String subtitle,
-    Color color = const Color(GlassTheme.primaryAccent),
+    Color color = GlassTheme.primaryAccent,
   }) {
     return Center(
       child: Padding(
@@ -819,8 +819,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(GlassTheme.gradientTop),
-              Color(GlassTheme.gradientBottom),
+              GlassTheme.gradientTop,
+              GlassTheme.gradientBottom,
             ],
           ),
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -928,7 +928,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                       icon: const Icon(Icons.verified_user),
                       label: const Text('Add to Trusted'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(GlassTheme.primaryAccent),
+                        backgroundColor: GlassTheme.primaryAccent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -941,7 +941,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                       icon: const Icon(Icons.verified),
                       label: const Text('Already Trusted'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(GlassTheme.successColor),
+                        backgroundColor: GlassTheme.successColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -988,8 +988,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(GlassTheme.gradientTop),
-              Color(GlassTheme.gradientBottom),
+              GlassTheme.gradientTop,
+              GlassTheme.gradientBottom,
             ],
           ),
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1068,7 +1068,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(GlassTheme.primaryAccent),
+            activeColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -1083,7 +1083,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Remove Trusted Network?',
           style: TextStyle(color: Colors.white),
@@ -1104,7 +1104,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
             },
             child: const Text(
               'Remove',
-              style: TextStyle(color: Color(GlassTheme.errorColor)),
+              style: TextStyle(color: GlassTheme.errorColor),
             ),
           ),
         ],

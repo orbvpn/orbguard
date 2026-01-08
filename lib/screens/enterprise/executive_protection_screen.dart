@@ -55,7 +55,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
             ],
             bottom: TabBar(
               controller: _tabController,
-              indicatorColor: const Color(GlassTheme.primaryAccent),
+              indicatorColor: GlassTheme.primaryAccent,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white54,
               tabs: const [
@@ -68,7 +68,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                 )
               : TabBarView(
@@ -133,15 +133,15 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: hasAlerts
-                    ? const Color(GlassTheme.errorColor).withOpacity(0.2)
-                    : const Color(GlassTheme.successColor).withOpacity(0.2),
+                    ? GlassTheme.errorColor.withOpacity(0.2)
+                    : GlassTheme.successColor.withOpacity(0.2),
               ),
               child: Icon(
                 hasAlerts ? Icons.warning : Icons.verified_user,
                 size: 40,
                 color: hasAlerts
-                    ? const Color(GlassTheme.errorColor)
-                    : const Color(GlassTheme.successColor),
+                    ? GlassTheme.errorColor
+                    : GlassTheme.successColor,
               ),
             ),
             const SizedBox(width: 20),
@@ -172,7 +172,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     children: [
                       _buildStatusBadge(
                         '${provider.executives.length} VIPs',
-                        const Color(GlassTheme.primaryAccent),
+                        GlassTheme.primaryAccent,
                       ),
                       const SizedBox(width: 8),
                       _buildStatusBadge(
@@ -215,21 +215,21 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
           'Total Alerts',
           provider.totalAlertsCount.toString(),
           Icons.notifications,
-          const Color(GlassTheme.primaryAccent),
+          GlassTheme.primaryAccent,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'High Risk',
           provider.highRiskAlerts.length.toString(),
           Icons.dangerous,
-          const Color(GlassTheme.errorColor),
+          GlassTheme.errorColor,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'VIPs Protected',
           provider.highValueExecutives.length.toString(),
           Icons.shield,
-          const Color(GlassTheme.successColor),
+          GlassTheme.successColor,
         ),
       ],
     );
@@ -309,21 +309,21 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(GlassTheme.primaryAccent).withOpacity(0.1),
+        color: GlassTheme.primaryAccent.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(GlassTheme.primaryAccent).withOpacity(0.3),
+          color: GlassTheme.primaryAccent.withOpacity(0.3),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: const Color(GlassTheme.primaryAccent)),
+          Icon(icon, size: 16, color: GlassTheme.primaryAccent),
           const SizedBox(width: 6),
           Text(
             type.displayName,
             style: const TextStyle(
-              color: Color(GlassTheme.primaryAccent),
+              color: GlassTheme.primaryAccent,
               fontSize: 12,
             ),
           ),
@@ -338,7 +338,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
         icon: Icons.check_circle,
         title: 'No Alerts',
         subtitle: 'No impersonation attempts detected',
-        color: const Color(GlassTheme.successColor),
+        color: GlassTheme.successColor,
       );
     }
 
@@ -497,7 +497,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                   Icon(
                     Icons.lightbulb_outline,
                     size: 18,
-                    color: const Color(GlassTheme.primaryAccent),
+                    color: GlassTheme.primaryAccent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -553,8 +553,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
           height: 48,
           decoration: BoxDecoration(
             color: exec.isHighValue
-                ? const Color(GlassTheme.warningColor).withOpacity(0.2)
-                : const Color(GlassTheme.primaryAccent).withOpacity(0.2),
+                ? GlassTheme.warningColor.withOpacity(0.2)
+                : GlassTheme.primaryAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
@@ -562,8 +562,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               exec.name.isNotEmpty ? exec.name[0].toUpperCase() : '?',
               style: TextStyle(
                 color: exec.isHighValue
-                    ? const Color(GlassTheme.warningColor)
-                    : const Color(GlassTheme.primaryAccent),
+                    ? GlassTheme.warningColor
+                    : GlassTheme.primaryAccent,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -584,13 +584,13 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(GlassTheme.warningColor).withOpacity(0.2),
+                  color: GlassTheme.warningColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
                   'HIGH VALUE',
                   style: TextStyle(
-                    color: Color(GlassTheme.warningColor),
+                    color: GlassTheme.warningColor,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
@@ -631,7 +631,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     required IconData icon,
     required String title,
     required String subtitle,
-    Color color = const Color(GlassTheme.primaryAccent),
+    Color color = GlassTheme.primaryAccent,
     Widget? action,
   }) {
     return Center(
@@ -706,8 +706,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(GlassTheme.gradientTop),
-                Color(GlassTheme.gradientBottom),
+                GlassTheme.gradientTop,
+                GlassTheme.gradientBottom,
               ],
             ),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -752,7 +752,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -771,7 +771,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -791,7 +791,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(GlassTheme.primaryAccent),
+                        color: GlassTheme.primaryAccent,
                       ),
                     ),
                   ),
@@ -803,7 +803,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     children: [
                       const Icon(
                         Icons.star,
-                        color: Color(GlassTheme.warningColor),
+                        color: GlassTheme.warningColor,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -831,7 +831,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                       Switch(
                         value: isHighValue,
                         onChanged: (value) => setState(() => isHighValue = value),
-                        activeColor: const Color(GlassTheme.warningColor),
+                        activeColor: GlassTheme.warningColor,
                       ),
                     ],
                   ),
@@ -857,7 +857,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(GlassTheme.primaryAccent),
+                      backgroundColor: GlassTheme.primaryAccent,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.white12,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -894,8 +894,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(GlassTheme.gradientTop),
-              Color(GlassTheme.gradientBottom),
+              GlassTheme.gradientTop,
+              GlassTheme.gradientBottom,
             ],
           ),
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -945,7 +945,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                         ),
                       ),
@@ -962,7 +962,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                         ),
                       ),
@@ -979,7 +979,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                         ),
                       ),
@@ -998,7 +998,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: Color(GlassTheme.primaryAccent),
+                            color: GlassTheme.primaryAccent,
                           ),
                         ),
                       ),
@@ -1039,7 +1039,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     : const Icon(Icons.search),
                 label: Text(provider.isAnalyzing ? 'Analyzing...' : 'Analyze'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(GlassTheme.primaryAccent),
+                  backgroundColor: GlassTheme.primaryAccent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -1058,12 +1058,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: Row(
           children: [
             Icon(
               result.isImpersonation ? Icons.warning : Icons.check_circle,
-              color: result.isImpersonation ? riskColor : const Color(GlassTheme.successColor),
+              color: result.isImpersonation ? riskColor : GlassTheme.successColor,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1124,7 +1124,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(GlassTheme.gradientTop),
+        backgroundColor: GlassTheme.gradientTop,
         title: const Text(
           'Remove VIP?',
           style: TextStyle(color: Colors.white),
@@ -1145,7 +1145,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
             },
             child: const Text(
               'Remove',
-              style: TextStyle(color: Color(GlassTheme.errorColor)),
+              style: TextStyle(color: GlassTheme.errorColor),
             ),
           ),
         ],

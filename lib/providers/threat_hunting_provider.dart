@@ -217,7 +217,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
         return 0xFFF44336;
       case HuntType.persistenceMechanism:
         return 0xFF795548;
-      case HuntType.lateral:
+      case HuntType.lateralMovement:
         return 0xFF607D8B;
       case HuntType.privilegeEscalation:
         return 0xFFFF5722;

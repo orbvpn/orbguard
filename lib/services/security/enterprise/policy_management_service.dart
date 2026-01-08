@@ -8,7 +8,6 @@
 /// - Conditional access rules
 
 import 'dart:async';
-import '../../../data/api/rest/orbguard_client.dart';
 
 /// Policy type
 enum PolicyType {
@@ -473,13 +472,14 @@ class PolicyTemplate {
 }
 
 /// Policy Management Service
+/// Uses local in-memory storage (enterprise API not yet implemented)
 class PolicyManagementService {
-  final OrbGuardClient _client = OrbGuardClient.instance;
-
-  // Cached data
+  // Cached data (local storage)
   List<SecurityPolicy> _policies = [];
   List<PolicyTemplate> _templates = [];
   List<PolicyViolation> _violations = [];
+  int _nextPolicyId = 1;
+  int _nextRuleId = 1;
 
   // Stream controllers
   final _policyUpdateController = StreamController<SecurityPolicy>.broadcast();
@@ -500,37 +500,18 @@ class PolicyManagementService {
     ]);
   }
 
-  /// Load all policies
+  /// Load all policies (local storage)
   Future<List<SecurityPolicy>> loadPolicies() async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/policies',
-      );
-
-      _policies = (response['policies'] as List<dynamic>?)
-              ?.map((p) => SecurityPolicy.fromJson(p as Map<String, dynamic>))
-              .toList() ??
-          [];
-
-      return _policies;
-    } catch (e) {
-      return _policies;
-    }
+    // Return cached policies (in real impl, would sync with API)
+    return _policies;
   }
 
   /// Get single policy
   Future<SecurityPolicy?> getPolicy(String policyId) async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/policies/$policyId',
-      );
-      return SecurityPolicy.fromJson(response);
-    } catch (e) {
-      return _policies.where((p) => p.id == policyId).firstOrNull;
-    }
+    return _policies.where((p) => p.id == policyId).firstOrNull;
   }
 
-  /// Create new policy
+  /// Create new policy (local storage)
   Future<SecurityPolicy?> createPolicy({
     required String name,
     required String description,
@@ -540,31 +521,26 @@ class PolicyManagementService {
     List<String>? platforms,
     int priority = 0,
   }) async {
-    try {
-      final response = await _client.post<Map<String, dynamic>>(
-        '/enterprise/policies',
-        data: {
-          'name': name,
-          'description': description,
-          'type': type.name,
-          'enforcement': enforcement.name,
-          if (rules != null) 'rules': rules.map((r) => r.toJson()).toList(),
-          if (platforms != null) 'platforms': platforms,
-          'priority': priority,
-        },
-      );
+    final now = DateTime.now();
+    final policy = SecurityPolicy(
+      id: 'policy-${_nextPolicyId++}',
+      name: name,
+      description: description,
+      type: type,
+      enforcement: enforcement,
+      rules: rules ?? [],
+      platforms: platforms ?? [],
+      priority: priority,
+      createdAt: now,
+      updatedAt: now,
+    );
 
-      final policy = SecurityPolicy.fromJson(response);
-      _policies.add(policy);
-      _policyUpdateController.add(policy);
-
-      return policy;
-    } catch (e) {
-      return null;
-    }
+    _policies.add(policy);
+    _policyUpdateController.add(policy);
+    return policy;
   }
 
-  /// Update policy
+  /// Update policy (local storage)
   Future<SecurityPolicy?> updatePolicy(
     String policyId, {
     String? name,
@@ -575,164 +551,123 @@ class PolicyManagementService {
     int? priority,
     bool? isEnabled,
   }) async {
-    try {
-      final response = await _client.put<Map<String, dynamic>>(
-        '/enterprise/policies/$policyId',
-        data: {
-          if (name != null) 'name': name,
-          if (description != null) 'description': description,
-          if (enforcement != null) 'enforcement': enforcement.name,
-          if (rules != null) 'rules': rules.map((r) => r.toJson()).toList(),
-          if (platforms != null) 'platforms': platforms,
-          if (priority != null) 'priority': priority,
-          if (isEnabled != null) 'is_enabled': isEnabled,
-        },
-      );
+    final index = _policies.indexWhere((p) => p.id == policyId);
+    if (index < 0) return null;
 
-      final policy = SecurityPolicy.fromJson(response);
+    final existing = _policies[index];
+    final updated = SecurityPolicy(
+      id: existing.id,
+      name: name ?? existing.name,
+      description: description ?? existing.description,
+      type: existing.type,
+      enforcement: enforcement ?? existing.enforcement,
+      rules: rules ?? existing.rules,
+      platforms: platforms ?? existing.platforms,
+      priority: priority ?? existing.priority,
+      isEnabled: isEnabled ?? existing.isEnabled,
+      isDefault: existing.isDefault,
+      createdAt: existing.createdAt,
+      updatedAt: DateTime.now(),
+      createdBy: existing.createdBy,
+    );
 
-      final index = _policies.indexWhere((p) => p.id == policyId);
-      if (index >= 0) {
-        _policies[index] = policy;
-      }
-      _policyUpdateController.add(policy);
-
-      return policy;
-    } catch (e) {
-      return null;
-    }
+    _policies[index] = updated;
+    _policyUpdateController.add(updated);
+    return updated;
   }
 
-  /// Delete policy
+  /// Delete policy (local storage)
   Future<bool> deletePolicy(String policyId) async {
-    try {
-      await _client.delete<void>('/enterprise/policies/$policyId');
-      _policies.removeWhere((p) => p.id == policyId);
-      return true;
-    } catch (e) {
-      return false;
-    }
+    _policies.removeWhere((p) => p.id == policyId);
+    return true;
   }
 
-  /// Assign policy to groups
+  /// Assign policy to groups (stub)
   Future<bool> assignPolicyToGroups(
     String policyId,
     List<String> groupIds,
   ) async {
-    try {
-      await _client.post<void>(
-        '/enterprise/policies/$policyId/assign',
-        data: {'group_ids': groupIds},
-      );
-      await loadPolicies();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // Local stub - would sync with API in real impl
+    return true;
   }
 
-  /// Assign policy to devices
+  /// Assign policy to devices (stub)
   Future<bool> assignPolicyToDevices(
     String policyId,
     List<String> deviceIds,
   ) async {
-    try {
-      await _client.post<void>(
-        '/enterprise/policies/$policyId/assign',
-        data: {'device_ids': deviceIds},
-      );
-      await loadPolicies();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // Local stub - would sync with API in real impl
+    return true;
   }
 
-  /// Remove policy assignment
+  /// Remove policy assignment (stub)
   Future<bool> removePolicyAssignment(
     String policyId, {
     List<String>? groupIds,
     List<String>? deviceIds,
   }) async {
-    try {
-      await _client.post<void>(
-        '/enterprise/policies/$policyId/unassign',
-        data: {
-          if (groupIds != null) 'group_ids': groupIds,
-          if (deviceIds != null) 'device_ids': deviceIds,
-        },
-      );
-      await loadPolicies();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // Local stub - would sync with API in real impl
+    return true;
   }
 
-  /// Add rule to policy
+  /// Add rule to policy (local storage)
   Future<PolicyRule?> addRule(String policyId, PolicyRule rule) async {
-    try {
-      final response = await _client.post<Map<String, dynamic>>(
-        '/enterprise/policies/$policyId/rules',
-        data: rule.toJson(),
-      );
+    final index = _policies.indexWhere((p) => p.id == policyId);
+    if (index < 0) return null;
 
-      final newRule = PolicyRule.fromJson(response);
-      await loadPolicies();
+    final newRule = PolicyRule(
+      id: 'rule-${_nextRuleId++}',
+      name: rule.name,
+      description: rule.description,
+      condition: rule.condition,
+      action: rule.action,
+      parameters: rule.parameters,
+      isEnabled: rule.isEnabled,
+    );
 
-      return newRule;
-    } catch (e) {
-      return null;
-    }
+    // Create new policy with added rule
+    final existing = _policies[index];
+    final updatedRules = [...existing.rules, newRule];
+    await updatePolicy(policyId, rules: updatedRules);
+
+    return newRule;
   }
 
-  /// Update rule
+  /// Update rule (local storage)
   Future<bool> updateRule(
     String policyId,
     String ruleId,
     PolicyRule rule,
   ) async {
-    try {
-      await _client.put<void>(
-        '/enterprise/policies/$policyId/rules/$ruleId',
-        data: rule.toJson(),
-      );
-      await loadPolicies();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    final policyIndex = _policies.indexWhere((p) => p.id == policyId);
+    if (policyIndex < 0) return false;
+
+    final existing = _policies[policyIndex];
+    final updatedRules = existing.rules.map((r) {
+      if (r.id == ruleId) return rule;
+      return r;
+    }).toList();
+
+    await updatePolicy(policyId, rules: updatedRules);
+    return true;
   }
 
-  /// Delete rule
+  /// Delete rule (local storage)
   Future<bool> deleteRule(String policyId, String ruleId) async {
-    try {
-      await _client.delete<void>(
-        '/enterprise/policies/$policyId/rules/$ruleId',
-      );
-      await loadPolicies();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    final policyIndex = _policies.indexWhere((p) => p.id == policyId);
+    if (policyIndex < 0) return false;
+
+    final existing = _policies[policyIndex];
+    final updatedRules = existing.rules.where((r) => r.id != ruleId).toList();
+
+    await updatePolicy(policyId, rules: updatedRules);
+    return true;
   }
 
-  /// Load policy templates
+  /// Load policy templates (local storage)
   Future<List<PolicyTemplate>> loadTemplates() async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/policies/templates',
-      );
-
-      _templates = (response['templates'] as List<dynamic>?)
-              ?.map((t) => PolicyTemplate.fromJson(t as Map<String, dynamic>))
-              .toList() ??
-          [];
-
-      return _templates;
-    } catch (e) {
-      return _getDefaultTemplates();
-    }
+    _templates = _getDefaultTemplates();
+    return _templates;
   }
 
   List<PolicyTemplate> _getDefaultTemplates() {
@@ -828,88 +763,55 @@ class PolicyManagementService {
     );
   }
 
-  /// Get policy violations
+  /// Get policy violations (local storage)
   Future<List<PolicyViolation>> getViolations({
     String? policyId,
     String? deviceId,
     bool unresolvedOnly = false,
     int limit = 100,
   }) async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/policies/violations',
-        queryParameters: {
-          if (policyId != null) 'policy_id': policyId,
-          if (deviceId != null) 'device_id': deviceId,
-          'unresolved_only': unresolvedOnly,
-          'limit': limit,
-        },
-      );
+    var violations = _violations.toList();
 
-      _violations = (response['violations'] as List<dynamic>?)
-              ?.map((v) => PolicyViolation.fromJson(v as Map<String, dynamic>))
-              .toList() ??
-          [];
-
-      return _violations;
-    } catch (e) {
-      return _violations;
+    if (policyId != null) {
+      violations = violations.where((v) => v.policyId == policyId).toList();
     }
+    if (deviceId != null) {
+      violations = violations.where((v) => v.deviceId == deviceId).toList();
+    }
+    if (unresolvedOnly) {
+      violations = violations.where((v) => !v.isResolved).toList();
+    }
+
+    return violations.take(limit).toList();
   }
 
-  /// Resolve violation
+  /// Resolve violation (local storage)
   Future<bool> resolveViolation(String violationId, {String? notes}) async {
-    try {
-      await _client.post<void>(
-        '/enterprise/policies/violations/$violationId/resolve',
-        data: {if (notes != null) 'notes': notes},
-      );
-
-      final index = _violations.indexWhere((v) => v.id == violationId);
-      if (index >= 0) {
-        _violations.removeAt(index);
-      }
-
-      return true;
-    } catch (e) {
-      return false;
+    final index = _violations.indexWhere((v) => v.id == violationId);
+    if (index >= 0) {
+      _violations.removeAt(index);
     }
+    return true;
   }
 
-  /// Evaluate device compliance
+  /// Evaluate device compliance (stub)
   Future<Map<String, dynamic>> evaluateCompliance(String deviceId) async {
-    try {
-      final response = await _client.post<Map<String, dynamic>>(
-        '/enterprise/policies/evaluate',
-        data: {'device_id': deviceId},
-      );
-
-      return {
-        'is_compliant': response['is_compliant'],
-        'violations': response['violations'],
-        'evaluated_at': response['evaluated_at'],
-      };
-    } catch (e) {
-      return {'error': e.toString()};
-    }
+    // Local stub - would evaluate against policies in real impl
+    return {
+      'is_compliant': true,
+      'violations': <Map<String, dynamic>>[],
+      'evaluated_at': DateTime.now().toIso8601String(),
+    };
   }
 
   // ========== BYOD POLICY METHODS ==========
 
   /// Get BYOD policy for a device ownership type
   Future<SecurityPolicy?> getBYODPolicy(DeviceOwnershipType ownershipType) async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/policies/byod/${ownershipType.name}',
-      );
-      return SecurityPolicy.fromJson(response);
-    } catch (e) {
-      // Return default BYOD policy if not found
-      return _policies.where((p) => p.type == PolicyType.byod).firstOrNull;
-    }
+    return _policies.where((p) => p.type == PolicyType.byod).firstOrNull;
   }
 
-  /// Create BYOD policy with settings
+  /// Create BYOD policy with settings (local storage)
   Future<SecurityPolicy?> createBYODPolicy({
     required String name,
     required String description,
@@ -918,31 +820,15 @@ class PolicyManagementService {
     EnforcementLevel enforcement = EnforcementLevel.warn,
     List<String>? platforms,
   }) async {
-    try {
-      final rules = _generateBYODRules(settings);
-
-      final response = await _client.post<Map<String, dynamic>>(
-        '/enterprise/policies',
-        data: {
-          'name': name,
-          'description': description,
-          'type': PolicyType.byod.name,
-          'enforcement': enforcement.name,
-          'rules': rules.map((r) => r.toJson()).toList(),
-          if (platforms != null) 'platforms': platforms,
-          'byod_settings': settings.toJson(),
-          'target_ownership': targetOwnership.name,
-        },
-      );
-
-      final policy = SecurityPolicy.fromJson(response);
-      _policies.add(policy);
-      _policyUpdateController.add(policy);
-
-      return policy;
-    } catch (e) {
-      return null;
-    }
+    final rules = _generateBYODRules(settings);
+    return createPolicy(
+      name: name,
+      description: description,
+      type: PolicyType.byod,
+      enforcement: enforcement,
+      rules: rules,
+      platforms: platforms,
+    );
   }
 
   /// Generate BYOD rules from settings
@@ -1044,63 +930,35 @@ class PolicyManagementService {
     return rules;
   }
 
-  /// Enroll device as BYOD
+  /// Enroll device as BYOD (stub)
   Future<Map<String, dynamic>> enrollBYODDevice(BYODEnrollmentRequest request) async {
-    try {
-      final response = await _client.post<Map<String, dynamic>>(
-        '/enterprise/byod/enroll',
-        data: request.toJson(),
-      );
-
-      return {
-        'success': true,
-        'device_id': response['device_id'],
-        'enrollment_id': response['enrollment_id'],
-        'policy_id': response['policy_id'],
-        'message': response['message'] ?? 'Device enrolled successfully',
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
-    }
+    // Local stub - would call API in real impl
+    return {
+      'success': true,
+      'device_id': 'device-${DateTime.now().millisecondsSinceEpoch}',
+      'enrollment_id': 'enroll-${DateTime.now().millisecondsSinceEpoch}',
+      'policy_id': 'policy-byod-default',
+      'message': 'Device enrolled successfully (local)',
+    };
   }
 
-  /// Get BYOD enrollment status
+  /// Get BYOD enrollment status (stub)
   Future<Map<String, dynamic>> getBYODEnrollmentStatus(String deviceId) async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/byod/status/$deviceId',
-      );
-
-      return {
-        'is_enrolled': response['is_enrolled'] ?? false,
-        'ownership_type': response['ownership_type'],
-        'enrollment_date': response['enrollment_date'],
-        'policy_name': response['policy_name'],
-        'is_compliant': response['is_compliant'],
-        'work_profile_enabled': response['work_profile_enabled'],
-      };
-    } catch (e) {
-      return {'is_enrolled': false, 'error': e.toString()};
-    }
+    // Local stub - would call API in real impl
+    return {
+      'is_enrolled': false,
+      'ownership_type': 'unknown',
+      'enrollment_date': null,
+      'policy_name': null,
+      'is_compliant': true,
+      'work_profile_enabled': false,
+    };
   }
 
-  /// Unenroll BYOD device
+  /// Unenroll BYOD device (stub)
   Future<bool> unenrollBYODDevice(String deviceId, {bool wipeWorkData = true}) async {
-    try {
-      await _client.post<void>(
-        '/enterprise/byod/unenroll',
-        data: {
-          'device_id': deviceId,
-          'wipe_work_data': wipeWorkData,
-        },
-      );
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // Local stub - would call API in real impl
+    return true;
   }
 
   /// Get BYOD policy templates
@@ -1169,29 +1027,16 @@ class PolicyManagementService {
     ];
   }
 
-  /// Check device ownership type
+  /// Check device ownership type (stub)
   Future<DeviceOwnershipType> detectDeviceOwnership(String deviceId) async {
-    try {
-      final response = await _client.get<Map<String, dynamic>>(
-        '/enterprise/devices/$deviceId/ownership',
-      );
-      return DeviceOwnershipType.fromString(response['ownership_type'] as String?);
-    } catch (e) {
-      return DeviceOwnershipType.unknown;
-    }
+    // Local stub - would call API in real impl
+    return DeviceOwnershipType.unknown;
   }
 
-  /// Set device ownership type
+  /// Set device ownership type (stub)
   Future<bool> setDeviceOwnership(String deviceId, DeviceOwnershipType ownershipType) async {
-    try {
-      await _client.put<void>(
-        '/enterprise/devices/$deviceId/ownership',
-        data: {'ownership_type': ownershipType.name},
-      );
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // Local stub - would call API in real impl
+    return true;
   }
 
   /// Dispose resources

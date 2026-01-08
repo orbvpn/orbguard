@@ -48,7 +48,7 @@ enum HuntType {
   attackPattern('Attack Pattern', 'Match MITRE ATT&CK patterns'),
   dataExfiltration('Data Exfiltration', 'Detect data theft attempts'),
   persistenceMechanism('Persistence', 'Find persistence mechanisms'),
-  lateral Movement('Lateral Movement', 'Detect spreading behavior'),
+  lateralMovement('Lateral Movement', 'Detect spreading behavior'),
   privilegeEscalation('Privilege Escalation', 'Find escalation attempts');
 
   final String displayName;
@@ -213,12 +213,16 @@ class InvestigationCase {
 
 /// Case status
 enum CaseStatus {
-  open,
-  investigating,
-  pendingAction,
-  resolved,
-  falsePositive,
-  closed,
+  open('Open', 'Case is open'),
+  investigating('Investigating', 'Under investigation'),
+  pendingAction('Pending Action', 'Awaiting action'),
+  resolved('Resolved', 'Case resolved'),
+  falsePositive('False Positive', 'Marked as false positive'),
+  closed('Closed', 'Case closed');
+
+  final String displayName;
+  final String description;
+  const CaseStatus(this.displayName, this.description);
 }
 
 /// Case priority

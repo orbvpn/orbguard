@@ -212,7 +212,7 @@ class ExecutiveProtectionService {
       RegExp(r'\b(before (the )?end of (the )?(day|business))\b', caseSensitive: false),
       RegExp(r'\b(need(s|ed)? (this|it) (done|completed|now))\b', caseSensitive: false),
       RegExp(r'\b(critical|emergency|top priority)\b', caseSensitive: false),
-      RegExp(r'\b(don\'?t delay|act (now|fast|quickly))\b', caseSensitive: false),
+      RegExp(r"\b(don'?t delay|act (now|fast|quickly))\b", caseSensitive: false),
       RegExp(r'\b(deadline|time is running out)\b', caseSensitive: false),
     ];
 
@@ -231,7 +231,7 @@ class ExecutiveProtectionService {
     // Secrecy/confidentiality patterns
     _secrecyPatterns = [
       RegExp(r'\b(confidential|private|sensitive)\b', caseSensitive: false),
-      RegExp(r'\b(don\'?t (tell|share|mention|discuss))\b', caseSensitive: false),
+      RegExp(r"\b(don'?t (tell|share|mention|discuss))\b", caseSensitive: false),
       RegExp(r'\b(between (us|you and me))\b', caseSensitive: false),
       RegExp(r'\b(keep (this|it) (quiet|private|between))\b', caseSensitive: false),
       RegExp(r'\b(discretion|discreet(ly)?)\b', caseSensitive: false),

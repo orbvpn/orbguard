@@ -1,0 +1,16 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"path": "../orbguard.lab"
+	},
+	{
+		"path": "../orbnet"
+	},
+	{
+		"path": "../orbnet.admin"
+	}
+]
+}
