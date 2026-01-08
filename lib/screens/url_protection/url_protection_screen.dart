@@ -6,9 +6,9 @@ library url_protection_screen;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
+import '../../presentation/widgets/glass_widgets.dart';
 import '../../models/api/url_reputation.dart';
 import '../../providers/url_provider.dart';
 import '../../widgets/url/url_widgets.dart';
@@ -21,24 +21,17 @@ class UrlProtectionScreen extends StatefulWidget {
   State<UrlProtectionScreen> createState() => _UrlProtectionScreenState();
 }
 
-class _UrlProtectionScreenState extends State<UrlProtectionScreen>
-    with SingleTickerProviderStateMixin {
+class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   final UrlProvider _provider = UrlProvider();
-  late TabController _tabController;
+  final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey<GlassTabPageState>();
   bool _isInitialized = false;
   UrlReputationResult? _checkResult;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _initProvider();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _initProvider() async {
@@ -53,6 +46,12 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
 
   void _onProviderChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+    });
   }
 
   Future<void> _checkUrl(String url) async {
@@ -181,62 +180,71 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'URL Protection',
-        showBackButton: true,
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'clipboard_text',
-            onTap: _showListManagementSheet,
+  Widget _buildActionsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          IconButton(
+            icon: const DuotoneIcon('clipboard_text', size: 22, color: Colors.white),
+            onPressed: _showListManagementSheet,
             tooltip: 'Manage Lists',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Check'),
-                    Tab(text: 'History'),
-                    Tab(text: 'Stats'),
-                  ],
-                ),
-              ),
-            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return GlassTabPage(
+        title: 'URL Protection',
+        tabs: [
+          GlassTab(
+            label: 'Check',
+            iconPath: 'shield_check',
+            content: const Center(child: CircularProgressIndicator()),
           ),
-          Expanded(
-            child: !_isInitialized
-              ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Check tab
-                    _buildCheckTab(),
-
-                    // History tab
-                    _buildHistoryTab(),
-
-                    // Stats tab
-                    _buildStatsTab(),
-                  ],
-                ),
+          GlassTab(
+            label: 'History',
+            iconPath: 'history',
+            content: const SizedBox(),
+          ),
+          GlassTab(
+            label: 'Stats',
+            iconPath: 'chart',
+            content: const SizedBox(),
           ),
         ],
-      ),
+      );
+    }
+
+    return GlassTabPage(
+      key: _tabPageKey,
+      title: 'URL Protection',
+      hasSearch: true,
+      searchHint: 'Search URLs...',
+      onSearchChanged: _onSearchChanged,
+      headerContent: _buildActionsRow(),
+      tabs: [
+        GlassTab(
+          label: 'Check',
+          iconPath: 'shield_check',
+          content: _buildCheckTab(),
+        ),
+        GlassTab(
+          label: 'History',
+          iconPath: 'history',
+          content: _buildHistoryTab(),
+        ),
+        GlassTab(
+          label: 'Stats',
+          iconPath: 'chart',
+          content: _buildStatsTab(),
+        ),
+      ],
     );
   }
 
@@ -282,7 +290,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
           // Recent threats
           if (_provider.recentThreats.isNotEmpty) ...[
             _buildSectionHeader('Recent Threats', onViewAll: () {
-              _tabController.animateTo(1);
+              _tabPageKey.currentState?.animateToTab(1);
             }),
             const SizedBox(height: 12),
             ...List.generate(
@@ -307,7 +315,15 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
   }
 
   Widget _buildHistoryTab() {
-    final history = _provider.history;
+    var history = _provider.history;
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      history = history.where((entry) {
+        return entry.url.toLowerCase().contains(_searchQuery) ||
+            (entry.result?.domain.toLowerCase().contains(_searchQuery) ?? false);
+      }).toList();
+    }
 
     return history.isEmpty
         ? _buildEmptyHistoryState()
@@ -328,37 +344,38 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
                         ),
                       ),
                       const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: const Color(0xFF1D1E33),
-                              title: const Text('Clear History'),
-                              content: const Text(
-                                'Are you sure you want to clear all URL check history?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Cancel'),
+                      if (_searchQuery.isEmpty)
+                        TextButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: const Color(0xFF1D1E33),
+                                title: const Text('Clear History'),
+                                content: const Text(
+                                  'Are you sure you want to clear all URL check history?',
                                 ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    _provider.clearHistory();
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
                                   ),
-                                  child: const Text('Clear'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        child: const Text('Clear All'),
-                      ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _provider.clearHistory();
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    child: const Text('Clear'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: const Text('Clear All'),
+                        ),
                     ],
                   ),
                 );
@@ -393,7 +410,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'No URL History',
+              _searchQuery.isNotEmpty ? 'No Results Found' : 'No URL History',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -402,7 +419,9 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'URLs you check will appear here',
+              _searchQuery.isNotEmpty
+                  ? 'No URLs match your search'
+                  : 'URLs you check will appear here',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey[600],

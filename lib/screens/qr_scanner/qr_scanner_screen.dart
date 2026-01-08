@@ -7,8 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
 import '../../widgets/qr/qr_widgets.dart';
@@ -274,43 +273,38 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'QR Scanner',
-        showBackButton: true,
-        actions: [
-          if (_tabController.index == 0) ...[
-            GestureDetector(
-              onTap: _isCameraActive ? _toggleFlash : null,
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                child: DuotoneIcon(
-                  'bolt',
-                  size: 22,
-                  color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: _isCameraActive ? _switchCamera : null,
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                child: const DuotoneIcon(
-                  'camera',
-                  size: 22,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+    return GlassPage(
+      title: 'QR Scanner',
       body: Column(
         children: [
+          // Actions row
+          if (_tabController.index == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    onPressed: _isCameraActive ? _toggleFlash : null,
+                    icon: DuotoneIcon(
+                      'bolt',
+                      size: 22,
+                      color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
+                    ),
+                    tooltip: 'Flash',
+                  ),
+                  IconButton(
+                    onPressed: _isCameraActive ? _switchCamera : null,
+                    icon: const DuotoneIcon(
+                      'camera',
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                    tooltip: 'Switch Camera',
+                  ),
+                ],
+              ),
+            ),
           // Tab bar
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

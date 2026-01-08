@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/darkweb_provider.dart';
@@ -19,86 +19,59 @@ class DarkWebScreen extends StatefulWidget {
   State<DarkWebScreen> createState() => _DarkWebScreenState();
 }
 
-class _DarkWebScreenState extends State<DarkWebScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _DarkWebScreenState extends State<DarkWebScreen> {
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Dark Web Monitor',
-        showBackButton: true,
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: () {
-              context.read<DarkWebProvider>().refreshAssets();
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddAssetSheet(context),
-        backgroundColor: GlassTheme.primaryAccent,
-        foregroundColor: Colors.black,
-        icon: const DuotoneIcon('add_circle', size: 20),
-        label: const Text('Add Asset'),
-      ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  isScrollable: true,
-                  tabs: const [
-                    Tab(icon: DuotoneIcon('letter', size: 20), text: 'Email'),
-                    Tab(icon: DuotoneIcon('key', size: 20), text: 'Password'),
-                    Tab(icon: DuotoneIcon('bell', size: 20), text: 'Alerts'),
-                    Tab(icon: DuotoneIcon('chart', size: 20), text: 'Stats'),
-                  ],
+    return Consumer<DarkWebProvider>(
+      builder: (context, provider, child) {
+        return GlassTabPage(
+          title: 'Dark Web Monitor',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                FloatingActionButton.extended(
+                  onPressed: () => _showAddAssetSheet(context),
+                  backgroundColor: GlassTheme.primaryAccent,
+                  foregroundColor: Colors.black,
+                  icon: const DuotoneIcon('add_circle', size: 20),
+                  label: const Text('Add Asset'),
                 ),
-              ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: () {
+                    context.read<DarkWebProvider>().refreshAssets();
+                  },
+                  tooltip: 'Refresh',
+                ),
+              ],
             ),
           ),
-          Expanded(
-            child: Consumer<DarkWebProvider>(
-              builder: (context, provider, child) {
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildEmailTab(provider),
-                    _buildPasswordTab(provider),
-                    _buildAlertsTab(provider),
-                    _buildStatsTab(provider),
-                  ],
-                );
-              },
+          tabs: [
+            GlassTab(
+              label: 'Email',
+              iconPath: 'globe',
+              content: _buildEmailTab(provider),
             ),
-          ),
-        ],
-      ),
+            GlassTab(
+              label: 'Password',
+              iconPath: 'magnifier',
+              content: _buildPasswordTab(provider),
+            ),
+            GlassTab(
+              label: 'Alerts',
+              iconPath: 'danger_triangle',
+              content: _buildAlertsTab(provider),
+            ),
+            GlassTab(
+              label: 'Stats',
+              iconPath: 'history',
+              content: _buildStatsTab(provider),
+            ),
+          ],
+        );
+      },
     );
   }
 

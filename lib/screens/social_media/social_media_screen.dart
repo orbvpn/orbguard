@@ -7,9 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/social_media_provider.dart';
 import '../../services/security/social_media_monitor_service.dart';
 
@@ -44,66 +43,71 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Social Media Monitor',
-        showBackButton: true,
-        actions: [
-          Consumer<SocialMediaProvider>(
-            builder: (context, provider, _) => GlassAppBarAction(
-              svgIcon: provider.isScanning ? 'stop' : 'refresh',
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                if (!provider.isScanning) {
-                  provider.scanAllAccounts();
-                }
-              },
-            ),
+    return Consumer<SocialMediaProvider>(
+      builder: (context, provider, _) {
+        return GlassPage(
+          title: 'Social Media Monitor',
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: _showAddAccountDialog,
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Colors.black,
+            icon: const DuotoneIcon('add_circle', size: 24),
+            label: const Text('Add Account'),
           ),
-        ],
-      ),
-      body: Consumer<SocialMediaProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
-            );
-          }
-
-          return Column(
-            children: [
-              // Status card
-              _buildStatusCard(provider),
-              const SizedBox(height: 16),
-              // Stats row
-              _buildStatsRow(provider),
-              const SizedBox(height: 16),
-              // Tab bar
-              _buildTabBar(),
-              const SizedBox(height: 16),
-              // Tab content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+          body: provider.isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                )
+              : Column(
                   children: [
-                    _buildAccountsTab(provider),
-                    _buildAlertsTab(provider),
-                    _buildPrivacyTab(provider),
-                    _buildExposuresTab(provider),
+                    // Actions row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: DuotoneIcon(
+                              provider.isScanning ? 'stop' : 'refresh',
+                              size: 22,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              HapticFeedback.mediumImpact();
+                              if (!provider.isScanning) {
+                                provider.scanAllAccounts();
+                              }
+                            },
+                            tooltip: provider.isScanning ? 'Stop Scan' : 'Refresh',
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status card
+                    _buildStatusCard(provider),
+                    const SizedBox(height: 16),
+                    // Stats row
+                    _buildStatsRow(provider),
+                    const SizedBox(height: 16),
+                    // Tab bar
+                    _buildTabBar(),
+                    const SizedBox(height: 16),
+                    // Tab content
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildAccountsTab(provider),
+                          _buildAlertsTab(provider),
+                          _buildPrivacyTab(provider),
+                          _buildExposuresTab(provider),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddAccountDialog,
-        backgroundColor: GlassTheme.primaryAccent,
-        foregroundColor: Colors.black,
-        icon: const DuotoneIcon('add_circle', size: 24),
-        label: const Text('Add Account'),
-      ),
+        );
+      },
     );
   }
 

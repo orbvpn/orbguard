@@ -111,32 +111,24 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'OrbGuard',
-        actions: [
-          GestureDetector(
-            onTap: _showConnectionSheet,
-            child: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              child: const DuotoneIcon('wi_fi_router', size: 22),
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              // Navigate to settings
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              child: const DuotoneIcon('settings', size: 22),
-            ),
-          ),
-        ],
-      ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.white.withAlpha(150) : Colors.black.withAlpha(100);
+
+    return GlassPage(
+      title: 'Dashboard',
+      showBackButton: true,
+      actions: [
+        GestureDetector(
+          onTap: _showConnectionSheet,
+          child: DuotoneIcon('wi_fi_router', size: 22, color: iconColor),
+        ),
+        GestureDetector(
+          onTap: () {
+            // Navigate to settings
+          },
+          child: DuotoneIcon('settings', size: 22, color: iconColor),
+        ),
+      ],
       body: !_isInitialized
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

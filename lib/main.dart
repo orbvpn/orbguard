@@ -36,10 +36,12 @@ import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
 
-// Glass Theme
+// Glass Theme & Colors
 import 'presentation/theme/glass_theme.dart';
+import 'presentation/theme/colors.dart';
 import 'presentation/widgets/glass_container.dart';
 import 'presentation/widgets/duotone_icon.dart';
+import 'presentation/widgets/glass_bottom_nav.dart';
 
 // Providers
 import 'providers/qr_provider.dart';
@@ -118,12 +120,12 @@ class AntiSpywareApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData.dark().copyWith(
           scaffoldBackgroundColor: Colors.transparent,
-          primaryColor: GlassTheme.glassColorDark,
+          primaryColor: AppColors.primary,
           colorScheme: const ColorScheme.dark(
-            primary: GlassTheme.primaryAccent,
-            secondary: GlassTheme.secondaryAccent,
-            error: GlassTheme.errorColor,
-            surface: Color(0xFF1D1E33),
+            primary: AppColors.accent,
+            secondary: AppColors.secondary,
+            error: AppColors.error,
+            surface: AppColors.surfaceDark,
           ),
           appBarTheme: const AppBarTheme(
             backgroundColor: Colors.transparent,
@@ -159,6 +161,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const platform = MethodChannel('com.orb.guard/system');
+
+  // Bottom navigation state
+  int _currentNavIndex = 0;
 
   bool _isScanning = false;
   bool _hasRootAccess = false;
@@ -794,52 +799,309 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final iconColor = isDark ? Colors.white.withAlpha(150) : Colors.black.withAlpha(100);
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: const Text('OrbGuard', style: TextStyle(fontWeight: FontWeight.w600)),
-        elevation: 0,
-        actions: [
-          // Permission setup button
-          IconButton(
-            icon: DuotoneIcon(
-              AppIcons.shieldCheck,
-              color: _detectionCapability >= 80
-                  ? GlassTheme.successColor
-                  : _detectionCapability >= 50
-                      ? GlassTheme.warningColor
-                      : GlassTheme.errorColor,
+      backgroundColor: backgroundColor,
+      drawer: _buildNavigationDrawer(),
+      body: Stack(
+        children: [
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                // OrbX-style header
+                _buildOrbXHeader(isDark, textColor, iconColor),
+                // Body content
+                Expanded(
+                  child: _buildCurrentScreen(),
+                ),
+              ],
             ),
-            onPressed: _navigateToPermissionSetup,
           ),
-          IconButton(
-            icon: const DuotoneIcon(AppIcons.infoCircle, color: Colors.white),
-            onPressed: () => _showAboutDialog(),
+          // Bottom navigation bar
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: GlassBottomNavBar(
+              currentIndex: _currentNavIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentNavIndex = index;
+                });
+              },
+              items: const [
+                NavItem(label: 'Home', iconPath: AppIcons.home),
+                NavItem(label: 'Scan', iconPath: AppIcons.search),
+                NavItem(label: 'Intel', iconPath: AppIcons.structure),
+                NavItem(label: 'Settings', iconPath: AppIcons.settings),
+              ],
+            ),
           ),
         ],
       ),
-      drawer: _buildNavigationDrawer(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Detection capability banner
-            if (_permissionsChecked && _detectionCapability < 80)
-              _buildCapabilityBanner(),
-            _buildStatusCard(),
-            const SizedBox(height: 16),
-            _buildDeviceInfoCard(),
-            const SizedBox(height: 16),
-            _buildDetectionCapabilityCard(),
-            const SizedBox(height: 16),
-            _buildScanButton(),
-            const SizedBox(height: 16),
-            if (_threats.isNotEmpty) _buildThreatsSummary(),
-          ],
-        ),
+    );
+  }
+
+  /// OrbX-style header: round menu button LEFT, pill title RIGHT
+  Widget _buildOrbXHeader(bool isDark, Color textColor, Color iconColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Menu button (round glass, 50x50)
+          Builder(
+            builder: (context) => GestureDetector(
+              onTap: () => Scaffold.of(context).openDrawer(),
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: GlassTheme.circularGlassDecoration(isDark: isDark),
+                child: ClipOval(
+                  child: BackdropFilter(
+                    filter: GlassTheme.blurFilter,
+                    child: Center(
+                      child: DuotoneIcon(
+                        AppIcons.menu,
+                        size: 22,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Title container (pill-shaped)
+          Expanded(
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: GlassTheme.glassColor(isDark),
+                border: Border.all(
+                  color: GlassTheme.glassBorderColor(isDark),
+                  width: GlassTheme.borderWidth,
+                ),
+                boxShadow: [GlassTheme.shadow(isDark)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: BackdropFilter(
+                  filter: GlassTheme.blurFilter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        // Title text
+                        Expanded(
+                          child: Text(
+                            'OrbGuard',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ),
+                        // Permission status icon
+                        GestureDetector(
+                          onTap: _navigateToPermissionSetup,
+                          child: DuotoneIcon(
+                            AppIcons.shieldCheck,
+                            size: 22,
+                            color: _detectionCapability >= 80
+                                ? GlassTheme.successColor
+                                : _detectionCapability >= 50
+                                    ? GlassTheme.warningColor
+                                    : GlassTheme.errorColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Info icon
+                        GestureDetector(
+                          onTap: _showAboutDialog,
+                          child: DuotoneIcon(
+                            AppIcons.infoCircle,
+                            size: 22,
+                            color: iconColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build current screen based on navigation index
+  Widget _buildCurrentScreen() {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildHomeContent();
+      case 1:
+        return _buildScanContent();
+      case 2:
+        return _buildIntelContent();
+      case 3:
+        return _buildSettingsContent();
+      default:
+        return _buildHomeContent();
+    }
+  }
+
+  /// Home tab content
+  Widget _buildHomeContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_permissionsChecked && _detectionCapability < 80)
+            _buildCapabilityBanner(),
+          _buildStatusCard(),
+          const SizedBox(height: 16),
+          _buildDeviceInfoCard(),
+          const SizedBox(height: 16),
+          _buildDetectionCapabilityCard(),
+          const SizedBox(height: 16),
+          _buildScanButton(),
+          const SizedBox(height: 16),
+          if (_threats.isNotEmpty) _buildThreatsSummary(),
+        ],
+      ),
+    );
+  }
+
+  /// Scan tab content
+  Widget _buildScanContent() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GlassCircleButton(
+            size: 120,
+            tintColor: AppColors.accent,
+            onTap: () => _startScan(),
+            child: const DuotoneIcon(
+              AppIcons.search,
+              size: 56,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Tap to Start Scan',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withAlpha(200),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Detection capability: ${_detectionCapability.round()}%',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withAlpha(120),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Intel tab content - navigate to Intelligence Core
+  Widget _buildIntelContent() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GlassCircleButton(
+            size: 100,
+            tintColor: AppColors.accent,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => const IntelligenceCoreScreen(),
+              ));
+            },
+            child: const DuotoneIcon(
+              AppIcons.structure,
+              size: 48,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Threat Intelligence',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withAlpha(200),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap to browse IOCs & threat data',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withAlpha(120),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Settings tab content - navigate to Settings
+  Widget _buildSettingsContent() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GlassCircleButton(
+            size: 100,
+            tintColor: AppColors.accent,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => const SettingsScreen(),
+              ));
+            },
+            child: const DuotoneIcon(
+              AppIcons.settings,
+              size: 48,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withAlpha(200),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Configure app preferences',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withAlpha(120),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1129,7 +1391,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.all(20),
-        backgroundColor: const Color(0xFF00D9FF),
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
       ),
     );
@@ -1224,61 +1486,79 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildNavigationDrawer() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final secondaryColor = isDark ? Colors.white.withAlpha(150) : AppColors.textSecondary;
+
     return Drawer(
       backgroundColor: Colors.transparent,
       child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
         child: BackdropFilter(
           filter: GlassTheme.blurFilter,
           child: Container(
             decoration: BoxDecoration(
-              color: GlassTheme.glassColorDark,
-              border: Border(
-                right: BorderSide(
-                  color: GlassTheme.glassBorderColorDark,
-                  width: GlassTheme.borderWidth,
-                ),
+              color: isDark ? Colors.black.withAlpha(200) : Colors.white.withAlpha(240),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
             ),
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                DrawerHeader(
-                  decoration: BoxDecoration(
-                    gradient: GlassTheme.backgroundGradient(isDark: true),
+            child: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                children: [
+                  // Header Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.accent.withAlpha(isDark ? 40 : 25),
+                          AppColors.accent.withAlpha(isDark ? 20 : 12),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border.all(
+                        color: AppColors.accent.withAlpha(isDark ? 60 : 40),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.accent.withAlpha(30),
+                            border: Border.all(color: AppColors.accent.withAlpha(60), width: 1),
+                          ),
+                          child: const Center(
+                            child: DuotoneIcon(AppIcons.shield, size: 28, color: AppColors.accent),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('OrbGuard', style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                              const SizedBox(height: 4),
+                              Text('Mobile Security Suite', style: TextStyle(color: secondaryColor, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GlassCircleButton(
-                        size: 60,
-                        tintColor: GlassTheme.primaryAccent,
-                        child: const DuotoneIcon(
-                          AppIcons.shield,
-                          size: 32,
-                          color: GlassTheme.primaryAccent,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'OrbGuard',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Mobile Security Suite',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildDrawerItem(
+                  _buildDrawerItem(
                   svgIcon: 'widget_5',
                   title: 'Dashboard',
                   subtitle: 'Real-time threat overview',
@@ -1536,19 +1816,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       ),
+      ),
     );
   }
 
   Widget _buildDrawerSection(String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: Colors.grey[500],
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
+          color: isDark ? Colors.white.withAlpha(100) : Colors.black.withAlpha(80),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.5,
         ),
       ),
     );
@@ -1560,19 +1842,76 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: GlassSvgIconBox(
-        icon: svgIcon,
-        color: GlassTheme.primaryAccent,
-        size: 36,
-        iconSize: 18,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final secondaryColor = isDark ? Colors.white.withAlpha(130) : AppColors.textSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: isDark
+                  ? Colors.white.withAlpha(8)
+                  : Colors.black.withAlpha(5),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.accent.withAlpha(isDark ? 25 : 15),
+                  ),
+                  child: Center(
+                    child: DuotoneIcon(
+                      svgIcon,
+                      size: 18,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: secondaryColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                DuotoneIcon(
+                  AppIcons.chevronRight,
+                  size: 14,
+                  color: secondaryColor,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-      ),
-      onTap: onTap,
     );
   }
 

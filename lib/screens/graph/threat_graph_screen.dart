@@ -2,7 +2,6 @@
 /// Threat correlation and relationship visualization interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -39,24 +38,31 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Threat Graph',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.search,
-            onTap: () => _showSearchDialog(context),
-          ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadGraphData,
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Threat Graph',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
           : Column(
               children: [
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.search, size: 22, color: Colors.white),
+                        onPressed: () => _showSearchDialog(context),
+                        tooltip: 'Search',
+                      ),
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadGraphData,
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
+                ),
                 // Graph visualization placeholder
                 Expanded(
                   flex: 2,

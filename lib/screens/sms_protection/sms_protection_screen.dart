@@ -6,9 +6,9 @@ library sms_protection_screen;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/sms_provider.dart';
 import '../../widgets/sms/sms_widgets.dart';
@@ -22,24 +22,22 @@ class SmsProtectionScreen extends StatefulWidget {
   State<SmsProtectionScreen> createState() => _SmsProtectionScreenState();
 }
 
-class _SmsProtectionScreenState extends State<SmsProtectionScreen>
-    with SingleTickerProviderStateMixin {
+class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
   final SmsProvider _provider = SmsProvider();
-  late TabController _tabController;
+  final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey();
   bool _isInitialized = false;
   SmsAnalysisResult? _manualAnalysisResult;
   bool _isManualAnalyzing = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _initProvider();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _provider.dispose();
     super.dispose();
   }
@@ -90,13 +88,65 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
     }
   }
 
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
+  List<SmsMessage> get _filteredMessages {
+    var messages = _provider.messages;
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      messages = messages.where((m) =>
+        m.sender.toLowerCase().contains(query) ||
+        m.content.toLowerCase().contains(query)
+      ).toList();
+    }
+    return messages;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'SMS Protection',
-        showBackButton: true,
-        actions: [
+    if (!_isInitialized) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return GlassTabPage(
+      key: _tabPageKey,
+      title: 'SMS Protection',
+      hasSearch: true,
+      searchHint: 'Search messages...',
+      onSearchChanged: _onSearchChanged,
+      headerContent: _buildActionsRow(),
+      tabs: [
+        GlassTab(
+          label: 'Inbox',
+          iconPath: 'inbox',
+          content: _buildInboxTab(),
+        ),
+        GlassTab(
+          label: 'Check',
+          iconPath: 'shield_check',
+          content: _buildCheckTab(),
+        ),
+        GlassTab(
+          label: 'Stats',
+          iconPath: 'chart',
+          content: _buildStatsTab(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
           if (_provider.unanalyzedCount > 0)
             TextButton.icon(
               onPressed:
@@ -107,59 +157,17 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const DuotoneIcon('shield_check', size: 18),
+                  : const DuotoneIcon('shield_check', size: 18, color: Colors.white),
               label: Text(
                 _provider.isAnalyzing
                     ? 'Scanning...'
                     : 'Scan All (${_provider.unanalyzedCount})',
               ),
             ),
-          GlassAppBarAction(
-            svgIcon: 'forbidden',
-            onTap: () => _showBlockedSendersSheet(),
+          IconButton(
+            icon: const DuotoneIcon('forbidden', size: 22, color: Colors.white),
+            onPressed: () => _showBlockedSendersSheet(),
             tooltip: 'Blocked Senders',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Inbox'),
-                    Tab(text: 'Check'),
-                    Tab(text: 'Stats'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: !_isInitialized
-              ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Inbox tab
-                    _buildInboxTab(),
-
-                    // Check tab
-                    _buildCheckTab(),
-
-                    // Stats tab
-                    _buildStatsTab(),
-                  ],
-                ),
           ),
         ],
       ),
@@ -167,7 +175,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   }
 
   Widget _buildInboxTab() {
-    final messages = _provider.messages;
+    final messages = _filteredMessages;
 
     return Column(
       children: [
@@ -238,7 +246,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'No Messages',
+                _searchQuery.isNotEmpty ? 'No Results' : 'No Messages',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -247,7 +255,9 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                _getEmptyStateMessage(),
+                _searchQuery.isNotEmpty
+                    ? 'No messages match "$_searchQuery"'
+                    : _getEmptyStateMessage(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey[600],
@@ -255,7 +265,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              if (_provider.filter != SmsFilter.all)
+              if (_provider.filter != SmsFilter.all && _searchQuery.isEmpty)
                 OutlinedButton(
                   onPressed: () => _provider.setFilter(SmsFilter.all),
                   style: OutlinedButton.styleFrom(
@@ -573,7 +583,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 TextButton(
                   onPressed: () {
                     _provider.setFilter(SmsFilter.dangerous);
-                    _tabController.animateTo(0);
+                    _tabPageKey.currentState?.animateToTab(0);
                   },
                   child: const Text('View All'),
                 ),

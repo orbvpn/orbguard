@@ -2,7 +2,6 @@
 /// Advanced threat correlation and analysis interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -40,28 +39,35 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Correlation Engine',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.play,
-            onTap: _isCorrelating ? null : _runCorrelation,
-          ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadResults,
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Correlation Engine',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
           : Column(
               children: [
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
+                        onPressed: _isCorrelating ? null : _runCorrelation,
+                        tooltip: 'Run Correlation',
+                      ),
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadResults,
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
+                ),
                 // Engine filter
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: _engines.map((engine) {
                       final isSelected = engine == _selectedEngine;

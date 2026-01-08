@@ -49,42 +49,65 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'SIEM Integration',
-        actions: [
-          IconButton(
-            icon: const DuotoneIcon('add_circle', size: 24),
-            tooltip: 'Add Connection',
-            onPressed: () => _showAddConnectionDialog(context),
-          ),
-          IconButton(
-            icon: const DuotoneIcon('refresh', size: 24),
-            onPressed: _isLoading ? null : _loadData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Connections'),
-            Tab(text: 'Forwarders'),
-            Tab(text: 'Alerts'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+    return GlassPage(
+      title: 'SIEM Integration',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildConnectionsTab(),
-                _buildForwardersTab(),
-                _buildAlertsTab(),
+                IconButton(
+                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                  tooltip: 'Add Connection',
+                  onPressed: () => _showAddConnectionDialog(context),
+                ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadData,
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Connections'),
+                    Tab(text: 'Forwarders'),
+                    Tab(text: 'Alerts'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildConnectionsTab(),
+                      _buildForwardersTab(),
+                      _buildAlertsTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -46,41 +46,63 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'YARA Rules',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.fileDownload,
-            onTap: () => _showUploadDialog(context),
-            tooltip: 'Upload',
-          ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadRules,
-            tooltip: 'Refresh',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Rules'),
-            Tab(text: 'Scan'),
-            Tab(text: 'Results'),
-          ],
-        ),
-      ),
+    return GlassPage(
+      title: 'YARA Rules',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _buildRulesTab(),
-                _buildScanTab(),
-                _buildResultsTab(),
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.fileDownload, size: 22, color: Colors.white),
+                        onPressed: () => _showUploadDialog(context),
+                        tooltip: 'Upload',
+                      ),
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadRules,
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
+                ),
+                // Tab bar
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                    child: Container(
+                      decoration: GlassTheme.glassDecoration(),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicatorColor: GlassTheme.primaryAccent,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white54,
+                        tabs: const [
+                          Tab(text: 'Rules'),
+                          Tab(text: 'Scan'),
+                          Tab(text: 'Results'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildRulesTab(),
+                      _buildScanTab(),
+                      _buildResultsTab(),
+                    ],
+                  ),
+                ),
               ],
             ),
     );

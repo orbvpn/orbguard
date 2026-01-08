@@ -2,7 +2,6 @@
 /// Threat intelligence source management interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -36,46 +35,60 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Intelligence Sources',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.addCircle,
-            onPressed: () => _showAddSourceDialog(context),
-          ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onPressed: _isLoading ? null : _loadSources,
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Intelligence Sources',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
           : _sources.isEmpty
               ? _buildEmptyState()
-              : ListView(
-                  padding: const EdgeInsets.all(16),
+              : Column(
                   children: [
-                    // Stats
-                    Row(
-                      children: [
-                        _buildStatCard('Active', _sources.where((s) => s.isEnabled).length.toString(), GlassTheme.successColor),
-                        const SizedBox(width: 12),
-                        _buildStatCard('Total IOCs', '45.2K', GlassTheme.primaryAccent),
-                      ],
+                    // Actions row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
+                            onPressed: () => _showAddSourceDialog(context),
+                            tooltip: 'Add Source',
+                          ),
+                          IconButton(
+                            icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                            onPressed: _isLoading ? null : _loadSources,
+                            tooltip: 'Refresh',
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    // Content
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          // Stats
+                          Row(
+                            children: [
+                              _buildStatCard('Active', _sources.where((s) => s.isEnabled).length.toString(), GlassTheme.successColor),
+                              const SizedBox(width: 12),
+                              _buildStatCard('Total IOCs', '45.2K', GlassTheme.primaryAccent),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
 
-                    // Source categories
-                    const GlassSectionHeader(title: 'Open Source Feeds'),
-                    ..._sources.where((s) => s.category == 'Open Source').map(_buildSourceCard),
+                          // Source categories
+                          const GlassSectionHeader(title: 'Open Source Feeds'),
+                          ..._sources.where((s) => s.category == 'Open Source').map(_buildSourceCard),
 
-                    const GlassSectionHeader(title: 'Commercial Feeds'),
-                    ..._sources.where((s) => s.category == 'Commercial').map(_buildSourceCard),
+                          const GlassSectionHeader(title: 'Commercial Feeds'),
+                          ..._sources.where((s) => s.category == 'Commercial').map(_buildSourceCard),
 
-                    const GlassSectionHeader(title: 'Community Feeds'),
-                    ..._sources.where((s) => s.category == 'Community').map(_buildSourceCard),
+                          const GlassSectionHeader(title: 'Community Feeds'),
+                          ..._sources.where((s) => s.category == 'Community').map(_buildSourceCard),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
     );

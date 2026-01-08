@@ -40,46 +40,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   Widget build(BuildContext context) {
     return Consumer<ThreatHuntingProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Threat Hunting',
-            actions: [
-              if (provider.isHunting)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: GlassTheme.primaryAccent,
-                    ),
-                  ),
-                )
-              else
-                IconButton(
-                  icon: const DuotoneIcon('play', size: 24),
-                  tooltip: 'Run All Critical Hunts',
-                  onPressed: () => provider.executeAllCriticalHunts(),
-                ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              isScrollable: true,
-              tabs: const [
-                Tab(text: 'Hunts'),
-                Tab(text: 'Findings'),
-                Tab(text: 'Cases'),
-                Tab(text: 'MITRE'),
-                Tab(text: 'Graph'),
-                Tab(text: 'Correlation'),
-                Tab(text: 'ML'),
-              ],
-            ),
-          ),
+        return GlassPage(
+          title: 'Threat Hunting',
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
@@ -88,6 +50,59 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                 )
               : Column(
                   children: [
+                    // Actions row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (provider.isHunting)
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: GlassTheme.primaryAccent,
+                                ),
+                              ),
+                            )
+                          else
+                            IconButton(
+                              icon: const DuotoneIcon('play', size: 22, color: Colors.white),
+                              tooltip: 'Run All Critical Hunts',
+                              onPressed: () => provider.executeAllCriticalHunts(),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Tab bar
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                        child: Container(
+                          decoration: GlassTheme.glassDecoration(),
+                          child: TabBar(
+                            controller: _tabController,
+                            indicatorColor: GlassTheme.primaryAccent,
+                            labelColor: Colors.white,
+                            unselectedLabelColor: Colors.white54,
+                            isScrollable: true,
+                            tabs: const [
+                              Tab(text: 'Hunts'),
+                              Tab(text: 'Findings'),
+                              Tab(text: 'Cases'),
+                              Tab(text: 'MITRE'),
+                              Tab(text: 'Graph'),
+                              Tab(text: 'Correlation'),
+                              Tab(text: 'ML'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                     // Hunt Progress
                     if (provider.isHunting && provider.currentProgress != null)
                       _buildHuntProgress(provider),

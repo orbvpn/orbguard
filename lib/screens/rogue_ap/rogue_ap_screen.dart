@@ -39,72 +39,96 @@ class _RogueAPScreenState extends State<RogueAPScreen>
   Widget build(BuildContext context) {
     return Consumer<RogueAPProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Rogue AP Detection',
-            actions: [
-              if (provider.isScanning)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: GlassTheme.primaryAccent,
-                    ),
-                  ),
-                )
-              else
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 24),
-                  onPressed: () => provider.scanForAPs(),
-                ),
-              IconButton(
-                icon: const DuotoneIcon('settings', size: 24),
-                onPressed: () => _showSettings(context, provider),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Nearby APs'),
-                Tab(text: 'Threats'),
-                Tab(text: 'Trusted'),
-              ],
-            ),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                )
-              : Column(
+        return GlassPage(
+          title: 'Rogue AP Detection',
+          body: Column(
+            children: [
+              // Actions row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Scan progress
-                    if (provider.isScanning) _buildScanProgress(provider),
-                    // Current connection status
-                    if (provider.currentConnection != null && !provider.isScanning)
-                      _buildCurrentConnection(provider),
-                    // Stats summary
-                    if (!provider.isScanning) _buildStats(provider),
-                    // Tab content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildNearbyAPsTab(provider),
-                          _buildThreatsTab(provider),
-                          _buildTrustedTab(provider),
-                        ],
+                    if (provider.isScanning)
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: GlassTheme.primaryAccent,
+                          ),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                        onPressed: () => provider.scanForAPs(),
+                        tooltip: 'Scan',
                       ),
+                    IconButton(
+                      icon: const DuotoneIcon('settings', size: 22, color: Colors.white),
+                      onPressed: () => _showSettings(context, provider),
+                      tooltip: 'Settings',
                     ),
                   ],
                 ),
+              ),
+              // Tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                  child: Container(
+                    decoration: GlassTheme.glassDecoration(),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorColor: GlassTheme.primaryAccent,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white54,
+                      tabs: const [
+                        Tab(text: 'Nearby APs'),
+                        Tab(text: 'Threats'),
+                        Tab(text: 'Trusted'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: provider.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: GlassTheme.primaryAccent,
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          // Scan progress
+                          if (provider.isScanning) _buildScanProgress(provider),
+                          // Current connection status
+                          if (provider.currentConnection != null && !provider.isScanning)
+                            _buildCurrentConnection(provider),
+                          // Stats summary
+                          if (!provider.isScanning) _buildStats(provider),
+                          // Tab content
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildNearbyAPsTab(provider),
+                                _buildThreatsTab(provider),
+                                _buildTrustedTab(provider),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );

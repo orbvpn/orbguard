@@ -2,11 +2,11 @@
 /// Camera/microphone monitoring, clipboard protection, and tracker blocking
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/privacy_provider.dart';
 
@@ -17,63 +17,64 @@ class PrivacyProtectionScreen extends StatefulWidget {
   State<PrivacyProtectionScreen> createState() => _PrivacyProtectionScreenState();
 }
 
-class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PrivacyProvider>().init();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<PrivacyProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Privacy Protection',
-            actions: [
-              GlassAppBarAction(
-                svgIcon: AppIcons.shield,
-                onTap: provider.isAuditing ? null : () => provider.runAudit(),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              isScrollable: true,
-              tabs: const [
-                Tab(text: 'Overview'),
-                Tab(text: 'Camera/Mic'),
-                Tab(text: 'Trackers'),
-                Tab(text: 'Events'),
+        return GlassTabPage(
+          title: 'Privacy Protection',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.shield, size: 22, color: Colors.white),
+                  onPressed: provider.isAuditing ? null : () => provider.runAudit(),
+                  tooltip: 'Run Audit',
+                ),
               ],
             ),
           ),
-          body: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOverviewTab(provider),
-                    _buildCameraMicTab(provider),
-                    _buildTrackersTab(provider),
-                    _buildEventsTab(provider),
-                  ],
-                ),
+          tabs: [
+            GlassTab(
+              label: 'Overview',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildOverviewTab(provider),
+            ),
+            GlassTab(
+              label: 'Camera/Mic',
+              iconPath: 'camera',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildCameraMicTab(provider),
+            ),
+            GlassTab(
+              label: 'Trackers',
+              iconPath: 'forbidden',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildTrackersTab(provider),
+            ),
+            GlassTab(
+              label: 'Events',
+              iconPath: 'history',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildEventsTab(provider),
+            ),
+          ],
         );
       },
     );
@@ -526,12 +527,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(
-            'assets/icons/$icon.svg',
-            width: 64,
-            height: 64,
-            colorFilter: ColorFilter.mode(GlassTheme.primaryAccent.withAlpha(128), BlendMode.srcIn),
-          ),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           Text(
             title,

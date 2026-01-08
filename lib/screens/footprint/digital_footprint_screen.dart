@@ -2,11 +2,11 @@
 /// Data broker removal and personal data exposure tracking interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/digital_footprint_provider.dart';
 
@@ -17,17 +17,15 @@ class DigitalFootprintScreen extends StatefulWidget {
   State<DigitalFootprintScreen> createState() => _DigitalFootprintScreenState();
 }
 
-class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _tabPageKey = GlobalKey<GlassTabPageState>();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DigitalFootprintProvider>().init();
     });
@@ -35,7 +33,6 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _emailController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
@@ -46,35 +43,39 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
   Widget build(BuildContext context) {
     return Consumer<DigitalFootprintProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Digital Footprint',
-            actions: [
-              GlassAppBarAction(
-                svgIcon: AppIcons.refresh,
-                onTap: provider.isLoading ? null : () => provider.loadBrokers(),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Scan'),
-                Tab(text: 'Brokers'),
-                Tab(text: 'Requests'),
+        return GlassTabPage(
+          key: _tabPageKey,
+          title: 'Digital Footprint',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  onPressed: provider.isLoading ? null : () => provider.loadBrokers(),
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildScanTab(provider),
-              _buildBrokersTab(provider),
-              _buildRequestsTab(provider),
-            ],
-          ),
+          tabs: [
+            GlassTab(
+              label: 'Scan',
+              iconPath: 'magnifier',
+              content: _buildScanTab(provider),
+            ),
+            GlassTab(
+              label: 'Brokers',
+              iconPath: 'globe',
+              content: _buildBrokersTab(provider),
+            ),
+            GlassTab(
+              label: 'Requests',
+              iconPath: 'chart',
+              content: _buildRequestsTab(provider),
+            ),
+          ],
         );
       },
     );
@@ -585,7 +586,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             onPressed: () {
               Navigator.pop(context);
               provider.requestBatchRemoval(brokers);
-              _tabController.animateTo(2); // Go to requests tab
+              _tabPageKey.currentState?.animateToTab(2); // Go to requests tab
             },
             child: const Text('Request Removal'),
           ),
@@ -682,7 +683,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
                       : () {
                           Navigator.pop(context);
                           provider.requestRemoval(broker);
-                          _tabController.animateTo(2);
+                          _tabPageKey.currentState?.animateToTab(2);
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,

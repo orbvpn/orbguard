@@ -41,45 +41,69 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
   Widget build(BuildContext context) {
     return Consumer<ExecutiveProtectionProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Executive Protection',
-            actions: [
-              IconButton(
-                icon: const DuotoneIcon('user_plus', size: 24),
-                onPressed: () => _showAddExecutiveSheet(context, provider),
-              ),
-              IconButton(
-                icon: const DuotoneIcon('letter', size: 24),
-                onPressed: () => _showAnalyzeMessageSheet(context, provider),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Dashboard'),
-                Tab(text: 'Alerts'),
-                Tab(text: 'VIPs'),
-              ],
-            ),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabController,
+        return GlassPage(
+          title: 'Executive Protection',
+          body: Column(
+            children: [
+              // Actions row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _buildDashboardTab(provider),
-                    _buildAlertsTab(provider),
-                    _buildVIPsTab(provider),
+                    IconButton(
+                      icon: const DuotoneIcon('user_plus', size: 22, color: Colors.white),
+                      onPressed: () => _showAddExecutiveSheet(context, provider),
+                      tooltip: 'Add VIP',
+                    ),
+                    IconButton(
+                      icon: const DuotoneIcon('letter', size: 22, color: Colors.white),
+                      onPressed: () => _showAnalyzeMessageSheet(context, provider),
+                      tooltip: 'Analyze Message',
+                    ),
                   ],
                 ),
+              ),
+              // Tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                  child: Container(
+                    decoration: GlassTheme.glassDecoration(),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorColor: GlassTheme.primaryAccent,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white54,
+                      tabs: const [
+                        Tab(text: 'Dashboard'),
+                        Tab(text: 'Alerts'),
+                        Tab(text: 'VIPs'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: provider.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: GlassTheme.primaryAccent,
+                        ),
+                      )
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildDashboardTab(provider),
+                          _buildAlertsTab(provider),
+                          _buildVIPsTab(provider),
+                        ],
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );

@@ -47,34 +47,57 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   Widget build(BuildContext context) {
     return Consumer<ScamDetectionProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Scam Detection',
-            actions: [
-              if (provider.analysisHistory.isNotEmpty)
-                IconButton(
-                  icon: const DuotoneIcon('trash_bin_minimalistic', size: 24, color: Colors.white),
-                  onPressed: () => _confirmClearHistory(context, provider),
-                ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Analyze'),
-                Tab(text: 'History'),
-                Tab(text: 'Patterns'),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            controller: _tabController,
+        return GlassPage(
+          title: 'Scam Detection',
+          body: Column(
             children: [
-              _buildAnalyzeTab(provider),
-              _buildHistoryTab(provider),
-              _buildPatternsTab(provider),
+              // Actions row
+              if (provider.analysisHistory.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: const DuotoneIcon('trash_bin_minimalistic', size: 22, color: Colors.white),
+                        onPressed: () => _confirmClearHistory(context, provider),
+                        tooltip: 'Clear History',
+                      ),
+                    ],
+                  ),
+                ),
+              // Tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                  child: Container(
+                    decoration: GlassTheme.glassDecoration(),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorColor: GlassTheme.primaryAccent,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white54,
+                      tabs: const [
+                        Tab(text: 'Analyze'),
+                        Tab(text: 'History'),
+                        Tab(text: 'Patterns'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAnalyzeTab(provider),
+                    _buildHistoryTab(provider),
+                    _buildPatternsTab(provider),
+                  ],
+                ),
+              ),
             ],
           ),
         );

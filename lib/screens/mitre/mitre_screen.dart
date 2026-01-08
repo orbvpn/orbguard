@@ -7,8 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/mitre_provider.dart';
 import '../../widgets/mitre/mitre_widgets.dart';
 
@@ -44,19 +43,24 @@ class _MitreScreenState extends State<MitreScreen>
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
       value: _provider,
-      child: GlassScaffold(
-        appBar: GlassAppBar(
-          title: 'MITRE ATT&CK',
-          showBackButton: true,
-          actions: [
-            GlassAppBarAction(
-              svgIcon: 'info_circle',
-              onTap: _showInfoDialog,
-            ),
-          ],
-        ),
+      child: GlassPage(
+        title: 'MITRE ATT&CK',
         body: Column(
           children: [
+            // Actions row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const DuotoneIcon('info_circle', size: 22, color: Colors.white),
+                    onPressed: _showInfoDialog,
+                    tooltip: 'Info',
+                  ),
+                ],
+              ),
+            ),
             // Tab bar
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

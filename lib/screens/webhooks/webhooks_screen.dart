@@ -35,41 +35,54 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Webhooks',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'add_circle',
-            onTap: () => _showAddWebhookDialog(context),
-          ),
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: _isLoading ? () {} : _loadWebhooks,
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Webhooks',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : _webhooks.isEmpty
-              ? _buildEmptyState()
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    // Stats
-                    Row(
-                      children: [
-                        _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), GlassTheme.successColor),
-                        const SizedBox(width: 12),
-                        _buildStatCard('Total Sent', '1,247', GlassTheme.primaryAccent),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    const GlassSectionHeader(title: 'Configured Webhooks'),
-                    ..._webhooks.map((webhook) => _buildWebhookCard(webhook)),
-                  ],
+          : Column(
+              children: [
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                        onPressed: () => _showAddWebhookDialog(context),
+                        tooltip: 'Add Webhook',
+                      ),
+                      IconButton(
+                        icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadWebhooks,
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
                 ),
+                Expanded(
+                  child: _webhooks.isEmpty
+                      ? _buildEmptyState()
+                      : ListView(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          children: [
+                            // Stats
+                            Row(
+                              children: [
+                                _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), GlassTheme.successColor),
+                                const SizedBox(width: 12),
+                                _buildStatCard('Total Sent', '1,247', GlassTheme.primaryAccent),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            const GlassSectionHeader(title: 'Configured Webhooks'),
+                            ..._webhooks.map((webhook) => _buildWebhookCard(webhook)),
+                          ],
+                        ),
+                ),
+              ],
+            ),
     );
   }
 

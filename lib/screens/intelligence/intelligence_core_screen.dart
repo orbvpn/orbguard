@@ -62,42 +62,65 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Intelligence Core',
-        actions: [
-          IconButton(
-            icon: const DuotoneIcon('file', size: 24),
-            tooltip: 'Import Indicators',
-            onPressed: () => _showImportDialog(context),
-          ),
-          IconButton(
-            icon: const DuotoneIcon('refresh', size: 24),
-            onPressed: _isLoading ? null : _loadIndicators,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Browse'),
-            Tab(text: 'Check'),
-            Tab(text: 'History'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+    return GlassPage(
+      title: 'Intelligence Core',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildBrowseTab(),
-                _buildCheckTab(),
-                _buildHistoryTab(),
+                IconButton(
+                  icon: const DuotoneIcon('file', size: 22, color: Colors.white),
+                  tooltip: 'Import Indicators',
+                  onPressed: () => _showImportDialog(context),
+                ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadIndicators,
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Browse'),
+                    Tab(text: 'Check'),
+                    Tab(text: 'History'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildBrowseTab(),
+                      _buildCheckTab(),
+                      _buildHistoryTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

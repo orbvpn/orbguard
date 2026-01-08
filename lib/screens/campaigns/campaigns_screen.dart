@@ -2,14 +2,14 @@
 /// Active threat campaign tracking and intelligence interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/campaign.dart';
+import '../../models/api/threat_indicator.dart';
 
 class CampaignsScreen extends StatefulWidget {
   const CampaignsScreen({super.key});
@@ -18,9 +18,7 @@ class CampaignsScreen extends StatefulWidget {
   State<CampaignsScreen> createState() => _CampaignsScreenState();
 }
 
-class _CampaignsScreenState extends State<CampaignsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _CampaignsScreenState extends State<CampaignsScreen> {
   bool _isLoading = true;
   bool _showActiveOnly = true;
   List<Campaign> _campaigns = [];
@@ -29,14 +27,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadCampaigns();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadCampaigns() async {
@@ -60,46 +51,121 @@ class _CampaignsScreenState extends State<CampaignsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Threat Campaigns',
-        actions: [
-          IconButton(
-            icon: DuotoneIcon(
-              _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
-              size: 24,
-              color: Colors.white,
+    return GlassTabPage(
+      title: 'Threat Campaigns',
+      headerContent: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: DuotoneIcon(
+                _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
+                size: 24,
+                color: Colors.white,
+              ),
+              onPressed: () {
+                setState(() => _showActiveOnly = !_showActiveOnly);
+                _loadCampaigns();
+              },
             ),
-            onPressed: () {
-              setState(() => _showActiveOnly = !_showActiveOnly);
-              _loadCampaigns();
-            },
-          ),
-          IconButton(
-            icon: const DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
-            onPressed: _isLoading ? null : _loadCampaigns,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Active'),
-            Tab(text: 'All'),
+            IconButton(
+              icon: const DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
+              onPressed: _isLoading ? null : _loadCampaigns,
+            ),
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
-                _buildCampaignsList(_campaigns),
-              ],
+      tabs: [
+        GlassTab(
+          label: 'Active',
+          iconPath: 'shield',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
+        ),
+        GlassTab(
+          label: 'Critical',
+          iconPath: 'danger_triangle',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _buildCampaignsList(_campaigns.where((c) => c.severity == SeverityLevel.critical).toList()),
+        ),
+        GlassTab(
+          label: 'Stats',
+          iconPath: 'chart',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _buildStatsView(),
+        ),
+        GlassTab(
+          label: 'History',
+          iconPath: 'history',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _buildCampaignsList(_campaigns),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsView() {
+    final activeCampaigns = _campaigns.where((c) => c.isActive).length;
+    final criticalCount = _campaigns.where((c) => c.severity == SeverityLevel.critical).length;
+    final highCount = _campaigns.where((c) => c.severity == SeverityLevel.high).length;
+    final totalIOCs = _campaigns.fold<int>(0, (sum, c) => sum + c.indicatorCount);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Campaign Overview',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildStatRow('Total Campaigns', '${_campaigns.length}', AppIcons.campaign),
+              _buildStatRow('Active Campaigns', '$activeCampaigns', AppIcons.shieldCheck),
+              _buildStatRow('Critical Severity', '$criticalCount', AppIcons.dangerTriangle),
+              _buildStatRow('High Severity', '$highCount', AppIcons.dangerTriangle),
+              _buildStatRow('Total IOCs', '$totalIOCs', AppIcons.hook),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatRow(String label, String value, String icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          DuotoneIcon(icon, size: 20, color: GlassTheme.primaryAccent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.white.withAlpha(179)),
             ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -132,7 +198,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
           Row(
             children: [
               GlassSvgIconBox(
-                icon: _getCampaignIcon(campaign.type),
+                icon: _getCampaignIcon(campaign.objective ?? 'unknown'),
                 color: severityColor,
                 size: 48,
               ),
@@ -162,7 +228,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
                             ),
                           ),
                         Text(
-                          campaign.type,
+                          campaign.objective ?? 'Unknown',
                           style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
                         ),
                       ],
@@ -170,12 +236,12 @@ class _CampaignsScreenState extends State<CampaignsScreen>
                   ],
                 ),
               ),
-              GlassBadge(text: campaign.severity.toUpperCase(), color: severityColor, fontSize: 10),
+              GlassBadge(text: campaign.severity.value.toUpperCase(), color: severityColor, fontSize: 10),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            campaign.description,
+            campaign.description ?? 'No description available',
             style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -185,21 +251,22 @@ class _CampaignsScreenState extends State<CampaignsScreen>
             children: [
               _buildCampaignStat(AppIcons.dangerTriangle, '${campaign.indicatorCount} IOCs'),
               const SizedBox(width: 16),
-              _buildCampaignStat(AppIcons.clock, _formatDate(campaign.firstSeen)),
+              if (campaign.firstSeen != null)
+                _buildCampaignStat(AppIcons.clock, _formatDate(campaign.firstSeen!)),
               const Spacer(),
-              if (campaign.actorName != null)
-                GlassBadge(text: campaign.actorName!, color: const Color(0xFF9C27B0), fontSize: 10),
+              if (campaign.associatedActors.isNotEmpty)
+                GlassBadge(text: campaign.associatedActors.first, color: const Color(0xFF9C27B0), fontSize: 10),
             ],
           ),
-          if (campaign.targetedRegions.isNotEmpty || campaign.targetedSectors.isNotEmpty) ...[
+          if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
-                ...campaign.targetedRegions.take(2).map((region) =>
+                ...campaign.targetedCountries.take(2).map((region) =>
                     _buildTargetChip(AppIcons.global, region, const Color(0xFF2196F3))),
-                ...campaign.targetedSectors.take(2).map((sector) =>
+                ...campaign.targetedIndustries.take(2).map((sector) =>
                     _buildTargetChip(AppIcons.enterprise, sector, const Color(0xFFFF9800))),
               ],
             ),
@@ -292,7 +359,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
               Row(
                 children: [
                   GlassSvgIconBox(
-                    icon: _getCampaignIcon(campaign.type),
+                    icon: _getCampaignIcon(campaign.objective ?? 'unknown'),
                     color: severityColor,
                     size: 56,
                     iconSize: 28,
@@ -339,7 +406,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
 
               // Description
               Text(
-                campaign.description,
+                campaign.description ?? 'No description available',
                 style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 14),
               ),
               const SizedBox(height: 20),
@@ -349,49 +416,51 @@ class _CampaignsScreenState extends State<CampaignsScreen>
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildDetailRow('Type', campaign.type),
-                    _buildDetailRow('Severity', campaign.severity.toUpperCase()),
-                    _buildDetailRow('First Seen', _formatDate(campaign.firstSeen)),
+                    if (campaign.objective != null)
+                      _buildDetailRow('Objective', campaign.objective!),
+                    _buildDetailRow('Severity', campaign.severity.value.toUpperCase()),
+                    if (campaign.firstSeen != null)
+                      _buildDetailRow('First Seen', _formatDate(campaign.firstSeen!)),
                     if (campaign.lastSeen != null)
                       _buildDetailRow('Last Seen', _formatDate(campaign.lastSeen!)),
                     _buildDetailRow('Indicators', '${campaign.indicatorCount} IOCs'),
-                    if (campaign.actorName != null)
-                      _buildDetailRow('Threat Actor', campaign.actorName!),
+                    if (campaign.associatedActors.isNotEmpty)
+                      _buildDetailRow('Threat Actors', campaign.associatedActors.join(', ')),
                   ],
                 ),
               ),
 
               // Targets
-              if (campaign.targetedRegions.isNotEmpty || campaign.targetedSectors.isNotEmpty) ...[
+              if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const Text(
                   'Targets',
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                if (campaign.targetedRegions.isNotEmpty) ...[
-                  const GlassSectionHeader(title: 'Regions'),
+                if (campaign.targetedCountries.isNotEmpty) ...[
+                  const GlassSectionHeader(title: 'Countries'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: campaign.targetedRegions.map((r) =>
+                    children: campaign.targetedCountries.map((r) =>
                         GlassBadge(text: r, color: const Color(0xFF2196F3))).toList(),
                   ),
                 ],
-                if (campaign.targetedSectors.isNotEmpty) ...[
+                if (campaign.targetedIndustries.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const GlassSectionHeader(title: 'Sectors'),
+                  const GlassSectionHeader(title: 'Industries'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: campaign.targetedSectors.map((s) =>
+                    children: campaign.targetedIndustries.map((s) =>
                         GlassBadge(text: s, color: const Color(0xFFFF9800))).toList(),
                   ),
                 ],
               ],
 
               // TTPs
-              if (campaign.ttps.isNotEmpty) ...[
+              if (campaign.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const Text(
                   'MITRE ATT&CK TTPs',
@@ -401,7 +470,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: campaign.ttps.map((ttp) => Container(
+                  children: campaign.mitreTechniques.map((ttp) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
@@ -432,41 +501,45 @@ class _CampaignsScreenState extends State<CampaignsScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.end,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
+  Color _getSeverityColor(SeverityLevel severity) {
+    switch (severity) {
+      case SeverityLevel.critical:
         return GlassTheme.errorColor;
-      case 'high':
+      case SeverityLevel.high:
         return const Color(0xFFFF5722);
-      case 'medium':
+      case SeverityLevel.medium:
         return GlassTheme.warningColor;
-      case 'low':
+      case SeverityLevel.low:
         return const Color(0xFF4CAF50);
       default:
         return Colors.grey;
     }
   }
 
-  String _getCampaignIcon(String type) {
-    switch (type.toLowerCase()) {
+  String _getCampaignIcon(String objective) {
+    switch (objective.toLowerCase()) {
       case 'phishing':
         return AppIcons.letter;
       case 'ransomware':
         return AppIcons.lock;
-      case 'apt':
-        return AppIcons.shieldCheck;
-      case 'malware':
-        return AppIcons.bug;
-      case 'ddos':
-        return AppIcons.cloudStorage;
       case 'espionage':
         return AppIcons.eye;
+      case 'financial':
+        return AppIcons.wallet;
+      case 'sabotage':
+        return AppIcons.dangerTriangle;
       default:
         return AppIcons.campaign;
     }
@@ -484,63 +557,81 @@ class _CampaignsScreenState extends State<CampaignsScreen>
   }
 
   List<Campaign> _getSampleCampaigns() {
+    final now = DateTime.now();
     return [
       Campaign(
         id: '1',
         name: 'PhishHook 2025',
-        type: 'Phishing',
+        objective: 'phishing',
         description: 'Large-scale phishing campaign targeting financial institutions with fake login pages.',
-        severity: 'critical',
+        severity: SeverityLevel.critical,
         isActive: true,
-        firstSeen: DateTime.now().subtract(const Duration(days: 14)),
-        lastSeen: DateTime.now().subtract(const Duration(hours: 2)),
+        firstSeen: now.subtract(const Duration(days: 14)),
+        lastSeen: now.subtract(const Duration(hours: 2)),
         indicatorCount: 245,
-        actorName: 'FIN7',
-        targetedRegions: ['North America', 'Europe'],
-        targetedSectors: ['Financial', 'Banking'],
-        ttps: ['T1566.001', 'T1204', 'T1078'],
+        associatedActors: ['FIN7'],
+        targetedCountries: ['North America', 'Europe'],
+        targetedIndustries: ['Financial', 'Banking'],
+        mitreTechniques: ['T1566.001', 'T1204', 'T1078'],
+        aliases: [],
+        targetedPlatforms: [],
+        createdAt: now,
+        updatedAt: now,
       ),
       Campaign(
         id: '2',
         name: 'RansomCloud',
-        type: 'Ransomware',
+        objective: 'ransomware',
         description: 'Cloud-targeting ransomware campaign exploiting misconfigured S3 buckets.',
-        severity: 'high',
+        severity: SeverityLevel.high,
         isActive: true,
-        firstSeen: DateTime.now().subtract(const Duration(days: 30)),
+        firstSeen: now.subtract(const Duration(days: 30)),
         indicatorCount: 89,
-        targetedRegions: ['Global'],
-        targetedSectors: ['Technology', 'Healthcare'],
-        ttps: ['T1486', 'T1490', 'T1027'],
+        targetedCountries: ['Global'],
+        targetedIndustries: ['Technology', 'Healthcare'],
+        mitreTechniques: ['T1486', 'T1490', 'T1027'],
+        aliases: [],
+        associatedActors: [],
+        targetedPlatforms: [],
+        createdAt: now,
+        updatedAt: now,
       ),
       Campaign(
         id: '3',
         name: 'MobileHunter',
-        type: 'Malware',
+        objective: 'espionage',
         description: 'Android spyware distributed through fake app stores targeting mobile banking users.',
-        severity: 'high',
+        severity: SeverityLevel.high,
         isActive: true,
-        firstSeen: DateTime.now().subtract(const Duration(days: 45)),
+        firstSeen: now.subtract(const Duration(days: 45)),
         indicatorCount: 156,
-        actorName: 'APT41',
-        targetedRegions: ['Asia Pacific'],
-        targetedSectors: ['Mobile Banking', 'Cryptocurrency'],
-        ttps: ['T1437', 'T1533', 'T1417'],
+        associatedActors: ['APT41'],
+        targetedCountries: ['Asia Pacific'],
+        targetedIndustries: ['Mobile Banking', 'Cryptocurrency'],
+        mitreTechniques: ['T1437', 'T1533', 'T1417'],
+        aliases: [],
+        targetedPlatforms: ['android'],
+        createdAt: now,
+        updatedAt: now,
       ),
       Campaign(
         id: '4',
         name: 'CredentialStorm',
-        type: 'APT',
+        objective: 'financial',
         description: 'Sophisticated credential harvesting campaign using supply chain compromise.',
-        severity: 'critical',
+        severity: SeverityLevel.critical,
         isActive: false,
-        firstSeen: DateTime.now().subtract(const Duration(days: 90)),
-        lastSeen: DateTime.now().subtract(const Duration(days: 15)),
+        firstSeen: now.subtract(const Duration(days: 90)),
+        lastSeen: now.subtract(const Duration(days: 15)),
         indicatorCount: 312,
-        actorName: 'Lazarus Group',
-        targetedRegions: ['South Korea', 'Japan', 'USA'],
-        targetedSectors: ['Defense', 'Government'],
-        ttps: ['T1195', 'T1078', 'T1003'],
+        associatedActors: ['Lazarus Group'],
+        targetedCountries: ['South Korea', 'Japan', 'USA'],
+        targetedIndustries: ['Defense', 'Government'],
+        mitreTechniques: ['T1195', 'T1078', 'T1003'],
+        aliases: [],
+        targetedPlatforms: [],
+        createdAt: now,
+        updatedAt: now,
       ),
     ];
   }

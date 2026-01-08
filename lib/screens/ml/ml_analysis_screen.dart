@@ -2,7 +2,6 @@
 /// Machine learning anomaly detection and analysis interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -48,41 +47,65 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'ML Analysis',
-        actions: [
-          IconButton(
-            icon: DuotoneIcon(AppIcons.play, size: 24, color: Colors.white),
-            onPressed: _isAnalyzing ? null : _runAnalysis,
-          ),
-          IconButton(
-            icon: DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
-            onPressed: _isLoading ? null : _loadData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Models'),
-            Tab(text: 'Anomalies'),
-            Tab(text: 'Insights'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+    return GlassPage(
+      title: 'ML Analysis',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildModelsTab(),
-                _buildAnomaliesTab(),
-                _buildInsightsTab(),
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
+                  onPressed: _isAnalyzing ? null : _runAnalysis,
+                  tooltip: 'Run Analysis',
+                ),
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadData,
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Models'),
+                    Tab(text: 'Anomalies'),
+                    Tab(text: 'Insights'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildModelsTab(),
+                      _buildAnomaliesTab(),
+                      _buildInsightsTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

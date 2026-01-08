@@ -49,42 +49,65 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'STIX/TAXII 2.1',
-        actions: [
-          IconButton(
-            icon: const DuotoneIcon('add_circle', size: 24),
-            tooltip: 'Add Server',
-            onPressed: () => _showAddServerDialog(context),
-          ),
-          IconButton(
-            icon: const DuotoneIcon('refresh', size: 24),
-            onPressed: _isLoading ? null : _loadData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Servers'),
-            Tab(text: 'Collections'),
-            Tab(text: 'Objects'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+    return GlassPage(
+      title: 'STIX/TAXII 2.1',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildServersTab(),
-                _buildCollectionsTab(),
-                _buildObjectsTab(),
+                IconButton(
+                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                  tooltip: 'Add Server',
+                  onPressed: () => _showAddServerDialog(context),
+                ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadData,
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Servers'),
+                    Tab(text: 'Collections'),
+                    Tab(text: 'Objects'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildServersTab(),
+                      _buildCollectionsTab(),
+                      _buildObjectsTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

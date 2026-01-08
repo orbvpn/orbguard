@@ -2,7 +2,6 @@
 /// Automated response playbooks interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -38,48 +37,70 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Playbooks',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.addCircle,
-            onTap: () => _showCreatePlaybookDialog(context),
-            tooltip: 'Create Playbook',
+    return GlassPage(
+      title: 'Playbooks',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
+                  onPressed: () => _showCreatePlaybookDialog(context),
+                  tooltip: 'Create Playbook',
+                ),
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadData,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadData,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  TabBar(
-                    indicatorColor: GlassTheme.primaryAccent,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white54,
-                    tabs: const [
-                      Tab(text: 'Playbooks'),
-                      Tab(text: 'Executions'),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : DefaultTabController(
+                    length: 2,
+                    child: Column(
                       children: [
-                        _buildPlaybooksTab(),
-                        _buildExecutionsTab(),
+                        // Tab bar
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                            child: Container(
+                              decoration: GlassTheme.glassDecoration(),
+                              child: const TabBar(
+                                indicatorColor: GlassTheme.primaryAccent,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.white54,
+                                tabs: [
+                                  Tab(text: 'Playbooks'),
+                                  Tab(text: 'Executions'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _buildPlaybooksTab(),
+                              _buildExecutionsTab(),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
@@ -15,9 +16,7 @@ class DesktopSecurityScreen extends StatefulWidget {
   State<DesktopSecurityScreen> createState() => _DesktopSecurityScreenState();
 }
 
-class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   bool _isScanning = false;
   final List<PersistenceItem> _persistenceItems = [];
   final List<SignedApp> _signedApps = [];
@@ -26,14 +25,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -47,35 +39,38 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Desktop Security',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: _isScanning ? null : _runScan,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Persistence'),
-            Tab(text: 'Code Signing'),
-            Tab(text: 'Firewall'),
+    return GlassTabPage(
+      title: 'Desktop Security',
+      headerContent: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              onPressed: _isScanning ? null : _runScan,
+              tooltip: 'Refresh',
+            ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPersistenceTab(),
-          _buildCodeSigningTab(),
-          _buildFirewallTab(),
-        ],
-      ),
+      tabs: [
+        GlassTab(
+          label: 'Persistence',
+          iconPath: 'laptop',
+          content: _buildPersistenceTab(),
+        ),
+        GlassTab(
+          label: 'Code Signing',
+          iconPath: 'shield',
+          content: _buildCodeSigningTab(),
+        ),
+        GlassTab(
+          label: 'Firewall',
+          iconPath: 'link_round',
+          content: _buildFirewallTab(),
+        ),
+      ],
     );
   }
 

@@ -15,15 +15,12 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'Settings',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'Settings',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               // Protection settings
               _buildSettingsSection(
@@ -292,16 +289,13 @@ class ProtectionSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'Protection Features',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'Protection Features',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final protection = settings.protection;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _buildInfoCard(
                 'Configure which protection features are active. '
@@ -464,16 +458,13 @@ class NotificationSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'Notification Settings',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'Notification Settings',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final notif = settings.notifications;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _buildSectionHeader('Notifications'),
               _buildSwitchTile(
@@ -685,16 +676,13 @@ class PrivacySettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'Privacy Settings',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'Privacy Settings',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final privacy = settings.privacy;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _buildSectionHeader('App Security'),
               _buildSwitchTile(
@@ -886,16 +874,13 @@ class ScanSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'Scan Settings',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'Scan Settings',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final scan = settings.scan;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _buildSwitchTile(
                 'Auto Scan',
@@ -1019,16 +1004,13 @@ class VpnSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'VPN Settings',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'VPN Settings',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final vpn = settings.vpn;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _buildSwitchTile(
                 'Auto Connect',
@@ -1179,11 +1161,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: const GlassAppBar(
-        title: 'API Configuration',
-        showBackButton: true,
-      ),
+    return GlassPage(
+      title: 'API Configuration',
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           final api = settings.api;
@@ -1197,7 +1176,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
           }
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               Container(
                 padding: const EdgeInsets.all(16),

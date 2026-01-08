@@ -50,42 +50,65 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Compliance Reporting',
-        actions: [
-          IconButton(
-            icon: const DuotoneIcon('clock_circle', size: 24),
-            tooltip: 'Schedule Reports',
-            onPressed: () => _showScheduleDialog(context),
-          ),
-          IconButton(
-            icon: const DuotoneIcon('refresh', size: 24),
-            onPressed: _isLoading ? null : _loadData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Frameworks'),
-            Tab(text: 'Reports'),
-            Tab(text: 'Controls'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : TabBarView(
-              controller: _tabController,
+    return GlassPage(
+      title: 'Compliance Reporting',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildFrameworksTab(),
-                _buildReportsTab(),
-                _buildControlsTab(),
+                IconButton(
+                  icon: const DuotoneIcon('clock_circle', size: 22, color: Colors.white),
+                  tooltip: 'Schedule Reports',
+                  onPressed: () => _showScheduleDialog(context),
+                ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadData,
+                  tooltip: 'Refresh',
+                ),
               ],
             ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Frameworks'),
+                    Tab(text: 'Reports'),
+                    Tab(text: 'Controls'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildFrameworksTab(),
+                      _buildReportsTab(),
+                      _buildControlsTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

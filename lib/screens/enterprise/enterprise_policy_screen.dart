@@ -40,56 +40,81 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
   Widget build(BuildContext context) {
     return Consumer<EnterprisePolicyProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Enterprise Policies',
-            actions: [
-              IconButton(
-                icon: const DuotoneIcon('add_circle', size: 24),
-                onPressed: () => _showCreatePolicySheet(context, provider),
-              ),
-              IconButton(
-                icon: const DuotoneIcon('refresh', size: 24),
-                onPressed: () => provider.loadPolicies(),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Policies'),
-                Tab(text: 'Violations'),
-                Tab(text: 'Templates'),
-                Tab(text: 'BYOD'),
-              ],
-            ),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                )
-              : Column(
+        return GlassPage(
+          title: 'Enterprise Policies',
+          body: Column(
+            children: [
+              // Actions row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Stats
-                    _buildStats(provider),
-                    // Tab content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildPoliciesTab(provider),
-                          _buildViolationsTab(provider),
-                          _buildTemplatesTab(provider),
-                          _buildBYODTab(provider),
-                        ],
-                      ),
+                    IconButton(
+                      icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                      onPressed: () => _showCreatePolicySheet(context, provider),
+                      tooltip: 'Add Policy',
+                    ),
+                    IconButton(
+                      icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                      onPressed: () => provider.loadPolicies(),
+                      tooltip: 'Refresh',
                     ),
                   ],
                 ),
+              ),
+              // Tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                  child: Container(
+                    decoration: GlassTheme.glassDecoration(),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorColor: GlassTheme.primaryAccent,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white54,
+                      isScrollable: true,
+                      tabs: const [
+                        Tab(text: 'Policies'),
+                        Tab(text: 'Violations'),
+                        Tab(text: 'Templates'),
+                        Tab(text: 'BYOD'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: provider.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: GlassTheme.primaryAccent,
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          // Stats
+                          _buildStats(provider),
+                          // Tab content
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildPoliciesTab(provider),
+                                _buildViolationsTab(provider),
+                                _buildTemplatesTab(provider),
+                                _buildBYODTab(provider),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );

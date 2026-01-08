@@ -7,9 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/supply_chain_provider.dart';
 import '../../services/security/supply_chain_monitor_service.dart';
 
@@ -41,55 +40,58 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Supply Chain Monitor',
-        showBackButton: true,
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: () => _startScan(),
+    return Consumer<SupplyChainProvider>(
+      builder: (context, provider, _) {
+        return GlassPage(
+          title: 'Supply Chain Monitor',
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: _startScan,
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Colors.black,
+            icon: const DuotoneIcon('magnifer', size: 20),
+            label: const Text('Scan Apps'),
           ),
-        ],
-      ),
-      body: Consumer<SupplyChainProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
-            );
-          }
-
-          return Column(
-            children: [
-              // Stats summary
-              _buildStatsSummary(provider),
-              const SizedBox(height: 16),
-              // Tab bar
-              _buildTabBar(),
-              const SizedBox(height: 16),
-              // Tab content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+          body: provider.isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                )
+              : Column(
                   children: [
-                    _buildVulnerabilitiesTab(provider),
-                    _buildTrackersTab(provider),
-                    _buildLibrariesTab(provider),
+                    // Actions row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                            onPressed: () => _startScan(),
+                            tooltip: 'Refresh',
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Stats summary
+                    _buildStatsSummary(provider),
+                    const SizedBox(height: 16),
+                    // Tab bar
+                    _buildTabBar(),
+                    const SizedBox(height: 16),
+                    // Tab content
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildVulnerabilitiesTab(provider),
+                          _buildTrackersTab(provider),
+                          _buildLibrariesTab(provider),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _startScan,
-        backgroundColor: GlassTheme.primaryAccent,
-        foregroundColor: Colors.black,
-        icon: const DuotoneIcon('magnifer', size: 20),
-        label: const Text('Scan Apps'),
-      ),
+        );
+      },
     );
   }
 

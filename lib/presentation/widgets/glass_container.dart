@@ -1,198 +1,18 @@
 /// Glass Container Widgets - iOS 26 Liquid Glass Design
 /// Reusable glass-effect container widgets
+///
+/// Note: Core glass widgets (GlassContainer, GlassCircleButton, GlassPillContainer,
+/// GlassGradientBackground) are defined in glass_theme.dart.
+/// This file contains additional specialized glass widgets.
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/glass_theme.dart';
 
-/// Gradient background that makes glass effects visible
-class GlassGradientBackground extends StatelessWidget {
-  final Widget child;
-  final bool isDark;
-
-  const GlassGradientBackground({
-    super.key,
-    required this.child,
-    this.isDark = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: GlassTheme.backgroundGradient(isDark: isDark),
-      ),
-      child: child,
-    );
-  }
-}
-
-/// Generic glass container with blur effect
-class GlassContainer extends StatelessWidget {
-  final Widget child;
-  final double? width;
-  final double? height;
-  final EdgeInsetsGeometry? padding;
-  final EdgeInsetsGeometry? margin;
-  final double borderRadius;
-  final bool isDark;
-  final bool withBlur;
-  final bool withShadow;
-  final Color? tintColor;
-  final VoidCallback? onTap;
-
-  const GlassContainer({
-    super.key,
-    required this.child,
-    this.width,
-    this.height,
-    this.padding,
-    this.margin,
-    this.borderRadius = GlassTheme.radiusMedium,
-    this.isDark = true,
-    this.withBlur = true,
-    this.withShadow = true,
-    this.tintColor,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Widget container = Container(
-      width: width,
-      height: height,
-      margin: margin,
-      decoration: tintColor != null
-          ? GlassTheme.tintedGlassDecoration(
-              tintColor: tintColor!,
-              isDark: isDark,
-              radius: borderRadius,
-            )
-          : GlassTheme.glassDecoration(
-              isDark: isDark,
-              radius: borderRadius,
-              withShadow: withShadow,
-            ),
-      child: Padding(
-        padding: padding ?? const EdgeInsets.all(16),
-        child: child,
-      ),
-    );
-
-    if (withBlur) {
-      container = ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: GlassTheme.blurFilter,
-          child: container,
-        ),
-      );
-    }
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: container,
-      );
-    }
-
-    return container;
-  }
-}
-
-/// Pill-shaped glass container (for nav bars, tabs)
-class GlassPillContainer extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry? padding;
-  final EdgeInsetsGeometry? margin;
-  final bool isDark;
-  final bool withBlur;
-  final VoidCallback? onTap;
-
-  const GlassPillContainer({
-    super.key,
-    required this.child,
-    this.padding,
-    this.margin,
-    this.isDark = true,
-    this.withBlur = true,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassContainer(
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      margin: margin,
-      borderRadius: GlassTheme.radiusPill,
-      isDark: isDark,
-      withBlur: withBlur,
-      onTap: onTap,
-      child: child,
-    );
-  }
-}
-
-/// Circular glass button
-class GlassCircleButton extends StatelessWidget {
-  final Widget child;
-  final double size;
-  final bool isDark;
-  final bool withBlur;
-  final VoidCallback? onTap;
-  final Color? tintColor;
-
-  const GlassCircleButton({
-    super.key,
-    required this.child,
-    this.size = 48,
-    this.isDark = true,
-    this.withBlur = true,
-    this.onTap,
-    this.tintColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Widget button = Container(
-      width: size,
-      height: size,
-      decoration: tintColor != null
-          ? BoxDecoration(
-              color: tintColor!.withAlpha(40),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: tintColor!.withAlpha(80),
-                width: GlassTheme.borderWidth,
-              ),
-            )
-          : GlassTheme.circularGlassDecoration(
-              isDark: isDark,
-              withShadow: true,
-            ),
-      child: Center(child: child),
-    );
-
-    if (withBlur) {
-      button = ClipOval(
-        child: BackdropFilter(
-          filter: GlassTheme.blurFilter,
-          child: button,
-        ),
-      );
-    }
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: button,
-      );
-    }
-
-    return button;
-  }
-}
+// Re-export core glass widgets from glass_theme.dart for convenience
+export '../theme/glass_theme.dart'
+    show GlassContainer, GlassCircleButton, GlassPillContainer,
+         GlassGradientBackground, GlassGradientPosition;
 
 /// Glass card widget (replacement for Card)
 class GlassCard extends StatelessWidget {
@@ -215,15 +35,24 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassContainer(
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget card = GlassContainer(
       padding: padding ?? const EdgeInsets.all(16),
       margin: margin ?? const EdgeInsets.only(bottom: 12),
       borderRadius: GlassTheme.radiusLarge,
-      isDark: isDark,
       tintColor: tintColor,
-      onTap: onTap,
       child: child,
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: card,
+      );
+    }
+
+    return card;
   }
 }
 
@@ -377,13 +206,13 @@ class GlassListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassContainer(
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget tile = GlassContainer(
       padding: padding ?? const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 8),
       borderRadius: GlassTheme.radiusSmall,
-      isDark: isDark,
-      withBlur: false,
-      onTap: onTap,
+      blur: false,
       child: Row(
         children: [
           if (leading != null) ...[
@@ -398,7 +227,7 @@ class GlassListTile extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
+                    color: actualIsDark ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
                   ),
@@ -407,7 +236,7 @@ class GlassListTile extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.black45,
+                      color: actualIsDark ? Colors.white54 : Colors.black45,
                       fontSize: 13,
                     ),
                   ),
@@ -418,6 +247,12 @@ class GlassListTile extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(onTap: onTap, child: tile);
+    }
+
+    return tile;
   }
 }
 
@@ -436,6 +271,8 @@ class GlassSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
       child: Row(
@@ -444,7 +281,7 @@ class GlassSectionHeader extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              color: isDark ? Colors.white38 : Colors.black38,
+              color: actualIsDark ? Colors.white38 : Colors.black38,
               fontSize: 12,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -470,10 +307,12 @@ class GlassDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       height: height,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10),
+      color: actualIsDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10),
     );
   }
 }

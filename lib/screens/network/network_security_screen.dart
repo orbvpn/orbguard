@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
 import '../../widgets/network/network_widgets.dart';
@@ -18,85 +18,75 @@ class NetworkSecurityScreen extends StatefulWidget {
   State<NetworkSecurityScreen> createState() => _NetworkSecurityScreenState();
 }
 
-class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
+  String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Network Security',
-        showBackButton: true,
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: () {
-              final provider = context.read<NetworkProvider>();
-              provider.refreshNetworkInfo();
-              provider.scanNetworks();
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  isScrollable: true,
-                  tabs: const [
-                    Tab(icon: DuotoneIcon('wi_fi_router', size: 24), text: 'WiFi'),
-                    Tab(icon: DuotoneIcon('lock', size: 24), text: 'VPN'),
-                    Tab(icon: DuotoneIcon('server', size: 24), text: 'DNS'),
-                    Tab(icon: DuotoneIcon('chart', size: 24), text: 'Stats'),
-                  ],
+    return Consumer<NetworkProvider>(
+      builder: (context, provider, child) {
+        return GlassTabPage(
+          title: 'Network Security',
+          hasSearch: true,
+          searchHint: 'Search networks...',
+          onSearchChanged: _onSearchChanged,
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: () {
+                    provider.refreshNetworkInfo();
+                    provider.scanNetworks();
+                  },
+                  tooltip: 'Refresh',
                 ),
-              ),
+              ],
             ),
           ),
-          Expanded(
-            child: Consumer<NetworkProvider>(
-              builder: (context, provider, child) {
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildWifiTab(provider),
-                    _buildVpnTab(provider),
-                    _buildDnsTab(provider),
-                    _buildStatsTab(provider),
-                  ],
-                );
-              },
+          tabs: [
+            GlassTab(
+              label: 'WiFi',
+              iconPath: 'wi_fi_router',
+              content: _buildWifiTab(provider),
             ),
-          ),
-        ],
-      ),
+            GlassTab(
+              label: 'VPN',
+              iconPath: 'lock',
+              content: _buildVpnTab(provider),
+            ),
+            GlassTab(
+              label: 'DNS',
+              iconPath: 'server',
+              content: _buildDnsTab(provider),
+            ),
+            GlassTab(
+              label: 'Stats',
+              iconPath: 'chart',
+              content: _buildStatsTab(provider),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildWifiTab(NetworkProvider provider) {
+    // Filter networks based on search query
+    final filteredNetworks = _searchQuery.isEmpty
+        ? provider.nearbyNetworks
+        : provider.nearbyNetworks
+            .where((n) => n.ssid.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -165,16 +155,16 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Nearby Networks',
-                style: TextStyle(
+              Text(
+                _searchQuery.isEmpty ? 'Nearby Networks' : 'Search Results',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
-                '${provider.nearbyNetworks.length} found',
+                '${filteredNetworks.where((n) => !n.isConnected).length} found',
                 style: TextStyle(
                   color: Colors.grey[500],
                   fontSize: 12,
@@ -183,7 +173,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
             ],
           ),
           const SizedBox(height: 12),
-          if (provider.nearbyNetworks.isEmpty)
+          if (filteredNetworks.where((n) => !n.isConnected).isEmpty)
             GlassCard(
               child: Center(
                 child: Column(
@@ -194,13 +184,15 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                       color: Colors.grey.withAlpha(77),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'No networks found',
-                      style: TextStyle(color: Colors.white70),
+                    Text(
+                      _searchQuery.isEmpty ? 'No networks found' : 'No matching networks',
+                      style: const TextStyle(color: Colors.white70),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tap scan to search for nearby networks',
+                      _searchQuery.isEmpty
+                          ? 'Tap scan to search for nearby networks'
+                          : 'Try a different search term',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 12,
@@ -211,7 +203,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
               ),
             )
           else
-            ...provider.nearbyNetworks
+            ...filteredNetworks
                 .where((n) => !n.isConnected)
                 .map((network) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),

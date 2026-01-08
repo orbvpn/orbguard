@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/device_security_provider.dart';
 
@@ -16,65 +17,66 @@ class DeviceSecurityScreen extends StatefulWidget {
   State<DeviceSecurityScreen> createState() => _DeviceSecurityScreenState();
 }
 
-class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeviceSecurityProvider>().init();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<DeviceSecurityProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Device Security',
-            actions: [
-              if (provider.status.isLost || provider.status.isStolen)
-                IconButton(
-                  icon: DuotoneIcon('check_circle', size: 24, color: GlassTheme.successColor),
-                  tooltip: 'Mark as Recovered',
-                  onPressed: () => provider.markAsRecovered(),
-                ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              isScrollable: true,
-              tabs: const [
-                Tab(text: 'Status'),
-                Tab(text: 'Anti-Theft'),
-                Tab(text: 'Location'),
-                Tab(text: 'SIM'),
-              ],
+        return GlassTabPage(
+          title: 'Device Security',
+          headerContent: (provider.status.isLost || provider.status.isStolen)
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: DuotoneIcon('check_circle', size: 24, color: GlassTheme.successColor),
+                        tooltip: 'Mark as Recovered',
+                        onPressed: () => provider.markAsRecovered(),
+                      ),
+                    ],
+                  ),
+                )
+              : null,
+          tabs: [
+            GlassTab(
+              label: 'Status',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildStatusTab(provider),
             ),
-          ),
-          body: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildStatusTab(provider),
-                    _buildAntiTheftTab(provider),
-                    _buildLocationTab(provider),
-                    _buildSimTab(provider),
-                  ],
-                ),
+            GlassTab(
+              label: 'Anti-Theft',
+              iconPath: 'smartphone',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildAntiTheftTab(provider),
+            ),
+            GlassTab(
+              label: 'Location',
+              iconPath: 'settings',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildLocationTab(provider),
+            ),
+            GlassTab(
+              label: 'SIM',
+              iconPath: 'chart',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildSimTab(provider),
+            ),
+          ],
         );
       },
     );

@@ -1,14 +1,134 @@
 /// Glass App Bar - iOS 26 Liquid Glass Design
-/// Frosted glass-effect app bar widget
+/// Frosted glass-effect app bar widget matching OrbX design
+///
+/// Features:
+/// - Round back button on LEFT
+/// - Title in pill-shaped container on RIGHT
+/// - Tap feedback animation (scale + opacity)
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/glass_theme.dart';
+import '../theme/colors.dart';
 import 'duotone_icon.dart';
 
-/// Glass-styled app bar with blur effect
+/// Glass-styled floating header bar (OrbX style)
+///
+/// A floating header with round back button and pill-shaped title container.
+/// Not a traditional PreferredSizeWidget - use inside a Stack.
+class GlassHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback? onBack;
+  final Widget? actionIcon;
+  final VoidCallback? onAction;
+  final bool showBackButton;
+
+  const GlassHeader({
+    super.key,
+    required this.title,
+    this.onBack,
+    this.actionIcon,
+    this.onAction,
+    this.showBackButton = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: topPadding + 12,
+        left: 16,
+        right: 16,
+      ),
+      child: Row(
+        children: [
+          // Back button (round, like OrbX)
+          if (showBackButton)
+            _TapFeedbackButton(
+              onTap: onBack ?? () => Navigator.pop(context),
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: GlassTheme.circularGlassDecoration(isDark: isDark),
+                child: ClipOval(
+                  child: BackdropFilter(
+                    filter: GlassTheme.blurFilter,
+                    child: Center(
+                      child: DuotoneIcon(
+                        AppIcons.chevronLeft,
+                        size: 22,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 50),
+
+          const SizedBox(width: 12),
+
+          // Title container (pill-shaped)
+          Expanded(
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: GlassTheme.glassColor(isDark),
+                border: Border.all(
+                  color: GlassTheme.glassBorderColor(isDark),
+                  width: GlassTheme.borderWidth,
+                ),
+                boxShadow: [GlassTheme.shadow(isDark)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: BackdropFilter(
+                  filter: GlassTheme.blurFilter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        // Title text
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ),
+                        // Optional action icon inside the pill
+                        if (actionIcon != null && onAction != null)
+                          _TapFeedbackButton(
+                            onTap: onAction!,
+                            child: actionIcon!,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Legacy Glass App Bar (PreferredSizeWidget) - for backward compatibility
+/// Consider migrating to GlassHeader for new screens
 class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
   final Widget? titleWidget;
@@ -42,6 +162,8 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = actualIsDark ? Colors.white : AppColors.textPrimary;
     final totalHeight = height +
         (bottom?.preferredSize.height ?? 0) +
         MediaQuery.of(context).padding.top;
@@ -53,15 +175,16 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
           height: totalHeight,
           padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
           decoration: BoxDecoration(
-            color: GlassTheme.glassColor(isDark),
+            color: GlassTheme.glassColor(actualIsDark),
             border: Border(
               bottom: BorderSide(
-                color: GlassTheme.glassBorderColor(isDark),
+                color: GlassTheme.glassBorderColor(actualIsDark),
                 width: GlassTheme.borderWidth,
               ),
             ),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 height: height,
@@ -71,15 +194,15 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
                     if (leading != null)
                       leading!
                     else if (showBackButton)
-                      _buildBackButton(context)
+                      _buildBackButton(context, textColor)
                     else
                       const SizedBox(width: 16),
 
                     // Title
                     Expanded(
                       child: centerTitle
-                          ? Center(child: _buildTitle())
-                          : _buildTitle(),
+                          ? Center(child: _buildTitle(textColor))
+                          : _buildTitle(textColor),
                     ),
 
                     // Actions
@@ -102,13 +225,13 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(Color textColor) {
     if (titleWidget != null) return titleWidget!;
     if (title != null) {
       return Text(
         title!,
         style: TextStyle(
-          color: isDark ? Colors.white : Colors.black87,
+          color: textColor,
           fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
@@ -117,7 +240,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     return const SizedBox.shrink();
   }
 
-  Widget _buildBackButton(BuildContext context) {
+  Widget _buildBackButton(BuildContext context, Color textColor) {
     return GestureDetector(
       onTap: onLeadingTap ?? () => Navigator.of(context).pop(),
       child: Container(
@@ -126,7 +249,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
         alignment: Alignment.center,
         child: DuotoneIcon(
           AppIcons.chevronLeft,
-          color: isDark ? Colors.white : Colors.black87,
+          color: textColor,
           size: 20,
         ),
       ),
@@ -155,7 +278,8 @@ class GlassAppBarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = color ?? (isDark ? Colors.white : Colors.black87);
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = color ?? (actualIsDark ? Colors.white : Colors.black87);
 
     Widget iconWidget;
     if (svgIcon != null) {
@@ -208,6 +332,8 @@ class GlassFloatingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ClipRRect(
@@ -217,7 +343,7 @@ class GlassFloatingHeader extends StatelessWidget {
           child: Container(
             padding: padding ?? const EdgeInsets.all(16),
             decoration: GlassTheme.glassDecoration(
-              isDark: isDark,
+              isDark: actualIsDark,
               radius: GlassTheme.radiusMedium,
             ),
             child: child,
@@ -241,8 +367,10 @@ class GlassStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: isDark
+      value: actualIsDark
           ? SystemUiOverlayStyle.light.copyWith(
               statusBarColor: Colors.transparent,
             )
@@ -277,11 +405,13 @@ class GlassScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return GlassStatusBar(
-      isDark: isDark,
+      isDark: actualIsDark,
       child: Container(
         decoration: BoxDecoration(
-          gradient: GlassTheme.backgroundGradient(isDark: isDark),
+          gradient: GlassTheme.backgroundGradient(isDark: actualIsDark),
         ),
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -292,6 +422,142 @@ class GlassScaffold extends StatelessWidget {
           floatingActionButton: floatingActionButton,
           drawer: drawer,
         ),
+      ),
+    );
+  }
+}
+
+/// Glass Page - OrbX-style page layout
+///
+/// A complete page layout matching OrbX design:
+/// - Gradient background
+/// - Column layout with header at top (NOT floating)
+/// - SafeArea for proper padding
+/// - Round back button LEFT + pill title RIGHT
+class GlassPage extends StatelessWidget {
+  final String title;
+  final Widget body;
+  final VoidCallback? onBack;
+  final List<Widget>? actions;
+  final VoidCallback? onAction;
+  final bool showBackButton;
+  final Widget? bottomNavigationBar;
+  final Widget? floatingActionButton;
+
+  const GlassPage({
+    super.key,
+    required this.title,
+    required this.body,
+    this.onBack,
+    this.actions,
+    this.onAction,
+    this.showBackButton = true,
+    this.bottomNavigationBar,
+    this.floatingActionButton,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+
+    return GlassStatusBar(
+      isDark: isDark,
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // OrbX-style header: round back + pill title
+              _buildOrbXHeader(context, isDark, textColor),
+              // Main content
+              Expanded(child: body),
+            ],
+          ),
+        ),
+        bottomNavigationBar: bottomNavigationBar,
+        floatingActionButton: floatingActionButton,
+      ),
+    );
+  }
+
+  /// OrbX-style header: round back button LEFT, pill title RIGHT
+  Widget _buildOrbXHeader(BuildContext context, bool isDark, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Back button (round glass, 50x50)
+          if (showBackButton)
+            _TapFeedbackButton(
+              onTap: onBack ?? () => Navigator.pop(context),
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: GlassTheme.circularGlassDecoration(isDark: isDark),
+                child: ClipOval(
+                  child: BackdropFilter(
+                    filter: GlassTheme.blurFilter,
+                    child: Center(
+                      child: DuotoneIcon(
+                        AppIcons.chevronLeft,
+                        size: 22,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (showBackButton) const SizedBox(width: 12),
+          // Title container (pill-shaped)
+          Expanded(
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: GlassTheme.glassColor(isDark),
+                border: Border.all(
+                  color: GlassTheme.glassBorderColor(isDark),
+                  width: GlassTheme.borderWidth,
+                ),
+                boxShadow: [GlassTheme.shadow(isDark)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: BackdropFilter(
+                  filter: GlassTheme.blurFilter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        // Title text
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ),
+                        // Action icons inside the pill
+                        if (actions != null)
+                          ...actions!.map((action) => Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: action,
+                              )),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -314,6 +580,8 @@ class GlassBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.all(16),
       child: ClipRRect(
@@ -323,15 +591,15 @@ class GlassBottomNav extends StatelessWidget {
           child: Container(
             height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: GlassTheme.pillGlassDecoration(isDark: isDark),
+            decoration: GlassTheme.pillGlassDecoration(isDark: actualIsDark),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(items.length, (index) {
                 final item = items[index];
                 final isSelected = index == currentIndex;
                 final iconColor = isSelected
-                    ? GlassTheme.primaryAccent
-                    : (isDark ? Colors.white54 : Colors.black45);
+                    ? AppColors.accent
+                    : (actualIsDark ? Colors.white54 : Colors.black45);
 
                 return GestureDetector(
                   onTap: () => onTap(index),
@@ -344,7 +612,7 @@ class GlassBottomNav extends StatelessWidget {
                     ),
                     decoration: isSelected
                         ? BoxDecoration(
-                            color: GlassTheme.primaryAccent.withAlpha(30),
+                            color: AppColors.accent.withAlpha(30),
                             borderRadius: BorderRadius.circular(20),
                           )
                         : null,
@@ -414,4 +682,85 @@ class GlassBottomNavItem {
         activeSvgIcon = activeIcon ?? icon,
         icon = null,
         activeIcon = null;
+}
+
+// ============================================================================
+// TAP FEEDBACK BUTTON
+// ============================================================================
+
+/// A button with visual tap feedback (scale + opacity animation)
+class _TapFeedbackButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _TapFeedbackButton({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_TapFeedbackButton> createState() => _TapFeedbackButtonState();
+}
+
+class _TapFeedbackButtonState extends State<_TapFeedbackButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.6).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    _controller.forward();
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    _controller.reverse();
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  void _handleTapCancel() {
+    _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: Opacity(
+              opacity: _opacityAnimation.value,
+              child: widget.child,
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

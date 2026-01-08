@@ -39,66 +39,79 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Enterprise Overview',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'download_minimalistic',
-            tooltip: 'Export Report',
-            onTap: () => _showExportDialog(context),
-          ),
-          GlassAppBarAction(
-            svgIcon: 'refresh',
-            onTap: _isLoading ? null : _loadData,
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Enterprise Overview',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: GlassTheme.primaryAccent,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Security Score
-                  _buildSecurityScoreCard(),
-                  const SizedBox(height: 16),
-
-                  // Key Metrics
-                  _buildKeyMetrics(),
-                  const SizedBox(height: 24),
-
-                  // Threat Summary
-                  const GlassSectionHeader(title: 'Threat Summary'),
-                  _buildThreatSummary(),
-                  const SizedBox(height: 24),
-
-                  // Device Health
-                  const GlassSectionHeader(title: 'Device Health'),
-                  _buildDeviceHealthGrid(),
-                  const SizedBox(height: 24),
-
-                  // Compliance Status
-                  const GlassSectionHeader(title: 'Compliance Status'),
-                  _buildComplianceStatus(),
-                  const SizedBox(height: 24),
-
-                  // Recent Events
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          : Column(
+              children: [
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const GlassSectionHeader(title: 'Recent Events'),
-                      TextButton(
-                        onPressed: () {},
-                        child: const Text('View All', style: TextStyle(color: GlassTheme.primaryAccent)),
+                      IconButton(
+                        icon: const DuotoneIcon('download_minimalistic', size: 22, color: Colors.white),
+                        onPressed: () => _showExportDialog(context),
+                        tooltip: 'Export Report',
+                      ),
+                      IconButton(
+                        icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadData,
+                        tooltip: 'Refresh',
                       ),
                     ],
                   ),
-                  ..._recentEvents.take(5).map((event) => _buildEventCard(event)),
-                ],
-              ),
+                ),
+                // Content
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    color: GlassTheme.primaryAccent,
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        // Security Score
+                        _buildSecurityScoreCard(),
+                        const SizedBox(height: 16),
+
+                        // Key Metrics
+                        _buildKeyMetrics(),
+                        const SizedBox(height: 24),
+
+                        // Threat Summary
+                        const GlassSectionHeader(title: 'Threat Summary'),
+                        _buildThreatSummary(),
+                        const SizedBox(height: 24),
+
+                        // Device Health
+                        const GlassSectionHeader(title: 'Device Health'),
+                        _buildDeviceHealthGrid(),
+                        const SizedBox(height: 24),
+
+                        // Compliance Status
+                        const GlassSectionHeader(title: 'Compliance Status'),
+                        _buildComplianceStatus(),
+                        const SizedBox(height: 24),
+
+                        // Recent Events
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const GlassSectionHeader(title: 'Recent Events'),
+                            TextButton(
+                              onPressed: () {},
+                              child: const Text('View All', style: TextStyle(color: GlassTheme.primaryAccent)),
+                            ),
+                          ],
+                        ),
+                        ..._recentEvents.take(5).map((event) => _buildEventCard(event)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }

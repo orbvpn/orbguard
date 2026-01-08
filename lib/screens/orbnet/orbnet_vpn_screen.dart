@@ -2,7 +2,6 @@
 /// VPN DNS filtering and server management interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -47,33 +46,56 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'OrbNet VPN',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.settings,
-            onTap: () => _showSettingsDialog(context),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: GlassTheme.primaryAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Connect'),
-            Tab(text: 'Servers'),
-            Tab(text: 'DNS Filter'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+    return GlassPage(
+      title: 'OrbNet VPN',
+      body: Column(
         children: [
-          _buildConnectTab(),
-          _buildServersTab(),
-          _buildDnsFilterTab(),
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.settings, size: 22, color: Colors.white),
+                  onPressed: () => _showSettingsDialog(context),
+                  tooltip: 'Settings',
+                ),
+              ],
+            ),
+          ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              child: Container(
+                decoration: GlassTheme.glassDecoration(),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: GlassTheme.primaryAccent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Connect'),
+                    Tab(text: 'Servers'),
+                    Tab(text: 'DNS Filter'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildConnectTab(),
+                _buildServersTab(),
+                _buildDnsFilterTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );

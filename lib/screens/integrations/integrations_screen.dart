@@ -2,11 +2,9 @@
 /// Third-party integrations management interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class IntegrationsScreen extends StatefulWidget {
@@ -37,42 +35,55 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Integrations',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadIntegrations,
+    return GlassPage(
+      title: 'Integrations',
+      body: Column(
+        children: [
+          // Actions row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  onPressed: _isLoading ? null : _loadIntegrations,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                : ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      // Stats
+                      Row(
+                        children: [
+                          _buildStatCard('Connected', _integrations.where((i) => i.isConnected).length.toString(), GlassTheme.successColor),
+                          const SizedBox(width: 12),
+                          _buildStatCard('Available', _integrations.length.toString(), GlassTheme.primaryAccent),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Connected integrations
+                      if (_integrations.any((i) => i.isConnected)) ...[
+                        const GlassSectionHeader(title: 'Connected'),
+                        ..._integrations.where((i) => i.isConnected).map((i) => _buildIntegrationCard(i)),
+                      ],
+
+                      // Available integrations
+                      const GlassSectionHeader(title: 'Available Integrations'),
+                      ..._integrations.where((i) => !i.isConnected).map((i) => _buildIntegrationCard(i)),
+                    ],
+                  ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Stats
-                Row(
-                  children: [
-                    _buildStatCard('Connected', _integrations.where((i) => i.isConnected).length.toString(), GlassTheme.successColor),
-                    const SizedBox(width: 12),
-                    _buildStatCard('Available', _integrations.length.toString(), GlassTheme.primaryAccent),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Connected integrations
-                if (_integrations.any((i) => i.isConnected)) ...[
-                  const GlassSectionHeader(title: 'Connected'),
-                  ..._integrations.where((i) => i.isConnected).map((i) => _buildIntegrationCard(i)),
-                ],
-
-                // Available integrations
-                const GlassSectionHeader(title: 'Available Integrations'),
-                ..._integrations.where((i) => !i.isConnected).map((i) => _buildIntegrationCard(i)),
-              ],
-            ),
     );
   }
 

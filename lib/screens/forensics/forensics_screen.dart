@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
-import '../../presentation/widgets/glass_container.dart';
-import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
 
@@ -18,77 +18,53 @@ class ForensicsScreen extends StatefulWidget {
   State<ForensicsScreen> createState() => _ForensicsScreenState();
 }
 
-class _ForensicsScreenState extends State<ForensicsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _ForensicsScreenState extends State<ForensicsScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ForensicsProvider>().init();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Forensic Analysis',
-        showBackButton: true,
-        actions: [
-          GlassAppBarAction(
-            svgIcon: 'info_circle',
-            onTap: () => _showInfoDialog(context),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: [
-                    Tab(icon: DuotoneIcon('magnifer_bug', size: 24), text: 'Analyze'),
-                    Tab(icon: DuotoneIcon('history', size: 24), text: 'History'),
-                    Tab(icon: DuotoneIcon('database', size: 24), text: 'IOCs'),
-                  ],
+    return Consumer<ForensicsProvider>(
+      builder: (context, provider, child) {
+        return GlassTabPage(
+          title: 'Forensic Analysis',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const DuotoneIcon('info_circle', size: 22, color: Colors.white),
+                  onPressed: () => _showInfoDialog(context),
+                  tooltip: 'Info',
                 ),
-              ),
+              ],
             ),
           ),
-          Expanded(
-            child: Consumer<ForensicsProvider>(
-              builder: (context, provider, child) {
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAnalyzeTab(provider),
-                    _buildHistoryTab(provider),
-                    _buildIOCsTab(provider),
-                  ],
-                );
-              },
+          tabs: [
+            GlassTab(
+              label: 'Analyze',
+              iconPath: 'magnifier',
+              content: _buildAnalyzeTab(provider),
             ),
-          ),
-        ],
-      ),
+            GlassTab(
+              label: 'History',
+              iconPath: 'history',
+              content: _buildHistoryTab(provider),
+            ),
+            GlassTab(
+              label: 'IOCs',
+              iconPath: 'chart',
+              content: _buildIOCsTab(provider),
+            ),
+          ],
+        );
+      },
     );
   }
 

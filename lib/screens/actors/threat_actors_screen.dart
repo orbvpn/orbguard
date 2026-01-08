@@ -2,7 +2,6 @@
 /// Threat actor profiles and intelligence interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -53,30 +52,35 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
         ? _actors
         : _actors.where((a) => a.category == _selectedCategory).toList();
 
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: 'Threat Actors',
-        actions: [
-          GlassAppBarAction(
-            svgIcon: AppIcons.search,
-            onTap: () => _showSearchDialog(context),
-            tooltip: 'Search',
-          ),
-          GlassAppBarAction(
-            svgIcon: AppIcons.refresh,
-            onTap: _isLoading ? null : _loadActors,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+    return GlassPage(
+      title: 'Threat Actors',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
           : Column(
               children: [
+                // Actions row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.search, size: 22, color: Colors.white),
+                        onPressed: () => _showSearchDialog(context),
+                        tooltip: 'Search',
+                      ),
+                      IconButton(
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        onPressed: _isLoading ? null : _loadActors,
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
+                ),
                 // Category filter
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: _categories.map((cat) {
                       final isSelected = cat == _selectedCategory;

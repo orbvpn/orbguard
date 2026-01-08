@@ -37,46 +37,69 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   Widget build(BuildContext context) {
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Analytics',
-            actions: [
-              PopupMenuButton<String>(
-                icon: const DuotoneIcon('calendar', size: 24, color: Colors.white),
-                color: GlassTheme.gradientTop,
-                onSelected: (value) => setState(() => _selectedTimeRange = value),
-                itemBuilder: (context) => [
-                  _buildTimeRangeItem('24h', 'Last 24 Hours'),
-                  _buildTimeRangeItem('7d', 'Last 7 Days'),
-                  _buildTimeRangeItem('30d', 'Last 30 Days'),
-                  _buildTimeRangeItem('90d', 'Last 90 Days'),
-                ],
-              ),
-              IconButton(
-                icon: const DuotoneIcon('refresh', size: 24, color: Colors.white),
-                onPressed: provider.isLoading ? null : () => provider.refreshDashboard(),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Overview'),
-                Tab(text: 'Threats'),
-                Tab(text: 'Protection'),
-              ],
-            ),
-          ),
+        return GlassPage(
+          title: 'Analytics',
           body: provider.isLoading
               ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : TabBarView(
-                  controller: _tabController,
+              : Column(
                   children: [
-                    _buildOverviewTab(provider),
-                    _buildThreatsTab(provider),
-                    _buildProtectionTab(provider),
+                    // Actions row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          PopupMenuButton<String>(
+                            icon: const DuotoneIcon('calendar', size: 22, color: Colors.white),
+                            color: GlassTheme.gradientTop,
+                            onSelected: (value) => setState(() => _selectedTimeRange = value),
+                            itemBuilder: (context) => [
+                              _buildTimeRangeItem('24h', 'Last 24 Hours'),
+                              _buildTimeRangeItem('7d', 'Last 7 Days'),
+                              _buildTimeRangeItem('30d', 'Last 30 Days'),
+                              _buildTimeRangeItem('90d', 'Last 90 Days'),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                            onPressed: provider.isLoading ? null : () => provider.refreshDashboard(),
+                            tooltip: 'Refresh',
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Tab bar
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+                        child: Container(
+                          decoration: GlassTheme.glassDecoration(),
+                          child: TabBar(
+                            controller: _tabController,
+                            indicatorColor: GlassTheme.primaryAccent,
+                            labelColor: Colors.white,
+                            unselectedLabelColor: Colors.white54,
+                            tabs: const [
+                              Tab(text: 'Overview'),
+                              Tab(text: 'Threats'),
+                              Tab(text: 'Protection'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildOverviewTab(provider),
+                          _buildThreatsTab(provider),
+                          _buildProtectionTab(provider),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
         );

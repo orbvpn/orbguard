@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/identity_protection_provider.dart';
 import '../../services/security/identity_theft_protection_service.dart';
@@ -18,83 +19,98 @@ class IdentityProtectionScreen extends StatefulWidget {
       _IdentityProtectionScreenState();
 }
 
-class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IdentityProtectionProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<IdentityProtectionProvider>(
       builder: (context, provider, _) {
-        return GlassScaffold(
-          appBar: GlassAppBar(
-            title: 'Identity Protection',
-            actions: [
-              if (provider.isScanning)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: GlassTheme.primaryAccent,
+        return GlassTabPage(
+          title: 'Identity Protection',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (provider.isScanning)
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: GlassTheme.primaryAccent,
+                      ),
                     ),
+                  )
+                else
+                  IconButton(
+                    icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                    onPressed: () => provider.scanAllAssets(),
+                    tooltip: 'Refresh',
                   ),
-                )
-              else
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 24),
-                  onPressed: () => provider.scanAllAssets(),
+                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                  onPressed: () => _showAddAssetSheet(context, provider),
+                  tooltip: 'Add Asset',
                 ),
-              IconButton(
-                icon: const DuotoneIcon('add_circle', size: 24),
-                onPressed: () => _showAddAssetSheet(context, provider),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(text: 'Overview'),
-                Tab(text: 'Assets'),
-                Tab(text: 'Alerts'),
-                Tab(text: 'Credit'),
               ],
             ),
           ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOverviewTab(provider),
-                    _buildAssetsTab(provider),
-                    _buildAlertsTab(provider),
-                    _buildCreditTab(provider),
-                  ],
-                ),
+          tabs: [
+            GlassTab(
+              label: 'Overview',
+              iconPath: 'user',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildOverviewTab(provider),
+            ),
+            GlassTab(
+              label: 'Assets',
+              iconPath: 'shield_check',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildAssetsTab(provider),
+            ),
+            GlassTab(
+              label: 'Alerts',
+              iconPath: 'danger_triangle',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildAlertsTab(provider),
+            ),
+            GlassTab(
+              label: 'Credit',
+              iconPath: 'history',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildCreditTab(provider),
+            ),
+          ],
         );
       },
     );
