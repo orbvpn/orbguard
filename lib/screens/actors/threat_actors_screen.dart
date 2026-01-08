@@ -2,8 +2,10 @@
 /// Threat actor profiles and intelligence interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/campaign.dart';
@@ -55,13 +57,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
       appBar: GlassAppBar(
         title: 'Threat Actors',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => _showSearchDialog(context),
+          GlassAppBarAction(
+            svgIcon: AppIcons.search,
+            onTap: () => _showSearchDialog(context),
+            tooltip: 'Search',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadActors,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadActors,
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -119,7 +123,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getCategoryIcon(actor.category),
                 color: _getCategoryColor(actor.category),
                 size: 48,
@@ -190,7 +194,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           Row(
             children: [
               if (actor.aliases.isNotEmpty) ...[
-                Icon(Icons.label, size: 14, color: Colors.white.withAlpha(102)),
+                DuotoneIcon(AppIcons.tag, size: 14, color: Colors.white.withAlpha(102)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -232,7 +236,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.person_search, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(AppIcons.threatActor, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           const Text(
             'No Threat Actors',
@@ -273,7 +277,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Header
               Row(
                 children: [
-                  GlassIconBox(
+                  GlassSvgIconBox(
                     icon: _getCategoryIcon(actor.category),
                     color: _getCategoryColor(actor.category),
                     size: 64,
@@ -453,7 +457,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           decoration: InputDecoration(
             hintText: 'Enter actor name or alias...',
             hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-            prefixIcon: const Icon(Icons.search, color: Colors.white54),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.all(12),
+              child: DuotoneIcon(AppIcons.search, size: 20, color: Colors.white54),
+            ),
           ),
           onSubmitted: (value) {
             Navigator.pop(context);
@@ -485,18 +492,18 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
     }
   }
 
-  IconData _getCategoryIcon(String category) {
+  String _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'apt':
-        return Icons.security;
+        return AppIcons.shieldCheck;
       case 'cybercrime':
-        return Icons.attach_money;
+        return AppIcons.dollar;
       case 'hacktivism':
-        return Icons.public;
+        return AppIcons.global;
       case 'nation-state':
-        return Icons.flag;
+        return AppIcons.flag;
       default:
-        return Icons.person;
+        return AppIcons.user;
     }
   }
 

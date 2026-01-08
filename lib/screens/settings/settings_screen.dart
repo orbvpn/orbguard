@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/settings_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -28,13 +29,13 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'Protection',
-                Icons.shield,
+                'shield_check',
                 const Color(0xFF00D9FF),
                 [
                   _buildSettingsTile(
                     'Protection Features',
                     'Enable/disable security features',
-                    Icons.security,
+                    'shield_check',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -45,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     'Scan Settings',
                     'Auto-scan and frequency',
-                    Icons.radar,
+                    'radar',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -60,13 +61,13 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'Notifications',
-                Icons.notifications,
+                'bell',
                 Colors.orange,
                 [
                   _buildSettingsTile(
                     'Alert Preferences',
                     'Manage notification types',
-                    Icons.notifications_active,
+                    'bell_bing',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -81,13 +82,13 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'Network & VPN',
-                Icons.vpn_lock,
+                'shield_keyhole',
                 Colors.green,
                 [
                   _buildSettingsTile(
                     'VPN Settings',
                     'Auto-connect and preferences',
-                    Icons.vpn_key,
+                    'key',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -102,13 +103,13 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'Privacy & Security',
-                Icons.privacy_tip,
+                'eye_closed',
                 Colors.purple,
                 [
                   _buildSettingsTile(
                     'Privacy Settings',
                     'Data sharing and app lock',
-                    Icons.lock,
+                    'lock',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -123,13 +124,13 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'Advanced',
-                Icons.settings,
+                'settings',
                 Colors.grey,
                 [
                   _buildSettingsTile(
                     'API Configuration',
                     'Server and connection settings',
-                    Icons.cloud,
+                    'cloud_storage',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -140,7 +141,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     'Reset Settings',
                     'Restore default settings',
-                    Icons.restore,
+                    'refresh',
                     isDestructive: true,
                     onTap: () => _showResetDialog(context, settings),
                   ),
@@ -151,24 +152,24 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsSection(
                 context,
                 'About',
-                Icons.info,
+                'info_circle',
                 Colors.blue,
                 [
                   _buildSettingsTile(
                     'App Version',
                     '1.0.0 (Build 1)',
-                    Icons.info_outline,
+                    'info_circle',
                   ),
                   _buildSettingsTile(
                     'Terms of Service',
                     'View terms and conditions',
-                    Icons.description,
+                    'file_text',
                     onTap: () {},
                   ),
                   _buildSettingsTile(
                     'Privacy Policy',
                     'View privacy policy',
-                    Icons.policy,
+                    'clipboard_text',
                     onTap: () {},
                   ),
                 ],
@@ -184,7 +185,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSettingsSection(
     BuildContext context,
     String title,
-    IconData icon,
+    String icon,
     Color color,
     List<Widget> children,
   ) {
@@ -193,7 +194,7 @@ class SettingsScreen extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, color: color, size: 20),
+            DuotoneIcon(icon, color: color, size: 20),
             const SizedBox(width: 8),
             Text(
               title,
@@ -217,14 +218,15 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSettingsTile(
     String title,
     String subtitle,
-    IconData icon, {
+    String icon, {
     VoidCallback? onTap,
     bool isDestructive = false,
   }) {
     return ListTile(
-      leading: Icon(
+      leading: DuotoneIcon(
         icon,
         color: isDestructive ? Colors.red : Colors.grey,
+        size: 24,
       ),
       title: Text(
         title,
@@ -241,7 +243,7 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       trailing: onTap != null
-          ? const Icon(Icons.chevron_right, color: Colors.grey)
+          ? const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20)
           : null,
       onTap: onTap,
     );
@@ -304,14 +306,14 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildInfoCard(
                 'Configure which protection features are active. '
                 'Disabling features may reduce security.',
-                Icons.info_outline,
+                'info_circle',
                 Colors.blue,
               ),
               const SizedBox(height: 24),
               _buildSwitchTile(
                 'SMS Protection',
                 'Analyze SMS messages for threats',
-                Icons.sms,
+                'chat_dots',
                 protection.smsProtectionEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(smsProtectionEnabled: value),
@@ -320,7 +322,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'URL Protection',
                 'Check URLs for malicious content',
-                Icons.link,
+                'link',
                 protection.urlProtectionEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(urlProtectionEnabled: value),
@@ -329,7 +331,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'QR Code Protection',
                 'Scan QR codes for threats',
-                Icons.qr_code_scanner,
+                'qr_code',
                 protection.qrProtectionEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(qrProtectionEnabled: value),
@@ -338,7 +340,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'App Security',
                 'Monitor installed apps for risks',
-                Icons.apps,
+                'smartphone',
                 protection.appSecurityEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(appSecurityEnabled: value),
@@ -347,7 +349,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'Network Protection',
                 'Monitor WiFi and network security',
-                Icons.wifi_lock,
+                'wi_fi_router',
                 protection.networkProtectionEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(networkProtectionEnabled: value),
@@ -356,7 +358,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'Dark Web Monitoring',
                 'Check for credential breaches',
-                Icons.dark_mode,
+                'incognito',
                 protection.darkWebMonitoringEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(darkWebMonitoringEnabled: value),
@@ -366,7 +368,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'Real-time Alerts',
                 'Get instant threat notifications',
-                Icons.notifications_active,
+                'bell_bing',
                 protection.realTimeAlertsEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(realTimeAlertsEnabled: value),
@@ -375,7 +377,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               _buildSwitchTile(
                 'Auto-block Threats',
                 'Automatically block detected threats',
-                Icons.block,
+                'forbidden',
                 protection.autoBlockThreats,
                 (value) => settings.updateProtection(
                   protection.copyWith(autoBlockThreats: value),
@@ -389,7 +391,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(String text, IconData icon, Color color) {
+  Widget _buildInfoCard(String text, String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -398,7 +400,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
+          DuotoneIcon(icon, color: color, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -417,7 +419,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
   Widget _buildSwitchTile(
     String title,
     String subtitle,
-    IconData icon,
+    String icon,
     bool value,
     Function(bool) onChanged, {
     bool isWarning = false,
@@ -429,9 +431,10 @@ class ProtectionSettingsScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
-        secondary: Icon(
+        secondary: DuotoneIcon(
           icon,
           color: value ? const Color(0xFF00D9FF) : Colors.grey,
+          size: 24,
         ),
         title: Text(
           title,
@@ -562,7 +565,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                           notif.copyWith(quietHoursStart: hour),
                         ),
                       ),
-                      const Icon(Icons.arrow_forward, color: Colors.grey),
+                      const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
                       _buildTimeSelector(
                         context,
                         'End',
@@ -753,7 +756,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.download, color: Colors.grey),
+                      leading: const DuotoneIcon('file_download', color: Colors.grey, size: 24),
                       title: const Text(
                         'Export Data',
                         style: TextStyle(color: Colors.white),
@@ -763,7 +766,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                       trailing:
-                          const Icon(Icons.chevron_right, color: Colors.grey),
+                          const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -773,7 +776,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     ListTile(
-                      leading: const Icon(Icons.delete, color: Colors.red),
+                      leading: const DuotoneIcon('trash_bin_minimalistic', color: Colors.red, size: 24),
                       title: const Text(
                         'Delete All Data',
                         style: TextStyle(color: Colors.red),
@@ -783,7 +786,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                       trailing:
-                          const Icon(Icons.chevron_right, color: Colors.grey),
+                          const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
                       onTap: () => _showDeleteDialog(context),
                     ),
                   ],
@@ -1204,7 +1207,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber, color: Colors.orange),
+                    const DuotoneIcon('danger_triangle', color: Colors.orange, size: 24),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -1370,7 +1373,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     }
                   });
                 },
-                icon: const Icon(Icons.network_check),
+                icon: const DuotoneIcon('wi_fi_router', color: Colors.black, size: 20),
                 label: const Text('Test Connection'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00D9FF),

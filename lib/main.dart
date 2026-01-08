@@ -39,6 +39,7 @@ import 'intelligence/cloud_threat_intelligence.dart';
 // Glass Theme
 import 'presentation/theme/glass_theme.dart';
 import 'presentation/widgets/glass_container.dart';
+import 'presentation/widgets/duotone_icon.dart';
 
 // Providers
 import 'providers/qr_provider.dart';
@@ -468,12 +469,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withAlpha(51),
               ),
-              child: const Icon(
-                Icons.verified_user,
-                size: 48,
-                color: Colors.green,
+              child: const Center(
+                child: DuotoneIcon(
+                  AppIcons.shieldCheck,
+                  size: 48,
+                  color: Colors.green,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -801,8 +804,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         actions: [
           // Permission setup button
           IconButton(
-            icon: Icon(
-              Icons.security,
+            icon: DuotoneIcon(
+              AppIcons.shieldCheck,
               color: _detectionCapability >= 80
                   ? GlassTheme.successColor
                   : _detectionCapability >= 50
@@ -812,7 +815,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: _navigateToPermissionSetup,
           ),
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: const DuotoneIcon(AppIcons.infoCircle, color: Colors.white),
             onPressed: () => _showAboutDialog(),
           ),
         ],
@@ -845,12 +848,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Color bannerColor = _detectionCapability >= 50 ? Colors.orange : Colors.red;
 
     return Card(
-      color: bannerColor.withOpacity(0.2),
+      color: bannerColor.withAlpha(51),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(Icons.warning, color: bannerColor),
+            DuotoneIcon(AppIcons.dangerTriangle, color: bannerColor),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -875,16 +878,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     Color statusColor = Colors.green;
     String statusText = 'Protected';
-    IconData statusIcon = Icons.shield;
+    String statusIcon = AppIcons.shield;
 
     if (criticalThreats > 0) {
       statusColor = Colors.red;
       statusText = 'Critical Threats Detected';
-      statusIcon = Icons.error;
+      statusIcon = AppIcons.dangerCircle;
     } else if (highThreats > 0) {
       statusColor = Colors.orange;
       statusText = 'Threats Detected';
-      statusIcon = Icons.warning;
+      statusIcon = AppIcons.dangerTriangle;
     }
 
     return GlassCard(
@@ -894,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           GlassCircleButton(
             size: 80,
             tintColor: statusColor,
-            child: Icon(statusIcon, size: 40, color: statusColor),
+            child: DuotoneIcon(statusIcon, size: 40, color: statusColor),
           ),
           const SizedBox(height: 16),
           Text(
@@ -948,8 +951,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.phone_android,
+              GlassSvgIconBox(
+                icon: AppIcons.smartphone,
                 color: GlassTheme.primaryAccent,
               ),
               const SizedBox(width: 12),
@@ -983,12 +986,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               Row(
                 children: [
-                  GlassIconBox(
+                  GlassSvgIconBox(
                     icon: _detectionCapability >= 80
-                        ? Icons.verified_user
+                        ? AppIcons.shieldCheck
                         : _detectionCapability >= 50
-                            ? Icons.shield
-                            : Icons.warning,
+                            ? AppIcons.shield
+                            : AppIcons.dangerTriangle,
                     color: capabilityColor,
                   ),
                   const SizedBox(width: 12),
@@ -1031,7 +1034,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     : 'Tap to configure permissions',
                 style: TextStyle(fontSize: 12, color: Colors.grey[400]),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+              DuotoneIcon(AppIcons.chevronRight, color: Colors.grey[600]!, size: 20),
             ],
           ),
         ],
@@ -1067,10 +1070,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    item.enabled ? Icons.check_circle : Icons.radio_button_unchecked,
+                  DuotoneIcon(
+                    item.enabled ? AppIcons.checkCircle : AppIcons.minusCircle,
                     size: 14,
-                    color: item.enabled ? Colors.green : Colors.grey[600],
+                    color: item.enabled ? Colors.green : Colors.grey[600]!,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -1115,7 +1118,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildScanButton() {
     return ElevatedButton.icon(
       onPressed: _isScanning ? null : () => _startScan(),
-      icon: Icon(_isScanning ? Icons.hourglass_empty : Icons.search, size: 32),
+      icon: DuotoneIcon(
+        _isScanning ? AppIcons.stopwatch : AppIcons.search,
+        size: 32,
+        color: Colors.black,
+      ),
       label: Text(
         _isScanning ? 'Scanning...' : 'Start Security Scan',
         style: const TextStyle(fontSize: 20),
@@ -1164,8 +1171,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(
-            complete ? Icons.check_circle : Icons.hourglass_empty,
+          DuotoneIcon(
+            complete ? AppIcons.checkCircle : AppIcons.stopwatch,
             color: complete ? Colors.green : Colors.grey,
             size: 20,
           ),
@@ -1190,8 +1197,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 12),
             ...(_threats.take(3).map((threat) => ListTile(
-                  leading: Icon(
-                    Icons.error,
+                  leading: DuotoneIcon(
+                    AppIcons.dangerCircle,
                     color: threat.severity == 'CRITICAL'
                         ? Colors.red
                         : threat.severity == 'HIGH'
@@ -1201,7 +1208,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   title: Text(threat.name),
                   subtitle: Text(threat.description),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete),
+                    icon: const DuotoneIcon(AppIcons.trash, color: Colors.grey),
                     onPressed: () => _removeThreat(threat),
                   ),
                 ))),
@@ -1246,8 +1253,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       GlassCircleButton(
                         size: 60,
                         tintColor: GlassTheme.primaryAccent,
-                        child: const Icon(
-                          Icons.shield,
+                        child: const DuotoneIcon(
+                          AppIcons.shield,
                           size: 32,
                           color: GlassTheme.primaryAccent,
                         ),
@@ -1272,7 +1279,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 _buildDrawerItem(
-                  icon: Icons.dashboard,
+                  svgIcon: 'widget_5',
                   title: 'Dashboard',
                   subtitle: 'Real-time threat overview',
                   onTap: () {
@@ -1285,7 +1292,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Protection'),
                 _buildDrawerItem(
-                  icon: Icons.sms,
+                  svgIcon: 'chat_dots',
                   title: 'SMS Protection',
                   subtitle: 'Phishing & smishing detection',
                   onTap: () {
@@ -1296,7 +1303,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.link,
+                  svgIcon: 'link',
                   title: 'URL Protection',
                   subtitle: 'Malicious link scanner',
                   onTap: () {
@@ -1307,7 +1314,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.qr_code_scanner,
+                  svgIcon: 'qr_code',
                   title: 'QR Scanner',
                   subtitle: 'Safe QR code scanning',
                   onTap: () {
@@ -1320,7 +1327,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Security'),
                 _buildDrawerItem(
-                  icon: Icons.apps,
+                  svgIcon: 'smartphone',
                   title: 'App Security',
                   subtitle: 'Installed app analysis',
                   onTap: () {
@@ -1331,7 +1338,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.wifi,
+                  svgIcon: 'wi_fi_router',
                   title: 'Network Security',
                   subtitle: 'Wi-Fi & network protection',
                   onTap: () {
@@ -1342,7 +1349,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.dark_mode,
+                  svgIcon: 'incognito',
                   title: 'Dark Web Monitor',
                   subtitle: 'Credential breach detection',
                   onTap: () {
@@ -1353,7 +1360,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.wifi_tethering,
+                  svgIcon: 'wi_fi_router_round',
                   title: 'Rogue AP Detection',
                   subtitle: 'Evil twin & fake hotspots',
                   onTap: () {
@@ -1364,7 +1371,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.shield,
+                  svgIcon: 'shield_network',
                   title: 'Network Firewall',
                   subtitle: 'Per-app network rules',
                   onTap: () {
@@ -1377,7 +1384,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Intelligence'),
                 _buildDrawerItem(
-                  icon: Icons.hub,
+                  svgIcon: 'structure',
                   title: 'Intelligence Core',
                   subtitle: 'Threat intel browsing & IOC check',
                   onTap: () {
@@ -1388,7 +1395,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.grid_view,
+                  svgIcon: 'widget_4',
                   title: 'MITRE ATT&CK',
                   subtitle: 'Threat framework mapping',
                   onTap: () {
@@ -1399,7 +1406,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.search,
+                  svgIcon: 'magnifer_bug',
                   title: 'Threat Hunting',
                   subtitle: 'Proactive threat detection',
                   onTap: () {
@@ -1410,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.inventory_2,
+                  svgIcon: 'box',
                   title: 'Supply Chain',
                   subtitle: 'Dependency vulnerabilities',
                   onTap: () {
@@ -1423,7 +1430,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Identity & Privacy'),
                 _buildDrawerItem(
-                  icon: Icons.person_pin,
+                  svgIcon: 'user_id',
                   title: 'Identity Protection',
                   subtitle: 'Credit & identity monitoring',
                   onTap: () {
@@ -1434,7 +1441,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.share,
+                  svgIcon: 'share',
                   title: 'Social Media',
                   subtitle: 'Account security monitoring',
                   onTap: () {
@@ -1447,7 +1454,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Enterprise'),
                 _buildDrawerItem(
-                  icon: Icons.admin_panel_settings,
+                  svgIcon: 'crown',
                   title: 'Executive Protection',
                   subtitle: 'VIP & BEC fraud detection',
                   onTap: () {
@@ -1458,7 +1465,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.policy,
+                  svgIcon: 'clipboard_text',
                   title: 'Enterprise Policy',
                   subtitle: 'MDM & compliance policies',
                   onTap: () {
@@ -1469,7 +1476,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.dashboard_customize,
+                  svgIcon: 'widget_5',
                   title: 'Enterprise Overview',
                   subtitle: 'Organization security status',
                   onTap: () {
@@ -1480,7 +1487,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.integration_instructions,
+                  svgIcon: 'server_square',
                   title: 'SIEM Integration',
                   subtitle: 'Splunk, ELK, ArcSight',
                   onTap: () {
@@ -1491,7 +1498,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.gavel,
+                  svgIcon: 'document_add',
                   title: 'Compliance Reports',
                   subtitle: 'SOC2, GDPR, HIPAA, PCI-DSS',
                   onTap: () {
@@ -1502,7 +1509,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.share,
+                  svgIcon: 'transfer_horizontal',
                   title: 'STIX/TAXII',
                   subtitle: 'Threat intelligence sharing',
                   onTap: () {
@@ -1514,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 const GlassDivider(isDark: true),
                 _buildDrawerItem(
-                  icon: Icons.settings,
+                  svgIcon: 'settings',
                   title: 'Settings',
                   subtitle: 'App configuration',
                   onTap: () {
@@ -1548,14 +1555,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildDrawerItem({
-    required IconData icon,
+    required String svgIcon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: GlassIconBox(
-        icon: icon,
+      leading: GlassSvgIconBox(
+        icon: svgIcon,
         color: GlassTheme.primaryAccent,
         size: 36,
         iconSize: 18,

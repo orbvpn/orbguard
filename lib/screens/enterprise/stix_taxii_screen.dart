@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class StixTaxiiScreen extends StatefulWidget {
@@ -53,12 +54,12 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
         title: 'STIX/TAXII 2.1',
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const DuotoneIcon('add_circle', size: 24),
             tooltip: 'Add Server',
             onPressed: () => _showAddServerDialog(context),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon('refresh', size: 24),
             onPressed: _isLoading ? null : _loadData,
           ),
         ],
@@ -95,7 +96,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
         GlassCard(
           child: Row(
             children: [
-              GlassIconBox(icon: Icons.info_outline, color: GlassTheme.primaryAccent),
+              GlassSvgIconBox(icon: 'info_circle', color: GlassTheme.primaryAccent),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -159,8 +160,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.dns,
+              GlassSvgIconBox(
+                icon: 'server_square',
                 color: server.isConnected ? GlassTheme.successColor : GlassTheme.errorColor,
               ),
               const SizedBox(width: 12),
@@ -190,9 +191,9 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              _buildServerStat(Icons.folder, '${server.collectionCount}', 'Collections'),
+              _buildServerStat('folder', '${server.collectionCount}', 'Collections'),
               const SizedBox(width: 16),
-              _buildServerStat(Icons.sync, _formatTime(server.lastSync), 'Last Sync'),
+              _buildServerStat('refresh', _formatTime(server.lastSync), 'Last Sync'),
               const SizedBox(width: 16),
               GlassBadge(text: 'TAXII ${server.version}', color: GlassTheme.primaryAccent, fontSize: 10),
             ],
@@ -202,11 +203,11 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
     );
   }
 
-  Widget _buildServerStat(IconData icon, String value, String label) {
+  Widget _buildServerStat(String icon, String value, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white38),
+        DuotoneIcon(icon, size: 14, color: Colors.white38),
         const SizedBox(width: 4),
         Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
         const SizedBox(width: 4),
@@ -265,8 +266,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.folder,
+              GlassSvgIconBox(
+                icon: 'folder',
                 color: collection.canRead ? GlassTheme.primaryAccent : Colors.grey,
               ),
               const SizedBox(width: 12),
@@ -337,7 +338,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(_getStixTypeIcon(entry.key), color: _getStixTypeColor(entry.key), size: 24),
+                      DuotoneIcon(_getStixTypeIcon(entry.key), color: _getStixTypeColor(entry.key), size: 24),
                       const SizedBox(height: 4),
                       Text('${entry.value.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       Text(entry.key.replaceAll('-', ' '), style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 9), textAlign: TextAlign.center),
@@ -365,7 +366,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
       onTap: () => _showObjectDetails(context, obj),
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getStixTypeIcon(obj.type),
             color: _getStixTypeColor(obj.type),
           ),
@@ -406,7 +407,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inbox, size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -564,7 +565,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(icon: Icons.dns, color: GlassTheme.primaryAccent, size: 56),
+                  GlassSvgIconBox(icon: 'server_square', color: GlassTheme.primaryAccent, size: 56),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -597,7 +598,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.sync),
+                      icon: const DuotoneIcon('refresh', size: 18),
                       label: const Text('Sync Now'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -613,7 +614,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
                         setState(() => _servers.remove(server));
                         Navigator.pop(context);
                       },
-                      icon: const Icon(Icons.delete),
+                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
                       label: const Text('Remove'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.errorColor,
@@ -656,7 +657,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
           children: [
             Row(
               children: [
-                GlassIconBox(icon: _getStixTypeIcon(obj.type), color: _getStixTypeColor(obj.type), size: 56),
+                GlassSvgIconBox(icon: _getStixTypeIcon(obj.type), color: _getStixTypeColor(obj.type), size: 56),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -713,26 +714,26 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
     );
   }
 
-  IconData _getStixTypeIcon(String type) {
+  String _getStixTypeIcon(String type) {
     switch (type.toLowerCase()) {
       case 'indicator':
-        return Icons.warning;
+        return 'danger_triangle';
       case 'malware':
-        return Icons.bug_report;
+        return 'bug';
       case 'threat-actor':
-        return Icons.person;
+        return 'user';
       case 'campaign':
-        return Icons.campaign;
+        return 'flag';
       case 'attack-pattern':
-        return Icons.pattern;
+        return 'structure';
       case 'vulnerability':
-        return Icons.security;
+        return 'shield';
       case 'tool':
-        return Icons.build;
+        return 'wrench';
       case 'identity':
-        return Icons.badge;
+        return 'user_circle';
       default:
-        return Icons.category;
+        return 'widget_5';
     }
   }
 

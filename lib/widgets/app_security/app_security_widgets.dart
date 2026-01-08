@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/api/url_reputation.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/app_security_provider.dart';
 
 /// Risk score gauge widget
@@ -289,8 +290,8 @@ class AppListCard extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
-                                  Icons.track_changes,
+                                const DuotoneIcon(
+                                  AppIcons.radar,
                                   size: 10,
                                   color: Colors.purple,
                                 ),
@@ -321,12 +322,12 @@ class AppListCard extends StatelessWidget {
               )
             else if (!hasResult && onAnalyze != null)
               IconButton(
-                icon: const Icon(Icons.search, color: Color(0xFF00D9FF)),
+                icon: const DuotoneIcon(AppIcons.search, color: Color(0xFF00D9FF)),
                 onPressed: onAnalyze,
                 tooltip: 'Analyze',
               )
             else
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              const DuotoneIcon(AppIcons.chevronRight, color: Colors.grey),
           ],
         ),
       ),
@@ -360,7 +361,7 @@ class PermissionChip extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(_getIconData(iconName), size: 20, color: color),
+            DuotoneIcon(_getIconString(iconName), size: 20, color: color),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -386,7 +387,7 @@ class PermissionChip extends StatelessWidget {
               ),
             ),
             if (permission.isDangerous)
-              const Icon(Icons.warning, size: 18, color: Colors.red),
+              const DuotoneIcon(AppIcons.dangerTriangle, size: 18, color: Colors.red),
           ],
         ),
       );
@@ -401,7 +402,7 @@ class PermissionChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_getIconData(iconName), size: 14, color: color),
+          DuotoneIcon(_getIconString(iconName), size: 14, color: color),
           const SizedBox(width: 6),
           Text(
             _formatPermissionName(permission.permission),
@@ -424,34 +425,34 @@ class PermissionChip extends StatelessWidget {
     }).join(' ');
   }
 
-  IconData _getIconData(String name) {
+  String _getIconString(String name) {
     switch (name) {
       case 'camera':
-        return Icons.camera_alt;
+        return AppIcons.camera;
       case 'mic':
-        return Icons.mic;
+        return AppIcons.microphone;
       case 'location_on':
-        return Icons.location_on;
+        return AppIcons.mapPoint;
       case 'contacts':
-        return Icons.contacts;
+        return AppIcons.usersGroup;
       case 'calendar_today':
-        return Icons.calendar_today;
+        return AppIcons.calendar;
       case 'folder':
-        return Icons.folder;
+        return AppIcons.folder;
       case 'sms':
-        return Icons.sms;
+        return AppIcons.chatDots;
       case 'phone':
-        return Icons.phone;
+        return AppIcons.smartphone;
       case 'bluetooth':
-        return Icons.bluetooth;
+        return AppIcons.bluetooth;
       case 'wifi':
-        return Icons.wifi;
+        return AppIcons.wifi;
       case 'notifications':
-        return Icons.notifications;
+        return AppIcons.bell;
       case 'accessibility':
-        return Icons.accessibility;
+        return AppIcons.user;
       default:
-        return Icons.security;
+        return AppIcons.shieldCheck;
     }
   }
 }
@@ -488,8 +489,8 @@ class TrackerCard extends StatelessWidget {
                 color: Colors.purple.withAlpha(40),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.track_changes,
+              child: const DuotoneIcon(
+                AppIcons.radar,
                 size: 18,
                 color: Colors.purple,
               ),
@@ -588,7 +589,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Total Apps',
                   stats.totalApps.toString(),
-                  Icons.apps,
+                  AppIcons.smartphone,
                   const Color(0xFF00D9FF),
                 ),
               ),
@@ -596,7 +597,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Analyzed',
                   stats.analyzedApps.toString(),
-                  Icons.search,
+                  AppIcons.search,
                   Colors.blue,
                 ),
               ),
@@ -609,7 +610,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'High Risk',
                   stats.highRiskApps.toString(),
-                  Icons.warning,
+                  AppIcons.dangerTriangle,
                   Colors.red,
                 ),
               ),
@@ -617,7 +618,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Sideloaded',
                   stats.sideloadedApps.toString(),
-                  Icons.file_download,
+                  AppIcons.fileDownload,
                   Colors.orange,
                 ),
               ),
@@ -630,7 +631,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Trackers',
                   stats.trackersFound.toString(),
-                  Icons.track_changes,
+                  AppIcons.radar,
                   Colors.purple,
                 ),
               ),
@@ -638,7 +639,7 @@ class AppSecurityStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Dangerous',
                   stats.dangerousPermissions.toString(),
-                  Icons.security,
+                  AppIcons.shieldCheck,
                   Colors.deepOrange,
                 ),
               ),
@@ -654,7 +655,7 @@ class AppSecurityStatsCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.bug_report, color: Colors.red, size: 20),
+                  const DuotoneIcon(AppIcons.bug, color: Colors.red, size: 20),
                   const SizedBox(width: 12),
                   Text(
                     '${stats.malwareDetected} malware app${stats.malwareDetected > 1 ? 's' : ''} detected!',
@@ -673,7 +674,7 @@ class AppSecurityStatsCard extends StatelessWidget {
   }
 
   Widget _buildStatItem(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -682,7 +683,7 @@ class AppSecurityStatsCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
+          DuotoneIcon(icon, color: color, size: 20),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -805,7 +806,7 @@ class ScanProgressIndicator extends StatelessWidget {
                 ),
                 ElevatedButton.icon(
                   onPressed: onStart,
-                  icon: const Icon(Icons.play_arrow, size: 18),
+                  icon: const DuotoneIcon(AppIcons.play, size: 18, color: Colors.black),
                   label: const Text('Scan'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D9FF),

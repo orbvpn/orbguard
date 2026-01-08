@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class ComplianceReportingScreen extends StatefulWidget {
@@ -54,12 +55,12 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
         title: 'Compliance Reporting',
         actions: [
           IconButton(
-            icon: const Icon(Icons.schedule),
+            icon: const DuotoneIcon('clock_circle', size: 24),
             tooltip: 'Schedule Reports',
             onPressed: () => _showScheduleDialog(context),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon('refresh', size: 24),
             onPressed: _isLoading ? null : _loadData,
           ),
         ],
@@ -165,7 +166,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.assessment, size: 18),
+                        : const DuotoneIcon('chart', size: 18),
                     label: Text(_isGenerating ? 'Generating...' : 'Generate Full Report'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
@@ -200,7 +201,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getFrameworkIcon(framework.id),
                 color: framework.isEnabled ? statusColor : Colors.grey,
               ),
@@ -242,11 +243,11 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildFrameworkStat(Icons.check_circle, '${framework.passedControls}', 'Passed', GlassTheme.successColor),
+                _buildFrameworkStat('check_circle', '${framework.passedControls}', 'Passed', GlassTheme.successColor),
                 const SizedBox(width: 16),
-                _buildFrameworkStat(Icons.warning, '${framework.failedControls}', 'Failed', GlassTheme.errorColor),
+                _buildFrameworkStat('danger_triangle', '${framework.failedControls}', 'Failed', GlassTheme.errorColor),
                 const SizedBox(width: 16),
-                _buildFrameworkStat(Icons.help_outline, '${framework.totalControls - framework.passedControls - framework.failedControls}', 'N/A', Colors.grey),
+                _buildFrameworkStat('question_circle', '${framework.totalControls - framework.passedControls - framework.failedControls}', 'N/A', Colors.grey),
               ],
             ),
           ],
@@ -255,11 +256,11 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
     );
   }
 
-  Widget _buildFrameworkStat(IconData icon, String value, String label, Color color) {
+  Widget _buildFrameworkStat(String icon, String value, String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        DuotoneIcon(icon, size: 14, color: color),
         const SizedBox(width: 4),
         Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
         const SizedBox(width: 4),
@@ -277,7 +278,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
           onTap: () => _showGenerateReportDialog(context),
           child: Row(
             children: [
-              GlassIconBox(icon: Icons.add_chart, color: GlassTheme.primaryAccent),
+              GlassSvgIconBox(icon: 'chart_square', color: GlassTheme.primaryAccent),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
@@ -288,7 +289,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              const DuotoneIcon('alt_arrow_right', color: Colors.white38, size: 24),
             ],
           ),
         ),
@@ -308,8 +309,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
       onTap: () => _showReportDetails(context, report),
       child: Row(
         children: [
-          GlassIconBox(
-            icon: Icons.description,
+          GlassSvgIconBox(
+            icon: 'file',
             color: _getFrameworkColor(report.framework),
           ),
           const SizedBox(width: 12),
@@ -322,7 +323,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 12, color: Colors.white.withAlpha(102)),
+                    DuotoneIcon('calendar', size: 12, color: Colors.white.withAlpha(102)),
                     const SizedBox(width: 4),
                     Text(
                       _formatDate(report.generatedAt),
@@ -342,7 +343,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.download, size: 20),
+                    icon: const DuotoneIcon('download_minimalistic', size: 20),
                     color: Colors.white54,
                     onPressed: () {},
                     padding: EdgeInsets.zero,
@@ -350,7 +351,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.share, size: 20),
+                    icon: const DuotoneIcon('share', size: 20),
                     color: Colors.white54,
                     onPressed: () {},
                     padding: EdgeInsets.zero,
@@ -416,26 +417,26 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
 
   Widget _buildControlCard(ComplianceControl control) {
     Color statusColor;
-    IconData statusIcon;
+    String statusIcon;
     switch (control.status) {
       case 'pass':
         statusColor = GlassTheme.successColor;
-        statusIcon = Icons.check_circle;
+        statusIcon = 'check_circle';
         break;
       case 'fail':
         statusColor = GlassTheme.errorColor;
-        statusIcon = Icons.cancel;
+        statusIcon = 'close_circle';
         break;
       default:
         statusColor = Colors.grey;
-        statusIcon = Icons.help_outline;
+        statusIcon = 'question_circle';
     }
 
     return GlassCard(
       onTap: () => _showControlDetails(context, control),
       child: Row(
         children: [
-          Icon(statusIcon, color: statusColor),
+          DuotoneIcon(statusIcon, color: statusColor, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -479,7 +480,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inbox, size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -541,7 +542,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(icon: _getFrameworkIcon(framework.id), color: GlassTheme.primaryAccent, size: 56),
+                  GlassSvgIconBox(icon: _getFrameworkIcon(framework.id), color: GlassTheme.primaryAccent, size: 56),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -579,7 +580,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.play_arrow),
+                      icon: const DuotoneIcon('play', size: 18),
                       label: const Text('Run Assessment'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -595,7 +596,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
                         Navigator.pop(context);
                         _showGenerateReportDialog(context, framework: framework.id);
                       },
-                      icon: const Icon(Icons.description),
+                      icon: const DuotoneIcon('file', size: 18),
                       label: const Text('Generate Report'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.primaryAccent,
@@ -689,17 +690,17 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.calendar_view_day, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('calendar', color: GlassTheme.primaryAccent, size: 24),
               title: const Text('Daily', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.calendar_view_week, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('calendar', color: GlassTheme.primaryAccent, size: 24),
               title: const Text('Weekly', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.calendar_view_month, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('calendar', color: GlassTheme.primaryAccent, size: 24),
               title: const Text('Monthly', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
@@ -722,20 +723,20 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
     );
   }
 
-  IconData _getFrameworkIcon(String id) {
+  String _getFrameworkIcon(String id) {
     switch (id.toUpperCase()) {
       case 'SOC2':
-        return Icons.verified_user;
+        return 'verified_check';
       case 'GDPR':
-        return Icons.privacy_tip;
+        return 'shield_check';
       case 'HIPAA':
-        return Icons.local_hospital;
+        return 'heart_pulse';
       case 'PCI-DSS':
-        return Icons.credit_card;
+        return 'card';
       case 'ISO27001':
-        return Icons.security;
+        return 'shield';
       default:
-        return Icons.policy;
+        return 'clipboard_text';
     }
   }
 

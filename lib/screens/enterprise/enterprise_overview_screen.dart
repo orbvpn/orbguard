@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class EnterpriseOverviewScreen extends StatefulWidget {
@@ -42,14 +43,14 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
       appBar: GlassAppBar(
         title: 'Enterprise Overview',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
+          GlassAppBarAction(
+            svgIcon: 'download_minimalistic',
             tooltip: 'Export Report',
-            onPressed: () => _showExportDialog(context),
+            onTap: () => _showExportDialog(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadData,
+          GlassAppBarAction(
+            svgIcon: 'refresh',
+            onTap: _isLoading ? null : _loadData,
           ),
         ],
       ),
@@ -161,7 +162,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.shield, color: scoreColor),
+                      DuotoneIcon('shield_check', size: 24, color: scoreColor),
                       const SizedBox(width: 8),
                       Text(
                         scoreLabel,
@@ -181,11 +182,11 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _buildMiniStat(Icons.devices, '${_stats.totalDevices}', 'Devices'),
+                      _buildMiniStat('devices', '${_stats.totalDevices}', 'Devices'),
                       const SizedBox(width: 16),
-                      _buildMiniStat(Icons.people, '${_stats.activeUsers}', 'Users'),
+                      _buildMiniStat('users_group_rounded', '${_stats.activeUsers}', 'Users'),
                       const SizedBox(width: 16),
-                      _buildMiniStat(Icons.warning, '${_stats.openIncidents}', 'Incidents'),
+                      _buildMiniStat('danger_triangle', '${_stats.openIncidents}', 'Incidents'),
                     ],
                   ),
                 ],
@@ -197,11 +198,11 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     );
   }
 
-  Widget _buildMiniStat(IconData icon, String value, String label) {
+  Widget _buildMiniStat(String svgIcon, String value, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: Colors.white54),
+        DuotoneIcon(svgIcon, size: 16, color: Colors.white54),
         const SizedBox(width: 4),
         Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         const SizedBox(width: 4),
@@ -213,22 +214,22 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
   Widget _buildKeyMetrics() {
     return Row(
       children: [
-        _buildMetricCard('Threats Blocked', '${_stats.threatsBlocked}', GlassTheme.errorColor, Icons.block, '+12%'),
+        _buildMetricCard('Threats Blocked', '${_stats.threatsBlocked}', GlassTheme.errorColor, 'forbidden', '+12%'),
         const SizedBox(width: 12),
-        _buildMetricCard('Policies Active', '${_stats.activePolicies}', GlassTheme.primaryAccent, Icons.policy, ''),
+        _buildMetricCard('Policies Active', '${_stats.activePolicies}', GlassTheme.primaryAccent, 'clipboard_text', ''),
         const SizedBox(width: 12),
-        _buildMetricCard('Compliance', '${_stats.complianceRate}%', GlassTheme.successColor, Icons.verified, '+5%'),
+        _buildMetricCard('Compliance', '${_stats.complianceRate}%', GlassTheme.successColor, 'shield_check', '+5%'),
       ],
     );
   }
 
-  Widget _buildMetricCard(String label, String value, Color color, IconData icon, String trend) {
+  Widget _buildMetricCard(String label, String value, Color color, String svgIcon, String trend) {
     return Expanded(
       child: GlassContainer(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 24),
+            DuotoneIcon(svgIcon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
@@ -302,22 +303,22 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
   Widget _buildDeviceHealthGrid() {
     return Row(
       children: [
-        _buildHealthCard('Healthy', _stats.healthyDevices, GlassTheme.successColor, Icons.check_circle),
+        _buildHealthCard('Healthy', _stats.healthyDevices, GlassTheme.successColor, 'check_circle'),
         const SizedBox(width: 12),
-        _buildHealthCard('At Risk', _stats.atRiskDevices, GlassTheme.warningColor, Icons.warning),
+        _buildHealthCard('At Risk', _stats.atRiskDevices, GlassTheme.warningColor, 'danger_triangle'),
         const SizedBox(width: 12),
-        _buildHealthCard('Critical', _stats.criticalDevices, GlassTheme.errorColor, Icons.error),
+        _buildHealthCard('Critical', _stats.criticalDevices, GlassTheme.errorColor, 'danger_circle'),
       ],
     );
   }
 
-  Widget _buildHealthCard(String label, int count, Color color, IconData icon) {
+  Widget _buildHealthCard(String label, int count, Color color, String svgIcon) {
     return Expanded(
       child: GlassCard(
         onTap: () {},
         child: Column(
           children: [
-            Icon(icon, color: color, size: 28),
+            DuotoneIcon(svgIcon, color: color, size: 28),
             const SizedBox(height: 8),
             Text('$count', style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
@@ -385,8 +386,8 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(
-            enabled ? (percentage >= 90 ? Icons.check_circle : Icons.warning) : Icons.remove_circle,
+          DuotoneIcon(
+            enabled ? (percentage >= 90 ? 'check_circle' : 'danger_triangle') : 'minus_circle',
             size: 18,
             color: statusColor,
           ),
@@ -400,7 +401,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
       onTap: () => _showEventDetails(context, event),
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getEventIcon(event.type),
             color: _getEventColor(event.severity),
             size: 44,
@@ -448,7 +449,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
           children: [
             Row(
               children: [
-                GlassIconBox(icon: _getEventIcon(event.type), color: _getEventColor(event.severity), size: 56),
+                GlassSvgIconBox(icon: _getEventIcon(event.type), color: _getEventColor(event.severity), size: 56),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -503,17 +504,17 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: GlassTheme.errorColor),
+              leading: const DuotoneIcon('document', color: GlassTheme.errorColor, size: 24),
               title: const Text('PDF Report', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.table_chart, color: GlassTheme.successColor),
+              leading: const DuotoneIcon('chart', color: GlassTheme.successColor, size: 24),
               title: const Text('CSV Export', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.code, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('code', color: GlassTheme.primaryAccent, size: 24),
               title: const Text('JSON Export', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
@@ -536,20 +537,20 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     );
   }
 
-  IconData _getEventIcon(String type) {
+  String _getEventIcon(String type) {
     switch (type.toLowerCase()) {
       case 'malware':
-        return Icons.bug_report;
+        return 'bug';
       case 'phishing':
-        return Icons.phishing;
+        return 'danger_triangle';
       case 'policy violation':
-        return Icons.policy;
+        return 'clipboard_text';
       case 'unauthorized access':
-        return Icons.lock;
+        return 'lock';
       case 'data exfiltration':
-        return Icons.upload;
+        return 'upload_minimalistic';
       default:
-        return Icons.security;
+        return 'shield_check';
     }
   }
 

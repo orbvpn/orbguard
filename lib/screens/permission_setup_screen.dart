@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../permissions/permission_manager.dart';
+import '../presentation/widgets/duotone_icon.dart';
 import 'elevated_access_setup_screen.dart';
 
 class PermissionSetupScreen extends StatefulWidget {
@@ -78,7 +79,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         title: const Text('Permission Setup'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon(AppIcons.refresh),
             onPressed: _checkPermissions,
           ),
         ],
@@ -100,7 +101,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         const SizedBox(height: 24),
 
         // Essential Permissions
-        _buildGroupHeader('Essential Permissions', Icons.security),
+        _buildGroupHeader('Essential Permissions', AppIcons.shieldCheck),
         const Text(
           'Required for basic threat detection',
           style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -111,13 +112,13 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           'Phone State',
           'Monitor device for suspicious modifications',
           Permission.phone,
-          Icons.phone_android,
+          AppIcons.smartphone,
         ),
 
         const SizedBox(height: 24),
 
         // Advanced Permissions
-        _buildGroupHeader('Advanced Detection', Icons.search),
+        _buildGroupHeader('Advanced Detection', AppIcons.search),
         const Text(
           'Enables deep threat analysis',
           style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -127,19 +128,19 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           'SMS Access',
           'Detect SMS-based exploits (Pegasus)',
           Permission.sms,
-          Icons.sms,
+          AppIcons.chatDots,
         ),
         _buildPermissionCard(
           'Location',
           'Detect location stalking behavior',
           Permission.location,
-          Icons.location_on,
+          AppIcons.mapPoint,
         ),
 
         const SizedBox(height: 24),
 
         // Special Permissions
-        _buildGroupHeader('Special Permissions', Icons.settings),
+        _buildGroupHeader('Special Permissions', AppIcons.settings),
         const Text(
           'Requires manual activation in Settings',
           style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -161,7 +162,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         const SizedBox(height: 24),
 
         // Enhanced Access
-        _buildGroupHeader('Enhanced Access', Icons.terminal),
+        _buildGroupHeader('Enhanced Access', AppIcons.codeSquare),
         const Text(
           'Enables deep system scanning',
           style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -177,32 +178,32 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
   Widget _buildEnhancedAccessCard() {
     final hasEnhancedAccess = _hasRootAccess || _accessMethod == 'Shell' || _accessMethod == 'AppProcess';
 
-    IconData accessIcon;
+    String accessIcon;
     Color accessColor;
     String accessLabel;
     String accessDescription;
 
     switch (_accessMethod) {
       case 'Root':
-        accessIcon = Icons.admin_panel_settings;
+        accessIcon = AppIcons.crown;
         accessColor = Colors.green;
         accessLabel = 'Root Access';
         accessDescription = 'Maximum protection - full system access';
         break;
       case 'Shell':
-        accessIcon = Icons.terminal;
+        accessIcon = AppIcons.codeSquare;
         accessColor = Colors.cyan;
         accessLabel = 'Shell Access';
         accessDescription = 'Enhanced scanning via Shizuku/ADB';
         break;
       case 'AppProcess':
-        accessIcon = Icons.settings_applications;
+        accessIcon = AppIcons.settings;
         accessColor = Colors.orange;
         accessLabel = 'Elevated Access';
         accessDescription = 'Extended monitoring capabilities';
         break;
       default:
-        accessIcon = Icons.shield_outlined;
+        accessIcon = AppIcons.shield;
         accessColor = Colors.grey;
         accessLabel = 'Standard Access';
         accessDescription = 'Tap to enable deeper scanning';
@@ -231,7 +232,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                   color: accessColor.withAlpha(30),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(accessIcon, color: accessColor, size: 24),
+                child: DuotoneIcon(accessIcon, color: accessColor, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -273,8 +274,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                 ),
               ),
               hasEnhancedAccess
-                  ? Icon(Icons.check_circle, color: accessColor)
-                  : Icon(Icons.chevron_right, color: Colors.grey[600]),
+                  ? DuotoneIcon(AppIcons.checkCircle, color: accessColor)
+                  : DuotoneIcon(AppIcons.chevronRight, color: Colors.grey[600]),
             ],
           ),
         ),
@@ -286,20 +287,20 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     final capability = _scanResult!.detectionCapability;
     Color color;
     String status;
-    IconData icon;
+    String icon;
 
     if (capability >= 80) {
       color = Colors.green;
       status = 'Excellent';
-      icon = Icons.check_circle;
+      icon = AppIcons.checkCircle;
     } else if (capability >= 50) {
       color = Colors.orange;
       status = 'Good';
-      icon = Icons.warning;
+      icon = AppIcons.dangerTriangle;
     } else {
       color = Colors.red;
       status = 'Limited';
-      icon = Icons.error;
+      icon = AppIcons.dangerCircle;
     }
 
     return Card(
@@ -310,7 +311,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           children: [
             Row(
               children: [
-                Icon(icon, color: color, size: 32),
+                DuotoneIcon(icon, color: color, size: 32),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -361,10 +362,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     );
   }
 
-  Widget _buildGroupHeader(String title, IconData icon) {
+  Widget _buildGroupHeader(String title, String icon) {
     return Row(
       children: [
-        Icon(icon, color: Colors.blue),
+        DuotoneIcon(icon, color: Colors.blue),
         const SizedBox(width: 8),
         Text(
           title,
@@ -385,12 +386,12 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(Icons.folder, color: isGranted ? Colors.green : Colors.grey),
+        leading: DuotoneIcon(AppIcons.folder, color: isGranted ? Colors.green : Colors.grey),
         title: const Text('Storage Access'),
         subtitle: const Text('Scan files for malware and threats',
             style: TextStyle(fontSize: 12)),
         trailing: isGranted
-            ? const Icon(Icons.check_circle, color: Colors.green)
+            ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
             : ElevatedButton(
                 onPressed: () => _requestPermission(Permission.storage, 'Storage Access'),
                 style: ElevatedButton.styleFrom(
@@ -407,7 +408,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     String name,
     String description,
     Permission permission,
-    IconData icon,
+    String icon,
   ) {
     return FutureBuilder<PermissionStatus>(
       future: permission.status,
@@ -419,13 +420,13 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           color: const Color(0xFF1D1E33),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: Icon(icon, color: isGranted ? Colors.green : Colors.grey),
+            leading: DuotoneIcon(icon, color: isGranted ? Colors.green : Colors.grey),
             title: Text(name),
             subtitle: Text(description, style: const TextStyle(fontSize: 12)),
             trailing: isGranted
-                ? const Icon(Icons.check_circle, color: Colors.green)
+                ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
                 : isDenied
-                    ? const Icon(Icons.block, color: Colors.red)
+                    ? const DuotoneIcon(AppIcons.forbidden, color: Colors.red)
                     : ElevatedButton(
                         onPressed: () => _requestPermission(permission, name),
                         style: ElevatedButton.styleFrom(
@@ -450,14 +451,14 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(
-          Icons.settings,
+        leading: DuotoneIcon(
+          AppIcons.settings,
           color: isGranted ? Colors.green : Colors.orange,
         ),
         title: Text(name),
         subtitle: Text(description, style: const TextStyle(fontSize: 12)),
         trailing: isGranted
-            ? const Icon(Icons.check_circle, color: Colors.green)
+            ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
             : ElevatedButton(
                 onPressed: onRequest,
                 style: ElevatedButton.styleFrom(
@@ -496,11 +497,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                 color: Colors.orange.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info, color: Colors.orange),
-                  SizedBox(width: 12),
-                  Expanded(
+                  const DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
+                  const SizedBox(width: 12),
+                  const Expanded(
                     child: Text(
                       'Grant essential permissions to enable scanning',
                       style: TextStyle(fontSize: 13),

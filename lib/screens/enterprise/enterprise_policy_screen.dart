@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/enterprise_policy_provider.dart';
 import '../../services/security/enterprise/policy_management_service.dart';
@@ -44,11 +45,11 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
             title: 'Enterprise Policies',
             actions: [
               IconButton(
-                icon: const Icon(Icons.add),
+                icon: const DuotoneIcon('add_circle', size: 24),
                 onPressed: () => _showCreatePolicySheet(context, provider),
               ),
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: const DuotoneIcon('refresh', size: 24),
                 onPressed: () => provider.loadPolicies(),
               ),
             ],
@@ -155,12 +156,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
   Widget _buildPoliciesTab(EnterprisePolicyProvider provider) {
     if (provider.policies.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.policy,
+        icon: 'clipboard_text',
         title: 'No Policies',
         subtitle: 'Create a policy to get started',
         action: TextButton.icon(
           onPressed: () => _showCreatePolicySheet(context, provider),
-          icon: const Icon(Icons.add),
+          icon: const DuotoneIcon('add_circle', size: 18),
           label: const Text('Create Policy'),
         ),
       );
@@ -181,7 +182,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
               padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Row(
                 children: [
-                  Icon(
+                  DuotoneIcon(
                     _getPolicyTypeIcon(entry.key),
                     size: 18,
                     color: Color(EnterprisePolicyProvider.getPolicyTypeColor(entry.key)),
@@ -228,9 +229,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                       color: typeColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      _getPolicyTypeIcon(policy.type),
-                      color: typeColor,
+                    child: Center(
+                      child: DuotoneIcon(
+                        _getPolicyTypeIcon(policy.type),
+                        color: typeColor,
+                        size: 24,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -317,10 +321,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     const Spacer(),
                     ...policy.platforms.map((p) => Padding(
                           padding: const EdgeInsets.only(left: 4),
-                          child: Icon(
+                          child: DuotoneIcon(
                             p.toLowerCase() == 'ios'
-                                ? Icons.apple
-                                : Icons.android,
+                                ? 'apple'
+                                : 'smartphone',
                             size: 16,
                             color: Colors.white54,
                           ),
@@ -356,7 +360,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
   Widget _buildViolationsTab(EnterprisePolicyProvider provider) {
     if (provider.violations.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.check_circle,
+        icon: 'check_circle',
         title: 'No Violations',
         subtitle: 'All devices are compliant',
         color: GlassTheme.successColor,
@@ -395,9 +399,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     color: severityColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    Icons.warning,
-                    color: severityColor,
+                  child: Center(
+                    child: DuotoneIcon(
+                      'danger_triangle',
+                      color: severityColor,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -453,8 +460,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(
-                  Icons.access_time,
+                DuotoneIcon(
+                  'clock_circle',
                   size: 14,
                   color: Colors.white.withOpacity(0.5),
                 ),
@@ -485,7 +492,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
 
     if (templates.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.dashboard_customize,
+        icon: 'widget_5',
         title: 'No Templates',
         subtitle: 'Policy templates are loading...',
       );
@@ -537,9 +544,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
             color: typeColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            _getPolicyTypeIcon(template.type),
-            color: typeColor,
+          child: Center(
+            child: DuotoneIcon(
+              _getPolicyTypeIcon(template.type),
+              color: typeColor,
+              size: 24,
+            ),
           ),
         ),
         title: Text(
@@ -557,9 +567,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
           ),
         ),
         trailing: IconButton(
-          icon: const Icon(
-            Icons.add_circle_outline,
+          icon: const DuotoneIcon(
+            'add_circle',
             color: GlassTheme.primaryAccent,
+            size: 24,
           ),
           onPressed: () =>
               _showCreateFromTemplateDialog(context, template, provider),
@@ -629,9 +640,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     color: GlassTheme.successColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.phone_android,
-                    color: GlassTheme.successColor,
+                  child: const Center(
+                    child: DuotoneIcon(
+                      'smartphone',
+                      color: GlassTheme.successColor,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -681,7 +695,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
               child: OutlinedButton.icon(
                 onPressed: () =>
                     _showCreateFromTemplateDialog(context, template, provider),
-                icon: const Icon(Icons.add),
+                icon: const DuotoneIcon('add_circle', size: 18),
                 label: const Text('Create Policy'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: GlassTheme.primaryAccent,
@@ -698,7 +712,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
@@ -710,7 +724,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -736,20 +750,20 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
     );
   }
 
-  IconData _getPolicyTypeIcon(PolicyType type) {
+  String _getPolicyTypeIcon(PolicyType type) {
     switch (type) {
       case PolicyType.security:
-        return Icons.security;
+        return 'shield';
       case PolicyType.compliance:
-        return Icons.verified_user;
+        return 'verified_check';
       case PolicyType.restriction:
-        return Icons.block;
+        return 'forbidden';
       case PolicyType.configuration:
-        return Icons.settings;
+        return 'settings';
       case PolicyType.conditional:
-        return Icons.rule;
+        return 'clipboard_text';
       case PolicyType.byod:
-        return Icons.phone_android;
+        return 'smartphone';
     }
   }
 
@@ -981,7 +995,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: const DuotoneIcon('trash_bin_minimalistic', color: Colors.red, size: 24),
                     onPressed: () {
                       Navigator.pop(context);
                       _confirmDelete(context, policy, provider);
@@ -1039,10 +1053,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          Icon(
+                          DuotoneIcon(
                             rule.isEnabled
-                                ? Icons.check_circle
-                                : Icons.cancel,
+                                ? 'check_circle'
+                                : 'close_circle',
                             size: 20,
                             color: rule.isEnabled
                                 ? GlassTheme.successColor

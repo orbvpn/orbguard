@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class IntelligenceCoreScreen extends StatefulWidget {
@@ -66,12 +67,12 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
         title: 'Intelligence Core',
         actions: [
           IconButton(
-            icon: const Icon(Icons.upload_file),
+            icon: const DuotoneIcon('file', size: 24),
             tooltip: 'Import Indicators',
             onPressed: () => _showImportDialog(context),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon('refresh', size: 24),
             onPressed: _isLoading ? null : _loadIndicators,
           ),
         ],
@@ -117,7 +118,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    const Icon(Icons.search, color: Colors.white38),
+                    const DuotoneIcon('magnifer', size: 20, color: Colors.white38),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
@@ -133,7 +134,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                     ),
                     if (_searchController.text.isNotEmpty)
                       IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.white38),
+                        icon: const DuotoneIcon('close_circle', size: 20, color: Colors.white38),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {});
@@ -238,8 +239,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
       onTap: () => _showIndicatorDetails(context, indicator),
       child: Row(
         children: [
-          GlassIconBox(
-            icon: _getIndicatorIcon(indicator.type),
+          GlassSvgIconBox(
+            icon: _getIndicatorSvgIcon(indicator.type),
             color: statusColor,
           ),
           const SizedBox(width: 12),
@@ -337,7 +338,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.search),
+                        : const DuotoneIcon('magnifer', size: 20),
                     label: Text(_isSearching ? 'Checking...' : 'Check Indicators'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
@@ -355,17 +356,17 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
           const GlassSectionHeader(title: 'Quick Check'),
           Row(
             children: [
-              _buildQuickCheckButton(Icons.language, 'IP Address', 'Check IP reputation'),
+              _buildQuickCheckButton('globus', 'IP Address', 'Check IP reputation'),
               const SizedBox(width: 12),
-              _buildQuickCheckButton(Icons.dns, 'Domain', 'Check domain reputation'),
+              _buildQuickCheckButton('server', 'Domain', 'Check domain reputation'),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickCheckButton(Icons.link, 'URL', 'Check URL safety'),
+              _buildQuickCheckButton('link', 'URL', 'Check URL safety'),
               const SizedBox(width: 12),
-              _buildQuickCheckButton(Icons.fingerprint, 'File Hash', 'Check file hash'),
+              _buildQuickCheckButton('object_scan', 'File Hash', 'Check file hash'),
             ],
           ),
 
@@ -380,13 +381,13 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     );
   }
 
-  Widget _buildQuickCheckButton(IconData icon, String title, String subtitle) {
+  Widget _buildQuickCheckButton(String icon, String title, String subtitle) {
     return Expanded(
       child: GlassCard(
         onTap: () => _showQuickCheckDialog(context, title),
         child: Row(
           children: [
-            GlassIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
+            GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -409,7 +410,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon('history', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             const Text(
               'No Check History',
@@ -439,8 +440,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
-            icon: result.found ? Icons.warning : Icons.check_circle,
+          GlassSvgIconBox(
+            icon: result.found ? 'danger_triangle' : 'check_circle',
             color: result.found ? GlassTheme.errorColor : GlassTheme.successColor,
           ),
           const SizedBox(width: 12),
@@ -533,8 +534,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(
-                    icon: _getIndicatorIcon(indicator.type),
+                  GlassSvgIconBox(
+                    icon: _getIndicatorSvgIcon(indicator.type),
                     color: indicator.isMalicious ? GlassTheme.errorColor : GlassTheme.primaryAccent,
                     size: 56,
                   ),
@@ -602,7 +603,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.copy),
+                      icon: const DuotoneIcon('copy', size: 20),
                       label: const Text('Copy'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -615,7 +616,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.block),
+                      icon: const DuotoneIcon('forbidden', size: 20),
                       label: const Text('Block'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.errorColor,
@@ -688,19 +689,19 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.file_upload, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('file', size: 24, color: GlassTheme.primaryAccent),
               title: const Text('CSV File', style: TextStyle(color: Colors.white)),
               subtitle: Text('Import from CSV', style: TextStyle(color: Colors.white.withAlpha(128))),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.code, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('code', size: 24, color: GlassTheme.primaryAccent),
               title: const Text('STIX/TAXII', style: TextStyle(color: Colors.white)),
               subtitle: Text('Import from TAXII server', style: TextStyle(color: Colors.white.withAlpha(128))),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.api, color: GlassTheme.primaryAccent),
+              leading: const DuotoneIcon('programming', size: 24, color: GlassTheme.primaryAccent),
               title: const Text('API', style: TextStyle(color: Colors.white)),
               subtitle: Text('Import via API', style: TextStyle(color: Colors.white.withAlpha(128))),
               onTap: () => Navigator.pop(context),
@@ -730,23 +731,23 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     );
   }
 
-  IconData _getIndicatorIcon(String type) {
+  String _getIndicatorSvgIcon(String type) {
     switch (type.toLowerCase()) {
       case 'ip address':
-        return Icons.language;
+        return 'globus';
       case 'domain':
-        return Icons.dns;
+        return 'server';
       case 'url':
-        return Icons.link;
+        return 'link';
       case 'hash (md5)':
       case 'hash (sha256)':
-        return Icons.fingerprint;
+        return 'object_scan';
       case 'email':
-        return Icons.email;
+        return 'letter';
       case 'file name':
-        return Icons.insert_drive_file;
+        return 'file';
       default:
-        return Icons.help_outline;
+        return 'question_circle';
     }
   }
 

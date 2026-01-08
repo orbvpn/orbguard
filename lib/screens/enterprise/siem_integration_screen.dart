@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class SiemIntegrationScreen extends StatefulWidget {
@@ -53,12 +54,12 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
         title: 'SIEM Integration',
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const DuotoneIcon('add_circle', size: 24),
             tooltip: 'Add Connection',
             onPressed: () => _showAddConnectionDialog(context),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon('refresh', size: 24),
             onPressed: _isLoading ? null : _loadData,
           ),
         ],
@@ -135,12 +136,12 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
 
   Widget _buildSupportedSiems() {
     final siems = [
-      {'name': 'Splunk', 'icon': Icons.analytics, 'color': const Color(0xFF65A637)},
-      {'name': 'Elastic', 'icon': Icons.search, 'color': const Color(0xFF00BFB3)},
-      {'name': 'ArcSight', 'icon': Icons.security, 'color': const Color(0xFF00A3E0)},
-      {'name': 'QRadar', 'icon': Icons.radar, 'color': const Color(0xFF054ADA)},
-      {'name': 'Sentinel', 'icon': Icons.cloud, 'color': const Color(0xFF0078D4)},
-      {'name': 'Chronicle', 'icon': Icons.history, 'color': const Color(0xFF4285F4)},
+      {'name': 'Splunk', 'icon': 'chart', 'color': const Color(0xFF65A637)},
+      {'name': 'Elastic', 'icon': 'magnifer', 'color': const Color(0xFF00BFB3)},
+      {'name': 'ArcSight', 'icon': 'shield_check', 'color': const Color(0xFF00A3E0)},
+      {'name': 'QRadar', 'icon': 'radar_2', 'color': const Color(0xFF054ADA)},
+      {'name': 'Sentinel', 'icon': 'cloud_storage', 'color': const Color(0xFF0078D4)},
+      {'name': 'Chronicle', 'icon': 'history', 'color': const Color(0xFF4285F4)},
     ];
 
     return SizedBox(
@@ -158,7 +159,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(siem['icon'] as IconData, color: siem['color'] as Color, size: 32),
+                  DuotoneIcon(siem['icon'] as String, size: 32, color: siem['color'] as Color),
                   const SizedBox(height: 8),
                   Text(
                     siem['name'] as String,
@@ -181,7 +182,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getSiemIcon(connection.type),
                 color: connection.isConnected ? GlassTheme.successColor : GlassTheme.errorColor,
               ),
@@ -222,11 +223,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              _buildConnectionStat(Icons.upload, '${connection.eventsSent}', 'Sent'),
+              _buildConnectionStat('upload_minimalistic', '${connection.eventsSent}', 'Sent'),
               const SizedBox(width: 16),
-              _buildConnectionStat(Icons.error_outline, '${connection.errors}', 'Errors'),
+              _buildConnectionStat('danger_circle', '${connection.errors}', 'Errors'),
               const SizedBox(width: 16),
-              _buildConnectionStat(Icons.access_time, _formatTime(connection.lastSync), 'Last Sync'),
+              _buildConnectionStat('clock_circle', _formatTime(connection.lastSync), 'Last Sync'),
             ],
           ),
         ],
@@ -234,11 +235,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
     );
   }
 
-  Widget _buildConnectionStat(IconData icon, String value, String label) {
+  Widget _buildConnectionStat(String icon, String value, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white38),
+        DuotoneIcon(icon, size: 14, color: Colors.white38),
         const SizedBox(width: 4),
         Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
         const SizedBox(width: 4),
@@ -256,7 +257,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
           onTap: () => _showAddForwarderDialog(context),
           child: Row(
             children: [
-              GlassIconBox(icon: Icons.add, color: GlassTheme.primaryAccent),
+              GlassSvgIconBox(icon: 'add_circle', color: GlassTheme.primaryAccent),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
@@ -267,7 +268,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              const DuotoneIcon('alt_arrow_right', size: 24, color: Colors.white38),
             ],
           ),
         ),
@@ -289,8 +290,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.send,
+              GlassSvgIconBox(
+                icon: 'plain',
                 color: forwarder.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
               ),
               const SizedBox(width: 12),
@@ -376,7 +377,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
       tintColor: alert.isAcknowledged ? null : severityColor,
       child: Row(
         children: [
-          GlassIconBox(icon: Icons.notification_important, color: severityColor),
+          GlassSvgIconBox(icon: 'bell_bing', color: severityColor),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -408,7 +409,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inbox, size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -594,7 +595,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(icon: _getSiemIcon(connection.type), color: GlassTheme.primaryAccent, size: 56),
+                  GlassSvgIconBox(icon: _getSiemIcon(connection.type), color: GlassTheme.primaryAccent, size: 56),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -627,7 +628,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.sync),
+                      icon: const DuotoneIcon('refresh', size: 18),
                       label: const Text('Test Connection'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -643,7 +644,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
                         setState(() => _connections.remove(connection));
                         Navigator.pop(context);
                       },
-                      icon: const Icon(Icons.delete),
+                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
                       label: const Text('Remove'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.errorColor,
@@ -685,22 +686,22 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
     );
   }
 
-  IconData _getSiemIcon(String type) {
+  String _getSiemIcon(String type) {
     switch (type.toLowerCase()) {
       case 'splunk':
-        return Icons.analytics;
+        return 'chart';
       case 'elastic':
-        return Icons.search;
+        return 'magnifer';
       case 'arcsight':
-        return Icons.security;
+        return 'shield_check';
       case 'qradar':
-        return Icons.radar;
+        return 'radar_2';
       case 'sentinel':
-        return Icons.cloud;
+        return 'cloud_storage';
       case 'chronicle':
-        return Icons.history;
+        return 'history';
       default:
-        return Icons.hub;
+        return 'server_square';
     }
   }
 

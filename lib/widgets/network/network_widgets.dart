@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
 
 /// WiFi security badge
@@ -32,8 +33,8 @@ class WifiSecurityBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            security.isSecure ? Icons.lock : Icons.lock_open,
+          DuotoneIcon(
+            security.isSecure ? AppIcons.lock : AppIcons.lockUnlocked,
             size: compact ? 12 : 14,
             color: color,
           ),
@@ -157,8 +158,8 @@ class WifiNetworkCard extends StatelessWidget {
                         : const Color(0xFF2A2B40),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                network.security.isSecure ? Icons.wifi_lock : Icons.wifi,
+              child: DuotoneIcon(
+                network.security.isSecure ? AppIcons.wifi : AppIcons.wifi,
                 color: network.isConnected
                     ? const Color(0xFF00D9FF)
                     : !network.security.isSecure
@@ -287,7 +288,7 @@ class NetworkThreatCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Icon(
+                DuotoneIcon(
                   _getThreatIcon(),
                   color: color,
                   size: 24,
@@ -317,7 +318,7 @@ class NetworkThreatCard extends StatelessWidget {
                 ),
                 if (onDismiss != null)
                   IconButton(
-                    icon: const Icon(Icons.close, size: 18),
+                    icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
                     onPressed: onDismiss,
                     color: Colors.grey,
                   ),
@@ -341,7 +342,7 @@ class NetworkThreatCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lightbulb_outline, size: 16, color: color),
+                    DuotoneIcon(AppIcons.lightbulb, size: 16, color: color),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -362,18 +363,18 @@ class NetworkThreatCard extends StatelessWidget {
     );
   }
 
-  IconData _getThreatIcon() {
+  String _getThreatIcon() {
     switch (threat.type) {
       case 'evil_twin':
-        return Icons.router;
+        return AppIcons.wifiRouter;
       case 'insecure_wifi':
-        return Icons.lock_open;
+        return AppIcons.lockUnlocked;
       case 'mitm':
-        return Icons.swap_horiz;
+        return AppIcons.transferHorizontal;
       case 'arp_spoofing':
-        return Icons.warning;
+        return AppIcons.dangerTriangle;
       default:
-        return Icons.security;
+        return AppIcons.shieldCheck;
     }
   }
 }
@@ -418,8 +419,8 @@ class VpnStatusCard extends StatelessWidget {
                       : Colors.grey.withAlpha(40),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  status.isConnected ? Icons.vpn_lock : Icons.vpn_key,
+                child: DuotoneIcon(
+                  status.isConnected ? AppIcons.vpn : AppIcons.key,
                   color: status.isConnected ? Colors.green : Colors.grey,
                   size: 28,
                 ),
@@ -566,8 +567,8 @@ class DnsProtectionCard extends StatelessWidget {
                       : Colors.grey.withAlpha(40),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  Icons.dns,
+                child: DuotoneIcon(
+                  AppIcons.server,
                   color: status.isEnabled ? const Color(0xFF00D9FF) : Colors.grey,
                 ),
               ),
@@ -608,7 +609,7 @@ class DnsProtectionCard extends StatelessWidget {
                   child: _buildFeatureChip(
                     'Malware',
                     status.isMalwareBlocking,
-                    Icons.bug_report,
+                    AppIcons.bug,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -616,7 +617,7 @@ class DnsProtectionCard extends StatelessWidget {
                   child: _buildFeatureChip(
                     'Ads',
                     status.isAdBlocking,
-                    Icons.block,
+                    AppIcons.forbidden,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -624,7 +625,7 @@ class DnsProtectionCard extends StatelessWidget {
                   child: _buildFeatureChip(
                     'Trackers',
                     status.isTrackingBlocking,
-                    Icons.track_changes,
+                    AppIcons.radar,
                   ),
                 ),
               ],
@@ -638,7 +639,7 @@ class DnsProtectionCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shield, size: 18, color: Color(0xFF00D9FF)),
+                  const DuotoneIcon(AppIcons.shield, size: 18, color: Color(0xFF00D9FF)),
                   const SizedBox(width: 10),
                   Text(
                     '${status.blockedQueries} threats blocked',
@@ -656,7 +657,7 @@ class DnsProtectionCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureChip(String label, bool enabled, IconData icon) {
+  Widget _buildFeatureChip(String label, bool enabled, String icon) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
@@ -668,7 +669,7 @@ class DnsProtectionCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          DuotoneIcon(
             icon,
             size: 14,
             color: enabled ? Colors.green : Colors.grey,
@@ -720,7 +721,7 @@ class NetworkStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Scans',
                   stats.totalScans.toString(),
-                  Icons.radar,
+                  AppIcons.radar,
                   const Color(0xFF00D9FF),
                 ),
               ),
@@ -728,7 +729,7 @@ class NetworkStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Threats',
                   stats.threatsDetected.toString(),
-                  Icons.warning,
+                  AppIcons.dangerTriangle,
                   stats.threatsDetected > 0 ? Colors.red : Colors.green,
                 ),
               ),
@@ -741,7 +742,7 @@ class NetworkStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'Open Networks',
                   stats.openNetworksFound.toString(),
-                  Icons.lock_open,
+                  AppIcons.lockUnlocked,
                   Colors.orange,
                 ),
               ),
@@ -749,7 +750,7 @@ class NetworkStatsCard extends StatelessWidget {
                 child: _buildStatItem(
                   'DNS Blocked',
                   stats.dnsQueriesBlocked.toString(),
-                  Icons.shield,
+                  AppIcons.shield,
                   Colors.purple,
                 ),
               ),
@@ -761,7 +762,7 @@ class NetworkStatsCard extends StatelessWidget {
   }
 
   Widget _buildStatItem(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -770,7 +771,7 @@ class NetworkStatsCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
+          DuotoneIcon(icon, color: color, size: 20),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -820,8 +821,8 @@ class CurrentNetworkCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              Icons.wifi_off,
+            DuotoneIcon(
+              AppIcons.wifi,
               size: 48,
               color: Colors.grey.withAlpha(128),
             ),
@@ -870,8 +871,8 @@ class CurrentNetworkCard extends StatelessWidget {
                       : Colors.red.withAlpha(40),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  network!.security.isSecure ? Icons.wifi_lock : Icons.wifi,
+                child: DuotoneIcon(
+                  network!.security.isSecure ? AppIcons.wifi : AppIcons.wifi,
                   color: network!.security.isSecure ? Colors.green : Colors.red,
                   size: 28,
                 ),
@@ -924,7 +925,7 @@ class CurrentNetworkCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber, color: Colors.red, size: 18),
+                  const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

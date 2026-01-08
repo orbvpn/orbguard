@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../presentation/widgets/duotone_icon.dart';
 
 class JailbreakInstructionsScreen extends StatelessWidget {
   const JailbreakInstructionsScreen({super.key});
@@ -112,7 +113,7 @@ class JailbreakInstructionsScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.pop(context);
                     },
-                    icon: const Icon(Icons.check),
+                    icon: const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
                     label: const Text('Test Jailbreak Status'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00D9FF),

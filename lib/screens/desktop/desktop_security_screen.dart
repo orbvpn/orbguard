@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
@@ -50,9 +51,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
       appBar: GlassAppBar(
         title: 'Desktop Security',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isScanning ? null : _runScan,
+          GlassAppBarAction(
+            svgIcon: 'refresh',
+            onTap: _isScanning ? null : _runScan,
           ),
         ],
         bottom: TabBar(
@@ -91,8 +92,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
           tintColor: _isScanning ? GlassTheme.primaryAccent : null,
           child: Row(
             children: [
-              GlassIconBox(
-                icon: Icons.radar,
+              GlassSvgIconBox(
+                icon: 'radar',
                 color: GlassTheme.primaryAccent,
               ),
               const SizedBox(width: 12),
@@ -121,7 +122,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
                   ),
                 )
               else
-                const Icon(Icons.play_arrow, color: GlassTheme.primaryAccent),
+                const DuotoneIcon('play', color: GlassTheme.primaryAccent),
             ],
           ),
         ),
@@ -144,12 +145,12 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
         // Categories info
         const SizedBox(height: 24),
         const GlassSectionHeader(title: 'Scan Coverage'),
-        _buildCoverageRow(Icons.play_circle, 'Launch Agents', true),
-        _buildCoverageRow(Icons.settings_applications, 'Launch Daemons', true),
-        _buildCoverageRow(Icons.login, 'Login Items', true),
-        _buildCoverageRow(Icons.schedule, 'Scheduled Tasks', true),
-        _buildCoverageRow(Icons.extension, 'Browser Extensions', true),
-        _buildCoverageRow(Icons.memory, 'Kernel Extensions', true),
+        _buildCoverageRow('play_circle', 'Launch Agents', true),
+        _buildCoverageRow('settings', 'Launch Daemons', true),
+        _buildCoverageRow('user', 'Login Items', true),
+        _buildCoverageRow('clock_circle', 'Scheduled Tasks', true),
+        _buildCoverageRow('widget', 'Browser Extensions', true),
+        _buildCoverageRow('cpu', 'Kernel Extensions', true),
       ],
     );
   }
@@ -175,7 +176,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
       tintColor: item.isSuspicious ? GlassTheme.errorColor : null,
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getPersistenceIcon(item.type),
             color: item.isSuspicious ? GlassTheme.errorColor : GlassTheme.successColor,
           ),
@@ -216,17 +217,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
     );
   }
 
-  Widget _buildCoverageRow(IconData icon, String title, bool enabled) {
+  Widget _buildCoverageRow(String icon, String title, bool enabled) {
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: enabled ? GlassTheme.primaryAccent : Colors.grey, size: 36),
+          GlassSvgIconBox(icon: icon, color: enabled ? GlassTheme.primaryAccent : Colors.grey, size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
           ),
-          Icon(
-            enabled ? Icons.check_circle : Icons.cancel,
+          DuotoneIcon(
+            enabled ? 'check_circle' : 'close_circle',
             color: enabled ? GlassTheme.successColor : Colors.grey,
           ),
         ],
@@ -270,20 +271,20 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
   Widget _buildSignedAppCard(SignedApp app) {
     Color statusColor;
     String statusText;
-    IconData statusIcon;
+    String statusIcon;
 
     if (!app.isSigned) {
       statusColor = GlassTheme.warningColor;
       statusText = 'Unsigned';
-      statusIcon = Icons.warning;
+      statusIcon = 'danger_triangle';
     } else if (!app.isValid) {
       statusColor = GlassTheme.errorColor;
       statusText = 'Invalid';
-      statusIcon = Icons.error;
+      statusIcon = 'danger_circle';
     } else {
       statusColor = GlassTheme.successColor;
       statusText = 'Valid';
-      statusIcon = Icons.verified;
+      statusIcon = 'verified_check';
     }
 
     return GlassCard(
@@ -298,7 +299,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
-              child: Icon(
+              child: DuotoneIcon(
                 _getAppIcon(app.name),
                 color: Colors.white,
                 size: 24,
@@ -329,7 +330,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Icon(statusIcon, color: statusColor, size: 20),
+              DuotoneIcon(statusIcon, color: statusColor, size: 20),
               const SizedBox(height: 4),
               Text(statusText, style: TextStyle(color: statusColor, fontSize: 10)),
             ],
@@ -351,7 +352,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
           tintColor: GlassTheme.successColor,
           child: Row(
             children: [
-              GlassIconBox(icon: Icons.shield, color: GlassTheme.successColor),
+              GlassSvgIconBox(icon: 'shield_check', color: GlassTheme.successColor),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
@@ -391,9 +392,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
         // Quick actions
         const SizedBox(height: 24),
         const GlassSectionHeader(title: 'Quick Actions'),
-        _buildQuickAction(Icons.block, 'Block All Incoming', 'Block all incoming connections'),
-        _buildQuickAction(Icons.public_off, 'Stealth Mode', 'Hide from network scans'),
-        _buildQuickAction(Icons.apps, 'App Permissions', 'Manage application access'),
+        _buildQuickAction('forbidden', 'Block All Incoming', 'Block all incoming connections'),
+        _buildQuickAction('eye_closed', 'Stealth Mode', 'Hide from network scans'),
+        _buildQuickAction('smartphone', 'App Permissions', 'Manage application access'),
 
         // Rules
         const SizedBox(height: 24),
@@ -403,7 +404,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
             const GlassSectionHeader(title: 'Firewall Rules'),
             TextButton.icon(
               onPressed: () => _showAddRuleDialog(context),
-              icon: const Icon(Icons.add, size: 18),
+              icon: const DuotoneIcon('add_circle', size: 18),
               label: const Text('Add Rule'),
               style: TextButton.styleFrom(foregroundColor: GlassTheme.primaryAccent),
             ),
@@ -414,12 +415,12 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String title, String subtitle) {
+  Widget _buildQuickAction(String icon, String title, String subtitle) {
     return GlassCard(
       onTap: () {},
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
+          GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -430,7 +431,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.white38),
+          const DuotoneIcon('alt_arrow_right', color: Colors.white38),
         ],
       ),
     );
@@ -442,8 +443,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
-            icon: isBlock ? Icons.block : Icons.check_circle,
+          GlassSvgIconBox(
+            icon: isBlock ? 'forbidden' : 'check_circle',
             color: isBlock ? GlassTheme.errorColor : GlassTheme.successColor,
             size: 40,
           ),
@@ -531,7 +532,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(
+                  GlassSvgIconBox(
                     icon: _getPersistenceIcon(item.type),
                     color: item.isSuspicious ? GlassTheme.errorColor : GlassTheme.successColor,
                     size: 56,
@@ -592,7 +593,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
                     Navigator.pop(context);
                     setState(() => _persistenceItems.remove(item));
                   },
-                  icon: const Icon(Icons.delete),
+                  icon: const DuotoneIcon('trash_bin_minimalistic', size: 20),
                   label: const Text('Remove'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
@@ -747,39 +748,39 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen>
     );
   }
 
-  IconData _getPersistenceIcon(String type) {
+  String _getPersistenceIcon(String type) {
     switch (type.toLowerCase()) {
       case 'launch agent':
-        return Icons.play_circle;
+        return 'play_circle';
       case 'launch daemon':
-        return Icons.settings_applications;
+        return 'settings';
       case 'login item':
-        return Icons.login;
+        return 'user';
       case 'scheduled task':
-        return Icons.schedule;
+        return 'clock_circle';
       case 'browser extension':
-        return Icons.extension;
+        return 'widget';
       case 'kernel extension':
-        return Icons.memory;
+        return 'cpu';
       default:
-        return Icons.code;
+        return 'code';
     }
   }
 
-  IconData _getAppIcon(String name) {
+  String _getAppIcon(String name) {
     final lower = name.toLowerCase();
     if (lower.contains('safari') || lower.contains('chrome') || lower.contains('firefox')) {
-      return Icons.language;
+      return 'globus';
     } else if (lower.contains('mail') || lower.contains('outlook')) {
-      return Icons.email;
+      return 'letter';
     } else if (lower.contains('terminal') || lower.contains('iterm')) {
-      return Icons.terminal;
+      return 'code_square';
     } else if (lower.contains('code') || lower.contains('xcode')) {
-      return Icons.code;
+      return 'code';
     } else if (lower.contains('finder')) {
-      return Icons.folder;
+      return 'folder';
     }
-    return Icons.apps;
+    return 'smartphone';
   }
 
   List<PersistenceItem> _getSamplePersistenceItems() {

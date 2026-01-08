@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/executive_protection_provider.dart';
 import '../../services/security/executive_protection_service.dart';
@@ -45,11 +46,11 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
             title: 'Executive Protection',
             actions: [
               IconButton(
-                icon: const Icon(Icons.person_add),
+                icon: const DuotoneIcon('user_plus', size: 24),
                 onPressed: () => _showAddExecutiveSheet(context, provider),
               ),
               IconButton(
-                icon: const Icon(Icons.email_outlined),
+                icon: const DuotoneIcon('letter', size: 24),
                 onPressed: () => _showAnalyzeMessageSheet(context, provider),
               ),
             ],
@@ -136,8 +137,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     ? GlassTheme.errorColor.withOpacity(0.2)
                     : GlassTheme.successColor.withOpacity(0.2),
               ),
-              child: Icon(
-                hasAlerts ? Icons.warning : Icons.verified_user,
+              child: DuotoneIcon(
+                hasAlerts ? 'danger_triangle' : 'verified_check',
                 size: 40,
                 color: hasAlerts
                     ? GlassTheme.errorColor
@@ -214,35 +215,35 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
         _buildStatCard(
           'Total Alerts',
           provider.totalAlertsCount.toString(),
-          Icons.notifications,
+          'bell',
           GlassTheme.primaryAccent,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'High Risk',
           provider.highRiskAlerts.length.toString(),
-          Icons.dangerous,
+          'danger_circle',
           GlassTheme.errorColor,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'VIPs Protected',
           provider.highValueExecutives.length.toString(),
-          Icons.shield,
+          'shield_check',
           GlassTheme.successColor,
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, String icon, Color color) {
     return Expanded(
       child: GlassCard(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(icon, color: color, size: 24),
+              DuotoneIcon(icon, color: color, size: 24),
               const SizedBox(height: 8),
               Text(
                 value,
@@ -269,10 +270,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
 
   Widget _buildAttackTypesCard() {
     final attackTypes = [
-      {'type': ImpersonationType.ceoFraud, 'icon': Icons.account_circle},
-      {'type': ImpersonationType.vendorFraud, 'icon': Icons.store},
-      {'type': ImpersonationType.giftCardScam, 'icon': Icons.card_giftcard},
-      {'type': ImpersonationType.w2Scam, 'icon': Icons.description},
+      {'type': ImpersonationType.ceoFraud, 'icon': 'user_circle'},
+      {'type': ImpersonationType.vendorFraud, 'icon': 'shop'},
+      {'type': ImpersonationType.giftCardScam, 'icon': 'card'},
+      {'type': ImpersonationType.w2Scam, 'icon': 'file'},
     ];
 
     return GlassCard(
@@ -295,7 +296,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               runSpacing: 12,
               children: attackTypes.map((at) {
                 final type = at['type'] as ImpersonationType;
-                final icon = at['icon'] as IconData;
+                final icon = at['icon'] as String;
                 return _buildAttackTypeChip(type, icon);
               }).toList(),
             ),
@@ -305,7 +306,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     );
   }
 
-  Widget _buildAttackTypeChip(ImpersonationType type, IconData icon) {
+  Widget _buildAttackTypeChip(ImpersonationType type, String icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -318,7 +319,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: GlassTheme.primaryAccent),
+          DuotoneIcon(icon, size: 16, color: GlassTheme.primaryAccent),
           const SizedBox(width: 6),
           Text(
             type.displayName,
@@ -335,7 +336,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
   Widget _buildAlertsTab(ExecutiveProtectionProvider provider) {
     if (provider.alerts.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.check_circle,
+        icon: 'check_circle',
         title: 'No Alerts',
         subtitle: 'No impersonation attempts detected',
         color: GlassTheme.successColor,
@@ -374,9 +375,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     color: riskColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    _getTypeIcon(alert.type),
-                    color: riskColor,
+                  child: Center(
+                    child: DuotoneIcon(
+                      _getTypeIcon(alert.type),
+                      color: riskColor,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -454,8 +458,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.warning_amber,
+                        DuotoneIcon(
+                          'danger_triangle',
                           size: 14,
                           color: riskColor,
                         ),
@@ -494,8 +498,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline,
+                  DuotoneIcon(
+                    'lightbulb',
                     size: 18,
                     color: GlassTheme.primaryAccent,
                   ),
@@ -521,12 +525,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
   Widget _buildVIPsTab(ExecutiveProtectionProvider provider) {
     if (provider.executives.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.person_add,
+        icon: 'user_plus',
         title: 'No VIPs Configured',
         subtitle: 'Add executive profiles to monitor for impersonation',
         action: TextButton.icon(
           onPressed: () => _showAddExecutiveSheet(context, provider),
-          icon: const Icon(Icons.add),
+          icon: const DuotoneIcon('add_circle', size: 18),
           label: const Text('Add VIP'),
         ),
       );
@@ -620,7 +624,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
           ],
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.white38),
+          icon: const DuotoneIcon('trash_bin_minimalistic', color: Colors.white38, size: 24),
           onPressed: () => _confirmRemoveExecutive(context, exec, provider),
         ),
       ),
@@ -628,7 +632,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
@@ -640,7 +644,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -666,23 +670,23 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
     );
   }
 
-  IconData _getTypeIcon(ImpersonationType? type) {
-    if (type == null) return Icons.warning;
+  String _getTypeIcon(ImpersonationType? type) {
+    if (type == null) return 'danger_triangle';
     switch (type) {
       case ImpersonationType.ceoFraud:
-        return Icons.account_circle;
+        return 'user_circle';
       case ImpersonationType.vendorFraud:
-        return Icons.store;
+        return 'shop';
       case ImpersonationType.attorneyFraud:
-        return Icons.gavel;
+        return 'scale';
       case ImpersonationType.dataTheft:
-        return Icons.folder;
+        return 'folder';
       case ImpersonationType.w2Scam:
-        return Icons.description;
+        return 'file';
       case ImpersonationType.giftCardScam:
-        return Icons.card_giftcard;
+        return 'card';
       case ImpersonationType.unknown:
-        return Icons.help_outline;
+        return 'question_circle';
     }
   }
 
@@ -746,7 +750,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                   decoration: const InputDecoration(
                     labelText: 'Full Name',
                     labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: Icon(Icons.person, color: Colors.white38),
+                    prefixIcon: const DuotoneIcon('user', color: Colors.white38, size: 24),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),
                     ),
@@ -765,7 +769,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                   decoration: const InputDecoration(
                     labelText: 'Email Address',
                     labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: Icon(Icons.email, color: Colors.white38),
+                    prefixIcon: const DuotoneIcon('letter', color: Colors.white38, size: 24),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),
                     ),
@@ -783,7 +787,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                   decoration: const InputDecoration(
                     labelText: 'Title (Optional)',
                     labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: Icon(Icons.work, color: Colors.white38),
+                    prefixIcon: const DuotoneIcon('case', color: Colors.white38, size: 24),
                     hintText: 'e.g., CEO, CFO, VP of Finance',
                     hintStyle: TextStyle(color: Colors.white24),
                     enabledBorder: OutlineInputBorder(
@@ -801,8 +805,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.star,
+                      const DuotoneIcon(
+                        'star',
                         color: GlassTheme.warningColor,
                         size: 20,
                       ),
@@ -916,7 +920,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
+                  icon: const DuotoneIcon('close_circle', color: Colors.white54, size: 24),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -1036,7 +1040,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.search),
+                    : const DuotoneIcon('magnifer', size: 18),
                 label: Text(provider.isAnalyzing ? 'Analyzing...' : 'Analyze'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,
@@ -1061,9 +1065,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
         backgroundColor: GlassTheme.gradientTop,
         title: Row(
           children: [
-            Icon(
-              result.isImpersonation ? Icons.warning : Icons.check_circle,
+            DuotoneIcon(
+              result.isImpersonation ? 'danger_triangle' : 'check_circle',
               color: result.isImpersonation ? riskColor : GlassTheme.successColor,
+              size: 24,
             ),
             const SizedBox(width: 12),
             Expanded(

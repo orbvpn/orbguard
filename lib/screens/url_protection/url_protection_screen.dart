@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../models/api/url_reputation.dart';
 import '../../providers/url_provider.dart';
 import '../../widgets/url/url_widgets.dart';
@@ -134,7 +135,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.green,
                       ),
-                      icon: const Icon(Icons.check, size: 18),
+                      icon: const DuotoneIcon('check_circle', size: 18, color: Colors.green),
                       label: const Text('Whitelist'),
                     ),
                   ),
@@ -153,7 +154,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                       ),
-                      icon: const Icon(Icons.block, size: 18),
+                      icon: const DuotoneIcon('forbidden', size: 18, color: Colors.red),
                       label: const Text('Blacklist'),
                     ),
                   ),
@@ -188,7 +189,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
         showBackButton: true,
         actions: [
           GlassAppBarAction(
-            icon: Icons.list_alt,
+            svgIcon: 'clipboard_text',
             onTap: _showListManagementSheet,
             tooltip: 'Manage Lists',
           ),
@@ -385,8 +386,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.history,
+            DuotoneIcon(
+              'history',
               size: 64,
               color: Colors.grey[700],
             ),
@@ -448,21 +449,21 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
           ),
           const SizedBox(height: 16),
           _StatusRow(
-            icon: Icons.security,
+            icon: 'shield_check',
             label: 'URL Scanning',
             status: 'Active',
             statusColor: Colors.green,
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            icon: Icons.cloud_sync,
+            icon: 'refresh',
             label: 'Threat Intelligence',
             status: 'Connected',
             statusColor: Colors.green,
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            icon: Icons.dns,
+            icon: 'server',
             label: 'DNS Filtering',
             status: 'Via OrbNet VPN',
             statusColor: GlassTheme.primaryAccent,
@@ -498,7 +499,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
             children: [
               Expanded(
                 child: _ListCountCard(
-                  icon: Icons.check_circle,
+                  icon: 'check_circle',
                   label: 'Whitelist',
                   count: _provider.whitelist.length,
                   color: Colors.green,
@@ -507,7 +508,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
               const SizedBox(width: 16),
               Expanded(
                 child: _ListCountCard(
-                  icon: Icons.block,
+                  icon: 'forbidden',
                   label: 'Blacklist',
                   count: _provider.blacklist.length,
                   color: Colors.red,
@@ -543,7 +544,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen>
 
 /// Status row widget
 class _StatusRow extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final String status;
   final Color statusColor;
@@ -559,7 +560,7 @@ class _StatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: Colors.grey[500]),
+        DuotoneIcon(icon, size: 20, color: Colors.grey[500]),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -592,7 +593,7 @@ class _StatusRow extends StatelessWidget {
 
 /// List count card
 class _ListCountCard extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final int count;
   final Color color;
@@ -615,7 +616,7 @@ class _ListCountCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color),
+          DuotoneIcon(icon, size: 20, color: color),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

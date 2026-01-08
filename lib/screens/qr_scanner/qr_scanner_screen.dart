@@ -9,6 +9,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
 import '../../widgets/qr/qr_widgets.dart';
 import '../../models/api/sms_analysis.dart';
@@ -188,7 +189,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.copy),
+                              icon: const DuotoneIcon('copy', size: 18),
                               label: const Text('Copy'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white70,
@@ -205,7 +206,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                                 Navigator.pop(context);
                                 _scannerController?.start();
                               },
-                              icon: const Icon(Icons.qr_code_scanner),
+                              icon: const DuotoneIcon('qr_code', size: 18),
                               label: const Text('Scan Again'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00D9FF),
@@ -233,7 +234,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                               );
                               _scannerController?.start();
                             },
-                            icon: const Icon(Icons.flag_outlined),
+                            icon: const DuotoneIcon('flag', size: 18),
                             label: const Text('Report False Positive'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange.withAlpha(51),
@@ -279,14 +280,31 @@ class _QrScannerScreenState extends State<QrScannerScreen>
         showBackButton: true,
         actions: [
           if (_tabController.index == 0) ...[
-            GlassAppBarAction(
-              icon: _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: _isFlashOn ? GlassTheme.primaryAccent : null,
+            GestureDetector(
               onTap: _isCameraActive ? _toggleFlash : null,
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                child: DuotoneIcon(
+                  'bolt',
+                  size: 22,
+                  color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
+                ),
+              ),
             ),
-            GlassAppBarAction(
-              icon: _isFrontCamera ? Icons.camera_front : Icons.camera_rear,
+            GestureDetector(
               onTap: _isCameraActive ? _switchCamera : null,
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                child: const DuotoneIcon(
+                  'camera',
+                  size: 22,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ],
@@ -306,9 +324,9 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   labelColor: GlassTheme.primaryAccent,
                   unselectedLabelColor: Colors.white54,
                   tabs: const [
-                    Tab(icon: Icon(Icons.qr_code_scanner), text: 'Scan'),
-                    Tab(icon: Icon(Icons.history), text: 'History'),
-                    Tab(icon: Icon(Icons.bar_chart), text: 'Stats'),
+                    Tab(icon: DuotoneIcon('qr_code', size: 24), text: 'Scan'),
+                    Tab(icon: DuotoneIcon('history', size: 24), text: 'History'),
+                    Tab(icon: DuotoneIcon('chart', size: 24), text: 'Stats'),
                   ],
                 ),
               ),
@@ -357,15 +375,15 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.camera_alt_outlined,
+                        DuotoneIcon(
+                          'camera',
                           size: 64,
-                          color: Colors.white24,
+                          color: Colors.white.withAlpha(61),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _startCamera,
-                          icon: const Icon(Icons.camera),
+                          icon: const DuotoneIcon('camera', size: 18),
                           label: const Text('Start Camera'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00D9FF),
@@ -439,8 +457,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.qr_code_2,
+            DuotoneIcon(
+              'qr_code',
               size: 64,
               color: Colors.white.withAlpha(31),
             ),
@@ -513,7 +531,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                     ),
                   );
                 },
-                icon: const Icon(Icons.delete_outline, size: 18),
+                icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
                 label: const Text('Clear'),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white54,
@@ -589,8 +607,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.verified_user,
+                    DuotoneIcon(
+                      'shield_check',
                       size: 48,
                       color: Colors.green.withAlpha(179),
                     ),

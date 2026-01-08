@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/identity_protection_provider.dart';
 import '../../services/security/identity_theft_protection_service.dart';
@@ -58,11 +59,11 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                 )
               else
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: const DuotoneIcon('refresh', size: 24),
                   onPressed: () => provider.scanAllAssets(),
                 ),
               IconButton(
-                icon: const Icon(Icons.add),
+                icon: const DuotoneIcon('add_circle', size: 24),
                 onPressed: () => _showAddAssetSheet(context, provider),
               ),
             ],
@@ -259,14 +260,14 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
         _buildStatCard(
           'Critical Alerts',
           provider.criticalAlerts.length.toString(),
-          Icons.error,
+          'danger_circle',
           GlassTheme.errorColor,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
           'Active Alerts',
           provider.activeAlerts.length.toString(),
-          Icons.warning,
+          'danger_triangle',
           GlassTheme.warningColor,
         ),
         const SizedBox(width: 12),
@@ -275,7 +276,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           provider.averageCreditScore > 0
               ? provider.averageCreditScore.toString()
               : '--',
-          Icons.credit_score,
+          'card',
           Color(IdentityProtectionProvider.getCreditScoreColor(
               provider.averageCreditScore)),
         ),
@@ -283,14 +284,14 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, String icon, Color color) {
     return Expanded(
       child: GlassCard(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(icon, color: color, size: 28),
+              DuotoneIcon(icon, color: color, size: 28),
               const SizedBox(height: 8),
               Text(
                 value,
@@ -324,9 +325,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.ac_unit,
+                const DuotoneIcon(
+                  'shield_check',
                   color: GlassTheme.primaryAccent,
+                  size: 24,
                 ),
                 const SizedBox(width: 8),
                 const Text(
@@ -371,11 +373,13 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                             .withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(
-                        isFrozen ? Icons.lock : Icons.lock_open,
-                        size: 18,
-                        color: Color(
-                            IdentityProtectionProvider.getBureauColor(bureau)),
+                      child: Center(
+                        child: DuotoneIcon(
+                          isFrozen ? 'lock' : 'lock_unlocked',
+                          size: 18,
+                          color: Color(
+                              IdentityProtectionProvider.getBureauColor(bureau)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -426,10 +430,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             color: GlassTheme.primaryAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
-            Icons.lightbulb_outline,
-            color: GlassTheme.primaryAccent,
-            size: 20,
+          child: const Center(
+            child: DuotoneIcon(
+              'lightbulb',
+              color: GlassTheme.primaryAccent,
+              size: 20,
+            ),
           ),
         ),
         title: Text(
@@ -439,8 +445,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             fontSize: 14,
           ),
         ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
+        trailing: const DuotoneIcon(
+          'alt_arrow_right',
           color: Colors.white24,
           size: 16,
         ),
@@ -451,12 +457,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
   Widget _buildAssetsTab(IdentityProtectionProvider provider) {
     if (provider.monitoredAssets.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.shield,
+        icon: 'shield_check',
         title: 'No Assets Monitored',
         subtitle: 'Add your personal information to monitor for exposure',
         action: TextButton.icon(
           onPressed: () => _showAddAssetSheet(context, provider),
-          icon: const Icon(Icons.add),
+          icon: const DuotoneIcon('add_circle', size: 18),
           label: const Text('Add Asset'),
         ),
       );
@@ -477,7 +483,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
               padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
               child: Row(
                 children: [
-                  Icon(
+                  DuotoneIcon(
                     _getAssetIcon(entry.key),
                     size: 18,
                     color: GlassTheme.primaryAccent,
@@ -515,9 +521,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
             color: statusColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            _getAssetIcon(asset.type),
-            color: statusColor,
+          child: Center(
+            child: DuotoneIcon(
+              _getAssetIcon(asset.type),
+              color: statusColor,
+              size: 24,
+            ),
           ),
         ),
         title: Text(
@@ -566,7 +575,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
           ],
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.white38),
+          icon: const DuotoneIcon('trash_bin_minimalistic', color: Colors.white38, size: 20),
           onPressed: () => _confirmRemoveAsset(context, asset, provider),
         ),
       ),
@@ -576,7 +585,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
   Widget _buildAlertsTab(IdentityProtectionProvider provider) {
     if (provider.alerts.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.notifications_none,
+        icon: 'bell',
         title: 'No Alerts',
         subtitle: 'Your identity appears to be safe',
         color: GlassTheme.successColor,
@@ -642,9 +651,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                     color: severityColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    _getAlertIcon(alert.type),
-                    color: severityColor,
+                  child: Center(
+                    child: DuotoneIcon(
+                      _getAlertIcon(alert.type),
+                      color: severityColor,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -900,9 +912,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                 ],
               ),
             ] else
-              const Icon(
-                Icons.add_circle_outline,
+              const DuotoneIcon(
+                'add_circle',
                 color: GlassTheme.primaryAccent,
+                size: 24,
               ),
           ],
         ),
@@ -911,7 +924,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
@@ -923,7 +936,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -949,61 +962,61 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
     );
   }
 
-  IconData _getAssetIcon(AssetType type) {
+  String _getAssetIcon(AssetType type) {
     switch (type) {
       case AssetType.ssn:
-        return Icons.badge;
+        return 'user_id';
       case AssetType.creditCard:
-        return Icons.credit_card;
+        return 'card';
       case AssetType.bankAccount:
-        return Icons.account_balance;
+        return 'wallet';
       case AssetType.email:
-        return Icons.email;
+        return 'letter';
       case AssetType.phone:
-        return Icons.phone;
+        return 'smartphone';
       case AssetType.driversLicense:
-        return Icons.directions_car;
+        return 'user_id';
       case AssetType.passport:
-        return Icons.flight;
+        return 'user_id';
       case AssetType.address:
-        return Icons.home;
+        return 'home';
       case AssetType.dateOfBirth:
-        return Icons.cake;
+        return 'calendar';
       case AssetType.mothersMaidenName:
-        return Icons.person;
+        return 'user';
       case AssetType.medicalId:
-        return Icons.medical_services;
+        return 'shield_check';
       case AssetType.other:
-        return Icons.description;
+        return 'file';
     }
   }
 
-  IconData _getAlertIcon(IdentityAlertType type) {
+  String _getAlertIcon(IdentityAlertType type) {
     switch (type) {
       case IdentityAlertType.ssnExposure:
-        return Icons.badge;
+        return 'user_id';
       case IdentityAlertType.creditInquiry:
-        return Icons.search;
+        return 'magnifer';
       case IdentityAlertType.newAccount:
-        return Icons.account_box;
+        return 'user_plus';
       case IdentityAlertType.addressChange:
-        return Icons.home;
+        return 'home';
       case IdentityAlertType.bankAccountExposure:
-        return Icons.account_balance;
+        return 'wallet';
       case IdentityAlertType.creditScoreChange:
-        return Icons.trending_down;
+        return 'graph_down';
       case IdentityAlertType.publicRecords:
-        return Icons.folder;
+        return 'folder';
       case IdentityAlertType.darkWebExposure:
-        return Icons.dark_mode;
+        return 'incognito';
       case IdentityAlertType.paydayLoan:
-        return Icons.money;
+        return 'money_bag';
       case IdentityAlertType.sexOffenderRegistry:
-        return Icons.warning;
+        return 'danger_triangle';
       case IdentityAlertType.courtRecords:
-        return Icons.gavel;
+        return 'document';
       case IdentityAlertType.utilityAccount:
-        return Icons.power;
+        return 'power';
     }
   }
 
@@ -1093,7 +1106,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen>
                   children: AssetType.values.where((t) => t != AssetType.other).map((type) {
                     final isSelected = type == selectedType;
                     return ChoiceChip(
-                      avatar: Icon(
+                      avatar: DuotoneIcon(
                         _getAssetIcon(type),
                         size: 18,
                         color: isSelected

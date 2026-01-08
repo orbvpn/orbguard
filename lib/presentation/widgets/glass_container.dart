@@ -3,6 +3,7 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/glass_theme.dart';
 
 /// Gradient background that makes glass effects visible
@@ -306,6 +307,48 @@ class GlassIconBox extends StatelessWidget {
       ),
       child: Center(
         child: Icon(icon, color: color, size: iconSize),
+      ),
+    );
+  }
+}
+
+/// Glass icon box using SVG duotone icons
+class GlassSvgIconBox extends StatelessWidget {
+  final String icon;
+  final Color color;
+  final double size;
+  final double iconSize;
+  final bool isDark;
+
+  const GlassSvgIconBox({
+    super.key,
+    required this.icon,
+    required this.color,
+    this.size = 40,
+    this.iconSize = 20,
+    this.isDark = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+        border: Border.all(
+          color: color.withAlpha(60),
+          width: GlassTheme.borderWidth,
+        ),
+      ),
+      child: Center(
+        child: SvgPicture.asset(
+          'assets/icons/$icon.svg',
+          width: iconSize,
+          height: iconSize,
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        ),
       ),
     );
   }

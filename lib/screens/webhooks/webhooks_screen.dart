@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 
 class WebhooksScreen extends StatefulWidget {
   const WebhooksScreen({super.key});
@@ -38,13 +39,13 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       appBar: GlassAppBar(
         title: 'Webhooks',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddWebhookDialog(context),
+          GlassAppBarAction(
+            svgIcon: 'add_circle',
+            onTap: () => _showAddWebhookDialog(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadWebhooks,
+          GlassAppBarAction(
+            svgIcon: 'refresh',
+            onTap: _isLoading ? () {} : _loadWebhooks,
           ),
         ],
       ),
@@ -95,8 +96,8 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: _getWebhookIcon(webhook.type),
+              GlassDuotoneIconBox(
+                icon: _getWebhookSvgIcon(webhook.type),
                 color: webhook.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
               ),
               const SizedBox(width: 12),
@@ -126,10 +127,10 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildWebhookStat(Icons.send, '${webhook.sentCount} sent'),
+              _buildWebhookStat('forward', '${webhook.sentCount} sent'),
               const SizedBox(width: 16),
               _buildWebhookStat(
-                webhook.lastStatus == 'success' ? Icons.check_circle : Icons.error,
+                webhook.lastStatus == 'success' ? 'check_circle' : 'danger_circle',
                 webhook.lastStatus == 'success' ? 'Healthy' : 'Failed',
                 color: webhook.lastStatus == 'success' ? GlassTheme.successColor : GlassTheme.errorColor,
               ),
@@ -150,11 +151,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     );
   }
 
-  Widget _buildWebhookStat(IconData icon, String text, {Color? color}) {
+  Widget _buildWebhookStat(String icon, String text, {Color? color}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color ?? Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: color ?? Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: color ?? Colors.white.withAlpha(128), fontSize: 12)),
       ],
@@ -166,7 +167,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.webhook, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon('link', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           const Text(
             'No Webhooks',
@@ -180,7 +181,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => _showAddWebhookDialog(context),
-            icon: const Icon(Icons.add),
+            icon: const DuotoneIcon('add_circle', size: 18, color: Colors.white),
             label: const Text('Add Webhook'),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
@@ -312,7 +313,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                         Navigator.pop(context);
                         // Test webhook
                       },
-                      icon: const Icon(Icons.send),
+                      icon: const DuotoneIcon('forward', size: 18, color: GlassTheme.primaryAccent),
                       label: const Text('Test'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -327,7 +328,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                         Navigator.pop(context);
                         setState(() => _webhooks.remove(webhook));
                       },
-                      icon: const Icon(Icons.delete),
+                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: GlassTheme.errorColor),
                       label: const Text('Delete'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.errorColor,
@@ -357,18 +358,18 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     );
   }
 
-  IconData _getWebhookIcon(String type) {
+  String _getWebhookSvgIcon(String type) {
     switch (type.toLowerCase()) {
       case 'slack':
-        return Icons.tag;
+        return 'hashtag';
       case 'teams':
-        return Icons.groups;
+        return 'users_group_rounded';
       case 'discord':
-        return Icons.chat;
+        return 'chat_dots';
       case 'pagerduty':
-        return Icons.notifications_active;
+        return 'bell_bing';
       default:
-        return Icons.webhook;
+        return 'link';
     }
   }
 

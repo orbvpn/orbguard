@@ -2,10 +2,12 @@
 /// Active threat campaign tracking and intelligence interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/campaign.dart';
 
@@ -63,14 +65,18 @@ class _CampaignsScreenState extends State<CampaignsScreen>
         title: 'Threat Campaigns',
         actions: [
           IconButton(
-            icon: Icon(_showActiveOnly ? Icons.filter_list : Icons.filter_list_off),
+            icon: DuotoneIcon(
+              _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
+              size: 24,
+              color: Colors.white,
+            ),
             onPressed: () {
               setState(() => _showActiveOnly = !_showActiveOnly);
               _loadCampaigns();
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
             onPressed: _isLoading ? null : _loadCampaigns,
           ),
         ],
@@ -100,7 +106,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
   Widget _buildCampaignsList(List<Campaign> campaigns) {
     if (campaigns.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.campaign,
+        icon: AppIcons.campaign,
         title: 'No Campaigns',
         subtitle: 'Active threat campaigns will appear here',
       );
@@ -125,7 +131,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getCampaignIcon(campaign.type),
                 color: severityColor,
                 size: 48,
@@ -177,9 +183,9 @@ class _CampaignsScreenState extends State<CampaignsScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildCampaignStat(Icons.warning, '${campaign.indicatorCount} IOCs'),
+              _buildCampaignStat(AppIcons.dangerTriangle, '${campaign.indicatorCount} IOCs'),
               const SizedBox(width: 16),
-              _buildCampaignStat(Icons.access_time, _formatDate(campaign.firstSeen)),
+              _buildCampaignStat(AppIcons.clock, _formatDate(campaign.firstSeen)),
               const Spacer(),
               if (campaign.actorName != null)
                 GlassBadge(text: campaign.actorName!, color: const Color(0xFF9C27B0), fontSize: 10),
@@ -192,9 +198,9 @@ class _CampaignsScreenState extends State<CampaignsScreen>
               runSpacing: 6,
               children: [
                 ...campaign.targetedRegions.take(2).map((region) =>
-                    _buildTargetChip(Icons.public, region, const Color(0xFF2196F3))),
+                    _buildTargetChip(AppIcons.global, region, const Color(0xFF2196F3))),
                 ...campaign.targetedSectors.take(2).map((sector) =>
-                    _buildTargetChip(Icons.business, sector, const Color(0xFFFF9800))),
+                    _buildTargetChip(AppIcons.enterprise, sector, const Color(0xFFFF9800))),
               ],
             ),
           ],
@@ -203,18 +209,18 @@ class _CampaignsScreenState extends State<CampaignsScreen>
     );
   }
 
-  Widget _buildCampaignStat(IconData icon, String text) {
+  Widget _buildCampaignStat(String icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
       ],
     );
   }
 
-  Widget _buildTargetChip(IconData icon, String text, Color color) {
+  Widget _buildTargetChip(String icon, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -224,7 +230,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          DuotoneIcon(icon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(text, style: TextStyle(color: color, fontSize: 10)),
         ],
@@ -233,7 +239,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -241,7 +247,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -285,7 +291,7 @@ class _CampaignsScreenState extends State<CampaignsScreen>
               // Header
               Row(
                 children: [
-                  GlassIconBox(
+                  GlassSvgIconBox(
                     icon: _getCampaignIcon(campaign.type),
                     color: severityColor,
                     size: 56,
@@ -447,22 +453,22 @@ class _CampaignsScreenState extends State<CampaignsScreen>
     }
   }
 
-  IconData _getCampaignIcon(String type) {
+  String _getCampaignIcon(String type) {
     switch (type.toLowerCase()) {
       case 'phishing':
-        return Icons.phishing;
+        return AppIcons.letter;
       case 'ransomware':
-        return Icons.lock;
+        return AppIcons.lock;
       case 'apt':
-        return Icons.security;
+        return AppIcons.shieldCheck;
       case 'malware':
-        return Icons.bug_report;
+        return AppIcons.bug;
       case 'ddos':
-        return Icons.cloud_off;
+        return AppIcons.cloudStorage;
       case 'espionage':
-        return Icons.visibility;
+        return AppIcons.eye;
       default:
-        return Icons.campaign;
+        return AppIcons.campaign;
     }
   }
 

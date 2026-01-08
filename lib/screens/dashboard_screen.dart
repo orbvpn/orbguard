@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../presentation/theme/glass_theme.dart';
+import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../presentation/widgets/glass_app_bar.dart';
 import '../providers/dashboard_provider.dart';
@@ -114,15 +115,25 @@ class _DashboardScreenState extends State<DashboardScreen>
       appBar: GlassAppBar(
         title: 'OrbGuard',
         actions: [
-          GlassAppBarAction(
-            icon: Icons.wifi,
+          GestureDetector(
             onTap: _showConnectionSheet,
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              child: const DuotoneIcon('wi_fi_router', size: 22),
+            ),
           ),
-          GlassAppBarAction(
-            icon: Icons.settings,
+          GestureDetector(
             onTap: () {
               // Navigate to settings
             },
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              child: const DuotoneIcon('settings', size: 22),
+            ),
           ),
         ],
       ),
@@ -218,24 +229,24 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     Color bannerColor;
     String message;
-    IconData icon;
+    String icon;
 
     if (!health.hasNetwork) {
       bannerColor = Colors.red;
       message = 'No network connection';
-      icon = Icons.signal_wifi_off;
+      icon = 'wi_fi_router';
     } else if (state == WebSocketState.error) {
       bannerColor = Colors.orange;
       message = 'Connection error. Tap to retry.';
-      icon = Icons.error_outline;
+      icon = 'danger_circle';
     } else if (state == WebSocketState.reconnecting) {
       bannerColor = Colors.amber;
       message = 'Reconnecting to threat stream...';
-      icon = Icons.sync;
+      icon = 'refresh';
     } else {
       bannerColor = Colors.grey;
       message = 'Not connected to live threat stream';
-      icon = Icons.cloud_off;
+      icon = 'cloud_storage';
     }
 
     return GestureDetector(
@@ -250,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         child: Row(
           children: [
-            Icon(icon, color: bannerColor, size: 20),
+            DuotoneIcon(icon, color: bannerColor, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -262,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
             if (health.hasNetwork && state != WebSocketState.reconnecting)
-              Icon(Icons.chevron_right, color: bannerColor, size: 20),
+              DuotoneIcon('alt_arrow_right', color: bannerColor, size: 20),
             if (state == WebSocketState.reconnecting)
               SizedBox(
                 width: 16,
@@ -325,7 +336,7 @@ class _ConnectionBottomSheet extends StatelessWidget {
 
 /// Quick action button widget
 class _QuickActionButton extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -350,7 +361,7 @@ class _QuickActionButton extends StatelessWidget {
               color: color.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: DuotoneIcon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 8),
           Text(

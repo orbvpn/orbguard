@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/sms_provider.dart';
 
 /// Threat level indicator badge
@@ -35,7 +36,7 @@ class ThreatLevelBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          DuotoneIcon(
             _getIcon(),
             size: compact ? 12 : 14,
             color: Color(level.color),
@@ -54,16 +55,16 @@ class ThreatLevelBadge extends StatelessWidget {
     );
   }
 
-  IconData _getIcon() {
+  String _getIcon() {
     switch (level) {
       case SmsThreatLevel.safe:
-        return Icons.check_circle;
+        return AppIcons.checkCircle;
       case SmsThreatLevel.suspicious:
-        return Icons.warning;
+        return AppIcons.dangerTriangle;
       case SmsThreatLevel.dangerous:
-        return Icons.dangerous;
+        return AppIcons.dangerCircle;
       case SmsThreatLevel.critical:
-        return Icons.error;
+        return AppIcons.dangerCircle;
     }
   }
 }
@@ -170,7 +171,7 @@ class SmsCard extends StatelessWidget {
                   ThreatLevelBadge(level: threatLevel, compact: true)
                 else if (onAnalyze != null)
                   IconButton(
-                    icon: const Icon(Icons.security, size: 20),
+                    icon: const DuotoneIcon(AppIcons.shieldCheck, size: 20, color: Color(0xFF00D9FF)),
                     color: const Color(0xFF00D9FF),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -227,8 +228,8 @@ class SmsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.warning_amber_rounded,
+              DuotoneIcon(
+                AppIcons.dangerTriangle,
                 size: 16,
                 color: Color(message.threatLevel.color),
               ),
@@ -299,7 +300,7 @@ class SmsCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.link_off, size: 14, color: Colors.red),
+          const DuotoneIcon(AppIcons.urlProtection, size: 14, color: Colors.red),
           const SizedBox(width: 6),
           Text(
             '${maliciousUrls.length} malicious URL${maliciousUrls.length > 1 ? 's' : ''}',
@@ -392,8 +393,8 @@ class SmsStatsCard extends StatelessWidget {
                   color: const Color(0xFF00D9FF).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.message,
+                child: const DuotoneIcon(
+                  AppIcons.chatDots,
                   color: Color(0xFF00D9FF),
                   size: 24,
                 ),
@@ -468,7 +469,7 @@ class SmsStatsCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error, color: Colors.red, size: 16),
+                  const DuotoneIcon(AppIcons.dangerCircle, color: Colors.red, size: 16),
                   const SizedBox(width: 8),
                   Text(
                     '${stats.criticalThreats} critical, ${stats.highThreats} high severity threats',
@@ -612,38 +613,38 @@ class SenderAnalysisCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _InfoRow(
-            icon: Icons.phone,
+            icon: AppIcons.smartphone,
             label: 'Sender',
             value: analysis.sender,
           ),
           if (analysis.isKnownSpammer)
             const _InfoRow(
-              icon: Icons.block,
+              icon: AppIcons.forbidden,
               label: 'Status',
               value: 'Known Spammer',
               valueColor: Colors.red,
             ),
           if (analysis.isSpoofed)
             _InfoRow(
-              icon: Icons.warning,
+              icon: AppIcons.dangerTriangle,
               label: 'Spoofed',
               value: analysis.spoofedBrand ?? 'Yes',
               valueColor: Colors.orange,
             ),
           if (analysis.isShortCode)
             const _InfoRow(
-              icon: Icons.short_text,
+              icon: AppIcons.chatDots,
               label: 'Type',
               value: 'Short Code',
             ),
           if (analysis.isAlphanumeric)
             const _InfoRow(
-              icon: Icons.abc,
+              icon: AppIcons.fileText,
               label: 'Type',
               value: 'Alphanumeric ID',
             ),
           _InfoRow(
-            icon: Icons.assessment,
+            icon: AppIcons.chartActivity,
             label: 'Risk Score',
             value: '${(analysis.riskScore * 100).toInt()}%',
             valueColor: _getRiskColor(analysis.riskScore),
@@ -654,7 +655,7 @@ class SenderAnalysisCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber,
+                      const DuotoneIcon(AppIcons.dangerTriangle,
                           size: 14, color: Colors.orange),
                       const SizedBox(width: 6),
                       Expanded(
@@ -683,7 +684,7 @@ class SenderAnalysisCard extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final String value;
   final Color? valueColor;
@@ -701,7 +702,7 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey[500]),
+          DuotoneIcon(icon, size: 16, color: Colors.grey[500]),
           const SizedBox(width: 8),
           Text(
             '$label:',
@@ -747,7 +748,7 @@ class ThreatDetailCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
+              DuotoneIcon(
                 _getThreatIcon(),
                 color: Color(threat.severity.color),
                 size: 20,
@@ -799,7 +800,7 @@ class ThreatDetailCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.format_quote, size: 14, color: Colors.grey),
+                  const DuotoneIcon(AppIcons.quoteDown, size: 14, color: Colors.grey),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -845,30 +846,30 @@ class ThreatDetailCard extends StatelessWidget {
     );
   }
 
-  IconData _getThreatIcon() {
+  String _getThreatIcon() {
     switch (threat.type) {
       case SmsThreatType.phishing:
-        return Icons.phishing;
+        return AppIcons.hook;
       case SmsThreatType.smishing:
-        return Icons.sms;
+        return AppIcons.chatDots;
       case SmsThreatType.malwareLink:
-        return Icons.bug_report;
+        return AppIcons.bug;
       case SmsThreatType.scam:
-        return Icons.money_off;
+        return AppIcons.wallet;
       case SmsThreatType.spam:
-        return Icons.report;
+        return AppIcons.dangerTriangle;
       case SmsThreatType.executiveImpersonation:
-        return Icons.person_off;
+        return AppIcons.user;
       case SmsThreatType.bankingFraud:
-        return Icons.account_balance;
+        return AppIcons.wallet;
       case SmsThreatType.packageDeliveryScam:
-        return Icons.local_shipping;
+        return AppIcons.box;
       case SmsThreatType.otpFraud:
-        return Icons.lock_clock;
+        return AppIcons.lock;
       case SmsThreatType.premiumRate:
-        return Icons.attach_money;
+        return AppIcons.dollarCircle;
       case SmsThreatType.unknown:
-        return Icons.help;
+        return AppIcons.questionCircle;
     }
   }
 }
@@ -903,8 +904,8 @@ class UrlAnalysisCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  url.isMalicious ? Icons.link_off : Icons.link,
+                DuotoneIcon(
+                  url.isMalicious ? AppIcons.urlProtection : AppIcons.urlProtection,
                   color: color,
                   size: 16,
                 ),
@@ -1095,7 +1096,7 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
                       valueColor: AlwaysStoppedAnimation(Colors.black),
                     ),
                   )
-                : const Icon(Icons.search, size: 20),
+                : const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
             label: Text(widget.isAnalyzing ? 'Analyzing...' : 'Analyze'),
           ),
         ],

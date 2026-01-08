@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/rogue_ap_provider.dart';
 
@@ -56,11 +57,11 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                 )
               else
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: const DuotoneIcon('refresh', size: 24),
                   onPressed: () => provider.scanForAPs(),
                 ),
               IconButton(
-                icon: const Icon(Icons.settings),
+                icon: const DuotoneIcon('settings', size: 24),
                 onPressed: () => _showSettings(context, provider),
               ),
             ],
@@ -171,9 +172,12 @@ class _RogueAPScreenState extends State<RogueAPScreen>
               color: Color(ap.threatLevel.color).withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.wifi,
-              color: Color(ap.threatLevel.color),
+            child: Center(
+              child: DuotoneIcon(
+                'wi_fi_router_round',
+                size: 24,
+                color: Color(ap.threatLevel.color),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -222,8 +226,9 @@ class _RogueAPScreenState extends State<RogueAPScreen>
               ],
             ),
           ),
-          Icon(
-            _getSignalIcon(ap.signalStrength),
+          DuotoneIcon(
+            _getSignalIconName(ap.signalStrength),
+            size: 24,
             color: GlassTheme.primaryAccent,
           ),
         ],
@@ -293,7 +298,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
   Widget _buildNearbyAPsTab(RogueAPProvider provider) {
     if (provider.detectedAPs.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.wifi_find,
+        icon: 'radar',
         title: 'No Access Points Found',
         subtitle: 'Tap scan to detect nearby WiFi networks',
       );
@@ -321,7 +326,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
 
     if (threats.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.verified_user,
+        icon: 'shield_check',
         title: 'No Threats Detected',
         subtitle: 'Your WiFi environment appears safe',
         color: GlassTheme.successColor,
@@ -340,7 +345,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
   Widget _buildTrustedTab(RogueAPProvider provider) {
     if (provider.trustedAPs.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.verified,
+        icon: 'verified_check',
         title: 'No Trusted Networks',
         subtitle: 'Add networks you trust to whitelist them',
       );
@@ -377,8 +382,9 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                 child: Stack(
                   children: [
                     Center(
-                      child: Icon(
-                        _getSignalIcon(ap.signalStrength),
+                      child: DuotoneIcon(
+                        _getSignalIconName(ap.signalStrength),
+                        size: 24,
                         color: Color(ap.threatLevel.color),
                       ),
                     ),
@@ -420,8 +426,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                           ),
                         ),
                         if (isTrusted)
-                          const Icon(
-                            Icons.verified,
+                          const DuotoneIcon(
+                            'verified_check',
                             size: 16,
                             color: GlassTheme.primaryAccent,
                           ),
@@ -520,11 +526,14 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                     color: Color(ap.threatLevel.color).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    ap.threatLevel == APThreatLevel.dangerous
-                        ? Icons.dangerous
-                        : Icons.warning,
-                    color: Color(ap.threatLevel.color),
+                  child: Center(
+                    child: DuotoneIcon(
+                      ap.threatLevel == APThreatLevel.dangerous
+                          ? 'danger_circle'
+                          : 'danger_triangle',
+                      size: 24,
+                      color: Color(ap.threatLevel.color),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -584,8 +593,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(
-                        _getThreatIcon(threat),
+                      DuotoneIcon(
+                        _getThreatIconName(threat),
                         size: 18,
                         color: Color(ap.threatLevel.color),
                       ),
@@ -620,7 +629,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {},
-                    icon: const Icon(Icons.block, size: 18),
+                    icon: const DuotoneIcon('forbidden', size: 18),
                     label: const Text('Block'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: GlassTheme.errorColor,
@@ -634,7 +643,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => provider.addTrustedAP(ap),
-                    icon: const Icon(Icons.verified_user, size: 18),
+                    icon: const DuotoneIcon('shield_check', size: 18),
                     label: const Text('Trust'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: GlassTheme.primaryAccent,
@@ -663,9 +672,12 @@ class _RogueAPScreenState extends State<RogueAPScreen>
             color: GlassTheme.primaryAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(
-            Icons.verified,
-            color: GlassTheme.primaryAccent,
+          child: const Center(
+            child: DuotoneIcon(
+              'verified_check',
+              size: 24,
+              color: GlassTheme.primaryAccent,
+            ),
           ),
         ),
         title: Text(
@@ -683,8 +695,9 @@ class _RogueAPScreenState extends State<RogueAPScreen>
           ),
         ),
         trailing: IconButton(
-          icon: const Icon(
-            Icons.remove_circle_outline,
+          icon: const DuotoneIcon(
+            'minus_circle',
+            size: 24,
             color: GlassTheme.errorColor,
           ),
           onPressed: () => _confirmRemoveTrusted(context, ap, provider),
@@ -707,8 +720,8 @@ class _RogueAPScreenState extends State<RogueAPScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            security.isSecure ? Icons.lock : Icons.lock_open,
+          DuotoneIcon(
+            security.isSecure ? 'lock' : 'lock_unlocked',
             size: 10,
             color: color,
           ),
@@ -727,7 +740,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
@@ -738,7 +751,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -760,32 +773,30 @@ class _RogueAPScreenState extends State<RogueAPScreen>
     );
   }
 
-  IconData _getSignalIcon(int strength) {
-    if (strength >= -50) return Icons.signal_wifi_4_bar;
-    if (strength >= -60) return Icons.network_wifi_3_bar;
-    if (strength >= -70) return Icons.network_wifi_2_bar;
-    if (strength >= -80) return Icons.network_wifi_1_bar;
-    return Icons.signal_wifi_off;
+  String _getSignalIconName(int strength) {
+    // All signal strengths use the same wifi router icon
+    if (strength >= -80) return 'wi_fi_router';
+    return 'wi_fi_router';
   }
 
-  IconData _getThreatIcon(APThreatType threat) {
+  String _getThreatIconName(APThreatType threat) {
     switch (threat) {
       case APThreatType.evilTwin:
-        return Icons.content_copy;
+        return 'copy';
       case APThreatType.fakeHotspot:
-        return Icons.wifi_tethering_error;
+        return 'danger_circle';
       case APThreatType.sslStripping:
-        return Icons.https;
+        return 'lock_unlocked';
       case APThreatType.deauthAttack:
-        return Icons.signal_wifi_off;
+        return 'wi_fi_router';
       case APThreatType.weakEncryption:
-        return Icons.lock_open;
+        return 'lock_unlocked';
       case APThreatType.openNetwork:
-        return Icons.lock_outline;
+        return 'lock_keyhole';
       case APThreatType.suspiciousSSID:
-        return Icons.text_fields;
+        return 'danger_triangle';
       case APThreatType.macSpoofing:
-        return Icons.device_unknown;
+        return 'devices';
     }
   }
 
@@ -839,10 +850,12 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                     color: Color(ap.threatLevel.color).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    _getSignalIcon(ap.signalStrength),
-                    color: Color(ap.threatLevel.color),
-                    size: 28,
+                  child: Center(
+                    child: DuotoneIcon(
+                      _getSignalIconName(ap.signalStrength),
+                      size: 28,
+                      color: Color(ap.threatLevel.color),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -925,7 +938,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                         provider.addTrustedAP(ap);
                         Navigator.pop(context);
                       },
-                      icon: const Icon(Icons.verified_user),
+                      icon: const DuotoneIcon('shield_check', size: 20),
                       label: const Text('Add to Trusted'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.primaryAccent,
@@ -938,7 +951,7 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.verified),
+                      icon: const DuotoneIcon('verified_check', size: 20),
                       label: const Text('Already Trusted'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.successColor,

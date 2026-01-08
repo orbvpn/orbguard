@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_firewall_provider.dart';
 import '../../services/security/network_firewall_service.dart';
 
@@ -51,7 +52,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
         actions: [
           Consumer<NetworkFirewallProvider>(
             builder: (context, provider, _) => GlassAppBarAction(
-              icon: provider.isEnabled ? Icons.shield : Icons.shield_outlined,
+              svgIcon: 'shield_check',
               onTap: () {
                 HapticFeedback.mediumImpact();
                 provider.toggle();
@@ -114,10 +115,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                     .withOpacity(0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                provider.isEnabled ? Icons.shield : Icons.shield_outlined,
-                color: provider.isEnabled ? GlassTheme.successColor : Colors.grey,
-                size: 28,
+              child: Center(
+                child: DuotoneIcon(
+                  'shield_check',
+                  color: provider.isEnabled ? GlassTheme.successColor : Colors.grey,
+                  size: 28,
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -167,21 +170,21 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
           _buildStatCard(
             'Blocked',
             provider.stats.blockedConnections.toString(),
-            Icons.block,
+            'forbidden',
             GlassTheme.errorColor,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             'Allowed',
             provider.stats.allowedConnections.toString(),
-            Icons.check_circle,
+            'check_circle',
             GlassTheme.successColor,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             'Rules',
             provider.stats.activeRules.toString(),
-            Icons.rule,
+            'filter',
             GlassTheme.primaryAccent,
           ),
         ],
@@ -189,12 +192,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, String icon, Color color) {
     return Expanded(
       child: GlassCard(
         child: Column(
           children: [
-            Icon(icon, color: color, size: 24),
+            DuotoneIcon(icon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(
               value,
@@ -232,11 +235,11 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
               labelColor: GlassTheme.primaryAccent,
               unselectedLabelColor: Colors.white54,
               isScrollable: true,
-              tabs: const [
-                Tab(icon: Icon(Icons.swap_vert), text: 'Live'),
-                Tab(icon: Icon(Icons.notifications), text: 'Alerts'),
-                Tab(icon: Icon(Icons.rule), text: 'Rules'),
-                Tab(icon: Icon(Icons.apps), text: 'Apps'),
+              tabs: [
+                Tab(icon: DuotoneIcon('transfer_vertical', size: 20, color: null), text: 'Live'),
+                Tab(icon: DuotoneIcon('bell', size: 20, color: null), text: 'Alerts'),
+                Tab(icon: DuotoneIcon('filter', size: 20, color: null), text: 'Rules'),
+                Tab(icon: DuotoneIcon('smartphone', size: 20, color: null), text: 'Apps'),
               ],
             ),
           ),
@@ -248,7 +251,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
   Widget _buildConnectionsTab(NetworkFirewallProvider provider) {
     if (provider.connections.isEmpty) {
       return _buildEmptyState(
-        Icons.swap_vert,
+        'transfer_vertical',
         'No Connections',
         'Network activity will appear here',
       );
@@ -276,14 +279,16 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
               color: statusColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              conn.status == ConnectionStatus.blocked
-                  ? Icons.block
-                  : conn.direction == ConnectionDirection.inbound
-                      ? Icons.arrow_downward
-                      : Icons.arrow_upward,
-              color: statusColor,
-              size: 20,
+            child: Center(
+              child: DuotoneIcon(
+                conn.status == ConnectionStatus.blocked
+                    ? 'forbidden'
+                    : conn.direction == ConnectionDirection.inbound
+                        ? 'arrow_down'
+                        : 'arrow_up',
+                color: statusColor,
+                size: 20,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -358,7 +363,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
   Widget _buildAlertsTab(NetworkFirewallProvider provider) {
     if (provider.recentAlerts.isEmpty) {
       return _buildEmptyState(
-        Icons.notifications_none,
+        'bell_off',
         'No Alerts',
         'Blocked connections will appear here',
       );
@@ -387,10 +392,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                   color: GlassTheme.errorColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.gpp_bad,
-                  color: GlassTheme.errorColor,
-                  size: 20,
+                child: const Center(
+                  child: DuotoneIcon(
+                    'shield_cross',
+                    color: GlassTheme.errorColor,
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -522,7 +529,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
               Expanded(
                 child: _buildQuickBlockButton(
                   'Block Domain',
-                  Icons.language,
+                  'globus',
                   () => _showAddBlockDialog(RuleType.domain),
                 ),
               ),
@@ -530,7 +537,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
               Expanded(
                 child: _buildQuickBlockButton(
                   'Block IP',
-                  Icons.computer,
+                  'monitor',
                   () => _showAddBlockDialog(RuleType.ip),
                 ),
               ),
@@ -542,7 +549,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
         Expanded(
           child: provider.rules.isEmpty
               ? _buildEmptyState(
-                  Icons.rule,
+                  'filter',
                   'No Custom Rules',
                   'Add rules to block specific domains or IPs',
                 )
@@ -557,13 +564,13 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
     );
   }
 
-  Widget _buildQuickBlockButton(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildQuickBlockButton(String label, String icon, VoidCallback onTap) {
     return GlassCard(
       onTap: onTap,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: GlassTheme.primaryAccent, size: 20),
+          DuotoneIcon(icon, color: GlassTheme.primaryAccent, size: 20),
           const SizedBox(width: 8),
           Text(
             label,
@@ -592,12 +599,14 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                   .withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              rule.action == RuleAction.block ? Icons.block : Icons.check,
-              color: rule.action == RuleAction.block
-                  ? GlassTheme.errorColor
-                  : GlassTheme.successColor,
-              size: 20,
+            child: Center(
+              child: DuotoneIcon(
+                rule.action == RuleAction.block ? 'forbidden' : 'check_circle',
+                color: rule.action == RuleAction.block
+                    ? GlassTheme.errorColor
+                    : GlassTheme.successColor,
+                size: 20,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -651,8 +660,8 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           IconButton(
-            icon: Icon(
-              Icons.delete_outline,
+            icon: DuotoneIcon(
+              'trash_bin_minimalistic',
               color: Colors.white.withOpacity(0.4),
               size: 20,
             ),
@@ -666,7 +675,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
   Widget _buildAppsTab(NetworkFirewallProvider provider) {
     if (provider.appProfiles.isEmpty) {
       return _buildEmptyState(
-        Icons.apps,
+        'smartphone',
         'No App Data',
         'App network profiles will appear here',
       );
@@ -699,10 +708,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                   .withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.android,
-              color: GlassTheme.primaryAccent,
-              size: 24,
+            child: const Center(
+              child: DuotoneIcon(
+                'smartphone',
+                color: GlassTheme.primaryAccent,
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -742,9 +753,10 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
             ),
           ),
           PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
+            icon: DuotoneIcon(
+              'menu_dots',
               color: Colors.white.withOpacity(0.5),
+              size: 20,
             ),
             color: GlassTheme.gradientTop,
             itemBuilder: (context) => [
@@ -752,8 +764,8 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                 value: profile.isAllowed ? 'block' : 'allow',
                 child: Row(
                   children: [
-                    Icon(
-                      profile.isAllowed ? Icons.block : Icons.check,
+                    DuotoneIcon(
+                      profile.isAllowed ? 'forbidden' : 'check_circle',
                       color: profile.isAllowed
                           ? GlassTheme.errorColor
                           : GlassTheme.successColor,
@@ -767,13 +779,13 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'details',
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.white54, size: 18),
-                    SizedBox(width: 8),
-                    Text('View Details', style: TextStyle(color: Colors.white)),
+                    DuotoneIcon('info_circle', color: Colors.white54, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('View Details', style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
@@ -793,12 +805,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
     );
   }
 
-  Widget _buildEmptyState(IconData icon, String title, String subtitle) {
+  Widget _buildEmptyState(String icon, String title, String subtitle) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.white.withOpacity(0.2)),
+          DuotoneIcon(icon, size: 64, color: Colors.white.withOpacity(0.2)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -869,9 +881,13 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                     ? 'e.g., malware.com'
                     : 'e.g., 192.168.1.100',
                 hintStyle: TextStyle(color: Colors.grey[600]),
-                prefixIcon: Icon(
-                  type == RuleType.domain ? Icons.language : Icons.computer,
-                  color: Colors.grey,
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: DuotoneIcon(
+                    type == RuleType.domain ? 'globus' : 'monitor',
+                    color: Colors.grey,
+                    size: 20,
+                  ),
                 ),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
@@ -1004,10 +1020,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                       color: GlassTheme.primaryAccent.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
-                      Icons.android,
-                      color: GlassTheme.primaryAccent,
-                      size: 28,
+                    child: const Center(
+                      child: DuotoneIcon(
+                        'smartphone',
+                        color: GlassTheme.primaryAccent,
+                        size: 28,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),

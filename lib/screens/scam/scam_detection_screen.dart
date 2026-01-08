@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/scam_detection_provider.dart';
 
 class ScamDetectionScreen extends StatefulWidget {
@@ -52,7 +53,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
             actions: [
               if (provider.analysisHistory.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline),
+                  icon: const DuotoneIcon('trash_bin_minimalistic', size: 24, color: Colors.white),
                   onPressed: () => _confirmClearHistory(context, provider),
                 ),
             ],
@@ -143,7 +144,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.security),
+                  : const DuotoneIcon('shield_check', size: 20, color: Colors.white),
               label: Text(provider.isAnalyzing ? 'Analyzing...' : 'Analyze for Scams'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
@@ -207,7 +208,10 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
             decoration: InputDecoration(
               hintText: 'Enter URL to check...',
               hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: const Icon(Icons.link, color: Colors.white54),
+              prefixIcon: const Padding(
+                padding: EdgeInsets.all(12),
+                child: DuotoneIcon('link', color: Colors.white54, size: 24),
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -222,7 +226,10 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
             decoration: InputDecoration(
               hintText: 'Enter phone number...',
               hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: const Icon(Icons.phone, color: Colors.white54),
+              prefixIcon: const Padding(
+                padding: EdgeInsets.all(12),
+                child: DuotoneIcon('smartphone', color: Colors.white54, size: 24),
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -232,7 +239,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white54),
+              const DuotoneIcon('info_circle', color: Colors.white54, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -278,8 +285,8 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: result.isScam ? Icons.warning : Icons.check_circle,
+              GlassDuotoneIconBox(
+                icon: result.isScam ? 'danger_triangle' : 'check_circle',
                 color: riskColor,
                 size: 48,
               ),
@@ -313,7 +320,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
               withBlur: false,
               child: Row(
                 children: [
-                  const Icon(Icons.category, size: 18, color: Colors.white54),
+                  const DuotoneIcon('tag', size: 18, color: Colors.white54),
                   const SizedBox(width: 8),
                   Text(
                     'Type: ${result.scamType!.displayName}',
@@ -334,7 +341,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(
                     children: [
-                      Icon(Icons.arrow_right, size: 16, color: riskColor),
+                      DuotoneIcon('alt_arrow_right', size: 16, color: riskColor),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -358,7 +365,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.lightbulb, size: 16, color: GlassTheme.warningColor),
+                      const DuotoneIcon('lightbulb', size: 16, color: GlassTheme.warningColor),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -378,7 +385,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   Widget _buildHistoryTab(ScamDetectionProvider provider) {
     if (provider.analysisHistory.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.history,
+        icon: 'history',
         title: 'No History',
         subtitle: 'Your scam analysis history will appear here',
       );
@@ -401,8 +408,8 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
       onTap: () => _showResultDetails(context, result),
       child: Row(
         children: [
-          GlassIconBox(
-            icon: result.isScam ? Icons.warning : Icons.check_circle,
+          GlassDuotoneIconBox(
+            icon: result.isScam ? 'danger_triangle' : 'check_circle',
             color: riskColor,
           ),
           const SizedBox(width: 12),
@@ -446,7 +453,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
 
     if (provider.patterns.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.pattern,
+        icon: 'structure',
         title: 'No Patterns',
         subtitle: 'Scam patterns will be displayed here',
       );
@@ -471,7 +478,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(icon: _getScamTypeIcon(pattern.type), color: typeColor),
+              GlassDuotoneIconBox(icon: _getScamTypeSvgIcon(pattern.type), color: typeColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -534,7 +541,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -542,7 +549,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -656,30 +663,30 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
     }
   }
 
-  IconData _getScamTypeIcon(ScamType type) {
+  String _getScamTypeSvgIcon(ScamType type) {
     switch (type) {
       case ScamType.phishing:
-        return Icons.phishing;
+        return 'danger_triangle';
       case ScamType.impersonation:
-        return Icons.person_off;
+        return 'user_cross';
       case ScamType.advanceFee:
-        return Icons.attach_money;
+        return 'dollar';
       case ScamType.techSupport:
-        return Icons.support_agent;
+        return 'headphones_round';
       case ScamType.romance:
-        return Icons.favorite;
+        return 'heart';
       case ScamType.investment:
-        return Icons.trending_up;
+        return 'graph_up';
       case ScamType.lottery:
-        return Icons.casino;
+        return 'gift';
       case ScamType.jobOffer:
-        return Icons.work;
+        return 'user_id';
       case ScamType.charity:
-        return Icons.volunteer_activism;
+        return 'heart_shine';
       case ScamType.government:
-        return Icons.account_balance;
+        return 'server_square';
       default:
-        return Icons.warning;
+        return 'danger_triangle';
     }
   }
 

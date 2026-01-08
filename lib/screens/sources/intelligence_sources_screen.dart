@@ -2,8 +2,10 @@
 /// Threat intelligence source management interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class IntelligenceSourcesScreen extends StatefulWidget {
@@ -38,12 +40,12 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
       appBar: GlassAppBar(
         title: 'Intelligence Sources',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
+          GlassAppBarAction(
+            svgIcon: AppIcons.addCircle,
             onPressed: () => _showAddSourceDialog(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
             onPressed: _isLoading ? null : _loadSources,
           ),
         ],
@@ -104,7 +106,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getSourceIcon(source.type),
                 color: source.isEnabled ? GlassTheme.successColor : Colors.grey,
               ),
@@ -134,9 +136,9 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildSourceStat(Icons.storage, '${source.indicatorCount} IOCs'),
+              _buildSourceStat(AppIcons.database, '${source.indicatorCount} IOCs'),
               const SizedBox(width: 16),
-              _buildSourceStat(Icons.access_time, 'Updated ${source.lastUpdated}'),
+              _buildSourceStat(AppIcons.clock, 'Updated ${source.lastUpdated}'),
             ],
           ),
           if (source.description != null) ...[
@@ -165,11 +167,11 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
     );
   }
 
-  Widget _buildSourceStat(IconData icon, String text) {
+  Widget _buildSourceStat(String icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
       ],
@@ -181,7 +183,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.source, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(AppIcons.intelligence, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           const Text(
             'No Intelligence Sources',
@@ -193,13 +195,19 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
             style: TextStyle(color: Colors.white.withAlpha(153)),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: () => _showAddSourceDialog(context),
-            icon: const Icon(Icons.add),
-            label: const Text('Add Source'),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
               foregroundColor: Colors.white,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DuotoneIcon(AppIcons.addCircle, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                const Text('Add Source'),
+              ],
             ),
           ),
         ],
@@ -244,18 +252,18 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
     );
   }
 
-  IconData _getSourceIcon(String type) {
+  String _getSourceIcon(String type) {
     switch (type.toLowerCase()) {
       case 'stix/taxii':
-        return Icons.api;
+        return AppIcons.stixTaxii;
       case 'misp':
-        return Icons.hub;
+        return AppIcons.structure;
       case 'csv':
-        return Icons.table_chart;
+        return AppIcons.fileText;
       case 'json':
-        return Icons.code;
+        return AppIcons.code;
       default:
-        return Icons.source;
+        return AppIcons.intelligence;
     }
   }
 

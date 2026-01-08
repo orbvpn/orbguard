@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/app_security_provider.dart';
 import '../../widgets/app_security/app_security_widgets.dart';
 
@@ -41,7 +42,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
         showBackButton: true,
         actions: [
           PopupMenuButton<AppSortOption>(
-            icon: const Icon(Icons.sort, color: Colors.white),
+            icon: const DuotoneIcon('sort_vertical', size: 24, color: Colors.white),
             color: GlassTheme.gradientTop,
             onSelected: (option) {
               context.read<AppSecurityProvider>().setSortOption(option);
@@ -55,7 +56,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                   child: Row(
                     children: [
                       if (option == currentSort)
-                        Icon(Icons.check, size: 18, color: GlassTheme.primaryAccent)
+                        DuotoneIcon('check_circle', size: 18, color: GlassTheme.primaryAccent)
                       else
                         const SizedBox(width: 18),
                       const SizedBox(width: 8),
@@ -83,9 +84,9 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                   labelColor: GlassTheme.primaryAccent,
                   unselectedLabelColor: Colors.white54,
                   tabs: const [
-                    Tab(icon: Icon(Icons.apps), text: 'Apps'),
-                    Tab(icon: Icon(Icons.warning), text: 'Risks'),
-                    Tab(icon: Icon(Icons.bar_chart), text: 'Stats'),
+                    Tab(icon: DuotoneIcon('smartphone', size: 20), text: 'Apps'),
+                    Tab(icon: DuotoneIcon('danger_triangle', size: 20), text: 'Risks'),
+                    Tab(icon: DuotoneIcon('chart_2', size: 20), text: 'Stats'),
                   ],
                 ),
               ),
@@ -196,7 +197,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
           if (highRiskApps.isNotEmpty) ...[
             _buildSectionHeader(
               'High Risk Apps',
-              Icons.warning,
+              'danger_triangle',
               Colors.red,
               highRiskApps.length,
             ),
@@ -221,7 +222,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green.withAlpha(178)),
+                  DuotoneIcon('check_circle', size: 24, color: Colors.green.withAlpha(178)),
                   const SizedBox(width: 12),
                   const Text(
                     'No high risk apps detected',
@@ -239,7 +240,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
           if (sideloadedApps.isNotEmpty) ...[
             _buildSectionHeader(
               'Sideloaded Apps',
-              Icons.file_download,
+              'download_minimalistic',
               Colors.orange,
               sideloadedApps.length,
             ),
@@ -252,7 +253,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                  const DuotoneIcon('info_circle', size: 18, color: Colors.orange),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -283,7 +284,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
           if (appsWithTrackers.isNotEmpty) ...[
             _buildSectionHeader(
               'Apps with Trackers',
-              Icons.track_changes,
+              'eye',
               Colors.purple,
               appsWithTrackers.length,
             ),
@@ -358,8 +359,8 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.apps,
+          DuotoneIcon(
+            'smartphone',
             size: 64,
             color: Colors.white.withAlpha(31),
           ),
@@ -385,10 +386,10 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
   }
 
   Widget _buildSectionHeader(
-      String title, IconData icon, Color color, int count) {
+      String title, String svgIcon, Color color, int count) {
     return Row(
       children: [
-        Icon(icon, color: color, size: 20),
+        DuotoneIcon(svgIcon, color: color, size: 20),
         const SizedBox(width: 8),
         Text(
           title,
@@ -641,10 +642,10 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                               color: Colors.red.withAlpha(40),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.bug_report,
+                                DuotoneIcon('bug',
                                     size: 16, color: Colors.red),
                                 SizedBox(width: 6),
                                 Text(
@@ -666,10 +667,10 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                               color: Colors.orange.withAlpha(40),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.file_download,
+                                DuotoneIcon('download_minimalistic',
                                     size: 16, color: Colors.orange),
                                 SizedBox(width: 6),
                                 Text(
@@ -708,7 +709,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning_amber,
+                            const DuotoneIcon('danger_triangle',
                                 size: 18, color: Colors.orange),
                             const SizedBox(width: 12),
                             Expanded(
@@ -771,7 +772,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.lightbulb, color: Colors.blue),
+                        const DuotoneIcon('lightbulb_bolt', size: 24, color: Colors.blue),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -791,8 +792,8 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                 Center(
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.search,
+                      DuotoneIcon(
+                        'magnifer',
                         size: 48,
                         color: Colors.grey.withAlpha(128),
                       ),
@@ -810,7 +811,7 @@ class _AppSecurityScreenState extends State<AppSecurityScreen>
                           provider.analyzeApp(app.app.packageName);
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.search),
+                        icon: const DuotoneIcon('magnifer', size: 20, color: Colors.black),
                         label: const Text('Analyze Now'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00D9FF),

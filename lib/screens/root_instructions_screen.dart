@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../presentation/widgets/duotone_icon.dart';
 
 class RootInstructionsScreen extends StatelessWidget {
   const RootInstructionsScreen({super.key});
@@ -72,7 +73,7 @@ class RootInstructionsScreen extends StatelessWidget {
             onPressed: () {
               // Open XDA Developers
             },
-            icon: const Icon(Icons.open_in_new),
+            icon: const DuotoneIcon(AppIcons.share, color: Colors.white),
             label: const Text('Visit XDA Developers Forum'),
             style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
           ),
@@ -82,7 +83,7 @@ class RootInstructionsScreen extends StatelessWidget {
               // Test root access
               Navigator.pop(context);
             },
-            icon: const Icon(Icons.check),
+            icon: const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
             label: const Text('Test Root Access'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00D9FF),

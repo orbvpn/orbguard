@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../models/api/threat_stats.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 
 /// Card displaying overall protection status
 class ProtectionStatusCard extends StatelessWidget {
@@ -58,24 +59,24 @@ class ProtectionStatusCard extends StatelessWidget {
     final grade = protection?.protectionGrade ?? status?.grade ?? 'U';
 
     Color statusColor;
-    IconData statusIcon;
+    String statusIcon;
     String statusText;
 
     if (!isProtected) {
       statusColor = Colors.red;
-      statusIcon = Icons.shield_outlined;
+      statusIcon = AppIcons.shield;
       statusText = 'Not Protected';
     } else if (score >= 80) {
       statusColor = Colors.green;
-      statusIcon = Icons.verified_user;
+      statusIcon = AppIcons.shieldCheck;
       statusText = 'Fully Protected';
     } else if (score >= 50) {
       statusColor = Colors.orange;
-      statusIcon = Icons.shield;
+      statusIcon = AppIcons.shield;
       statusText = 'Partially Protected';
     } else {
       statusColor = Colors.red;
-      statusIcon = Icons.warning;
+      statusIcon = AppIcons.dangerTriangle;
       statusText = 'Low Protection';
     }
 
@@ -118,7 +119,7 @@ class ProtectionStatusCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: onScanTap,
-              icon: const Icon(Icons.search, size: 20),
+              icon: const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
               label: const Text('Start Scan'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
@@ -137,11 +138,11 @@ class ProtectionStatusCard extends StatelessWidget {
 
   Widget _buildFeatureRow() {
     final features = [
-      _FeatureInfo('SMS', protection!.smsProtection, Icons.sms),
-      _FeatureInfo('Web', protection!.webProtection, Icons.language),
-      _FeatureInfo('App', protection!.appProtection, Icons.apps),
-      _FeatureInfo('Network', protection!.networkProtection, Icons.wifi),
-      _FeatureInfo('VPN', protection!.vpnProtection, Icons.vpn_key),
+      _FeatureInfo('SMS', protection!.smsProtection, AppIcons.chatDots),
+      _FeatureInfo('Web', protection!.webProtection, AppIcons.globus),
+      _FeatureInfo('App', protection!.appProtection, AppIcons.smartphone),
+      _FeatureInfo('Network', protection!.networkProtection, AppIcons.wifi),
+      _FeatureInfo('VPN', protection!.vpnProtection, AppIcons.key),
     ];
 
     return Row(
@@ -164,7 +165,7 @@ class _ProtectionScoreCircle extends StatelessWidget {
   final double score;
   final String grade;
   final Color color;
-  final IconData icon;
+  final String icon;
 
   const _ProtectionScoreCircle({
     required this.score,
@@ -207,7 +208,7 @@ class _ProtectionScoreCircle extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 32, color: color),
+              DuotoneIcon(icon, size: 32, color: color),
               const SizedBox(height: 4),
               Text(
                 grade,
@@ -236,7 +237,7 @@ class _ProtectionScoreCircle extends StatelessWidget {
 class _FeatureInfo {
   final String name;
   final FeatureStatus status;
-  final IconData icon;
+  final String icon;
 
   _FeatureInfo(this.name, this.status, this.icon);
 }
@@ -272,7 +273,7 @@ class _FeatureStatusChip extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: color.withOpacity(0.5)),
           ),
-          child: Icon(
+          child: DuotoneIcon(
             feature.icon,
             size: 20,
             color: color,
@@ -307,20 +308,20 @@ class ProtectionStatusIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color color;
-    IconData icon;
+    String icon;
 
     if (!isProtected) {
       color = Colors.red;
-      icon = Icons.shield_outlined;
+      icon = AppIcons.shield;
     } else if (score >= 80) {
       color = Colors.green;
-      icon = Icons.verified_user;
+      icon = AppIcons.shieldCheck;
     } else if (score >= 50) {
       color = Colors.orange;
-      icon = Icons.shield;
+      icon = AppIcons.shield;
     } else {
       color = Colors.red;
-      icon = Icons.warning;
+      icon = AppIcons.dangerTriangle;
     }
 
     return InkWell(
@@ -336,7 +337,7 @@ class ProtectionStatusIndicator extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
+            DuotoneIcon(icon, size: 16, color: color),
             const SizedBox(width: 6),
             Text(
               '${score.round()}%',
@@ -403,8 +404,8 @@ class DeviceHealthCard extends StatelessWidget {
                 : Colors.orange.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            Icons.phone_android,
+          child: DuotoneIcon(
+            AppIcons.smartphone,
             color: (health?.isHealthy ?? true) ? Colors.green : Colors.orange,
             size: 20,
           ),
@@ -463,7 +464,7 @@ class DeviceHealthCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.info_outline,
+                    const DuotoneIcon(AppIcons.infoCircle,
                         color: Colors.orange, size: 16),
                     const SizedBox(width: 8),
                     Text(
@@ -501,8 +502,8 @@ class DeviceHealthCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(
-            passed ? Icons.check_circle : Icons.cancel,
+          DuotoneIcon(
+            passed ? AppIcons.checkCircle : AppIcons.closeCircle,
             size: 18,
             color: passed ? Colors.green : Colors.red,
           ),
@@ -525,7 +526,7 @@ class DeviceHealthCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.help_outline, size: 40, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.questionCircle, size: 40, color: Colors.grey[600]),
             const SizedBox(height: 8),
             Text(
               'Health status unavailable',

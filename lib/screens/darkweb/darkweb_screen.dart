@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/darkweb_provider.dart';
 import '../../widgets/darkweb/darkweb_widgets.dart';
@@ -42,7 +43,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
         showBackButton: true,
         actions: [
           GlassAppBarAction(
-            icon: Icons.refresh,
+            svgIcon: 'refresh',
             onTap: () {
               context.read<DarkWebProvider>().refreshAssets();
             },
@@ -53,7 +54,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
         onPressed: () => _showAddAssetSheet(context),
         backgroundColor: GlassTheme.primaryAccent,
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.add),
+        icon: const DuotoneIcon('add_circle', size: 20),
         label: const Text('Add Asset'),
       ),
       body: Column(
@@ -72,10 +73,10 @@ class _DarkWebScreenState extends State<DarkWebScreen>
                   unselectedLabelColor: Colors.white54,
                   isScrollable: true,
                   tabs: const [
-                    Tab(icon: Icon(Icons.email), text: 'Email'),
-                    Tab(icon: Icon(Icons.password), text: 'Password'),
-                    Tab(icon: Icon(Icons.notifications), text: 'Alerts'),
-                    Tab(icon: Icon(Icons.bar_chart), text: 'Stats'),
+                    Tab(icon: DuotoneIcon('letter', size: 20), text: 'Email'),
+                    Tab(icon: DuotoneIcon('key', size: 20), text: 'Password'),
+                    Tab(icon: DuotoneIcon('bell', size: 20), text: 'Alerts'),
+                    Tab(icon: DuotoneIcon('chart', size: 20), text: 'Stats'),
                   ],
                 ),
               ),
@@ -169,7 +170,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
               TextButton.icon(
                 onPressed: () => _showAddAssetSheet(context,
                     preselectedType: AssetType.email),
-                icon: const Icon(Icons.add, size: 18),
+                icon: const DuotoneIcon('add_circle', size: 18),
                 label: const Text('Add'),
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF00D9FF),
@@ -228,7 +229,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.security, color: Color(0xFF00D9FF)),
+                    const DuotoneIcon('shield_check', size: 24, color: Color(0xFF00D9FF)),
                     const SizedBox(width: 12),
                     const Text(
                       'How It Works',
@@ -301,8 +302,8 @@ class _DarkWebScreenState extends State<DarkWebScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.notifications_none,
+            DuotoneIcon(
+              'bell',
               size: 64,
               color: Colors.white.withAlpha(31),
             ),
@@ -401,8 +402,8 @@ class _DarkWebScreenState extends State<DarkWebScreen>
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.add_circle_outline,
+                    DuotoneIcon(
+                      'add_circle',
                       size: 48,
                       color: Colors.grey.withAlpha(77),
                     ),
@@ -557,8 +558,10 @@ class _DarkWebScreenState extends State<DarkWebScreen>
                 decoration: InputDecoration(
                   hintText: _getHintText(selectedType),
                   hintStyle: TextStyle(color: Colors.grey[600]),
-                  prefixIcon:
-                      Icon(_getAssetIcon(selectedType), color: Colors.grey),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: DuotoneIcon(_getAssetIcon(selectedType), size: 24, color: Colors.grey),
+                  ),
                   filled: true,
                   fillColor: const Color(0xFF2A2B40),
                   border: OutlineInputBorder(
@@ -616,18 +619,18 @@ class _DarkWebScreenState extends State<DarkWebScreen>
     }
   }
 
-  IconData _getAssetIcon(AssetType type) {
+  String _getAssetIcon(AssetType type) {
     switch (type) {
       case AssetType.email:
-        return Icons.email;
+        return 'letter';
       case AssetType.phone:
-        return Icons.phone;
+        return 'smartphone';
       case AssetType.domain:
-        return Icons.language;
+        return 'global';
       case AssetType.username:
-        return Icons.person;
+        return 'user';
       case AssetType.password:
-        return Icons.password;
+        return 'key';
     }
   }
 
@@ -716,25 +719,25 @@ class _DarkWebScreenState extends State<DarkWebScreen>
                 _buildDetailRow(
                   'Breach Date',
                   '${breach.breachDate!.year}-${breach.breachDate!.month.toString().padLeft(2, '0')}-${breach.breachDate!.day.toString().padLeft(2, '0')}',
-                  Icons.calendar_today,
+                  'calendar',
                 ),
               if (breach.pwnCount != null)
                 _buildDetailRow(
                   'Accounts Affected',
                   _formatNumber(breach.pwnCount!),
-                  Icons.people,
+                  'users_group_two_rounded',
                 ),
               if (breach.isVerified)
                 _buildDetailRow(
                   'Status',
                   'Verified Breach',
-                  Icons.verified,
+                  'verified_check',
                 ),
               if (breach.isSensitive)
                 _buildDetailRow(
                   'Sensitivity',
                   'Contains Sensitive Data',
-                  Icons.warning_amber,
+                  'danger_triangle',
                   color: Colors.orange,
                 ),
               // Description
@@ -791,7 +794,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.lightbulb, color: Colors.blue, size: 20),
+                        DuotoneIcon('lightbulb_bolt', color: Colors.blue, size: 20),
                         SizedBox(width: 8),
                         Text(
                           'Recommended Actions',
@@ -826,13 +829,13 @@ class _DarkWebScreenState extends State<DarkWebScreen>
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon,
+  Widget _buildDetailRow(String label, String value, String icon,
       {Color? color}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color ?? Colors.grey[500]),
+          DuotoneIcon(icon, size: 20, color: color ?? Colors.grey[500]),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,7 +868,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle, size: 16, color: Colors.blue),
+          const DuotoneIcon('check_circle', size: 16, color: Colors.blue),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -922,7 +925,7 @@ class _DarkWebScreenState extends State<DarkWebScreen>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber, color: Colors.red),
+                  const DuotoneIcon('danger_triangle', color: Colors.red, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

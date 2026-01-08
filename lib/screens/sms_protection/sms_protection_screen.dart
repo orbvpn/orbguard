@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/sms_provider.dart';
 import '../../widgets/sms/sms_widgets.dart';
@@ -106,7 +107,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.security, size: 18),
+                  : const DuotoneIcon('shield_check', size: 18),
               label: Text(
                 _provider.isAnalyzing
                     ? 'Scanning...'
@@ -114,7 +115,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               ),
             ),
           GlassAppBarAction(
-            icon: Icons.block,
+            svgIcon: 'forbidden',
             onTap: () => _showBlockedSendersSheet(),
             tooltip: 'Blocked Senders',
           ),
@@ -230,8 +231,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.sms,
+              DuotoneIcon(
+                'chat_dots',
                 size: 64,
                 color: Colors.grey[700],
               ),
@@ -340,8 +341,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline,
+                  DuotoneIcon(
+                    'lightbulb',
                     color: Color(result.threatLevel.color),
                     size: 20,
                   ),
@@ -517,28 +518,28 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
           ),
           const SizedBox(height: 16),
           _StatusRow(
-            icon: Icons.sms,
+            icon: 'chat_dots',
             label: 'SMS Monitoring',
             status: 'Active',
             statusColor: Colors.green,
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            icon: Icons.security,
+            icon: 'shield_check',
             label: 'Real-time Analysis',
             status: 'Enabled',
             statusColor: Colors.green,
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            icon: Icons.cloud_sync,
+            icon: 'cloud_storage',
             label: 'Cloud Intelligence',
             status: 'Connected',
             statusColor: Colors.green,
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            icon: Icons.block,
+            icon: 'forbidden',
             label: 'Blocked Senders',
             status: '${_provider.blockedSenders.length}',
             statusColor: Colors.orange,
@@ -585,8 +586,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.verified_user,
+                    DuotoneIcon(
+                      'shield_check',
                       size: 48,
                       color: Colors.green[700],
                     ),
@@ -632,7 +633,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
 
 /// Status row widget
 class _StatusRow extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final String status;
   final Color statusColor;
@@ -648,7 +649,7 @@ class _StatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: Colors.grey[500]),
+        DuotoneIcon(icon, size: 20, color: Colors.grey[500]),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -709,10 +710,12 @@ class _ThreatListItem extends StatelessWidget {
                 color: Color(message.threatLevel.color).withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                _getThreatIcon(),
-                size: 16,
-                color: Color(message.threatLevel.color),
+              child: Center(
+                child: DuotoneIcon(
+                  _getThreatIcon(),
+                  size: 16,
+                  color: Color(message.threatLevel.color),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -745,23 +748,23 @@ class _ThreatListItem extends StatelessWidget {
     );
   }
 
-  IconData _getThreatIcon() {
+  String _getThreatIcon() {
     if (message.analysisResult?.threats.isEmpty ?? true) {
-      return Icons.warning;
+      return 'danger_triangle';
     }
 
     final threatType = message.analysisResult!.threats.first.type;
     switch (threatType) {
       case SmsThreatType.phishing:
-        return Icons.phishing;
+        return 'danger_triangle';
       case SmsThreatType.smishing:
-        return Icons.sms;
+        return 'chat_dots';
       case SmsThreatType.bankingFraud:
-        return Icons.account_balance;
+        return 'wallet';
       case SmsThreatType.packageDeliveryScam:
-        return Icons.local_shipping;
+        return 'box';
       default:
-        return Icons.warning;
+        return 'danger_triangle';
     }
   }
 }
@@ -800,7 +803,7 @@ class _BlockedSendersSheet extends StatelessWidget {
           // Title
           Row(
             children: [
-              const Icon(Icons.block, color: Colors.red),
+              const DuotoneIcon('forbidden', color: Colors.red, size: 24),
               const SizedBox(width: 10),
               const Text(
                 'Blocked Senders',
@@ -836,11 +839,10 @@ class _BlockedSendersSheet extends StatelessWidget {
             )
           else
             ...blockedSenders.map((sender) => ListTile(
-                  leading: const Icon(Icons.phone, color: Colors.grey),
+                  leading: const DuotoneIcon('smartphone', color: Colors.grey, size: 24),
                   title: Text(sender),
                   trailing: IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    color: Colors.red,
+                    icon: const DuotoneIcon('minus_circle', color: Colors.red, size: 24),
                     onPressed: () {
                       onUnblock(sender);
                       Navigator.pop(context);

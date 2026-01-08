@@ -2,9 +2,11 @@
 /// Data broker removal and personal data exposure tracking interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/digital_footprint_provider.dart';
 
@@ -48,9 +50,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
           appBar: GlassAppBar(
             title: 'Digital Footprint',
             actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: provider.isLoading ? null : () => provider.loadBrokers(),
+              GlassAppBarAction(
+                svgIcon: AppIcons.refresh,
+                onTap: provider.isLoading ? null : () => provider.loadBrokers(),
               ),
             ],
             bottom: TabBar(
@@ -116,7 +118,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             controller: _emailController,
             label: 'Email Address',
             hint: 'Enter your email',
-            icon: Icons.email,
+            svgIcon: AppIcons.letter,
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 12),
@@ -126,7 +128,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             controller: _nameController,
             label: 'Full Name (Optional)',
             hint: 'Enter your name',
-            icon: Icons.person,
+            svgIcon: AppIcons.user,
           ),
           const SizedBox(height: 12),
 
@@ -135,7 +137,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             controller: _phoneController,
             label: 'Phone Number (Optional)',
             hint: 'Enter your phone',
-            icon: Icons.phone,
+            svgIcon: AppIcons.smartphone,
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 20),
@@ -143,20 +145,27 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
           // Scan button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               onPressed: provider.isScanning ? null : () => _startScan(provider),
-              icon: provider.isScanning
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.search),
-              label: Text(provider.isScanning ? 'Scanning...' : 'Start Scan'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (provider.isScanning)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  else
+                    DuotoneIcon(AppIcons.search, size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(provider.isScanning ? 'Scanning...' : 'Start Scan'),
+                ],
               ),
             ),
           ),
@@ -282,7 +291,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
     required TextEditingController controller,
     required String label,
     required String hint,
-    required IconData icon,
+    required String svgIcon,
     TextInputType? keyboardType,
   }) {
     return Column(
@@ -302,7 +311,10 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: Icon(icon, color: Colors.white54),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DuotoneIcon(svgIcon, size: 20, color: Colors.white54),
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -318,7 +330,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
 
     if (provider.brokers.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.business,
+        svgIcon: AppIcons.enterprise,
         title: 'No Data Brokers',
         subtitle: 'Data broker information will appear here',
       );
@@ -357,7 +369,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(icon: Icons.business, color: _getCategoryColor(broker.category)),
+              GlassSvgIconBox(icon: AppIcons.enterprise, color: _getCategoryColor(broker.category)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -387,13 +399,13 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
           Row(
             children: [
               _buildBrokerInfoChip(
-                Icons.access_time,
+                AppIcons.clock,
                 '~${broker.estimatedDays} days',
                 Colors.white54,
               ),
               const SizedBox(width: 8),
               _buildBrokerInfoChip(
-                Icons.speed,
+                AppIcons.chartSquare,
                 'Difficulty: ${(broker.difficulty * 100).toInt()}%',
                 difficultyColor,
               ),
@@ -424,7 +436,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
     );
   }
 
-  Widget _buildBrokerInfoChip(IconData icon, String text, Color color) {
+  Widget _buildBrokerInfoChip(String svgIcon, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -434,7 +446,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          DuotoneIcon(svgIcon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(text, style: TextStyle(color: color, fontSize: 11)),
         ],
@@ -445,7 +457,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
   Widget _buildRequestsTab(DigitalFootprintProvider provider) {
     if (provider.requests.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.pending_actions,
+        svgIcon: AppIcons.clipboardText,
         title: 'No Removal Requests',
         subtitle: 'Your data removal requests will appear here',
       );
@@ -485,7 +497,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getStatusIcon(request.status),
             color: statusColor,
           ),
@@ -512,7 +524,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String svgIcon,
     required String title,
     required String subtitle,
   }) {
@@ -520,7 +532,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
+          DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -606,8 +618,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(
-                    icon: Icons.business,
+                  GlassSvgIconBox(
+                    icon: AppIcons.enterprise,
                     color: _getCategoryColor(broker.category),
                     size: 56,
                     iconSize: 28,
@@ -664,7 +676,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: provider.isSubmitting
                       ? null
                       : () {
@@ -672,12 +684,18 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
                           provider.requestRemoval(broker);
                           _tabController.animateTo(2);
                         },
-                  icon: const Icon(Icons.delete_forever),
-                  label: const Text('Request Data Removal'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      DuotoneIcon(AppIcons.trash, size: 20, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Text('Request Data Removal'),
+                    ],
                   ),
                 ),
               ),
@@ -718,20 +736,20 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen>
     }
   }
 
-  IconData _getStatusIcon(RemovalStatus status) {
+  String _getStatusIcon(RemovalStatus status) {
     switch (status) {
       case RemovalStatus.pending:
-        return Icons.hourglass_empty;
+        return AppIcons.clock;
       case RemovalStatus.submitted:
-        return Icons.send;
+        return AppIcons.forward;
       case RemovalStatus.inProgress:
-        return Icons.autorenew;
+        return AppIcons.refresh;
       case RemovalStatus.completed:
-        return Icons.check_circle;
+        return AppIcons.checkCircle;
       case RemovalStatus.failed:
-        return Icons.error;
+        return AppIcons.dangerCircle;
       case RemovalStatus.rejected:
-        return Icons.cancel;
+        return AppIcons.closeCircle;
     }
   }
 }

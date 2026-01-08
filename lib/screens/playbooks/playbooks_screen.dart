@@ -2,8 +2,10 @@
 /// Automated response playbooks interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class PlaybooksScreen extends StatefulWidget {
@@ -40,13 +42,15 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       appBar: GlassAppBar(
         title: 'Playbooks',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showCreatePlaybookDialog(context),
+          GlassAppBarAction(
+            svgIcon: AppIcons.addCircle,
+            onTap: () => _showCreatePlaybookDialog(context),
+            tooltip: 'Create Playbook',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadData,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadData,
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -82,7 +86,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   Widget _buildPlaybooksTab() {
     if (_playbooks.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.play_circle_outline,
+        icon: AppIcons.playCircle,
         title: 'No Playbooks',
         subtitle: 'Create automated response playbooks',
       );
@@ -129,8 +133,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.play_circle,
+              GlassSvgIconBox(
+                icon: AppIcons.playCircle,
                 color: playbook.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
               ),
               const SizedBox(width: 12),
@@ -176,7 +180,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   Widget _buildExecutionsTab() {
     if (_executions.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.history,
+        icon: AppIcons.timer,
         title: 'No Executions',
         subtitle: 'Playbook executions will appear here',
       );
@@ -205,12 +209,12 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: execution.status == 'success'
-                    ? Icons.check_circle
+                    ? AppIcons.checkCircle
                     : execution.status == 'running'
-                        ? Icons.play_circle
-                        : Icons.error,
+                        ? AppIcons.playCircle
+                        : AppIcons.dangerCircle,
                 color: statusColor,
               ),
               const SizedBox(width: 12),
@@ -232,9 +236,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildExecutionStat(Icons.timer, '${execution.duration}s'),
+              _buildExecutionStat(AppIcons.stopwatch, '${execution.duration}s'),
               const SizedBox(width: 16),
-              _buildExecutionStat(Icons.layers, '${execution.stepsCompleted}/${execution.totalSteps} steps'),
+              _buildExecutionStat(AppIcons.structure, '${execution.stepsCompleted}/${execution.totalSteps} steps'),
               const Spacer(),
               Text(
                 _formatTime(execution.startedAt),
@@ -247,11 +251,11 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     );
   }
 
-  Widget _buildExecutionStat(IconData icon, String text) {
+  Widget _buildExecutionStat(String icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
       ],
@@ -259,7 +263,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -267,7 +271,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -323,17 +327,23 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
                     _executePlaybook(playbook);
                   },
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Run Now'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      DuotoneIcon(AppIcons.play, size: 20, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Text('Run Now'),
+                    ],
                   ),
                 ),
               ),
@@ -372,7 +382,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               ],
             ),
           ),
-          Icon(_getActionIcon(step.action), size: 20, color: Colors.white54),
+          DuotoneIcon(_getActionIcon(step.action), size: 20, color: Colors.white54),
         ],
       ),
     );
@@ -444,20 +454,20 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     });
   }
 
-  IconData _getActionIcon(String action) {
+  String _getActionIcon(String action) {
     switch (action.toLowerCase()) {
       case 'notify':
-        return Icons.notifications;
+        return AppIcons.bell;
       case 'block':
-        return Icons.block;
+        return AppIcons.forbidden;
       case 'isolate':
-        return Icons.shield;
+        return AppIcons.shield;
       case 'scan':
-        return Icons.search;
+        return AppIcons.search;
       case 'log':
-        return Icons.receipt_long;
+        return AppIcons.document;
       default:
-        return Icons.play_arrow;
+        return AppIcons.play;
     }
   }
 

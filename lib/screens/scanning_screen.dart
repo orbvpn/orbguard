@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../presentation/widgets/duotone_icon.dart';
 
 /// Result object from scanning screen containing all scan data
 class ScanResult {
@@ -48,37 +49,37 @@ class _ScanningScreenState extends State<ScanningScreen>
   final List<ScanPhase> _phases = [
     ScanPhase(
       name: 'System Analysis',
-      icon: Icons.memory,
+      svgIcon: 'cpu',
       description: 'Checking system integrity',
       activities: ['Analyzing boot sequence', 'Checking system partitions', 'Verifying kernel modules', 'Scanning system apps'],
     ),
     ScanPhase(
       name: 'Network Security',
-      icon: Icons.wifi_tethering,
+      svgIcon: 'wi_fi_router',
       description: 'Monitoring network connections',
       activities: ['Checking active connections', 'Analyzing DNS queries', 'Scanning open ports', 'Detecting suspicious traffic'],
     ),
     ScanPhase(
       name: 'App Inspection',
-      icon: Icons.apps,
+      svgIcon: 'smartphone',
       description: 'Scanning installed applications',
       activities: ['Analyzing app permissions', 'Checking app signatures', 'Scanning for malware patterns', 'Verifying app sources'],
     ),
     ScanPhase(
       name: 'File System',
-      icon: Icons.folder_open,
+      svgIcon: 'folder',
       description: 'Scanning storage for threats',
       activities: ['Scanning downloads folder', 'Checking hidden files', 'Analyzing file signatures', 'Detecting suspicious files'],
     ),
     ScanPhase(
       name: 'Process Monitor',
-      icon: Icons.account_tree,
+      svgIcon: 'database',
       description: 'Analyzing running processes',
       activities: ['Checking background services', 'Analyzing process memory', 'Detecting injection attacks', 'Monitoring system calls'],
     ),
     ScanPhase(
       name: 'Threat Intelligence',
-      icon: Icons.cloud_sync,
+      svgIcon: 'radar',
       description: 'Matching against threat database',
       activities: ['Querying threat database', 'Checking known signatures', 'Analyzing behavioral patterns', 'Correlating indicators'],
     ),
@@ -233,7 +234,7 @@ class _ScanningScreenState extends State<ScanningScreen>
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white54),
+                    icon: const DuotoneIcon('close_circle', size: 24, color: Colors.white54),
                     onPressed: () => Navigator.pop(context, ScanResult(
                       threats: [],
                       itemsScanned: 0,
@@ -359,8 +360,8 @@ class _ScanningScreenState extends State<ScanningScreen>
                     ],
                   ),
                   child: Center(
-                    child: Icon(
-                      _scanComplete ? Icons.check : Icons.shield,
+                    child: DuotoneIcon(
+                      _scanComplete ? 'check_circle' : 'shield_check',
                       size: 60,
                       color: _scanComplete ? Colors.green : Colors.cyan,
                     ),
@@ -439,8 +440,8 @@ class _ScanningScreenState extends State<ScanningScreen>
                     width: 2,
                   ),
                 ),
-                child: Icon(
-                  isComplete ? Icons.check : _phases[index].icon,
+                child: DuotoneIcon(
+                  isComplete ? 'check_circle' : _phases[index].svgIcon,
                   size: 20,
                   color: isComplete
                       ? Colors.green
@@ -481,7 +482,7 @@ class _ScanningScreenState extends State<ScanningScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 20),
+            const DuotoneIcon('check_circle', size: 20, color: Colors.green),
             const SizedBox(width: 8),
             Text(
               _threats.isEmpty ? 'No threats detected' : '${_threats.length} threats found',
@@ -526,13 +527,13 @@ class _ScanningScreenState extends State<ScanningScreen>
 
 class ScanPhase {
   final String name;
-  final IconData icon;
+  final String svgIcon;
   final String description;
   final List<String> activities;
 
   ScanPhase({
     required this.name,
-    required this.icon,
+    required this.svgIcon,
     required this.description,
     required this.activities,
   });

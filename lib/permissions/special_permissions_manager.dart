@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
+import '../presentation/widgets/duotone_icon.dart';
 
 class SpecialPermissionsManager {
   static const platform = MethodChannel('com.orb.guard/system');
@@ -129,7 +130,7 @@ class SpecialPermissionsManager {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.security, color: Color(0xFF00D9FF)),
+            const DuotoneIcon(AppIcons.shieldCheck, color: Color(0xFF00D9FF)),
             const SizedBox(width: 12),
             Expanded(child: Text(title)),
           ],
@@ -164,7 +165,7 @@ class SpecialPermissionsManager {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, size: 20, color: Colors.blue),
+                    DuotoneIcon(AppIcons.infoCircle, size: 20, color: Colors.blue),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -251,19 +252,19 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Card(
-                  color: Color(0xFF1D1E33),
+                Card(
+                  color: const Color(0xFF1D1E33),
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.security,
+                            const DuotoneIcon(AppIcons.shieldCheck,
                                 color: Color(0xFF00D9FF), size: 32),
-                            SizedBox(width: 12),
-                            Expanded(
+                            const SizedBox(width: 12),
+                            const Expanded(
                               child: Text(
                                 'Enhanced Threat Detection',
                                 style: TextStyle(
@@ -274,8 +275,8 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 12),
-                        Text(
+                        const SizedBox(height: 12),
+                        const Text(
                           'For comprehensive spyware detection, OrbGuard needs additional permissions to analyze behavioral patterns and detect malicious accessibility services.',
                           style: TextStyle(fontSize: 14),
                         ),
@@ -290,7 +291,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                   type: SpecialPermissionType.usageStats,
                   title: 'Usage Access',
                   description: 'Monitor app behavior and detect anomalies',
-                  icon: Icons.analytics,
+                  icon: AppIcons.chartSquare,
                   isGranted: widget.permissionManager.hasUsageStats,
                   benefits: [
                     'Detect background spyware activity',
@@ -307,7 +308,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                   type: SpecialPermissionType.accessibility,
                   title: 'Accessibility Detection',
                   description: 'Scan for malicious accessibility services',
-                  icon: Icons.accessibility,
+                  icon: AppIcons.user,
                   isGranted: widget.permissionManager.hasAccessibility,
                   benefits: [
                     'Detect keylogger attempts',
@@ -323,7 +324,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                 if (!widget.permissionManager.hasAllSpecialPermissions) ...[
                   ElevatedButton.icon(
                     onPressed: _requestAllPermissions,
-                    icon: const Icon(Icons.check_circle),
+                    icon: const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
                     label: const Text('Grant All Permissions'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00D9FF),
@@ -353,15 +354,15 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.green.withOpacity(0.3)),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.privacy_tip,
+                          const DuotoneIcon(AppIcons.privacy,
                               color: Colors.green, size: 20),
-                          SizedBox(width: 8),
-                          Text(
+                          const SizedBox(width: 8),
+                          const Text(
                             'Privacy First',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
@@ -370,8 +371,8 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 8),
+                      const Text(
                         '• All analysis happens on your device\n'
                         '• No personal data is collected\n'
                         '• No data sent to external servers\n'
@@ -390,7 +391,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
     required SpecialPermissionType type,
     required String title,
     required String description,
-    required IconData icon,
+    required String icon,
     required bool isGranted,
     required List<String> benefits,
   }) {
@@ -411,7 +412,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                         : Colors.orange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
+                  child: DuotoneIcon(
                     icon,
                     color: isGranted ? Colors.green : Colors.orange,
                     size: 32,
@@ -440,8 +441,8 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                     ],
                   ),
                 ),
-                Icon(
-                  isGranted ? Icons.check_circle : Icons.warning,
+                DuotoneIcon(
+                  isGranted ? AppIcons.checkCircle : AppIcons.dangerTriangle,
                   color: isGranted ? Colors.green : Colors.orange,
                   size: 28,
                 ),
@@ -462,8 +463,8 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.check,
+                    const DuotoneIcon(
+                      AppIcons.checkCircle,
                       size: 16,
                       color: Color(0xFF00D9FF),
                     ),
@@ -482,7 +483,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 onPressed: () => _requestPermission(type),
-                icon: const Icon(Icons.settings),
+                icon: const DuotoneIcon(AppIcons.settings, color: Colors.white),
                 label: const Text('Grant Permission'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 40),

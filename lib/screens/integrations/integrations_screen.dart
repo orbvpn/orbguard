@@ -2,8 +2,11 @@
 /// Third-party integrations management interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class IntegrationsScreen extends StatefulWidget {
@@ -38,9 +41,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       appBar: GlassAppBar(
         title: 'Integrations',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadIntegrations,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadIntegrations,
           ),
         ],
       ),
@@ -101,7 +104,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
-              child: Icon(
+              child: DuotoneIcon(
                 _getIntegrationIcon(integration.type),
                 color: integration.color,
                 size: 28,
@@ -175,7 +178,11 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
-                      child: Icon(_getIntegrationIcon(integration.type), color: integration.color, size: 32),
+                      child: DuotoneIcon(
+                        _getIntegrationIcon(integration.type),
+                        color: integration.color,
+                        size: 32,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -208,30 +215,42 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: integration.isConnected
-                    ? OutlinedButton.icon(
+                    ? OutlinedButton(
                         onPressed: () {
                           setState(() => integration.isConnected = false);
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.link_off),
-                        label: const Text('Disconnect'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: GlassTheme.errorColor,
                           side: const BorderSide(color: GlassTheme.errorColor),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: GlassTheme.errorColor),
+                            const SizedBox(width: 8),
+                            const Text('Disconnect'),
+                          ],
+                        ),
                       )
-                    : ElevatedButton.icon(
+                    : ElevatedButton(
                         onPressed: () {
                           _connectIntegration(integration);
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.link),
-                        label: const Text('Connect'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: GlassTheme.primaryAccent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.white),
+                            const SizedBox(width: 8),
+                            const Text('Connect'),
+                          ],
                         ),
                       ),
               ),
@@ -247,7 +266,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, size: 18, color: GlassTheme.successColor),
+          DuotoneIcon(AppIcons.checkCircle, size: 18, color: GlassTheme.successColor),
           const SizedBox(width: 12),
           Expanded(
             child: Text(feature, style: TextStyle(color: Colors.white.withAlpha(204))),
@@ -267,22 +286,22 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     );
   }
 
-  IconData _getIntegrationIcon(String type) {
+  String _getIntegrationIcon(String type) {
     switch (type.toLowerCase()) {
       case 'messaging':
-        return Icons.message;
+        return AppIcons.chatLine;
       case 'siem':
-        return Icons.security;
+        return AppIcons.shieldCheck;
       case 'ticketing':
-        return Icons.confirmation_number;
+        return AppIcons.ticket;
       case 'cloud':
-        return Icons.cloud;
+        return AppIcons.cloudStorage;
       case 'email':
-        return Icons.email;
+        return AppIcons.letter;
       case 'analytics':
-        return Icons.analytics;
+        return AppIcons.chartSquare;
       default:
-        return Icons.extension;
+        return AppIcons.integrations;
     }
   }
 

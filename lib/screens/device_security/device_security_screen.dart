@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/device_security_provider.dart';
 
@@ -44,7 +45,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             actions: [
               if (provider.status.isLost || provider.status.isStolen)
                 IconButton(
-                  icon: const Icon(Icons.check_circle, color: GlassTheme.successColor),
+                  icon: DuotoneIcon('check_circle', size: 24, color: GlassTheme.successColor),
                   tooltip: 'Mark as Recovered',
                   onPressed: () => provider.markAsRecovered(),
                 ),
@@ -99,12 +100,12 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               children: [
                 Row(
                   children: [
-                    GlassIconBox(
+                    GlassSvgIconBox(
                       icon: status.isStolen
-                          ? Icons.report
+                          ? 'danger_circle'
                           : status.isLost
-                              ? Icons.search
-                              : Icons.check_circle,
+                              ? 'object_scan'
+                              : 'check_circle',
                       color: statusColor,
                       size: 56,
                       iconSize: 28,
@@ -143,7 +144,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => _confirmMarkLost(context, provider),
-                          icon: const Icon(Icons.search),
+                          icon: DuotoneIcon('object_scan', size: 18),
                           label: const Text('Mark Lost'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: GlassTheme.warningColor,
@@ -155,7 +156,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => _confirmMarkStolen(context, provider),
-                          icon: const Icon(Icons.report),
+                          icon: DuotoneIcon('danger_circle', size: 18),
                           label: const Text('Mark Stolen'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: GlassTheme.errorColor,
@@ -185,7 +186,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
           Row(
             children: [
               _buildActionButton(
-                icon: Icons.location_on,
+                svgIcon: 'map_point',
                 label: 'Locate',
                 color: GlassTheme.primaryAccent,
                 isLoading: provider.isLocating,
@@ -193,7 +194,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               ),
               const SizedBox(width: 12),
               _buildActionButton(
-                icon: Icons.lock,
+                svgIcon: 'lock',
                 label: 'Lock',
                 color: const Color(0xFF9C27B0),
                 isLoading: provider.isSendingCommand,
@@ -201,7 +202,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               ),
               const SizedBox(width: 12),
               _buildActionButton(
-                icon: Icons.volume_up,
+                svgIcon: 'bell',
                 label: 'Ring',
                 color: GlassTheme.warningColor,
                 isLoading: provider.isSendingCommand,
@@ -209,7 +210,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               ),
               const SizedBox(width: 12),
               _buildActionButton(
-                icon: Icons.delete_forever,
+                svgIcon: 'trash_bin_trash',
                 label: 'Wipe',
                 color: GlassTheme.errorColor,
                 isLoading: provider.isSendingCommand,
@@ -302,7 +303,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
   }
 
   Widget _buildActionButton({
-    required IconData icon,
+    required String svgIcon,
     required String label,
     required Color color,
     required VoidCallback onPressed,
@@ -321,7 +322,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
                 child: CircularProgressIndicator(strokeWidth: 2, color: color),
               )
             else
-              Icon(icon, color: color, size: 28),
+              DuotoneIcon(svgIcon, color: color, size: 28),
             const SizedBox(height: 8),
             Text(
               label,
@@ -346,7 +347,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(icon: Icons.bug_report, color: severityColor),
+              GlassSvgIconBox(icon: 'bug', color: severityColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -375,8 +376,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(
-                  vuln.isPatched ? Icons.check_circle : Icons.update,
+                DuotoneIcon(
+                  vuln.isPatched ? 'check_circle' : 'refresh',
                   size: 14,
                   color: vuln.isPatched ? GlassTheme.successColor : GlassTheme.warningColor,
                 ),
@@ -411,7 +412,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
           const SizedBox(height: 12),
 
           _buildSettingsTile(
-            icon: Icons.location_on,
+            svgIcon: 'map_point',
             title: 'Remote Locate',
             subtitle: 'Allow remote location tracking',
             value: settings.locateEnabled,
@@ -419,7 +420,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             color: GlassTheme.primaryAccent,
           ),
           _buildSettingsTile(
-            icon: Icons.lock,
+            svgIcon: 'lock',
             title: 'Remote Lock',
             subtitle: 'Allow remote device locking',
             value: settings.lockEnabled,
@@ -427,7 +428,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             color: const Color(0xFF9C27B0),
           ),
           _buildSettingsTile(
-            icon: Icons.volume_up,
+            svgIcon: 'bell',
             title: 'Remote Ring',
             subtitle: 'Allow remote sound alarm',
             value: settings.ringEnabled,
@@ -435,7 +436,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             color: GlassTheme.warningColor,
           ),
           _buildSettingsTile(
-            icon: Icons.delete_forever,
+            svgIcon: 'trash_bin_trash',
             title: 'Remote Wipe',
             subtitle: 'Allow remote data erasure (dangerous)',
             value: settings.wipeEnabled,
@@ -443,7 +444,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             color: GlassTheme.errorColor,
           ),
           _buildSettingsTile(
-            icon: Icons.sim_card,
+            svgIcon: 'sim_card',
             title: 'SIM Monitoring',
             subtitle: 'Alert when SIM card is changed',
             value: settings.simMonitoringEnabled,
@@ -451,7 +452,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
             color: const Color(0xFF2196F3),
           ),
           _buildSettingsTile(
-            icon: Icons.camera_front,
+            svgIcon: 'object_scan',
             title: 'Thief Selfie',
             subtitle: 'Take photo after failed unlock attempts',
             value: settings.thiefSelfieEnabled,
@@ -508,7 +509,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               tintColor: GlassTheme.errorColor,
               child: Row(
                 children: [
-                  const Icon(Icons.photo_camera, color: GlassTheme.errorColor),
+                  DuotoneIcon('camera', size: 24, color: GlassTheme.errorColor),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -530,7 +531,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
   }
 
   Widget _buildSettingsTile({
-    required IconData icon,
+    required String svgIcon,
     required String title,
     required String subtitle,
     required bool value,
@@ -540,7 +541,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: color),
+          GlassSvgIconBox(icon: svgIcon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -592,7 +593,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.location_searching),
+                  : DuotoneIcon('map_point', size: 20),
               label: Text(provider.isLocating ? 'Locating...' : 'Locate Now'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
@@ -625,8 +626,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.location_on,
+              GlassSvgIconBox(
+                icon: 'map_point',
                 color: isCurrent ? GlassTheme.primaryAccent : Colors.white54,
               ),
               const SizedBox(width: 12),
@@ -651,7 +652,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.access_time, size: 14, color: Colors.white.withAlpha(102)),
+              DuotoneIcon('clock_circle', size: 14, color: Colors.white.withAlpha(102)),
               const SizedBox(width: 4),
               Text(
                 _formatTime(location.timestamp),
@@ -659,7 +660,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
               ),
               if (location.accuracy != null) ...[
                 const SizedBox(width: 16),
-                Icon(Icons.gps_fixed, size: 14, color: Colors.white.withAlpha(102)),
+                DuotoneIcon('map_point', size: 14, color: Colors.white.withAlpha(102)),
                 const SizedBox(width: 4),
                 Text(
                   '±${location.accuracy!.toStringAsFixed(0)}m',
@@ -713,7 +714,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
 
           if (provider.simHistory.isEmpty && provider.currentSIM == null)
             _buildEmptyState(
-              icon: Icons.sim_card,
+              svgIcon: 'sim_card',
               title: 'No SIM Data',
               subtitle: 'SIM card information will appear here',
             ),
@@ -727,8 +728,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
       tintColor: sim.isTrusted ? GlassTheme.successColor : null,
       child: Row(
         children: [
-          GlassIconBox(
-            icon: Icons.sim_card,
+          GlassSvgIconBox(
+            icon: 'sim_card',
             color: sim.isTrusted
                 ? GlassTheme.successColor
                 : isCurrent
@@ -769,7 +770,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String svgIcon,
     required String title,
     required String subtitle,
   }) {
@@ -779,7 +780,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             Text(
               title,

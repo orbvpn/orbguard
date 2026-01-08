@@ -2,8 +2,10 @@
 /// Advanced threat correlation and analysis interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class CorrelationScreen extends StatefulWidget {
@@ -42,13 +44,13 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       appBar: GlassAppBar(
         title: 'Correlation Engine',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.play_arrow),
-            onPressed: _isCorrelating ? null : _runCorrelation,
+          GlassAppBarAction(
+            svgIcon: AppIcons.play,
+            onTap: _isCorrelating ? null : _runCorrelation,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadResults,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadResults,
           ),
         ],
       ),
@@ -172,7 +174,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getEngineIcon(result.engine),
                 color: _getEngineColor(result.engine),
               ),
@@ -214,9 +216,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildCorrelationStat(Icons.link, '${result.linkedEntities} entities'),
+              _buildCorrelationStat(AppIcons.urlProtection, '${result.linkedEntities} entities'),
               const SizedBox(width: 16),
-              _buildCorrelationStat(Icons.access_time, _formatTime(result.timestamp)),
+              _buildCorrelationStat(AppIcons.clock, _formatTime(result.timestamp)),
             ],
           ),
           if (result.relatedIndicators.isNotEmpty) ...[
@@ -242,11 +244,11 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     );
   }
 
-  Widget _buildCorrelationStat(IconData icon, String text) {
+  Widget _buildCorrelationStat(String icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
       ],
@@ -258,7 +260,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.hub, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(AppIcons.correlation, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           const Text(
             'No Correlations',
@@ -270,13 +272,19 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
             style: TextStyle(color: Colors.white.withAlpha(153)),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: _runCorrelation,
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Run Correlation'),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
               foregroundColor: Colors.white,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DuotoneIcon(AppIcons.play, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                const Text('Run Correlation'),
+              ],
             ),
           ),
         ],
@@ -349,7 +357,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                 ...result.relatedIndicators.map((indicator) => GlassCard(
                       child: Row(
                         children: [
-                          const GlassIconBox(icon: Icons.warning, color: GlassTheme.errorColor, size: 36),
+                          const GlassSvgIconBox(icon: AppIcons.dangerTriangle, color: GlassTheme.errorColor, size: 36),
                           const SizedBox(width: 12),
                           Text(indicator, style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
                         ],
@@ -391,18 +399,18 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     }
   }
 
-  IconData _getEngineIcon(String engine) {
+  String _getEngineIcon(String engine) {
     switch (engine) {
       case 'IOC Matching':
-        return Icons.fingerprint;
+        return AppIcons.objectScan;
       case 'Behavior Analysis':
-        return Icons.psychology;
+        return AppIcons.mlAnalysis;
       case 'MITRE Mapping':
-        return Icons.map;
+        return AppIcons.mitre;
       case 'Campaign Attribution':
-        return Icons.campaign;
+        return AppIcons.campaign;
       default:
-        return Icons.hub;
+        return AppIcons.correlation;
     }
   }
 

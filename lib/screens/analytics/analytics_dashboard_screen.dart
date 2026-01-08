@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/dashboard_provider.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
@@ -41,7 +42,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             title: 'Analytics',
             actions: [
               PopupMenuButton<String>(
-                icon: const Icon(Icons.calendar_today),
+                icon: const DuotoneIcon('calendar', size: 24, color: Colors.white),
                 color: GlassTheme.gradientTop,
                 onSelected: (value) => setState(() => _selectedTimeRange = value),
                 itemBuilder: (context) => [
@@ -52,7 +53,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: const DuotoneIcon('refresh', size: 24, color: Colors.white),
                 onPressed: provider.isLoading ? null : () => provider.refreshDashboard(),
               ),
             ],
@@ -89,7 +90,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       child: Row(
         children: [
           if (_selectedTimeRange == value)
-            const Icon(Icons.check, size: 18, color: GlassTheme.primaryAccent)
+            const DuotoneIcon('check_circle', size: 18, color: GlassTheme.primaryAccent)
           else
             const SizedBox(width: 18),
           const SizedBox(width: 8),
@@ -112,17 +113,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           // Key metrics
           Row(
             children: [
-              _buildMetricCard('Total Scans', '1,247', Icons.search, GlassTheme.primaryAccent),
+              _buildMetricCard('Total Scans', '1,247', 'magnifer', GlassTheme.primaryAccent),
               const SizedBox(width: 12),
-              _buildMetricCard('Threats Blocked', '89', Icons.block, GlassTheme.errorColor),
+              _buildMetricCard('Threats Blocked', '89', 'forbidden', GlassTheme.errorColor),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildMetricCard('URLs Checked', '3,521', Icons.link, const Color(0xFF9C27B0)),
+              _buildMetricCard('URLs Checked', '3,521', 'link', const Color(0xFF9C27B0)),
               const SizedBox(width: 12),
-              _buildMetricCard('SMS Analyzed', '245', Icons.sms, const Color(0xFF2196F3)),
+              _buildMetricCard('SMS Analyzed', '245', 'chat_dots', const Color(0xFF2196F3)),
             ],
           ),
           const SizedBox(height: 24),
@@ -153,28 +154,28 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           ),
           const SizedBox(height: 12),
           _buildActivityCard(
-            icon: Icons.block,
+            icon: 'forbidden',
             title: 'Phishing URL Blocked',
             subtitle: 'hxxps://fake-bank.com/login',
             time: '2 min ago',
             color: GlassTheme.errorColor,
           ),
           _buildActivityCard(
-            icon: Icons.sms,
+            icon: 'chat_dots',
             title: 'Smishing SMS Detected',
             subtitle: 'Suspicious message from +1234567890',
             time: '15 min ago',
             color: GlassTheme.warningColor,
           ),
           _buildActivityCard(
-            icon: Icons.qr_code,
+            icon: 'qr_code',
             title: 'Safe QR Code Scanned',
             subtitle: 'https://example.com',
             time: '1 hour ago',
             color: GlassTheme.successColor,
           ),
           _buildActivityCard(
-            icon: Icons.wifi,
+            icon: 'wi_fi_router',
             title: 'Network Scan Complete',
             subtitle: 'No threats detected',
             time: '3 hours ago',
@@ -185,7 +186,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(String label, String value, String icon, Color color) {
     return Expanded(
       child: GlassCard(
         child: Column(
@@ -193,9 +194,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           children: [
             Row(
               children: [
-                GlassIconBox(icon: icon, color: color, size: 36, iconSize: 18),
+                GlassDuotoneIconBox(icon: icon, color: color, size: 36, iconSize: 18),
                 const Spacer(),
-                Icon(Icons.trending_up, size: 16, color: GlassTheme.successColor),
+                DuotoneIcon('graph_up', size: 16, color: GlassTheme.successColor),
               ],
             ),
             const SizedBox(height: 12),
@@ -242,7 +243,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   }
 
   Widget _buildActivityCard({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     required String time,
@@ -251,7 +252,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: color),
+          GlassDuotoneIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -286,7 +287,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               children: [
                 Row(
                   children: [
-                    const GlassIconBox(icon: Icons.warning, color: GlassTheme.errorColor, size: 56, iconSize: 28),
+                    const GlassDuotoneIconBox(icon: 'danger_triangle', color: GlassTheme.errorColor, size: 56, iconSize: 28),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -316,11 +317,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard('Phishing URLs', 35, Icons.link, GlassTheme.errorColor),
-          _buildThreatTypeCard('Malware Apps', 22, Icons.apps, const Color(0xFFFF5722)),
-          _buildThreatTypeCard('Smishing SMS', 18, Icons.sms, GlassTheme.warningColor),
-          _buildThreatTypeCard('Scam Calls', 8, Icons.phone, const Color(0xFF9C27B0)),
-          _buildThreatTypeCard('Rogue Networks', 6, Icons.wifi, const Color(0xFF2196F3)),
+          _buildThreatTypeCard('Phishing URLs', 35, 'link', GlassTheme.errorColor),
+          _buildThreatTypeCard('Malware Apps', 22, 'smartphone', const Color(0xFFFF5722)),
+          _buildThreatTypeCard('Smishing SMS', 18, 'chat_dots', GlassTheme.warningColor),
+          _buildThreatTypeCard('Scam Calls', 8, 'smartphone', const Color(0xFF9C27B0)),
+          _buildThreatTypeCard('Rogue Networks', 6, 'wi_fi_router', const Color(0xFF2196F3)),
           const SizedBox(height: 24),
 
           // Top threat sources
@@ -338,11 +339,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildThreatTypeCard(String type, int count, IconData icon, Color color) {
+  Widget _buildThreatTypeCard(String type, int count, String icon, Color color) {
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: color),
+          GlassDuotoneIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Text(type, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
@@ -399,12 +400,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildProtectionModuleCard('URL Protection', true, '3,521 URLs checked', Icons.link),
-          _buildProtectionModuleCard('SMS Protection', true, '245 messages scanned', Icons.sms),
-          _buildProtectionModuleCard('App Security', true, '48 apps analyzed', Icons.apps),
-          _buildProtectionModuleCard('Network Security', true, '12 networks audited', Icons.wifi),
-          _buildProtectionModuleCard('Dark Web Monitor', true, '2 emails monitored', Icons.dark_mode),
-          _buildProtectionModuleCard('Privacy Protection', false, 'Enable for full protection', Icons.privacy_tip),
+          _buildProtectionModuleCard('URL Protection', true, '3,521 URLs checked', 'link'),
+          _buildProtectionModuleCard('SMS Protection', true, '245 messages scanned', 'chat_dots'),
+          _buildProtectionModuleCard('App Security', true, '48 apps analyzed', 'smartphone'),
+          _buildProtectionModuleCard('Network Security', true, '12 networks audited', 'wi_fi_router'),
+          _buildProtectionModuleCard('Dark Web Monitor', true, '2 emails monitored', 'incognito'),
+          _buildProtectionModuleCard('Privacy Protection', false, 'Enable for full protection', 'eye_closed'),
           const SizedBox(height: 24),
 
           // Quick stats
@@ -498,11 +499,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildProtectionModuleCard(String name, bool enabled, String status, IconData icon) {
+  Widget _buildProtectionModuleCard(String name, bool enabled, String status, String icon) {
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
+          GlassDuotoneIconBox(
             icon: icon,
             color: enabled ? GlassTheme.successColor : Colors.grey,
           ),
@@ -519,9 +520,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               ],
             ),
           ),
-          Icon(
-            enabled ? Icons.check_circle : Icons.cancel,
+          DuotoneIcon(
+            enabled ? 'check_circle' : 'close_circle',
             color: enabled ? GlassTheme.successColor : Colors.grey,
+            size: 24,
           ),
         ],
       ),

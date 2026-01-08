@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../services/realtime/websocket_service.dart';
 import '../../services/realtime/connection_manager.dart';
 import '../../presentation/widgets/glass_container.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 
 /// Connection status indicator for app bar or status bar
 class ConnectionIndicator extends StatelessWidget {
@@ -50,7 +51,7 @@ class ConnectionIndicator extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 1.5),
               )
             else
-              Icon(_getIcon(), size: 14, color: _getColor()),
+              DuotoneIcon(_getIcon(), size: 14, color: _getColor()),
           ],
         ),
       ),
@@ -144,20 +145,6 @@ class ConnectionIndicator extends StatelessWidget {
     }
   }
 
-  IconData _getIcon() {
-    switch (state) {
-      case WebSocketState.connected:
-        return Icons.cloud_done;
-      case WebSocketState.connecting:
-      case WebSocketState.reconnecting:
-        return Icons.cloud_sync;
-      case WebSocketState.error:
-        return Icons.cloud_off;
-      case WebSocketState.disconnected:
-        return Icons.cloud_outlined;
-    }
-  }
-
   String _getText() {
     switch (state) {
       case WebSocketState.connected:
@@ -170,6 +157,20 @@ class ConnectionIndicator extends StatelessWidget {
         return 'Error';
       case WebSocketState.disconnected:
         return 'Disconnected';
+    }
+  }
+
+  String _getIcon() {
+    switch (state) {
+      case WebSocketState.connected:
+        return AppIcons.cloudStorage;
+      case WebSocketState.connecting:
+      case WebSocketState.reconnecting:
+        return AppIcons.refresh;
+      case WebSocketState.error:
+        return AppIcons.dangerCircle;
+      case WebSocketState.disconnected:
+        return AppIcons.cloudStorage;
     }
   }
 }
@@ -265,7 +266,7 @@ class ConnectionHealthCard extends StatelessWidget {
             color: _getStateColor().withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
+          child: DuotoneIcon(
             _getStateIcon(),
             color: _getStateColor(),
             size: 24,
@@ -370,7 +371,7 @@ class ConnectionHealthCard extends StatelessWidget {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: health.hasNetwork ? onConnect : null,
-              icon: const Icon(Icons.link, size: 18),
+              icon: DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.black),
               label: const Text('Connect'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
@@ -383,7 +384,7 @@ class ConnectionHealthCard extends StatelessWidget {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: onDisconnect,
-              icon: const Icon(Icons.link_off, size: 18),
+              icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.orange),
               label: const Text('Disconnect'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.orange,
@@ -410,17 +411,17 @@ class ConnectionHealthCard extends StatelessWidget {
     }
   }
 
-  IconData _getStateIcon() {
+  String _getStateIcon() {
     switch (health.state) {
       case WebSocketState.connected:
-        return Icons.cloud_done;
+        return AppIcons.cloudStorage;
       case WebSocketState.connecting:
       case WebSocketState.reconnecting:
-        return Icons.cloud_sync;
+        return AppIcons.refresh;
       case WebSocketState.error:
-        return Icons.cloud_off;
+        return AppIcons.dangerCircle;
       case WebSocketState.disconnected:
-        return Icons.cloud_outlined;
+        return AppIcons.cloudStorage;
     }
   }
 
@@ -450,7 +451,7 @@ class ConnectionStatusAction extends StatelessWidget {
       onPressed: onTap,
       icon: Stack(
         children: [
-          Icon(
+          DuotoneIcon(
             _getIcon(),
             color: _getColor(),
           ),
@@ -487,17 +488,17 @@ class ConnectionStatusAction extends StatelessWidget {
     }
   }
 
-  IconData _getIcon() {
+  String _getIcon() {
     switch (state) {
       case WebSocketState.connected:
-        return Icons.cloud_done;
+        return AppIcons.cloudStorage;
       case WebSocketState.connecting:
       case WebSocketState.reconnecting:
-        return Icons.cloud_sync;
+        return AppIcons.refresh;
       case WebSocketState.error:
-        return Icons.cloud_off;
+        return AppIcons.dangerCircle;
       case WebSocketState.disconnected:
-        return Icons.cloud_outlined;
+        return AppIcons.cloudStorage;
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/threat_hunting_provider.dart';
 import '../../services/security/threat_hunting_service.dart';
@@ -57,7 +58,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                 )
               else
                 IconButton(
-                  icon: const Icon(Icons.play_arrow),
+                  icon: const DuotoneIcon('play', size: 24),
                   tooltip: 'Run All Critical Hunts',
                   onPressed: () => provider.executeAllCriticalHunts(),
                 ),
@@ -242,7 +243,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   Widget _buildHuntsTab(ThreatHuntingProvider provider) {
     if (provider.availableHunts.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.search,
+        icon: 'magnifer',
         title: 'No Hunts Available',
         subtitle: 'Threat hunts are loading...',
       );
@@ -318,9 +319,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                       color: typeColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      _getHuntTypeIcon(hunt.type),
-                      color: typeColor,
+                    child: Center(
+                      child: DuotoneIcon(
+                        _getHuntTypeIcon(hunt.type),
+                        color: typeColor,
+                        size: 24,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -438,7 +442,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
 
     if (allFindings.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.check_circle,
+        icon: 'check_circle',
         title: 'No Findings',
         subtitle: 'Run threat hunts to detect security issues',
         color: GlassTheme.successColor,
@@ -477,9 +481,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                     color: severityColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    _getFindingIcon(finding.type),
-                    color: severityColor,
+                  child: Center(
+                    child: DuotoneIcon(
+                      _getFindingIcon(finding.type),
+                      color: severityColor,
+                      size: 22,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -537,8 +544,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.code,
+                  const DuotoneIcon(
+                    'code',
                     size: 14,
                     color: Colors.white38,
                   ),
@@ -587,8 +594,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.arrow_right,
+                        const DuotoneIcon(
+                          'arrow_right',
                           size: 16,
                           color: GlassTheme.primaryAccent,
                         ),
@@ -614,7 +621,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   Widget _buildCasesTab(ThreatHuntingProvider provider) {
     if (provider.cases.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.folder_open,
+        icon: 'folder_open',
         title: 'No Investigation Cases',
         subtitle: 'Create cases from findings to track investigations',
       );
@@ -649,9 +656,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                     color: statusColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    Icons.folder,
-                    color: statusColor,
+                  child: Center(
+                    child: DuotoneIcon(
+                      'folder',
+                      color: statusColor,
+                      size: 22,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -707,8 +717,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(
-                  Icons.access_time,
+                DuotoneIcon(
+                  'clock_circle',
                   size: 14,
                   color: Colors.white.withOpacity(0.5),
                 ),
@@ -739,7 +749,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
 
     if (mitreMap.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.grid_view,
+        icon: 'structure',
         title: 'MITRE ATT&CK Coverage',
         subtitle: 'Attack techniques covered by threat hunts',
       );
@@ -838,7 +848,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
@@ -849,7 +859,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -871,45 +881,45 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
     );
   }
 
-  IconData _getHuntTypeIcon(HuntType type) {
+  String _getHuntTypeIcon(HuntType type) {
     switch (type) {
       case HuntType.iocSweep:
-        return Icons.search;
+        return 'magnifer';
       case HuntType.behaviorAnalysis:
-        return Icons.psychology;
+        return 'cpu';
       case HuntType.anomalyDetection:
-        return Icons.trending_up;
+        return 'graph_up';
       case HuntType.attackPattern:
-        return Icons.pattern;
+        return 'structure';
       case HuntType.dataExfiltration:
-        return Icons.upload;
+        return 'arrow_up';
       case HuntType.persistenceMechanism:
-        return Icons.repeat;
+        return 'refresh';
       case HuntType.lateralMovement:
-        return Icons.swap_horiz;
+        return 'transfer_horizontal';
       case HuntType.privilegeEscalation:
-        return Icons.arrow_upward;
+        return 'arrow_up';
     }
   }
 
-  IconData _getFindingIcon(FindingType type) {
+  String _getFindingIcon(FindingType type) {
     switch (type) {
       case FindingType.malwareIndicator:
-        return Icons.bug_report;
+        return 'bug';
       case FindingType.suspiciousApp:
-        return Icons.apps;
+        return 'smartphone';
       case FindingType.networkAnomaly:
-        return Icons.wifi;
+        return 'wi_fi_router';
       case FindingType.dataExfiltration:
-        return Icons.upload;
+        return 'arrow_up';
       case FindingType.persistenceMechanism:
-        return Icons.repeat;
+        return 'refresh';
       case FindingType.privilegeAbuse:
-        return Icons.admin_panel_settings;
+        return 'crown';
       case FindingType.configurationRisk:
-        return Icons.settings;
+        return 'settings';
       case FindingType.vulnerableComponent:
-        return Icons.warning;
+        return 'danger_triangle';
     }
   }
 
@@ -991,10 +1001,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                       color: typeColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(
-                      _getHuntTypeIcon(hunt.type),
-                      color: typeColor,
-                      size: 28,
+                    child: Center(
+                      child: DuotoneIcon(
+                        _getHuntTypeIcon(hunt.type),
+                        color: typeColor,
+                        size: 28,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1067,8 +1079,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.rule,
+                        DuotoneIcon(
+                          'clipboard_text',
                           size: 18,
                           color: Color(ThreatHuntingProvider.getSeverityColor(rule.severity)),
                         ),
@@ -1138,7 +1150,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                           Navigator.pop(context);
                           provider.executeHunt(hunt.id);
                         },
-                  icon: const Icon(Icons.play_arrow),
+                  icon: const DuotoneIcon('play', size: 18),
                   label: const Text('Run Hunt'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
@@ -1197,7 +1209,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
             children: [
               Row(
                 children: [
-                  const Icon(Icons.hub, color: GlassTheme.primaryAccent),
+                  const DuotoneIcon('structure', color: GlassTheme.primaryAccent, size: 24),
                   const SizedBox(width: 12),
                   const Text(
                     'Threat Relationship Graph',
@@ -1205,7 +1217,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.fullscreen, color: Colors.white54),
+                    icon: const DuotoneIcon('target', color: Colors.white54, size: 24),
                     onPressed: () {},
                   ),
                 ],
@@ -1241,7 +1253,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(_getNodeIcon(node.type), size: 16, color: _getNodeColor(node.type)),
+                                  DuotoneIcon(_getNodeIcon(node.type), size: 16, color: _getNodeColor(node.type)),
                                   const SizedBox(height: 2),
                                   Text(
                                     node.label,
@@ -1360,7 +1372,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
           children: [
             Row(
               children: [
-                Icon(_getNodeIcon(node.type), color: _getNodeColor(node.type), size: 32),
+                DuotoneIcon(_getNodeIcon(node.type), color: _getNodeColor(node.type), size: 32),
                 const SizedBox(width: 12),
                 Text(node.label, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               ],
@@ -1392,20 +1404,20 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
     }
   }
 
-  IconData _getNodeIcon(String type) {
+  String _getNodeIcon(String type) {
     switch (type) {
       case 'threat-actor':
-        return Icons.person;
+        return 'user';
       case 'malware':
-        return Icons.bug_report;
+        return 'bug';
       case 'attack-pattern':
-        return Icons.pattern;
+        return 'structure';
       case 'indicator':
-        return Icons.warning;
+        return 'danger_triangle';
       case 'target':
-        return Icons.business;
+        return 'server_square';
       default:
-        return Icons.circle;
+        return 'help';
     }
   }
 
@@ -1469,7 +1481,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
           onTap: () {},
           child: Row(
             children: [
-              const Icon(Icons.add_circle, color: GlassTheme.primaryAccent),
+              const DuotoneIcon('add_circle', color: GlassTheme.primaryAccent, size: 24),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
@@ -1480,7 +1492,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              const DuotoneIcon('alt_arrow_right', color: Colors.white38, size: 24),
             ],
           ),
         ),
@@ -1529,7 +1541,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.link, color: rule.isEnabled ? severityColor : Colors.grey),
+              DuotoneIcon('link', color: rule.isEnabled ? severityColor : Colors.grey, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1625,7 +1637,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   color: GlassTheme.primaryAccent.withAlpha(40),
                 ),
                 child: const Center(
-                  child: Icon(Icons.psychology, size: 40, color: GlassTheme.primaryAccent),
+                  child: const DuotoneIcon('cpu', size: 40, color: GlassTheme.primaryAccent),
                 ),
               ),
               const SizedBox(width: 20),
@@ -1639,7 +1651,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.check_circle, size: 14, color: GlassTheme.successColor),
+                        const DuotoneIcon('check_circle', size: 14, color: GlassTheme.successColor),
                         const SizedBox(width: 4),
                         const Text('Healthy', style: TextStyle(color: GlassTheme.successColor, fontSize: 12)),
                         const SizedBox(width: 16),
@@ -1705,9 +1717,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   color: (model.isActive ? GlassTheme.primaryAccent : Colors.grey).withAlpha(40),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.psychology,
-                  color: model.isActive ? GlassTheme.primaryAccent : Colors.grey,
+                child: Center(
+                  child: DuotoneIcon(
+                    'cpu',
+                    size: 24,
+                    color: model.isActive ? GlassTheme.primaryAccent : Colors.grey,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1736,7 +1751,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
               const SizedBox(width: 8),
               GlassBadge(text: model.isActive ? 'Active' : 'Inactive', color: model.isActive ? GlassTheme.successColor : Colors.grey, fontSize: 10),
               const Spacer(),
-              Icon(Icons.warning_amber, size: 14, color: GlassTheme.warningColor.withAlpha(179)),
+              DuotoneIcon('danger_triangle', size: 14, color: GlassTheme.warningColor.withAlpha(179)),
               const SizedBox(width: 4),
               Text('${model.anomaliesDetected} anomalies', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
             ],
@@ -1777,7 +1792,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                       color: GlassTheme.primaryAccent.withAlpha(40),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.psychology, color: GlassTheme.primaryAccent, size: 28),
+                    child: const DuotoneIcon('cpu', color: GlassTheme.primaryAccent, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1811,7 +1826,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {},
-                      icon: const Icon(Icons.refresh),
+                      icon: const DuotoneIcon('refresh', size: 18),
                       label: const Text('Retrain'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: GlassTheme.primaryAccent,
@@ -1824,7 +1839,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {},
-                      icon: Icon(model.isActive ? Icons.pause : Icons.play_arrow),
+                      icon: DuotoneIcon(model.isActive ? 'pause' : 'play', size: 18),
                       label: Text(model.isActive ? 'Disable' : 'Enable'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: model.isActive ? GlassTheme.warningColor : GlassTheme.successColor,

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/social_media_provider.dart';
 import '../../services/security/social_media_monitor_service.dart';
 
@@ -50,7 +51,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
         actions: [
           Consumer<SocialMediaProvider>(
             builder: (context, provider, _) => GlassAppBarAction(
-              icon: provider.isScanning ? Icons.stop : Icons.refresh,
+              svgIcon: provider.isScanning ? 'stop' : 'refresh',
               onTap: () {
                 HapticFeedback.mediumImpact();
                 if (!provider.isScanning) {
@@ -100,7 +101,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
         onPressed: _showAddAccountDialog,
         backgroundColor: GlassTheme.primaryAccent,
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.add),
+        icon: const DuotoneIcon('add_circle', size: 24),
         label: const Text('Add Account'),
       ),
     );
@@ -122,10 +123,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                     .withOpacity(0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                hasAlerts ? Icons.warning_rounded : Icons.verified_user,
-                color: hasAlerts ? GlassTheme.errorColor : GlassTheme.successColor,
-                size: 28,
+              child: Center(
+                child: DuotoneIcon(
+                  hasAlerts ? 'danger_triangle' : 'verified_check',
+                  size: 28,
+                  color: hasAlerts ? GlassTheme.errorColor : GlassTheme.successColor,
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -177,21 +180,21 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
           _buildStatCard(
             'Impersonation',
             provider.alerts.length.toString(),
-            Icons.person_off,
+            'user_block',
             GlassTheme.errorColor,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             'Privacy Score',
             '${provider.averagePrivacyScore}%',
-            Icons.privacy_tip,
+            'shield_check',
             _getPrivacyColor(provider.averagePrivacyScore),
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             'Exposures',
             provider.exposures.length.toString(),
-            Icons.visibility,
+            'eye',
             GlassTheme.warningColor,
           ),
         ],
@@ -199,12 +202,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, String iconName, Color color) {
     return Expanded(
       child: GlassCard(
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
+            DuotoneIcon(iconName, color: color, size: 22),
             const SizedBox(height: 8),
             Text(
               value,
@@ -244,10 +247,10 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
               unselectedLabelColor: Colors.white54,
               isScrollable: true,
               tabs: const [
-                Tab(icon: Icon(Icons.account_circle), text: 'Accounts'),
-                Tab(icon: Icon(Icons.warning), text: 'Alerts'),
-                Tab(icon: Icon(Icons.privacy_tip), text: 'Privacy'),
-                Tab(icon: Icon(Icons.visibility), text: 'Exposure'),
+                Tab(icon: DuotoneIcon('user_circle', size: 20), text: 'Accounts'),
+                Tab(icon: DuotoneIcon('danger_triangle', size: 20), text: 'Alerts'),
+                Tab(icon: DuotoneIcon('shield_check', size: 20), text: 'Privacy'),
+                Tab(icon: DuotoneIcon('eye', size: 20), text: 'Exposure'),
               ],
             ),
           ),
@@ -259,7 +262,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
   Widget _buildAccountsTab(SocialMediaProvider provider) {
     if (provider.accounts.isEmpty) {
       return _buildEmptyState(
-        Icons.account_circle_outlined,
+        'user_circle',
         'No Accounts',
         'Add social media accounts to monitor',
       );
@@ -292,8 +295,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                   color: platformColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  _getPlatformIcon(account.platform),
+                child: DuotoneIcon(
+                  _getPlatformSvgIcon(account.platform),
                   color: platformColor,
                   size: 24,
                 ),
@@ -322,8 +325,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                         ),
                         if (account.isVerified) ...[
                           const SizedBox(width: 6),
-                          Icon(
-                            Icons.verified,
+                          DuotoneIcon(
+                            'verified_check',
                             color: platformColor,
                             size: 14,
                           ),
@@ -400,8 +403,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.shield,
+          DuotoneIcon(
+            'shield_check',
             color: _getPrivacyColor(score),
             size: 14,
           ),
@@ -422,7 +425,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
   Widget _buildAlertsTab(SocialMediaProvider provider) {
     if (provider.alerts.isEmpty) {
       return _buildEmptyState(
-        Icons.check_circle,
+        'check_circle',
         'No Alerts',
         'No impersonation attempts detected',
       );
@@ -454,10 +457,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                   color: threatColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.person_off,
-                  color: threatColor,
-                  size: 22,
+                child: Center(
+                  child: DuotoneIcon(
+                    'user_block',
+                    color: threatColor,
+                    size: 22,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -552,7 +557,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.insights, size: 14, color: Colors.white.withOpacity(0.5)),
+                    DuotoneIcon('chart', size: 14, color: Colors.white.withOpacity(0.5)),
                     const SizedBox(width: 4),
                     Text(
                       'Similarity: ${(alert.similarityScore * 100).toInt()}%',
@@ -630,7 +635,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
   Widget _buildPrivacyTab(SocialMediaProvider provider) {
     if (provider.accounts.isEmpty) {
       return _buildEmptyState(
-        Icons.privacy_tip_outlined,
+        'shield_check',
         'No Privacy Data',
         'Add accounts to see privacy analysis',
       );
@@ -667,8 +672,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                   color: platformColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  _getPlatformIcon(account.platform),
+                child: DuotoneIcon(
+                  _getPlatformSvgIcon(account.platform),
                   color: platformColor,
                   size: 22,
                 ),
@@ -744,8 +749,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    Icon(
-                      setting.isOptimal ? Icons.check_circle : Icons.warning,
+                    DuotoneIcon(
+                      setting.isOptimal ? 'check_circle' : 'danger_triangle',
                       color: setting.isOptimal
                           ? GlassTheme.successColor
                           : GlassTheme.warningColor,
@@ -792,8 +797,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.arrow_right,
+                      const DuotoneIcon(
+                        'alt_arrow_right',
                         color: GlassTheme.primaryAccent,
                         size: 18,
                       ),
@@ -821,7 +826,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
   Widget _buildExposuresTab(SocialMediaProvider provider) {
     if (provider.exposures.isEmpty) {
       return _buildEmptyState(
-        Icons.visibility_off,
+        'eye_closed',
         'No Exposures Found',
         'Your data appears to be secure',
       );
@@ -852,10 +857,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                   color: severityColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  Icons.visibility,
-                  color: severityColor,
-                  size: 20,
+                child: Center(
+                  child: DuotoneIcon(
+                    'eye',
+                    color: severityColor,
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -914,8 +921,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.lightbulb,
+                const DuotoneIcon(
+                  'lightbulb_bolt',
                   color: GlassTheme.primaryAccent,
                   size: 16,
                 ),
@@ -937,12 +944,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
     );
   }
 
-  Widget _buildEmptyState(IconData icon, String title, String subtitle) {
+  Widget _buildEmptyState(String iconName, String title, String subtitle) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.white.withOpacity(0.2)),
+          DuotoneIcon(iconName, size: 64, color: Colors.white.withOpacity(0.2)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -1029,9 +1036,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                               color: isSelected ? color : Colors.transparent,
                             ),
                           ),
-                          child: Icon(
-                            _getPlatformIcon(platform),
-                            color: isSelected ? color : Colors.white54,
+                          child: Center(
+                            child: DuotoneIcon(
+                              _getPlatformSvgIcon(platform),
+                              color: isSelected ? color : Colors.white54,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -1046,7 +1056,10 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                 decoration: InputDecoration(
                   hintText: 'Username (without @)',
                   hintStyle: TextStyle(color: Colors.grey[600]),
-                  prefixIcon: const Icon(Icons.alternate_email, color: Colors.grey),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: DuotoneIcon('hashtag', color: Colors.grey, size: 24),
+                  ),
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.05),
                   border: OutlineInputBorder(
@@ -1097,28 +1110,28 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
     // Navigate to detailed view or show modal
   }
 
-  IconData _getPlatformIcon(SocialPlatform platform) {
+  String _getPlatformSvgIcon(SocialPlatform platform) {
     switch (platform) {
       case SocialPlatform.facebook:
-        return Icons.facebook;
+        return 'share';
       case SocialPlatform.instagram:
-        return Icons.camera_alt;
+        return 'camera';
       case SocialPlatform.twitter:
-        return Icons.tag;
+        return 'hashtag';
       case SocialPlatform.linkedin:
-        return Icons.work;
+        return 'user_id';
       case SocialPlatform.tiktok:
-        return Icons.music_note;
+        return 'play_circle';
       case SocialPlatform.snapchat:
-        return Icons.camera;
+        return 'camera_minimalistic';
       case SocialPlatform.youtube:
-        return Icons.play_circle;
+        return 'play_circle';
       case SocialPlatform.reddit:
-        return Icons.forum;
+        return 'chat_round';
       case SocialPlatform.whatsapp:
-        return Icons.chat;
+        return 'chat_dots';
       case SocialPlatform.telegram:
-        return Icons.send;
+        return 'forward';
     }
   }
 

@@ -2,8 +2,10 @@
 /// Machine learning anomaly detection and analysis interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class MLAnalysisScreen extends StatefulWidget {
@@ -51,11 +53,11 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
         title: 'ML Analysis',
         actions: [
           IconButton(
-            icon: const Icon(Icons.play_arrow),
+            icon: DuotoneIcon(AppIcons.play, size: 24, color: Colors.white),
             onPressed: _isAnalyzing ? null : _runAnalysis,
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
             onPressed: _isLoading ? null : _loadData,
           ),
         ],
@@ -132,7 +134,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
+              GlassSvgIconBox(
                 icon: _getModelIcon(model.type),
                 color: model.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
               ),
@@ -183,7 +185,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
   Widget _buildAnomaliesTab() {
     if (_anomalies.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.psychology,
+        icon: AppIcons.mlAnalysis,
         title: 'No Anomalies',
         subtitle: 'Run analysis to detect anomalies',
       );
@@ -227,7 +229,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(icon: Icons.warning, color: severityColor),
+              GlassSvgIconBox(icon: AppIcons.dangerTriangle, color: severityColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -246,9 +248,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildAnomalyStat(Icons.speed, 'Score: ${(anomaly.anomalyScore * 100).toInt()}%'),
+              _buildAnomalyStat(AppIcons.graphUp, 'Score: ${(anomaly.anomalyScore * 100).toInt()}%'),
               const SizedBox(width: 16),
-              _buildAnomalyStat(Icons.access_time, _formatTime(anomaly.detectedAt)),
+              _buildAnomalyStat(AppIcons.clock, _formatTime(anomaly.detectedAt)),
             ],
           ),
         ],
@@ -256,11 +258,11 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
     );
   }
 
-  Widget _buildAnomalyStat(IconData icon, String text) {
+  Widget _buildAnomalyStat(String icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
       ],
@@ -277,25 +279,25 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
           const SizedBox(height: 12),
 
           _buildInsightCard(
-            icon: Icons.trending_up,
+            icon: AppIcons.graphUp,
             title: 'Threat Trend Analysis',
             insight: 'Phishing attempts increased 23% this week compared to last week.',
             color: GlassTheme.errorColor,
           ),
           _buildInsightCard(
-            icon: Icons.schedule,
+            icon: AppIcons.clock,
             title: 'Attack Pattern',
             insight: 'Most threats detected between 9 AM - 11 AM local time.',
             color: GlassTheme.warningColor,
           ),
           _buildInsightCard(
-            icon: Icons.public,
+            icon: AppIcons.global,
             title: 'Geographic Analysis',
             insight: '45% of threat origins from Eastern European IP ranges.',
             color: GlassTheme.primaryAccent,
           ),
           _buildInsightCard(
-            icon: Icons.security,
+            icon: AppIcons.shieldWarning,
             title: 'Vulnerability Prediction',
             insight: 'High probability of credential-based attacks in next 24 hours.',
             color: const Color(0xFF9C27B0),
@@ -321,7 +323,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
   }
 
   Widget _buildInsightCard({
-    required IconData icon,
+    required String icon,
     required String title,
     required String insight,
     required Color color,
@@ -330,7 +332,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GlassIconBox(icon: icon, color: color),
+          GlassSvgIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -376,7 +378,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -384,7 +386,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -440,7 +442,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
             children: [
               Row(
                 children: [
-                  GlassIconBox(icon: Icons.warning, color: severityColor, size: 48),
+                  GlassSvgIconBox(icon: AppIcons.dangerTriangle, color: severityColor, size: 48),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -486,18 +488,18 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
     );
   }
 
-  IconData _getModelIcon(String type) {
+  String _getModelIcon(String type) {
     switch (type.toLowerCase()) {
       case 'classifier':
-        return Icons.category;
+        return AppIcons.filter;
       case 'anomaly detection':
-        return Icons.warning;
+        return AppIcons.dangerTriangle;
       case 'nlp':
-        return Icons.text_fields;
+        return AppIcons.fileText;
       case 'behavior analysis':
-        return Icons.psychology;
+        return AppIcons.mlAnalysis;
       default:
-        return Icons.memory;
+        return AppIcons.cpu;
     }
   }
 

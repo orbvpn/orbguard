@@ -4,6 +4,7 @@ library mitre_widgets;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/mitre_provider.dart';
 
 /// Tactic column header
@@ -118,8 +119,8 @@ class TechniqueChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isDetected) ...[
-              const Icon(
-                Icons.warning_rounded,
+              const DuotoneIcon(
+                AppIcons.dangerTriangle,
                 color: Colors.red,
                 size: 12,
               ),
@@ -303,7 +304,7 @@ class TechniqueDetailCard extends StatelessWidget {
               ),
               if (onClose != null)
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                  icon: const DuotoneIcon(AppIcons.closeCircle, color: Colors.white54, size: 20),
                   onPressed: onClose,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -322,7 +323,7 @@ class TechniqueDetailCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: Colors.red, size: 16),
+                  const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -468,8 +469,8 @@ class MitreStatsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.security,
+              const DuotoneIcon(
+                AppIcons.shieldCheck,
                 color: Color(0xFF00D9FF),
                 size: 24,
               ),

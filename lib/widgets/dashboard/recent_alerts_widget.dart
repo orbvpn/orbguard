@@ -10,6 +10,7 @@ import '../../models/api/threat_indicator.dart';
 import '../../services/realtime/websocket_service.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 
 /// Widget displaying recent security alerts
 class RecentAlertsWidget extends StatelessWidget {
@@ -63,8 +64,8 @@ class RecentAlertsWidget extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              Icon(
-                Icons.notifications,
+              DuotoneIcon(
+                AppIcons.bell,
                 color: unreadCount > 0 ? Colors.red : Colors.cyan,
                 size: 20,
               ),
@@ -131,7 +132,7 @@ class RecentAlertsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.check_circle_outline, size: 48, color: Colors.green[400]),
+            DuotoneIcon(AppIcons.checkCircle, size: 48, color: Colors.green[400]),
             const SizedBox(height: 12),
             Text(
               'No recent alerts',
@@ -167,7 +168,7 @@ class RecentAlertsWidget extends StatelessWidget {
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 16),
             color: Colors.red.withOpacity(0.2),
-            child: const Icon(Icons.delete_outline, color: Colors.red),
+            child: DuotoneIcon(AppIcons.trash, color: Colors.red),
           ),
           child: _AlertTile(
             alert: alert,
@@ -262,7 +263,7 @@ class _AlertTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            DuotoneIcon(AppIcons.chevronRight, color: Colors.grey, size: 20),
           ],
         ),
       ),
@@ -271,24 +272,24 @@ class _AlertTile extends StatelessWidget {
 
   Widget _buildSeverityIcon() {
     Color color;
-    IconData icon;
+    String icon;
 
     switch (alert.severity) {
       case SeverityLevel.critical:
         color = Colors.red;
-        icon = Icons.error;
+        icon = AppIcons.dangerCircle;
         break;
       case SeverityLevel.high:
         color = Colors.orange;
-        icon = Icons.warning;
+        icon = AppIcons.dangerTriangle;
         break;
       case SeverityLevel.medium:
         color = Colors.amber;
-        icon = Icons.info;
+        icon = AppIcons.infoCircle;
         break;
       default:
         color = Colors.grey;
-        icon = Icons.info_outline;
+        icon = AppIcons.infoCircle;
     }
 
     return Container(
@@ -298,7 +299,7 @@ class _AlertTile extends StatelessWidget {
         color: color.withOpacity(0.2),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, size: 18, color: color),
+      child: Center(child: DuotoneIcon(icon, size: 18, color: color)),
     );
   }
 
@@ -376,8 +377,8 @@ class RealtimeEventsWidget extends StatelessWidget {
                 : Colors.grey.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            Icons.stream,
+          child: DuotoneIcon(
+            AppIcons.wifi,
             color: isConnected ? Colors.green : Colors.grey,
             size: 20,
           ),
@@ -436,7 +437,7 @@ class RealtimeEventsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.cloud_off, size: 48, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.cloudStorage, size: 48, color: Colors.grey[600]),
             const SizedBox(height: 12),
             Text(
               'Not connected to threat stream',
@@ -449,7 +450,7 @@ class RealtimeEventsWidget extends StatelessWidget {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onConnect,
-                icon: const Icon(Icons.link, size: 18),
+                icon: DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.cyan),
                 label: const Text('Connect'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.cyan,
@@ -469,7 +470,7 @@ class RealtimeEventsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.hourglass_empty, size: 48, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.stopwatch, size: 48, color: Colors.grey[600]),
             const SizedBox(height: 12),
             Text(
               'Waiting for threat events...',

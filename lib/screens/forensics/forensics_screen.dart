@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
 
 class ForensicsScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
         showBackButton: true,
         actions: [
           GlassAppBarAction(
-            icon: Icons.info_outline,
+            svgIcon: 'info_circle',
             onTap: () => _showInfoDialog(context),
           ),
         ],
@@ -63,10 +64,10 @@ class _ForensicsScreenState extends State<ForensicsScreen>
                   indicatorColor: GlassTheme.primaryAccent,
                   labelColor: GlassTheme.primaryAccent,
                   unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(icon: Icon(Icons.search), text: 'Analyze'),
-                    Tab(icon: Icon(Icons.history), text: 'History'),
-                    Tab(icon: Icon(Icons.storage), text: 'IOCs'),
+                  tabs: [
+                    Tab(icon: DuotoneIcon('magnifer_bug', size: 24), text: 'Analyze'),
+                    Tab(icon: DuotoneIcon('history', size: 24), text: 'History'),
+                    Tab(icon: DuotoneIcon('database', size: 24), text: 'IOCs'),
                   ],
                 ),
               ),
@@ -123,7 +124,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
 
           // Full scan button
           _buildAnalysisButton(
-            icon: Icons.security,
+            icon: 'shield_check',
             title: 'Full Forensic Scan',
             description: 'Comprehensive analysis for all known spyware',
             color: GlassTheme.primaryAccent,
@@ -136,7 +137,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
           // Platform-specific options
           if (Platform.isIOS) ...[
             _buildAnalysisButton(
-              icon: Icons.power_settings_new,
+              icon: 'power',
               title: 'Shutdown Log Analysis',
               description: 'Check iOS shutdown.log for Pegasus indicators',
               color: Colors.orange,
@@ -146,7 +147,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
             ),
             const SizedBox(height: 12),
             _buildAnalysisButton(
-              icon: Icons.backup,
+              icon: 'cloud_storage',
               title: 'Backup Analysis',
               description: 'Scan iOS backup for spyware artifacts',
               color: Colors.blue,
@@ -156,7 +157,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
             ),
             const SizedBox(height: 12),
             _buildAnalysisButton(
-              icon: Icons.bug_report,
+              icon: 'bug',
               title: 'Sysdiagnose Analysis',
               description: 'Deep analysis of system diagnostics',
               color: Colors.purple,
@@ -166,7 +167,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
             ),
           ] else if (Platform.isAndroid) ...[
             _buildAnalysisButton(
-              icon: Icons.article,
+              icon: 'file_text',
               title: 'Logcat Analysis',
               description: 'Analyze Android system logs for malware',
               color: Colors.green,
@@ -178,7 +179,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
 
           const SizedBox(height: 12),
           _buildAnalysisButton(
-            icon: Icons.data_usage,
+            icon: 'chart',
             title: 'Data Usage Analysis',
             description: 'Detect suspicious network activity patterns',
             color: Colors.teal,
@@ -195,7 +196,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info, color: GlassTheme.primaryAccent),
+                    DuotoneIcon('info_circle', size: 24, color: GlassTheme.primaryAccent),
                     const SizedBox(width: 12),
                     const Text(
                       'About Forensic Analysis',
@@ -294,10 +295,12 @@ class _ForensicsScreenState extends State<ForensicsScreen>
                   color: color.withAlpha(40),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  hasThreats ? Icons.warning : Icons.verified_user,
-                  color: color,
-                  size: 28,
+                child: Center(
+                  child: DuotoneIcon(
+                    hasThreats ? 'danger_triangle' : 'shield_check',
+                    color: color,
+                    size: 28,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -321,7 +324,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.grey),
+                icon: const DuotoneIcon('close_circle', color: Colors.grey, size: 24),
                 onPressed: () {
                   context.read<ForensicsProvider>().clearCurrentAnalysis();
                 },
@@ -397,7 +400,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
   }
 
   Widget _buildAnalysisButton({
-    required IconData icon,
+    required String icon,
     required String title,
     required String description,
     required Color color,
@@ -414,7 +417,9 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               color: color.withAlpha(30),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Center(
+              child: DuotoneIcon(icon, color: color, size: 24),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -437,9 +442,10 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right,
-            color: onTap == null ? Colors.grey[700] : Colors.grey,
+          DuotoneIcon(
+            'alt_arrow_right',
+            color: onTap == null ? Colors.grey[700]! : Colors.grey,
+            size: 24,
           ),
         ],
       ),
@@ -454,7 +460,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey[700]),
+            DuotoneIcon('history', size: 64, color: Colors.grey[700]),
             const SizedBox(height: 16),
             Text(
               'No analysis history',
@@ -491,9 +497,12 @@ class _ForensicsScreenState extends State<ForensicsScreen>
                         .withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    hasThreats ? Icons.warning : Icons.check_circle,
-                    color: hasThreats ? Colors.red : Colors.green,
+                  child: Center(
+                    child: DuotoneIcon(
+                      hasThreats ? 'danger_triangle' : 'check_circle',
+                      color: hasThreats ? Colors.red : Colors.green,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -516,7 +525,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: Colors.grey[600]),
+                DuotoneIcon('alt_arrow_right', size: 24, color: Colors.grey[600]),
               ],
             ),
           ),
@@ -540,7 +549,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.storage, color: GlassTheme.primaryAccent),
+                    DuotoneIcon('database', size: 24, color: GlassTheme.primaryAccent),
                     const SizedBox(width: 12),
                     const Text(
                       'IOC Database',
@@ -588,28 +597,28 @@ class _ForensicsScreenState extends State<ForensicsScreen>
             'Pegasus (NSO Group)',
             stats.pegasusIOCs,
             Colors.red,
-            Icons.bug_report,
+            'bug',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Predator (Cytrox)',
             stats.predatorIOCs,
             Colors.orange,
-            Icons.pest_control,
+            'bug_minimalistic',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Stalkerware',
             stats.stalkerwareIOCs,
             Colors.purple,
-            Icons.visibility,
+            'eye',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Other Spyware',
             stats.otherIOCs,
             Colors.blue,
-            Icons.warning,
+            'danger_triangle',
           ),
 
           // Sources
@@ -659,7 +668,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
     );
   }
 
-  Widget _buildIOCCategory(String name, int count, Color color, IconData icon) {
+  Widget _buildIOCCategory(String name, int count, Color color, String icon) {
     return GlassCard(
       child: Row(
         children: [
@@ -670,7 +679,9 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               color: color.withAlpha(30),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Center(
+              child: DuotoneIcon(icon, color: color, size: 22),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -697,7 +708,7 @@ class _ForensicsScreenState extends State<ForensicsScreen>
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, color: Colors.green, size: 16),
+          DuotoneIcon('check_circle', color: Colors.green, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -772,9 +783,10 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  Icon(
-                    result.hasThreat ? Icons.warning : Icons.check_circle,
+                  DuotoneIcon(
+                    result.hasThreat ? 'danger_triangle' : 'check_circle',
                     color: result.hasThreat ? Colors.red : Colors.green,
+                    size: 24,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1088,7 +1100,10 @@ class _ForensicsScreenState extends State<ForensicsScreen>
               decoration: InputDecoration(
                 hintText: '/path/to/file',
                 hintStyle: TextStyle(color: Colors.grey[600]),
-                prefixIcon: const Icon(Icons.folder, color: Colors.grey),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: DuotoneIcon('folder', color: Colors.grey, size: 24),
+                ),
                 filled: true,
                 fillColor: const Color(0xFF2A2B40),
                 border: OutlineInputBorder(

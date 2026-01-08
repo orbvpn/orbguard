@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+import '../presentation/widgets/duotone_icon.dart';
 
 // ============================================================================
 // PERMISSION MANAGER - Handles all app permissions
@@ -18,7 +19,7 @@ class PermissionManager {
     'essential': PermissionGroup(
       name: 'Essential Permissions',
       description: 'Required for basic threat detection',
-      icon: Icons.security,
+      icon: AppIcons.shieldCheck,
       permissions: [
         PermissionInfo(
           permission: Permission.storage,
@@ -37,7 +38,7 @@ class PermissionManager {
     'advanced': PermissionGroup(
       name: 'Advanced Detection',
       description: 'Enables deep threat analysis',
-      icon: Icons.search,
+      icon: AppIcons.search,
       permissions: [
         PermissionInfo(
           permission: Permission.sms,
@@ -62,7 +63,7 @@ class PermissionManager {
     'special': PermissionGroup(
       name: 'Special Permissions',
       description: 'Requires manual activation in Settings',
-      icon: Icons.settings,
+      icon: AppIcons.settings,
       permissions: [], // Handled separately
     ),
   };
@@ -250,7 +251,7 @@ class PermissionManager {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.security, color: Colors.blue),
+            const DuotoneIcon(AppIcons.shieldCheck, color: Colors.blue),
             const SizedBox(width: 12),
             Expanded(child: Text(title)),
           ],
@@ -274,7 +275,7 @@ class PermissionManager {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle, color: Colors.blue),
+                  const DuotoneIcon(AppIcons.checkCircle, color: Colors.blue),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -386,7 +387,7 @@ class PermissionManager {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info, color: Colors.orange),
+                  DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -448,7 +449,7 @@ class PermissionManager {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange),
+                  DuotoneIcon(AppIcons.dangerTriangle, color: Colors.orange),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -549,7 +550,7 @@ class PermissionManager {
 class PermissionGroup {
   final String name;
   final String description;
-  final IconData icon;
+  final String icon;
   final List<PermissionInfo> permissions;
 
   const PermissionGroup({

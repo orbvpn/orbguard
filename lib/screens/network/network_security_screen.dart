@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
 import '../../widgets/network/network_widgets.dart';
 
@@ -41,7 +42,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
         showBackButton: true,
         actions: [
           GlassAppBarAction(
-            icon: Icons.refresh,
+            svgIcon: 'refresh',
             onTap: () {
               final provider = context.read<NetworkProvider>();
               provider.refreshNetworkInfo();
@@ -66,10 +67,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                   unselectedLabelColor: Colors.white54,
                   isScrollable: true,
                   tabs: const [
-                    Tab(icon: Icon(Icons.wifi), text: 'WiFi'),
-                    Tab(icon: Icon(Icons.vpn_lock), text: 'VPN'),
-                    Tab(icon: Icon(Icons.dns), text: 'DNS'),
-                    Tab(icon: Icon(Icons.bar_chart), text: 'Stats'),
+                    Tab(icon: DuotoneIcon('wi_fi_router', size: 24), text: 'WiFi'),
+                    Tab(icon: DuotoneIcon('lock', size: 24), text: 'VPN'),
+                    Tab(icon: DuotoneIcon('server', size: 24), text: 'DNS'),
+                    Tab(icon: DuotoneIcon('chart', size: 24), text: 'Stats'),
                   ],
                 ),
               ),
@@ -111,7 +112,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
             const SizedBox(height: 24),
             Row(
               children: [
-                const Icon(Icons.warning, color: Colors.red, size: 20),
+                const DuotoneIcon('danger_triangle', size: 20, color: Colors.red),
                 const SizedBox(width: 8),
                 Text(
                   'Active Threats (${provider.activeThreats.length})',
@@ -147,7 +148,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                         color: Colors.black,
                       ),
                     )
-                  : const Icon(Icons.radar),
+                  : const DuotoneIcon('wi_fi_router', size: 24),
               label: Text(provider.isScanning ? 'Scanning...' : 'Scan Networks'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00D9FF),
@@ -187,8 +188,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.wifi_find,
+                    DuotoneIcon(
+                      'wi_fi_router',
                       size: 48,
                       color: Colors.grey.withAlpha(77),
                     ),
@@ -248,22 +249,22 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
           ),
           const SizedBox(height: 12),
           _buildBenefitItem(
-            Icons.lock,
+            'lock',
             'Encrypted Connection',
             'All your internet traffic is encrypted end-to-end',
           ),
           _buildBenefitItem(
-            Icons.visibility_off,
+            'eye_closed',
             'Hide IP Address',
             'Your real IP address is hidden from websites',
           ),
           _buildBenefitItem(
-            Icons.wifi_lock,
+            'wi_fi_router',
             'Secure on Public WiFi',
             'Stay protected on unsecured networks',
           ),
           _buildBenefitItem(
-            Icons.language,
+            'globe',
             'Access Global Content',
             'Access content from anywhere in the world',
           ),
@@ -279,7 +280,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber, color: Colors.orange),
+                  const DuotoneIcon('danger_triangle', size: 24, color: Colors.orange),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -311,7 +312,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
     );
   }
 
-  Widget _buildBenefitItem(IconData icon, String title, String description) {
+  Widget _buildBenefitItem(String iconName, String title, String description) {
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -324,7 +325,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
               color: const Color(0xFF00D9FF).withAlpha(40),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF00D9FF), size: 20),
+            child: Center(
+              child: DuotoneIcon(iconName, size: 20, color: const Color(0xFF00D9FF)),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -479,7 +482,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          const Icon(Icons.dns, color: Color(0xFF00D9FF), size: 20),
+          const DuotoneIcon('server', size: 20, color: Color(0xFF00D9FF)),
           const SizedBox(width: 14),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,22 +532,22 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                 _buildRecommendation(
                   provider.vpnStatus.isConnected,
                   'Use VPN on public networks',
-                  Icons.vpn_lock,
+                  'lock',
                 ),
                 _buildRecommendation(
                   provider.dnsStatus.isEnabled,
                   'Enable DNS protection',
-                  Icons.dns,
+                  'server',
                 ),
                 _buildRecommendation(
                   provider.currentNetwork?.security.isRecommended ?? false,
                   'Use WPA2 or WPA3 encryption',
-                  Icons.lock,
+                  'lock',
                 ),
                 _buildRecommendation(
                   provider.activeThreats.isEmpty,
                   'No active network threats',
-                  Icons.shield,
+                  'shield_check',
                 ),
               ],
             ),
@@ -554,7 +557,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
     );
   }
 
-  Widget _buildRecommendation(bool isComplete, String text, IconData icon) {
+  Widget _buildRecommendation(bool isComplete, String text, String iconName) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -568,10 +571,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                   : Colors.grey.withAlpha(40),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              isComplete ? Icons.check : icon,
-              color: isComplete ? Colors.green : Colors.grey,
-              size: 18,
+            child: Center(
+              child: isComplete
+                  ? const DuotoneIcon('check_circle', size: 18, color: Colors.green)
+                  : DuotoneIcon(iconName, size: 18, color: Colors.grey),
             ),
           ),
           const SizedBox(width: 12),
@@ -638,7 +641,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber, color: Colors.red, size: 18),
+                    const DuotoneIcon('danger_triangle', size: 18, color: Colors.red),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(

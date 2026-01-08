@@ -2,8 +2,10 @@
 /// Threat correlation and relationship visualization interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class ThreatGraphScreen extends StatefulWidget {
@@ -41,13 +43,13 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
       appBar: GlassAppBar(
         title: 'Threat Graph',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => _showSearchDialog(context),
+          GlassAppBarAction(
+            svgIcon: AppIcons.search,
+            onTap: () => _showSearchDialog(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadGraphData,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadGraphData,
           ),
         ],
       ),
@@ -80,7 +82,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.hub, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+                DuotoneIcon(AppIcons.structure, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
                 const SizedBox(height: 12),
                 const Text(
                   'Threat Relationship Graph',
@@ -160,7 +162,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
       onTap: () => _showEntityDetails(context, node),
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getNodeIcon(node.type),
             color: color,
           ),
@@ -229,7 +231,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
               // Header
               Row(
                 children: [
-                  GlassIconBox(icon: _getNodeIcon(node.type), color: color, size: 56, iconSize: 28),
+                  GlassSvgIconBox(icon: _getNodeIcon(node.type), color: color, size: 56, iconSize: 28),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -287,7 +289,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
+          GlassSvgIconBox(
             icon: _getNodeIcon(relatedNode.type),
             color: _getNodeColor(relatedNode.type),
             size: 36,
@@ -334,7 +336,10 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
           decoration: InputDecoration(
             hintText: 'Search indicators, actors, campaigns...',
             hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-            prefixIcon: const Icon(Icons.search, color: Colors.white54),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.all(12),
+              child: DuotoneIcon(AppIcons.search, size: 20, color: Colors.white54),
+            ),
           ),
           onSubmitted: (value) {
             Navigator.pop(context);
@@ -365,20 +370,20 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
     }
   }
 
-  IconData _getNodeIcon(String type) {
+  String _getNodeIcon(String type) {
     switch (type.toLowerCase()) {
       case 'indicator':
-        return Icons.warning;
+        return AppIcons.ioc;
       case 'campaign':
-        return Icons.campaign;
+        return AppIcons.campaign;
       case 'actor':
-        return Icons.person;
+        return AppIcons.threatActor;
       case 'malware':
-        return Icons.bug_report;
+        return AppIcons.malware;
       case 'tool':
-        return Icons.build;
+        return AppIcons.settings;
       default:
-        return Icons.circle;
+        return AppIcons.target;
     }
   }
 

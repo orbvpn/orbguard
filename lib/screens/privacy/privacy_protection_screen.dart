@@ -2,9 +2,11 @@
 /// Camera/microphone monitoring, clipboard protection, and tracker blocking
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/privacy_provider.dart';
 
@@ -42,9 +44,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
           appBar: GlassAppBar(
             title: 'Privacy Protection',
             actions: [
-              IconButton(
-                icon: const Icon(Icons.shield),
-                onPressed: provider.isAuditing ? null : () => provider.runAudit(),
+              GlassAppBarAction(
+                svgIcon: AppIcons.shield,
+                onTap: provider.isAuditing ? null : () => provider.runAudit(),
               ),
             ],
             bottom: TabBar(
@@ -95,7 +97,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
           const SizedBox(height: 12),
 
           _buildSettingsTile(
-            icon: Icons.camera_alt,
+            icon: AppIcons.camera,
             title: 'Camera Monitoring',
             subtitle: 'Get alerts when apps access camera',
             value: provider.cameraMonitoringEnabled,
@@ -103,7 +105,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
             color: GlassTheme.primaryAccent,
           ),
           _buildSettingsTile(
-            icon: Icons.mic,
+            icon: AppIcons.microphone,
             title: 'Microphone Monitoring',
             subtitle: 'Get alerts when apps access microphone',
             value: provider.micMonitoringEnabled,
@@ -111,7 +113,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
             color: const Color(0xFFFF5722),
           ),
           _buildSettingsTile(
-            icon: Icons.content_paste,
+            icon: AppIcons.clipboard,
             title: 'Clipboard Protection',
             subtitle: 'Scan clipboard for threats',
             value: provider.clipboardProtectionEnabled,
@@ -119,7 +121,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
             color: const Color(0xFF9C27B0),
           ),
           _buildSettingsTile(
-            icon: Icons.block,
+            icon: AppIcons.forbidden,
             title: 'Tracker Blocking',
             subtitle: 'Block known trackers and analytics',
             value: provider.trackerBlockingEnabled,
@@ -156,7 +158,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
             ...provider.lastAudit!.recommendations.map((rec) => GlassCard(
                   child: Row(
                     children: [
-                      const GlassIconBox(icon: Icons.lightbulb, color: GlassTheme.warningColor),
+                      const GlassSvgIconBox(icon: AppIcons.lightbulb, color: GlassTheme.warningColor),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -231,7 +233,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
   }
 
   Widget _buildSettingsTile({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     required bool value,
@@ -241,7 +243,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: color),
+          GlassSvgIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -292,7 +294,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
           // Camera Events
           Row(
             children: [
-              const Icon(Icons.camera_alt, color: GlassTheme.primaryAccent),
+              DuotoneIcon(AppIcons.camera, color: GlassTheme.primaryAccent, size: 24),
               const SizedBox(width: 8),
               const Text(
                 'Recent Camera Access',
@@ -312,7 +314,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
           // Microphone Events
           Row(
             children: [
-              const Icon(Icons.mic, color: Color(0xFFFF5722)),
+              DuotoneIcon(AppIcons.microphone, color: const Color(0xFFFF5722), size: 24),
               const SizedBox(width: 8),
               const Text(
                 'Recent Microphone Access',
@@ -337,7 +339,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.warning, color: GlassTheme.errorColor),
+                      DuotoneIcon(AppIcons.dangerTriangle, color: GlassTheme.errorColor, size: 24),
                       const SizedBox(width: 8),
                       const Text(
                         'Background Access Detected',
@@ -376,8 +378,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
-            icon: event.type == PrivacyEventType.cameraAccess ? Icons.camera_alt : Icons.mic,
+          GlassSvgIconBox(
+            icon: event.type == PrivacyEventType.cameraAccess ? AppIcons.camera : AppIcons.microphone,
             color: color,
           ),
           const SizedBox(width: 12),
@@ -408,7 +410,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
   Widget _buildTrackersTab(PrivacyProvider provider) {
     if (provider.trackers.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.analytics,
+        icon: AppIcons.chartSquare,
         title: 'No Trackers Found',
         subtitle: 'Known trackers will appear here',
       );
@@ -427,7 +429,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
           tintColor: GlassTheme.successColor,
           child: Row(
             children: [
-              const GlassIconBox(icon: Icons.block, color: GlassTheme.successColor),
+              const GlassSvgIconBox(icon: AppIcons.forbidden, color: GlassTheme.successColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -466,8 +468,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(
-            icon: tracker.isBlocked ? Icons.block : Icons.analytics,
+          GlassSvgIconBox(
+            icon: tracker.isBlocked ? AppIcons.forbidden : AppIcons.chartSquare,
             color: tracker.isBlocked ? GlassTheme.successColor : GlassTheme.warningColor,
           ),
           const SizedBox(width: 12),
@@ -499,7 +501,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
   Widget _buildEventsTab(PrivacyProvider provider) {
     if (provider.events.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.history,
+        icon: AppIcons.timer,
         title: 'No Events',
         subtitle: 'Privacy events will appear here',
       );
@@ -516,7 +518,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -524,7 +526,12 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          SvgPicture.asset(
+            'assets/icons/$icon.svg',
+            width: 64,
+            height: 64,
+            colorFilter: ColorFilter.mode(GlassTheme.primaryAccent.withAlpha(128), BlendMode.srcIn),
+          ),
           const SizedBox(height: 16),
           Text(
             title,

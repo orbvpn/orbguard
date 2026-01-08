@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/supply_chain_provider.dart';
 import '../../services/security/supply_chain_monitor_service.dart';
 
@@ -46,7 +47,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
         showBackButton: true,
         actions: [
           GlassAppBarAction(
-            icon: Icons.refresh,
+            svgIcon: 'refresh',
             onTap: () => _startScan(),
           ),
         ],
@@ -86,7 +87,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
         onPressed: _startScan,
         backgroundColor: GlassTheme.primaryAccent,
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.search),
+        icon: const DuotoneIcon('magnifer', size: 20),
         label: const Text('Scan Apps'),
       ),
     );
@@ -166,8 +167,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                       .withOpacity(0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  hasIssues ? Icons.warning_rounded : Icons.verified_user,
+                child: DuotoneIcon(
+                  hasIssues ? 'danger_triangle' : 'verified_check',
                   color: hasIssues ? GlassTheme.errorColor : GlassTheme.successColor,
                   size: 28,
                 ),
@@ -273,10 +274,10 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
               indicatorColor: GlassTheme.primaryAccent,
               labelColor: GlassTheme.primaryAccent,
               unselectedLabelColor: Colors.white54,
-              tabs: const [
-                Tab(icon: Icon(Icons.bug_report), text: 'CVEs'),
-                Tab(icon: Icon(Icons.track_changes), text: 'Trackers'),
-                Tab(icon: Icon(Icons.library_books), text: 'Libraries'),
+              tabs: [
+                Tab(icon: DuotoneIcon('bug', size: 20), text: 'CVEs'),
+                Tab(icon: DuotoneIcon('radar', size: 20), text: 'Trackers'),
+                Tab(icon: DuotoneIcon('file_text', size: 20), text: 'Libraries'),
               ],
             ),
           ),
@@ -290,7 +291,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
 
     if (vulns.isEmpty) {
       return _buildEmptyState(
-        Icons.verified_user,
+        'verified_check',
         'No Vulnerabilities',
         'No known vulnerabilities found in your apps',
         GlassTheme.successColor,
@@ -341,7 +342,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.speed, size: 14, color: severityColor),
+                    DuotoneIcon('chart', size: 14, color: severityColor),
                     const SizedBox(width: 4),
                     Text(
                       vuln.cvssScore.toStringAsFixed(1),
@@ -366,7 +367,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.warning_amber, size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('danger_triangle', size: 14, color: Colors.white.withOpacity(0.5)),
               const SizedBox(width: 4),
               Text(
                 vuln.severity,
@@ -376,7 +377,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                 ),
               ),
               const SizedBox(width: 16),
-              Icon(Icons.update, size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('refresh', size: 14, color: Colors.white.withOpacity(0.5)),
               const SizedBox(width: 4),
               Text(
                 'Affected: ${vuln.affectedVersions}',
@@ -398,7 +399,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.check_circle, size: 14, color: GlassTheme.successColor),
+                  const DuotoneIcon('check_circle', size: 14, color: GlassTheme.successColor),
                   const SizedBox(width: 4),
                   Text(
                     'Fixed in ${vuln.fixedVersion}',
@@ -424,7 +425,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
 
     if (trackers.isEmpty) {
       return _buildEmptyState(
-        Icons.privacy_tip,
+        'eye_closed',
         'No Trackers Found',
         'No tracking libraries detected in your apps',
         GlassTheme.successColor,
@@ -448,7 +449,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
-                  Icon(
+                  DuotoneIcon(
                     _getCategoryIcon(entry.key),
                     size: 18,
                     color: GlassTheme.warningColor,
@@ -501,8 +502,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
               color: GlassTheme.warningColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.track_changes,
+            child: const DuotoneIcon(
+              'radar',
               color: GlassTheme.warningColor,
               size: 20,
             ),
@@ -554,7 +555,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
   Widget _buildLibrariesTab(SupplyChainProvider provider) {
     if (provider.librariesByCategory.isEmpty) {
       return _buildEmptyState(
-        Icons.library_books,
+        'file_text',
         'No Libraries Found',
         'Scan your apps to see detected libraries',
         Colors.white54,
@@ -566,7 +567,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
       children: provider.librariesByCategory.entries.map((entry) {
         return ExpansionTile(
           tilePadding: EdgeInsets.zero,
-          leading: Icon(
+          leading: DuotoneIcon(
             _getCategoryIcon(entry.value.first.category),
             color: GlassTheme.primaryAccent,
           ),
@@ -640,12 +641,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
   }
 
   Widget _buildEmptyState(
-      IconData icon, String title, String subtitle, Color color) {
+      String icon, String title, String subtitle, Color color) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: color.withOpacity(0.5)),
+          DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -777,8 +778,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.warning_rounded,
+                      const DuotoneIcon(
+                        'danger_triangle',
                         color: GlassTheme.errorColor,
                         size: 20,
                       ),
@@ -812,8 +813,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.link,
+                          DuotoneIcon(
+                            'link',
                             size: 14,
                             color: GlassTheme.primaryAccent.withOpacity(0.7),
                           ),
@@ -876,36 +877,36 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
     return const Color(0xFFFFEB3B);
   }
 
-  IconData _getCategoryIcon(LibraryCategory category) {
+  String _getCategoryIcon(LibraryCategory category) {
     switch (category) {
       case LibraryCategory.analytics:
-        return Icons.analytics;
+        return 'chart_square';
       case LibraryCategory.advertising:
-        return Icons.campaign;
+        return 'flag';
       case LibraryCategory.crashReporting:
-        return Icons.bug_report;
+        return 'bug';
       case LibraryCategory.authentication:
-        return Icons.fingerprint;
+        return 'object_scan';
       case LibraryCategory.payment:
-        return Icons.payment;
+        return 'card';
       case LibraryCategory.socialMedia:
-        return Icons.share;
+        return 'share';
       case LibraryCategory.cloud:
-        return Icons.cloud;
+        return 'cloud_storage';
       case LibraryCategory.database:
-        return Icons.storage;
+        return 'database';
       case LibraryCategory.networking:
-        return Icons.wifi;
+        return 'wi_fi_router';
       case LibraryCategory.security:
-        return Icons.security;
+        return 'shield_check';
       case LibraryCategory.ui:
-        return Icons.palette;
+        return 'widget';
       case LibraryCategory.utility:
-        return Icons.build;
+        return 'tuning';
       case LibraryCategory.malicious:
-        return Icons.dangerous;
+        return 'danger_circle';
       case LibraryCategory.unknown:
-        return Icons.help_outline;
+        return 'question_circle';
     }
   }
 }

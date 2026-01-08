@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../presentation/widgets/duotone_icon.dart';
 
 class ElevatedAccessSetupScreen extends StatefulWidget {
   const ElevatedAccessSetupScreen({super.key});
@@ -85,14 +86,14 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
     }
   }
 
-  IconData _getLevelIcon() {
+  String _getLevelIcon() {
     switch (_currentLevel) {
       case 'ROOT':
-        return Icons.verified_user;
+        return AppIcons.shieldCheck;
       case 'SHELL':
-        return Icons.security;
+        return AppIcons.shieldCheck;
       default:
-        return Icons.shield;
+        return AppIcons.shield;
     }
   }
 
@@ -116,7 +117,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          Icon(
+                          DuotoneIcon(
                             _getLevelIcon(),
                             size: 64,
                             color: _getLevelColor(),
@@ -198,7 +199,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                         'OrbGuard uses Android Debug Bridge (ADB) to gain shell '
                         'access, similar to how Shizuku works. This is completely '
                         'legitimate and safe.',
-                    Icons.info_outline,
+                    AppIcons.infoCircle,
                   ),
 
                   const SizedBox(height: 16),
@@ -213,7 +214,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                         'one-time setup.\n\n'
                         '3. ROOT - Full system access (uid 0). Can modify system, '
                         'remove any threat. Only if device is rooted.',
-                    Icons.layers,
+                    AppIcons.structure,
                   ),
 
                   const SizedBox(height: 24),
@@ -222,7 +223,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   if (_currentLevel == 'STANDARD') ...[
                     ElevatedButton.icon(
                       onPressed: _setupElevatedAccess,
-                      icon: const Icon(Icons.arrow_upward),
+                      icon: const DuotoneIcon(AppIcons.arrowUp, color: Colors.black),
                       label: const Text('Enable Shell Access'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00D9FF),
@@ -243,7 +244,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   ] else ...[
                     ElevatedButton.icon(
                       onPressed: _checkCurrentAccess,
-                      icon: const Icon(Icons.refresh),
+                      icon: const DuotoneIcon(AppIcons.refresh, color: Colors.white),
                       label: const Text('Re-check Access Level'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.all(16),
@@ -266,7 +267,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.verified, color: Colors.green),
+                            const DuotoneIcon(AppIcons.verifiedCheck, color: Colors.green),
                             const SizedBox(width: 8),
                             const Text(
                               'Safety & Privacy',
@@ -295,7 +296,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
     );
   }
 
-  Widget _buildInfoSection(String title, String content, IconData icon) {
+  Widget _buildInfoSection(String title, String content, String icon) {
     return Card(
       color: const Color(0xFF1D1E33),
       child: Padding(
@@ -305,7 +306,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, color: const Color(0xFF00D9FF)),
+                DuotoneIcon(icon, color: const Color(0xFF00D9FF)),
                 const SizedBox(width: 8),
                 Text(
                   title,
@@ -420,7 +421,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.star, color: Colors.blue),
+                        DuotoneIcon(AppIcons.star, color: Colors.blue),
                         SizedBox(width: 8),
                         Text(
                           'What You\'ll Get',
@@ -515,7 +516,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                                     .join('\n');
                                 _copyCommand(command);
                               },
-                              icon: const Icon(Icons.copy),
+                              icon: const DuotoneIcon(AppIcons.copy, color: Colors.black),
                               label: const Text('Copy Command'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00D9FF),
@@ -546,7 +547,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.info, color: Colors.orange),
+                      DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
                       SizedBox(width: 8),
                       Text(
                         'Important Note',
@@ -574,7 +575,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.check_circle),
+                  : const DuotoneIcon(AppIcons.checkCircle, color: Colors.white),
               label: Text(_isVerifying ? 'Verifying...' : 'Verify Access'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,

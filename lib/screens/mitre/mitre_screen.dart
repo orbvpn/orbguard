@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../providers/mitre_provider.dart';
@@ -49,7 +50,7 @@ class _MitreScreenState extends State<MitreScreen>
           showBackButton: true,
           actions: [
             GlassAppBarAction(
-              icon: Icons.info_outline,
+              svgIcon: 'info_circle',
               onTap: _showInfoDialog,
             ),
           ],
@@ -68,9 +69,9 @@ class _MitreScreenState extends State<MitreScreen>
                     indicatorColor: GlassTheme.primaryAccent,
                     labelColor: GlassTheme.primaryAccent,
                     unselectedLabelColor: Colors.white54,
-                    tabs: const [
-                      Tab(text: 'Matrix', icon: Icon(Icons.grid_view)),
-                      Tab(text: 'Detections', icon: Icon(Icons.warning_amber)),
+                    tabs: [
+                      Tab(text: 'Matrix', icon: DuotoneIcon('widget_4', size: 24)),
+                      Tab(text: 'Detections', icon: DuotoneIcon('danger_triangle', size: 24)),
                     ],
                   ),
                 ),
@@ -253,8 +254,8 @@ class _DetectionsTab extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.verified_user,
+                DuotoneIcon(
+                  'shield_check',
                   size: 64,
                   color: Colors.green.withAlpha(128),
                 ),
@@ -302,7 +303,7 @@ class _DetectionsTab extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: Colors.red),
+                  const DuotoneIcon('danger_triangle', size: 24, color: Colors.red),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -463,10 +464,10 @@ class _DetectionCard extends StatelessWidget {
               color: Colors.red.withAlpha(51),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.warning,
-              color: Colors.red,
+            child: const DuotoneIcon(
+              'danger_triangle',
               size: 20,
+              color: Colors.red,
             ),
           ),
           const SizedBox(width: 12),
@@ -526,8 +527,9 @@ class _DetectionCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right,
+          DuotoneIcon(
+            'alt_arrow_right',
+            size: 24,
             color: Colors.grey[600],
           ),
         ],

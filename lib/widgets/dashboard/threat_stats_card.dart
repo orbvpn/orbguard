@@ -9,6 +9,7 @@ import '../../models/api/threat_stats.dart';
 import '../../models/api/threat_indicator.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 
 /// Card displaying threat statistics overview
 class ThreatStatsCard extends StatelessWidget {
@@ -55,8 +56,8 @@ class ThreatStatsCard extends StatelessWidget {
             color: Colors.cyan.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
-            Icons.analytics,
+          child: const DuotoneIcon(
+            AppIcons.chartSquare,
             color: Colors.cyan,
             size: 20,
           ),
@@ -72,8 +73,8 @@ class ThreatStatsCard extends StatelessWidget {
           ),
         ),
         if (onTap != null)
-          const Icon(
-            Icons.chevron_right,
+          const DuotoneIcon(
+            AppIcons.chevronRight,
             color: Colors.grey,
             size: 20,
           ),
@@ -96,7 +97,7 @@ class ThreatStatsCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.cloud_off, size: 40, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.cloudStorage, size: 40, color: Colors.grey[600]),
             const SizedBox(height: 8),
             Text(
               'Unable to load threat data',
@@ -119,7 +120,7 @@ class ThreatStatsCard extends StatelessWidget {
                 label: 'Blocked Today',
                 value: _formatNumber(threatOverview?.threatsBlockedToday ?? 0),
                 color: Colors.green,
-                icon: Icons.shield,
+                icon: AppIcons.shield,
               ),
             ),
             Expanded(
@@ -127,7 +128,7 @@ class ThreatStatsCard extends StatelessWidget {
                 label: 'This Week',
                 value: _formatNumber(threatOverview?.threatsBlockedWeek ?? 0),
                 color: Colors.cyan,
-                icon: Icons.calendar_today,
+                icon: AppIcons.calendar,
               ),
             ),
           ],
@@ -173,7 +174,7 @@ class ThreatStatsCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber, color: Colors.red, size: 20),
+                const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -207,7 +208,7 @@ class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final IconData icon;
+  final String icon;
 
   const _StatItem({
     required this.label,
@@ -223,7 +224,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 14, color: color),
+            DuotoneIcon(icon, size: 14, color: color),
             const SizedBox(width: 4),
             Text(
               label,
@@ -316,22 +317,22 @@ class ThreatStatsCompact extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildMiniStat(Icons.shield, blockedToday.toString(), Colors.green),
+          _buildMiniStat(AppIcons.shield, blockedToday.toString(), Colors.green),
           const SizedBox(width: 12),
-          _buildMiniStat(Icons.error, criticalCount.toString(), Colors.red),
+          _buildMiniStat(AppIcons.dangerCircle, criticalCount.toString(), Colors.red),
           const SizedBox(width: 12),
           _buildMiniStat(
-              Icons.warning, highCount.toString(), Colors.orange),
+              AppIcons.dangerTriangle, highCount.toString(), Colors.orange),
         ],
       ),
     );
   }
 
-  Widget _buildMiniStat(IconData icon, String value, Color color) {
+  Widget _buildMiniStat(String icon, String value, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        DuotoneIcon(icon, size: 14, color: color),
         const SizedBox(width: 4),
         Text(
           value,

@@ -2,8 +2,10 @@
 /// VPN DNS filtering and server management interface
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class OrbNetVpnScreen extends StatefulWidget {
@@ -49,9 +51,9 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
       appBar: GlassAppBar(
         title: 'OrbNet VPN',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showSettingsDialog(context),
+          GlassAppBarAction(
+            svgIcon: AppIcons.settings,
+            onTap: () => _showSettingsDialog(context),
           ),
         ],
         bottom: TabBar(
@@ -103,8 +105,8 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
                     child: Center(
                       child: _isConnecting
                           ? const CircularProgressIndicator(color: GlassTheme.primaryAccent)
-                          : Icon(
-                              _isConnected ? Icons.power_settings_new : Icons.power_settings_new,
+                          : DuotoneIcon(
+                              AppIcons.power,
                               size: 64,
                               color: _isConnected ? GlassTheme.successColor : GlassTheme.primaryAccent,
                             ),
@@ -134,7 +136,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
           GlassCard(
             child: Row(
               children: [
-                const GlassIconBox(icon: Icons.dns, color: GlassTheme.primaryAccent),
+                GlassSvgIconBox(icon: AppIcons.server, color: GlassTheme.primaryAccent),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -176,10 +178,10 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
           // Features
           const SizedBox(height: 24),
           const GlassSectionHeader(title: 'Protection Features'),
-          _buildFeatureRow(Icons.block, 'Malware Blocking', true),
-          _buildFeatureRow(Icons.ads_click, 'Ad Blocking', true),
-          _buildFeatureRow(Icons.track_changes, 'Tracker Blocking', true),
-          _buildFeatureRow(Icons.phishing, 'Phishing Protection', true),
+          _buildFeatureRow(AppIcons.forbidden, 'Malware Blocking', true),
+          _buildFeatureRow(AppIcons.closeCircle, 'Ad Blocking', true),
+          _buildFeatureRow(AppIcons.target, 'Tracker Blocking', true),
+          _buildFeatureRow(AppIcons.shieldWarning, 'Phishing Protection', true),
         ],
       ),
     );
@@ -200,17 +202,18 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
     );
   }
 
-  Widget _buildFeatureRow(IconData icon, String title, bool enabled) {
+  Widget _buildFeatureRow(String icon, String title, bool enabled) {
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: enabled ? GlassTheme.successColor : Colors.grey, size: 36),
+          GlassSvgIconBox(icon: icon, color: enabled ? GlassTheme.successColor : Colors.grey, size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
           ),
-          Icon(
-            enabled ? Icons.check_circle : Icons.cancel,
+          DuotoneIcon(
+            enabled ? AppIcons.checkCircle : AppIcons.closeCircle,
+            size: 24,
             color: enabled ? GlassTheme.successColor : Colors.grey,
           ),
         ],
@@ -228,8 +231,8 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
           tintColor: _selectedServer == 'Auto' ? GlassTheme.primaryAccent : null,
           child: Row(
             children: [
-              GlassIconBox(
-                icon: Icons.auto_awesome,
+              GlassSvgIconBox(
+                icon: AppIcons.magic,
                 color: _selectedServer == 'Auto' ? GlassTheme.primaryAccent : Colors.white54,
               ),
               const SizedBox(width: 12),
@@ -243,7 +246,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
                 ),
               ),
               if (_selectedServer == 'Auto')
-                const Icon(Icons.check_circle, color: GlassTheme.primaryAccent),
+                DuotoneIcon(AppIcons.checkCircle, size: 24, color: GlassTheme.primaryAccent),
             ],
           ),
         ),
@@ -279,8 +282,8 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.signal_cellular_alt,
+                  DuotoneIcon(
+                    AppIcons.wifi,
                     size: 16,
                     color: server.latency < 50
                         ? GlassTheme.successColor
@@ -296,9 +299,9 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
             ],
           ),
           if (isSelected)
-            const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Icon(Icons.check_circle, color: GlassTheme.primaryAccent),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: DuotoneIcon(AppIcons.checkCircle, size: 24, color: GlassTheme.primaryAccent),
             ),
         ],
       ),
@@ -337,7 +340,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: Icons.block, color: enabled ? color : Colors.grey, size: 36),
+          GlassSvgIconBox(icon: AppIcons.forbidden, color: enabled ? color : Colors.grey, size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
@@ -356,7 +359,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
     return GlassCard(
       child: Row(
         children: [
-          GlassIconBox(icon: Icons.block, color: GlassTheme.errorColor, size: 36),
+          GlassSvgIconBox(icon: AppIcons.forbidden, color: GlassTheme.errorColor, size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
+import '../presentation/widgets/duotone_icon.dart';
 
 class ScanResultsScreen extends StatefulWidget {
   final List<ThreatDetection> threats;
@@ -73,16 +74,16 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               background: _buildHeader(isClean, critical.length, high.length),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
+              icon: const DuotoneIcon('alt_arrow_left', color: Colors.white, size: 24),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.share_outlined),
+                icon: const DuotoneIcon('share', color: Colors.white, size: 24),
                 onPressed: () => _shareResults(),
               ),
               IconButton(
-                icon: const Icon(Icons.info_outline),
+                icon: const DuotoneIcon('info_circle', color: Colors.white, size: 24),
                 onPressed: () => _showScanDetails(),
               ),
             ],
@@ -200,12 +201,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                   ),
                 ],
               ),
-              child: Icon(
+              child: DuotoneIcon(
                 isClean
-                    ? Icons.verified_user
+                    ? 'shield_check'
                     : critical > 0
-                        ? Icons.gpp_bad
-                        : Icons.warning_amber_rounded,
+                        ? 'shield_cross'
+                        : 'danger_triangle',
                 size: 50,
                 color: isClean
                     ? Colors.green
@@ -302,20 +303,20 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       ),
       child: Row(
         children: [
-          _buildSummaryItem(Icons.folder_open, 'Items Scanned', _formatNumber(widget.itemsScanned)),
+          _buildSummaryItem('folder_open', 'Items Scanned', _formatNumber(widget.itemsScanned)),
           Container(
             width: 1,
             height: 40,
             color: Colors.grey[800],
           ),
-          _buildSummaryItem(Icons.timer_outlined, 'Scan Time', _formatDuration(widget.scanDuration)),
+          _buildSummaryItem('clock_circle', 'Scan Time', _formatDuration(widget.scanDuration)),
           Container(
             width: 1,
             height: 40,
             color: Colors.grey[800],
           ),
           _buildSummaryItem(
-            Icons.security,
+            'shield_check',
             'Protection',
             widget.threats.isEmpty ? 'Active' : 'At Risk',
           ),
@@ -324,11 +325,11 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildSummaryItem(IconData icon, String label, String value) {
+  Widget _buildSummaryItem(String icon, String label, String value) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 20, color: Colors.cyan),
+          DuotoneIcon(icon, size: 20, color: Colors.cyan),
           const SizedBox(height: 8),
           Text(
             value,
@@ -366,7 +367,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               shape: BoxShape.circle,
               color: Colors.green.withOpacity(0.2),
             ),
-            child: const Icon(Icons.check, size: 32, color: Colors.green),
+            child: const DuotoneIcon('check_circle', size: 32, color: Colors.green),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -392,7 +393,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             children: [
               Expanded(
                 child: _buildTipCard(
-                  Icons.update,
+                  'restart',
                   'Keep Updated',
                   'Regular scans help maintain security',
                 ),
@@ -400,7 +401,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: _buildTipCard(
-                  Icons.shield,
+                  'shield',
                   'Stay Protected',
                   'Avoid unknown app sources',
                 ),
@@ -412,7 +413,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildTipCard(IconData icon, String title, String subtitle) {
+  Widget _buildTipCard(String icon, String title, String subtitle) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -422,7 +423,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.green),
+          DuotoneIcon(icon, size: 20, color: Colors.green),
           const SizedBox(height: 8),
           Text(
             title,
@@ -505,8 +506,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               color: color.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              _getThreatIcon(threat.type),
+            child: DuotoneIcon(
+              _getThreatSvgIcon(threat.type),
               color: color,
               size: 22,
             ),
@@ -565,7 +566,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
+                    const DuotoneIcon('danger_triangle', color: Colors.orange, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -590,7 +591,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.lightbulb_outline, color: Colors.cyan, size: 18),
+                    const DuotoneIcon('lightbulb', color: Colors.cyan, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -608,7 +609,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _quarantineThreat(threat),
-                    icon: const Icon(Icons.shield, size: 18),
+                    icon: const DuotoneIcon('shield', size: 18, color: Colors.cyan),
                     label: const Text('Quarantine'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.cyan,
@@ -621,7 +622,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _removeThreat(threat),
-                    icon: const Icon(Icons.delete_outline, size: 18),
+                    icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: Colors.white),
                     label: const Text('Remove'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
@@ -670,7 +671,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showRemoveAllDialog(),
-        icon: const Icon(Icons.delete_sweep),
+        icon: const DuotoneIcon('trash_bin_2', size: 24, color: Colors.white),
         label: const Text('Remove All Threats'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red,
@@ -684,22 +685,22 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  IconData _getThreatIcon(String type) {
+  String _getThreatSvgIcon(String type) {
     switch (type.toLowerCase()) {
       case 'network':
-        return Icons.wifi_tethering;
+        return 'wi_fi_router_round';
       case 'process':
-        return Icons.memory;
+        return 'cpu';
       case 'file':
-        return Icons.insert_drive_file;
+        return 'file';
       case 'package':
-        return Icons.apps;
+        return 'smartphone';
       case 'permission':
-        return Icons.admin_panel_settings;
+        return 'crown';
       case 'accessibility':
-        return Icons.accessibility;
+        return 'eye';
       default:
-        return Icons.bug_report;
+        return 'bug';
     }
   }
 
@@ -894,7 +895,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           const SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                DuotoneIcon('check_circle', color: Colors.green, size: 24),
                 SizedBox(width: 12),
                 Text('Threat dismissed'),
               ],
@@ -933,7 +934,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green),
+                  DuotoneIcon('check_circle', color: Colors.green, size: 24),
                   SizedBox(width: 12),
                   Text('Threat removed successfully'),
                 ],
@@ -952,7 +953,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.error, color: Colors.red),
+                  const DuotoneIcon('danger_circle', color: Colors.red, size: 24),
                   const SizedBox(width: 12),
                   Expanded(child: Text('Failed: ${result['error'] ?? 'Could not remove threat'}')),
                 ],
@@ -975,7 +976,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green),
+                  DuotoneIcon('check_circle', color: Colors.green, size: 24),
                   SizedBox(width: 12),
                   Text('Threat dismissed'),
                 ],
@@ -993,7 +994,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.error, color: Colors.orange),
+                  DuotoneIcon('danger_circle', color: Colors.orange, size: 24),
                   SizedBox(width: 12),
                   Expanded(child: Text('Critical threat requires elevated access to remove')),
                 ],
@@ -1080,7 +1081,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
         const SnackBar(
           content: Row(
             children: [
-              Icon(Icons.shield, color: Colors.cyan),
+              DuotoneIcon('shield', color: Colors.cyan, size: 24),
               SizedBox(width: 12),
               Text('Threat quarantined successfully'),
             ],

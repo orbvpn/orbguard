@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/sms_provider.dart';
 import '../../widgets/sms/sms_widgets.dart';
 
@@ -167,7 +168,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
         title: const Text('Message Details'),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
+            icon: const DuotoneIcon('menu_dots', color: Colors.white, size: 24),
             color: const Color(0xFF1D1E33),
             onSelected: (value) {
               switch (value) {
@@ -192,19 +193,19 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'copy',
                 child: ListTile(
-                  leading: Icon(Icons.copy, size: 20),
-                  title: Text('Copy message'),
+                  leading: const DuotoneIcon('copy', size: 20, color: Colors.white),
+                  title: const Text('Copy message'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
               PopupMenuItem(
                 value: isBlocked ? 'unblock' : 'block',
                 child: ListTile(
-                  leading: Icon(
-                    isBlocked ? Icons.check_circle : Icons.block,
+                  leading: DuotoneIcon(
+                    isBlocked ? 'check_circle' : 'forbidden',
                     size: 20,
                     color: isBlocked ? Colors.green : Colors.red,
                   ),
@@ -213,19 +214,19 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 ),
               ),
               if (hasAnalysis && _message.hasThreats)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'report',
                   child: ListTile(
-                    leading: Icon(Icons.flag, size: 20),
-                    title: Text('Report false positive'),
+                    leading: const DuotoneIcon('flag', size: 20, color: Colors.white),
+                    title: const Text('Report false positive'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
-                  leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                  title: Text('Delete', style: TextStyle(color: Colors.red)),
+                  leading: const DuotoneIcon('trash_bin_minimalistic', size: 20, color: Colors.red),
+                  title: const Text('Delete', style: TextStyle(color: Colors.red)),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -304,7 +305,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                   foregroundColor: const Color(0xFF00D9FF),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                icon: const Icon(Icons.refresh, size: 18),
+                icon: const DuotoneIcon('refresh', size: 18, color: Color(0xFF00D9FF)),
                 label: const Text('Re-analyze'),
               ),
             ],
@@ -424,7 +425,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.copy, size: 18),
+                icon: const DuotoneIcon('copy', size: 18, color: Colors.white),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: _copyContent,
@@ -497,8 +498,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.security,
+          const DuotoneIcon(
+            'shield_check',
             size: 48,
             color: Color(0xFF00D9FF),
           ),
@@ -530,7 +531,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 vertical: 12,
               ),
             ),
-            icon: const Icon(Icons.search, size: 18),
+            icon: const DuotoneIcon('magnifer', size: 18, color: Colors.black),
             label: const Text('Analyze Message'),
           ),
         ],
@@ -570,8 +571,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.lightbulb_outline,
+                DuotoneIcon(
+                  'lightbulb',
                   color: Color(analysis.threatLevel.color),
                   size: 18,
                 ),
@@ -598,7 +599,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: Colors.red, size: 18),
+                  const DuotoneIcon('danger_triangle', color: Colors.red, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -656,8 +657,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                _getIntentIcon(intent),
+              DuotoneIcon(
+                _getIntentSvgIcon(intent),
                 size: 14,
                 color: Colors.orange,
               ),
@@ -677,24 +678,24 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     );
   }
 
-  IconData _getIntentIcon(SuspiciousIntent intent) {
+  String _getIntentSvgIcon(SuspiciousIntent intent) {
     switch (intent) {
       case SuspiciousIntent.urgency:
-        return Icons.timer;
+        return 'stopwatch';
       case SuspiciousIntent.fear:
-        return Icons.warning;
+        return 'danger_triangle';
       case SuspiciousIntent.reward:
-        return Icons.card_giftcard;
+        return 'gift';
       case SuspiciousIntent.curiosity:
-        return Icons.help;
+        return 'question_circle';
       case SuspiciousIntent.authority:
-        return Icons.gavel;
+        return 'clipboard_text';
       case SuspiciousIntent.social:
-        return Icons.people;
+        return 'users_group_rounded';
       case SuspiciousIntent.greed:
-        return Icons.attach_money;
+        return 'dollar';
       case SuspiciousIntent.none:
-        return Icons.check;
+        return 'check_circle';
     }
   }
 

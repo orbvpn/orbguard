@@ -4,7 +4,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/glass_theme.dart';
+import 'duotone_icon.dart';
 
 /// Glass-styled app bar with blur effect
 class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -122,8 +124,8 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
         width: 48,
         height: 48,
         alignment: Alignment.center,
-        child: Icon(
-          Icons.arrow_back_ios_new,
+        child: DuotoneIcon(
+          AppIcons.chevronLeft,
           color: isDark ? Colors.white : Colors.black87,
           size: 20,
         ),
@@ -134,7 +136,8 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 /// Glass action button for app bar
 class GlassAppBarAction extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgIcon;
   final VoidCallback? onTap;
   final bool isDark;
   final Color? color;
@@ -142,26 +145,41 @@ class GlassAppBarAction extends StatelessWidget {
 
   const GlassAppBarAction({
     super.key,
-    required this.icon,
+    this.icon,
+    this.svgIcon,
     this.onTap,
     this.isDark = true,
     this.color,
     this.tooltip,
-  });
+  }) : assert(icon != null || svgIcon != null, 'Either icon or svgIcon must be provided');
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = color ?? (isDark ? Colors.white : Colors.black87);
+
+    Widget iconWidget;
+    if (svgIcon != null) {
+      iconWidget = SvgPicture.asset(
+        'assets/icons/$svgIcon.svg',
+        width: 22,
+        height: 22,
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+      );
+    } else {
+      iconWidget = Icon(
+        icon,
+        color: iconColor,
+        size: 22,
+      );
+    }
+
     Widget button = GestureDetector(
       onTap: onTap,
       child: Container(
         width: 44,
         height: 44,
         alignment: Alignment.center,
-        child: Icon(
-          icon,
-          color: color ?? (isDark ? Colors.white : Colors.black87),
-          size: 22,
-        ),
+        child: iconWidget,
       ),
     );
 
@@ -311,6 +329,9 @@ class GlassBottomNav extends StatelessWidget {
               children: List.generate(items.length, (index) {
                 final item = items[index];
                 final isSelected = index == currentIndex;
+                final iconColor = isSelected
+                    ? GlassTheme.primaryAccent
+                    : (isDark ? Colors.white54 : Colors.black45);
 
                 return GestureDetector(
                   onTap: () => onTap(index),
@@ -330,21 +351,24 @@ class GlassBottomNav extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          isSelected ? item.activeIcon : item.icon,
-                          color: isSelected
-                              ? GlassTheme.primaryAccent
-                              : (isDark ? Colors.white54 : Colors.black45),
-                          size: 24,
-                        ),
+                        if (item.svgIcon != null)
+                          DuotoneIcon(
+                            isSelected ? (item.activeSvgIcon ?? item.svgIcon!) : item.svgIcon!,
+                            color: iconColor,
+                            size: 24,
+                          )
+                        else
+                          Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            color: iconColor,
+                            size: 24,
+                          ),
                         if (item.label != null) ...[
                           const SizedBox(height: 4),
                           Text(
                             item.label!,
                             style: TextStyle(
-                              color: isSelected
-                                  ? GlassTheme.primaryAccent
-                                  : (isDark ? Colors.white54 : Colors.black45),
+                              color: iconColor,
                               fontSize: 10,
                               fontWeight: isSelected
                                   ? FontWeight.w600
@@ -367,13 +391,27 @@ class GlassBottomNav extends StatelessWidget {
 
 /// Glass bottom nav item data
 class GlassBottomNavItem {
-  final IconData icon;
-  final IconData activeIcon;
+  final IconData? icon;
+  final IconData? activeIcon;
+  final String? svgIcon;
+  final String? activeSvgIcon;
   final String? label;
 
   const GlassBottomNavItem({
-    required this.icon,
-    IconData? activeIcon,
+    this.icon,
+    this.activeIcon,
+    this.svgIcon,
+    this.activeSvgIcon,
     this.label,
-  }) : activeIcon = activeIcon ?? icon;
+  }) : assert(icon != null || svgIcon != null, 'Either icon or svgIcon must be provided');
+
+  /// Named constructor for SVG icons
+  const GlassBottomNavItem.svg({
+    required String icon,
+    String? activeIcon,
+    this.label,
+  })  : svgIcon = icon,
+        activeSvgIcon = activeIcon ?? icon,
+        icon = null,
+        activeIcon = null;
 }

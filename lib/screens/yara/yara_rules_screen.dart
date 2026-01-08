@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 
 class YaraRulesScreen extends StatefulWidget {
@@ -49,13 +50,15 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
       appBar: GlassAppBar(
         title: 'YARA Rules',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: () => _showUploadDialog(context),
+          GlassAppBarAction(
+            svgIcon: AppIcons.fileDownload,
+            onTap: () => _showUploadDialog(context),
+            tooltip: 'Upload',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadRules,
+          GlassAppBarAction(
+            svgIcon: AppIcons.refresh,
+            onTap: _isLoading ? null : _loadRules,
+            tooltip: 'Refresh',
           ),
         ],
         bottom: TabBar(
@@ -86,7 +89,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
   Widget _buildRulesTab() {
     if (_rules.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.rule,
+        icon: AppIcons.code,
         title: 'No YARA Rules',
         subtitle: 'Upload or sync YARA rules to start scanning',
       );
@@ -147,8 +150,8 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: Icons.rule,
+              GlassSvgIconBox(
+                icon: AppIcons.code,
                 color: rule.isEnabled ? severityColor : Colors.grey,
               ),
               const SizedBox(width: 12),
@@ -215,25 +218,25 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
 
           // Scan options
           _buildScanOption(
-            icon: Icons.phone_android,
+            icon: AppIcons.smartphone,
             title: 'Scan Device',
             subtitle: 'Scan installed apps and files',
             onTap: () => _startScan('device'),
           ),
           _buildScanOption(
-            icon: Icons.folder,
+            icon: AppIcons.folder,
             title: 'Scan Directory',
             subtitle: 'Scan a specific folder',
             onTap: () => _startScan('directory'),
           ),
           _buildScanOption(
-            icon: Icons.insert_drive_file,
+            icon: AppIcons.file,
             title: 'Scan File',
             subtitle: 'Scan a single file',
             onTap: () => _startScan('file'),
           ),
           _buildScanOption(
-            icon: Icons.memory,
+            icon: AppIcons.cpu,
             title: 'Scan Memory',
             subtitle: 'Scan running processes',
             onTap: () => _startScan('memory'),
@@ -262,7 +265,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
   }
 
   Widget _buildScanOption({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -271,7 +274,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
       onTap: _isScanning ? null : onTap,
       child: Row(
         children: [
-          GlassIconBox(icon: icon, color: GlassTheme.primaryAccent),
+          GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -282,7 +285,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.white54),
+          DuotoneIcon(AppIcons.chevronRight, color: Colors.white54, size: 20),
         ],
       ),
     );
@@ -291,7 +294,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
   Widget _buildResultsTab() {
     if (_scanResults.isEmpty) {
       return _buildEmptyState(
-        icon: Icons.fact_check,
+        icon: AppIcons.clipboardCheck,
         title: 'No Scan Results',
         subtitle: 'Run a scan to see results here',
       );
@@ -316,8 +319,8 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
         children: [
           Row(
             children: [
-              GlassIconBox(
-                icon: result.matches.isNotEmpty ? Icons.warning : Icons.check_circle,
+              GlassSvgIconBox(
+                icon: result.matches.isNotEmpty ? AppIcons.dangerTriangle : AppIcons.checkCircle,
                 color: result.matches.isNotEmpty ? severityColor : GlassTheme.successColor,
               ),
               const SizedBox(width: 12),
@@ -359,7 +362,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
   }
 
   Widget _buildEmptyState({
-    required IconData icon,
+    required String icon,
     required String title,
     required String subtitle,
   }) {
@@ -367,7 +370,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/api/url_reputation.dart';
 import '../../models/api/threat_indicator.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/url_provider.dart';
 
 /// URL safety badge
@@ -25,7 +26,7 @@ class UrlSafetyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isSafe ? Colors.green : Color(severity?.color ?? 0xFFE53935);
     final label = isSafe ? 'Safe' : (severity?.displayName ?? 'Unsafe');
-    final icon = isSafe ? Icons.verified_user : Icons.warning;
+    final icon = isSafe ? AppIcons.shieldCheck : AppIcons.dangerTriangle;
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -40,7 +41,7 @@ class UrlSafetyBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: compact ? 14 : 16, color: color),
+          DuotoneIcon(icon, size: compact ? 14 : 16, color: color),
           SizedBox(width: compact ? 4 : 6),
           Text(
             label,
@@ -148,8 +149,8 @@ class UrlResultCard extends StatelessWidget {
             // Header
             Row(
               children: [
-                Icon(
-                  result.isSafe ? Icons.check_circle : Icons.dangerous,
+                DuotoneIcon(
+                  result.isSafe ? AppIcons.checkCircle : AppIcons.dangerCircle,
                   color: result.isSafe ? Colors.green : Color(result.severity.color),
                   size: 24,
                 ),
@@ -214,7 +215,7 @@ class UrlResultCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.warning_amber, size: 16, color: Colors.red),
+                        const DuotoneIcon(AppIcons.dangerTriangle, size: 16, color: Colors.red),
                         const SizedBox(width: 6),
                         Text(
                           '${result.threats.length} threat${result.threats.length > 1 ? 's' : ''} detected',
@@ -249,8 +250,8 @@ class UrlResultCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline,
+                  DuotoneIcon(
+                    AppIcons.lightbulb,
                     size: 16,
                     color: Colors.grey[500],
                   ),
@@ -356,8 +357,8 @@ class UrlHistoryItem extends StatelessWidget {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(
-                        result?.isSafe == true ? Icons.check : Icons.warning,
+                    : DuotoneIcon(
+                        result?.isSafe == true ? AppIcons.checkCircle : AppIcons.dangerTriangle,
                         size: 18,
                         color: _getStatusColor(),
                       ),
@@ -401,7 +402,7 @@ class UrlHistoryItem extends StatelessWidget {
               if (onDelete != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -517,8 +518,8 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
                 horizontal: 16,
                 vertical: 14,
               ),
-              prefixIcon: Icon(
-                Icons.link,
+              prefixIcon: DuotoneIcon(
+                AppIcons.urlProtection,
                 color: Colors.grey[500],
               ),
             ),
@@ -543,7 +544,7 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
                       valueColor: AlwaysStoppedAnimation(Colors.black),
                     ),
                   )
-                : const Icon(Icons.search, size: 20),
+                : const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
             label: Text(widget.isChecking ? 'Checking...' : 'Check URL'),
           ),
         ],
@@ -577,8 +578,8 @@ class UrlStatsCard extends StatelessWidget {
                   color: const Color(0xFF00D9FF).withAlpha(50),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.language,
+                child: const DuotoneIcon(
+                  AppIcons.globus,
                   color: Color(0xFF00D9FF),
                   size: 24,
                 ),
@@ -770,7 +771,7 @@ class DomainDetailsCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+              const DuotoneIcon(AppIcons.infoCircle, size: 20, color: Colors.grey),
               const SizedBox(width: 8),
               const Text(
                 'Domain Information',
@@ -888,7 +889,7 @@ class _WarningRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(Icons.warning_amber, size: 14, color: color),
+          DuotoneIcon(AppIcons.dangerTriangle, size: 14, color: color),
           const SizedBox(width: 6),
           Text(
             text,
@@ -920,8 +921,8 @@ class _SslSection extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            ssl.hasValidSsl ? Icons.lock : Icons.lock_open,
+          DuotoneIcon(
+            ssl.hasValidSsl ? AppIcons.lock : AppIcons.lockUnlocked,
             size: 18,
             color: color,
           ),
@@ -985,7 +986,7 @@ class UrlListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: const Icon(Icons.language, color: Colors.grey),
+      leading: const DuotoneIcon(AppIcons.globus, color: Colors.grey),
       title: Text(entry.domain),
       subtitle: Text(
         'Added ${_formatDate(entry.addedAt)}',
@@ -995,7 +996,7 @@ class UrlListTile extends StatelessWidget {
         ),
       ),
       trailing: IconButton(
-        icon: const Icon(Icons.remove_circle_outline),
+        icon: const DuotoneIcon(AppIcons.minusCircle, color: Colors.red),
         color: Colors.red,
         onPressed: onRemove,
       ),

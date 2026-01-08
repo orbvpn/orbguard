@@ -5,6 +5,7 @@ library qr_widgets;
 import 'package:flutter/material.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
 
 /// QR result card
@@ -82,8 +83,8 @@ class QrResultCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline,
+                  DuotoneIcon(
+                    AppIcons.lightbulb,
                     size: 16,
                     color: Colors.grey[500],
                   ),
@@ -149,7 +150,7 @@ class QrResultCard extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                       ),
-                      icon: const Icon(Icons.block, size: 18),
+                      icon: const DuotoneIcon(AppIcons.forbidden, size: 18, color: Colors.red),
                       label: const Text('Block'),
                     ),
                   ),
@@ -160,7 +161,7 @@ class QrResultCard extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.grey,
                       ),
-                      icon: const Icon(Icons.copy, size: 18),
+                      icon: const DuotoneIcon(AppIcons.copy, size: 18, color: Colors.grey),
                       label: const Text('Copy'),
                     ),
                   ),
@@ -214,7 +215,7 @@ class QrThreatBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          DuotoneIcon(
             _getIcon(),
             size: compact ? 14 : 16,
             color: Color(level.color),
@@ -233,16 +234,16 @@ class QrThreatBadge extends StatelessWidget {
     );
   }
 
-  IconData _getIcon() {
+  String _getIcon() {
     switch (level) {
       case SmsThreatLevel.safe:
-        return Icons.verified_user;
+        return AppIcons.shieldCheck;
       case SmsThreatLevel.suspicious:
-        return Icons.warning;
+        return AppIcons.dangerTriangle;
       case SmsThreatLevel.dangerous:
-        return Icons.dangerous;
+        return AppIcons.dangerCircle;
       case SmsThreatLevel.critical:
-        return Icons.error;
+        return AppIcons.dangerCircle;
     }
   }
 }
@@ -263,7 +264,7 @@ class _ContentTypeIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Center(
-        child: Icon(
+        child: DuotoneIcon(
           _getIcon(),
           color: const Color(0xFF00D9FF),
           size: 22,
@@ -272,32 +273,32 @@ class _ContentTypeIcon extends StatelessWidget {
     );
   }
 
-  IconData _getIcon() {
+  String _getIcon() {
     switch (contentType.toLowerCase()) {
       case 'url':
-        return Icons.link;
+        return AppIcons.urlProtection;
       case 'text':
-        return Icons.text_fields;
+        return AppIcons.fileText;
       case 'email':
-        return Icons.email;
+        return AppIcons.letter;
       case 'phone':
-        return Icons.phone;
+        return AppIcons.smartphone;
       case 'sms':
-        return Icons.sms;
+        return AppIcons.chatDots;
       case 'wifi':
-        return Icons.wifi;
+        return AppIcons.wifi;
       case 'vcard':
-        return Icons.contact_page;
+        return AppIcons.userId;
       case 'geo':
-        return Icons.location_on;
+        return AppIcons.mapPoint;
       case 'event':
-        return Icons.event;
+        return AppIcons.calendar;
       case 'crypto':
-        return Icons.currency_bitcoin;
+        return AppIcons.wallet;
       case 'app_link':
-        return Icons.apps;
+        return AppIcons.smartphone;
       default:
-        return Icons.qr_code;
+        return AppIcons.qrCode;
     }
   }
 }
@@ -322,7 +323,7 @@ class _ThreatsList extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.warning_amber, size: 16, color: Colors.red),
+              const DuotoneIcon(AppIcons.dangerTriangle, size: 16, color: Colors.red),
               const SizedBox(width: 6),
               Text(
                 '${threats.length} threat${threats.length > 1 ? 's' : ''} detected',
@@ -406,7 +407,7 @@ class QrHistoryItem extends StatelessWidget {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(
+                    : DuotoneIcon(
                         _getContentIcon(),
                         size: 18,
                         color: _getStatusColor(),
@@ -446,7 +447,7 @@ class QrHistoryItem extends StatelessWidget {
               if (onDelete != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -466,19 +467,19 @@ class QrHistoryItem extends StatelessWidget {
     return Colors.red;
   }
 
-  IconData _getContentIcon() {
+  String _getContentIcon() {
     final type = entry.contentType ?? entry.result?.contentType ?? 'unknown';
     switch (type.toLowerCase()) {
       case 'url':
-        return Icons.link;
+        return AppIcons.urlProtection;
       case 'wifi':
-        return Icons.wifi;
+        return AppIcons.wifi;
       case 'phone':
-        return Icons.phone;
+        return AppIcons.smartphone;
       case 'email':
-        return Icons.email;
+        return AppIcons.letter;
       default:
-        return Icons.qr_code;
+        return AppIcons.qrCode;
     }
   }
 
@@ -520,8 +521,8 @@ class QrStatsCard extends StatelessWidget {
                   color: const Color(0xFF00D9FF).withAlpha(50),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.qr_code_scanner,
+                child: const DuotoneIcon(
+                  AppIcons.scanner,
                   color: Color(0xFF00D9FF),
                   size: 24,
                 ),
@@ -747,7 +748,7 @@ class _QrManualInputState extends State<QrManualInput> {
                       valueColor: AlwaysStoppedAnimation(Colors.black),
                     ),
                   )
-                : const Icon(Icons.search, size: 20),
+                : const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
             label: Text(widget.isAnalyzing ? 'Analyzing...' : 'Analyze'),
           ),
         ],
