@@ -61,6 +61,7 @@ import 'providers/network_firewall_provider.dart';
 import 'providers/social_media_provider.dart';
 import 'providers/rogue_ap_provider.dart' show RogueAPProvider;
 import 'providers/enterprise_policy_provider.dart';
+import 'providers/desktop_security_provider.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
@@ -125,6 +126,7 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SocialMediaProvider()),
         ChangeNotifierProvider(create: (_) => RogueAPProvider()),
         ChangeNotifierProvider(create: (_) => EnterprisePolicyProvider()),
+        ChangeNotifierProvider(create: (_) => DesktopSecurityProvider()),
       ],
       child: MaterialApp(
         title: 'OrbGuard',
