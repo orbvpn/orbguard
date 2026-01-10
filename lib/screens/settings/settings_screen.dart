@@ -9,6 +9,7 @@ import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -1338,19 +1339,19 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Testing connection...')),
                   );
-                  // TODO: Test API connection
-                  Future.delayed(const Duration(seconds: 1), () {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Connection successful!')),
-                      );
-                    }
-                  });
+                  final success = await OrbGuardApiClient.instance.testConnection();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success ? 'Connection successful!' : 'Connection failed'),
+                        backgroundColor: success ? GlassTheme.successColor : GlassTheme.errorColor,
+                      ),
+                    );
+                  }
                 },
                 icon: const DuotoneIcon('wi_fi_router', color: Colors.black, size: 20),
                 label: const Text('Test Connection'),

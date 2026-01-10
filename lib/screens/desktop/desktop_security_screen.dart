@@ -8,6 +8,7 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
   const DesktopSecurityScreen({super.key});
@@ -17,7 +18,10 @@ class DesktopSecurityScreen extends StatefulWidget {
 }
 
 class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
+  final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
+  bool _isLoading = false;
   bool _isScanning = false;
+  String? _error;
   final List<PersistenceItem> _persistenceItems = [];
   final List<SignedApp> _signedApps = [];
   final List<FirewallRule> _firewallRules = [];
@@ -29,18 +33,43 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   Future<void> _loadData() async {
-    await Future.delayed(const Duration(milliseconds: 300));
     setState(() {
-      _persistenceItems.addAll(_getSamplePersistenceItems());
-      _signedApps.addAll(_getSampleSignedApps());
-      _firewallRules.addAll(_getSampleFirewallRules());
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      // Load desktop security data from API
+      final persistenceData = await _apiClient.getPersistenceItems();
+      final signedAppsData = await _apiClient.getSignedApps();
+      final firewallData = await _apiClient.getDesktopFirewallRules();
+
+      setState(() {
+        _persistenceItems.clear();
+        _persistenceItems.addAll(persistenceData.map((json) => PersistenceItem.fromJson(json)));
+
+        _signedApps.clear();
+        _signedApps.addAll(signedAppsData.map((json) => SignedApp.fromJson(json)));
+
+        _firewallRules.clear();
+        _firewallRules.addAll(firewallData.map((json) => FirewallRule.fromJson(json)));
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load desktop security data: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return GlassTabPage(
       title: 'Desktop Security',
+      hasSearch: true,
+      searchHint: 'Search devices...',
       headerContent: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -489,18 +518,42 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
-  void _runScan() {
+  Future<void> _runScan() async {
     setState(() => _isScanning = true);
-    Future.delayed(const Duration(seconds: 3), () {
+
+    try {
+      // Run persistence scan via API
+      final results = await _apiClient.scanPersistence();
+
       if (!mounted) return;
-      setState(() => _isScanning = false);
+
+      setState(() {
+        _isScanning = false;
+        // Update persistence items with new scan results
+        if (results['items'] != null) {
+          _persistenceItems.clear();
+          _persistenceItems.addAll(
+            (results['items'] as List).map((json) => PersistenceItem.fromJson(json as Map<String, dynamic>)),
+          );
+        }
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Persistence scan complete'),
           backgroundColor: GlassTheme.successColor,
         ),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isScanning = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Scan failed: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
   }
 
   void _showPersistenceDetails(BuildContext context, PersistenceItem item) {
@@ -778,153 +831,6 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     return 'smartphone';
   }
 
-  List<PersistenceItem> _getSamplePersistenceItems() {
-    return [
-      PersistenceItem(
-        id: '1',
-        name: 'com.apple.spotlight',
-        type: 'Launch Agent',
-        path: '/System/Library/LaunchAgents/com.apple.spotlight.plist',
-        isRunning: true,
-        autoStart: true,
-        isSuspicious: false,
-      ),
-      PersistenceItem(
-        id: '2',
-        name: 'Google Chrome Helper',
-        type: 'Login Item',
-        path: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper',
-        isRunning: true,
-        autoStart: true,
-        isSuspicious: false,
-      ),
-      PersistenceItem(
-        id: '3',
-        name: 'com.unknown.helper',
-        type: 'Launch Agent',
-        path: '/Users/user/Library/LaunchAgents/com.unknown.helper.plist',
-        isRunning: true,
-        autoStart: true,
-        isSuspicious: true,
-        reason: 'Unknown developer, hidden executable, network connections detected',
-      ),
-      PersistenceItem(
-        id: '4',
-        name: 'Docker Desktop',
-        type: 'Login Item',
-        path: '/Applications/Docker.app/Contents/MacOS/Docker Desktop',
-        isRunning: false,
-        autoStart: true,
-        isSuspicious: false,
-      ),
-      PersistenceItem(
-        id: '5',
-        name: 'com.apple.ScreenTimeAgent',
-        type: 'Launch Daemon',
-        path: '/System/Library/LaunchDaemons/com.apple.ScreenTimeAgent.plist',
-        isRunning: true,
-        autoStart: true,
-        isSuspicious: false,
-      ),
-    ];
-  }
-
-  List<SignedApp> _getSampleSignedApps() {
-    return [
-      SignedApp(
-        name: 'Safari',
-        bundleId: 'com.apple.Safari',
-        isSigned: true,
-        isValid: true,
-        developer: 'Apple Inc.',
-        teamId: 'APPLECOMPUTER',
-      ),
-      SignedApp(
-        name: 'Google Chrome',
-        bundleId: 'com.google.Chrome',
-        isSigned: true,
-        isValid: true,
-        developer: 'Google LLC',
-        teamId: 'EQHXZ8M8AV',
-      ),
-      SignedApp(
-        name: 'Visual Studio Code',
-        bundleId: 'com.microsoft.VSCode',
-        isSigned: true,
-        isValid: true,
-        developer: 'Microsoft Corporation',
-        teamId: 'UBF8T346G9',
-      ),
-      SignedApp(
-        name: 'Unknown App',
-        bundleId: 'com.unknown.app',
-        isSigned: false,
-        isValid: false,
-        developer: '',
-      ),
-      SignedApp(
-        name: 'Modified App',
-        bundleId: 'com.modified.app',
-        isSigned: true,
-        isValid: false,
-        developer: 'Unknown Developer',
-      ),
-      SignedApp(
-        name: 'Terminal',
-        bundleId: 'com.apple.Terminal',
-        isSigned: true,
-        isValid: true,
-        developer: 'Apple Inc.',
-        teamId: 'APPLECOMPUTER',
-      ),
-    ];
-  }
-
-  List<FirewallRule> _getSampleFirewallRules() {
-    return [
-      FirewallRule(
-        id: '1',
-        name: 'Block SSH',
-        action: 'Block',
-        direction: 'Incoming',
-        protocol: 'TCP',
-        port: 22,
-      ),
-      FirewallRule(
-        id: '2',
-        name: 'Allow HTTPS',
-        action: 'Allow',
-        direction: 'Outgoing',
-        protocol: 'TCP',
-        port: 443,
-      ),
-      FirewallRule(
-        id: '3',
-        name: 'Block Telnet',
-        action: 'Block',
-        direction: 'Incoming',
-        protocol: 'TCP',
-        port: 23,
-      ),
-      FirewallRule(
-        id: '4',
-        name: 'Allow DNS',
-        action: 'Allow',
-        direction: 'Outgoing',
-        protocol: 'UDP',
-        port: 53,
-      ),
-      FirewallRule(
-        id: '5',
-        name: 'Block Unknown IPs',
-        action: 'Block',
-        direction: 'Incoming',
-        protocol: 'Any',
-        address: '0.0.0.0/0',
-        isEnabled: false,
-      ),
-    ];
-  }
 }
 
 class PersistenceItem {
@@ -947,6 +853,19 @@ class PersistenceItem {
     required this.isSuspicious,
     this.reason,
   });
+
+  factory PersistenceItem.fromJson(Map<String, dynamic> json) {
+    return PersistenceItem(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unknown',
+      type: json['type'] as String? ?? 'Unknown',
+      path: json['path'] as String? ?? '',
+      isRunning: json['is_running'] as bool? ?? false,
+      autoStart: json['auto_start'] as bool? ?? false,
+      isSuspicious: json['is_suspicious'] as bool? ?? false,
+      reason: json['reason'] as String?,
+    );
+  }
 }
 
 class SignedApp {
@@ -965,6 +884,17 @@ class SignedApp {
     required this.developer,
     this.teamId,
   });
+
+  factory SignedApp.fromJson(Map<String, dynamic> json) {
+    return SignedApp(
+      name: json['name'] as String? ?? 'Unknown',
+      bundleId: json['bundle_id'] as String? ?? '',
+      isSigned: json['is_signed'] as bool? ?? false,
+      isValid: json['is_valid'] as bool? ?? false,
+      developer: json['developer'] as String? ?? '',
+      teamId: json['team_id'] as String?,
+    );
+  }
 }
 
 class FirewallRule {
@@ -987,4 +917,17 @@ class FirewallRule {
     this.address,
     this.isEnabled = true,
   });
+
+  factory FirewallRule.fromJson(Map<String, dynamic> json) {
+    return FirewallRule(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unknown Rule',
+      action: json['action'] as String? ?? 'Block',
+      direction: json['direction'] as String? ?? 'Incoming',
+      protocol: json['protocol'] as String? ?? 'TCP',
+      port: json['port'] as int?,
+      address: json['address'] as String?,
+      isEnabled: json['is_enabled'] as bool? ?? true,
+    );
+  }
 }

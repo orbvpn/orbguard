@@ -189,7 +189,11 @@ class DashboardProvider extends ChangeNotifier {
 
     notifyListeners();
 
-    // TODO: API call to mark as read
+    try {
+      await _apiClient.markAlertAsRead(alertId);
+    } catch (e) {
+      debugPrint('Failed to mark alert as read: $e');
+    }
   }
 
   /// Clear all alerts
@@ -197,7 +201,11 @@ class DashboardProvider extends ChangeNotifier {
     _recentAlerts = [];
     notifyListeners();
 
-    // TODO: API call to clear alerts
+    try {
+      await _apiClient.clearAllAlerts();
+    } catch (e) {
+      debugPrint('Failed to clear alerts: $e');
+    }
   }
 
   /// Connect to real-time stream

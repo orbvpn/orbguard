@@ -14,7 +14,39 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.flutter.plugin.common.MethodChannel
+import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * URLExtractor - Helper object for extracting domain from URLs
+ */
+object URLExtractor {
+    /**
+     * Extract domain from a URL string
+     */
+    fun extractDomain(url: String): String? {
+        return try {
+            var normalizedUrl = url.trim()
+            if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+                normalizedUrl = "https://$normalizedUrl"
+            }
+            URL(normalizedUrl).host?.lowercase()
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+/**
+ * UrlThreatInfo - Data class for URL threat information
+ */
+data class UrlThreatInfo(
+    val url: String,
+    val isThreat: Boolean,
+    val threatLevel: String,
+    val reason: String,
+    val categories: List<String>
+)
 
 /**
  * BrowserMonitor - Manages browser URL monitoring and threat analysis

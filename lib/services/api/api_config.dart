@@ -75,6 +75,10 @@ class ApiEndpoints {
   /// GET /api/v1/sms/stats
   static const String smsStats = '$_v1/sms/stats';
 
+  /// Report SMS false positive
+  /// POST /api/v1/sms/report-false-positive
+  static const String smsReportFalsePositive = '$_v1/sms/report-false-positive';
+
   // ============================================
   // URL PROTECTION (Safe Web)
   // ============================================
@@ -168,6 +172,22 @@ class ApiEndpoints {
   /// POST /api/v1/network/wifi/audit
   static const String networkWifiAudit = '$_v1/network/wifi/audit';
 
+  /// Scan for rogue access points
+  /// POST /api/v1/network/rogue-ap/scan
+  static const String rogueApScan = '$_v1/network/rogue-ap/scan';
+
+  /// Get trusted access points
+  /// GET /api/v1/network/rogue-ap/trusted
+  static const String rogueApTrusted = '$_v1/network/rogue-ap/trusted';
+
+  /// Add trusted access point
+  /// POST /api/v1/network/rogue-ap/trusted
+  static const String rogueApTrustedAdd = '$_v1/network/rogue-ap/trusted';
+
+  /// Remove trusted access point
+  /// DELETE /api/v1/network/rogue-ap/trusted/{id}
+  static String rogueApTrustedRemove(String id) => '$_v1/network/rogue-ap/trusted/$id';
+
   /// Check DNS configuration
   /// POST /api/v1/network/dns/check
   static const String networkDnsCheck = '$_v1/network/dns/check';
@@ -258,6 +278,10 @@ class ApiEndpoints {
   // STATISTICS & DASHBOARD
   // ============================================
 
+  /// Health check / ping
+  /// GET /api/v1/health
+  static const String health = '$_v1/health';
+
   /// Get threat statistics
   /// GET /api/v1/stats
   static const String stats = '$_v1/stats';
@@ -269,6 +293,18 @@ class ApiEndpoints {
   /// Get protection status
   /// GET /api/v1/stats/protection
   static const String statsProtection = '$_v1/stats/protection';
+
+  /// Get alerts list
+  /// GET /api/v1/alerts
+  static const String alerts = '$_v1/alerts';
+
+  /// Mark alert as read
+  /// POST /api/v1/alerts/{id}/read
+  static String alertMarkRead(String id) => '$_v1/alerts/$id/read';
+
+  /// Clear all alerts
+  /// DELETE /api/v1/alerts
+  static const String alertsClear = '$_v1/alerts';
 
   // ============================================
   // STIX/TAXII
@@ -313,4 +349,233 @@ class ApiEndpoints {
   /// Register device
   /// POST /api/v1/auth/device
   static const String authDevice = '$_v1/auth/device';
+
+  // ============================================
+  // ENTERPRISE
+  // ============================================
+
+  /// Get enterprise statistics
+  /// GET /api/v1/enterprise/stats
+  static const String enterpriseStats = '$_v1/enterprise/stats';
+
+  /// Get enterprise security events
+  /// GET /api/v1/enterprise/events
+  static const String enterpriseEvents = '$_v1/enterprise/events';
+
+  /// Get enterprise device health
+  /// GET /api/v1/enterprise/devices
+  static const String enterpriseDevices = '$_v1/enterprise/devices';
+
+  /// Get compliance frameworks
+  /// GET /api/v1/enterprise/compliance/frameworks
+  static const String complianceFrameworks = '$_v1/enterprise/compliance/frameworks';
+
+  /// Get compliance reports
+  /// GET /api/v1/enterprise/compliance/reports
+  static const String complianceReports = '$_v1/enterprise/compliance/reports';
+
+  /// Get compliance controls
+  /// GET /api/v1/enterprise/compliance/controls
+  static const String complianceControls = '$_v1/enterprise/compliance/controls';
+
+  /// Generate compliance report
+  /// POST /api/v1/enterprise/compliance/reports/generate
+  static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports/generate';
+
+  /// Get enterprise policies
+  /// GET /api/v1/enterprise/policies
+  static const String enterprisePolicies = '$_v1/enterprise/policies';
+
+  /// Assign policy to groups
+  /// POST /api/v1/enterprise/policies/{id}/assign-groups
+  static String policyAssignGroups(String id) => '$_v1/enterprise/policies/$id/assign-groups';
+
+  /// Assign policy to devices
+  /// POST /api/v1/enterprise/policies/{id}/assign-devices
+  static String policyAssignDevices(String id) => '$_v1/enterprise/policies/$id/assign-devices';
+
+  /// Remove policy assignment
+  /// POST /api/v1/enterprise/policies/{id}/unassign
+  static String policyUnassign(String id) => '$_v1/enterprise/policies/$id/unassign';
+
+  /// Evaluate device compliance
+  /// POST /api/v1/enterprise/devices/{id}/evaluate-compliance
+  static String deviceEvaluateCompliance(String id) => '$_v1/enterprise/devices/$id/evaluate-compliance';
+
+  /// BYOD enrollment
+  /// POST /api/v1/enterprise/byod/enroll
+  static const String byodEnroll = '$_v1/enterprise/byod/enroll';
+
+  /// Get BYOD enrollment status
+  /// GET /api/v1/enterprise/byod/{deviceId}/status
+  static String byodStatus(String deviceId) => '$_v1/enterprise/byod/$deviceId/status';
+
+  /// BYOD unenrollment
+  /// POST /api/v1/enterprise/byod/{deviceId}/unenroll
+  static String byodUnenroll(String deviceId) => '$_v1/enterprise/byod/$deviceId/unenroll';
+
+  /// Detect device ownership
+  /// GET /api/v1/enterprise/devices/{id}/ownership
+  static String deviceOwnership(String id) => '$_v1/enterprise/devices/$id/ownership';
+
+  /// Set device ownership
+  /// POST /api/v1/enterprise/devices/{id}/ownership
+  static String deviceOwnershipSet(String id) => '$_v1/enterprise/devices/$id/ownership';
+
+  // ============================================
+  // SIEM INTEGRATION
+  // ============================================
+
+  /// Get SIEM connections
+  /// GET /api/v1/siem/connections
+  static const String siemConnections = '$_v1/siem/connections';
+
+  /// Get SIEM event forwarders
+  /// GET /api/v1/siem/forwarders
+  static const String siemForwarders = '$_v1/siem/forwarders';
+
+  /// Get SIEM alerts
+  /// GET /api/v1/siem/alerts
+  static const String siemAlerts = '$_v1/siem/alerts';
+
+  // ============================================
+  // WEBHOOKS
+  // ============================================
+
+  /// List webhooks
+  /// GET /api/v1/webhooks
+  static const String webhooks = '$_v1/webhooks';
+
+  /// Create/update webhook
+  /// POST /api/v1/webhooks
+  static const String webhooksCreate = '$_v1/webhooks';
+
+  /// Delete webhook
+  /// DELETE /api/v1/webhooks/{id}
+  static String webhookDelete(String id) => '$_v1/webhooks/$id';
+
+  // ============================================
+  // INTELLIGENCE SOURCES
+  // ============================================
+
+  /// List intelligence sources
+  /// GET /api/v1/intel/sources
+  static const String intelSources = '$_v1/intel/sources';
+
+  /// Get intelligence source details
+  /// GET /api/v1/intel/sources/{id}
+  static String intelSource(String id) => '$_v1/intel/sources/$id';
+
+  // ============================================
+  // INTEGRATIONS
+  // ============================================
+
+  /// List integrations
+  /// GET /api/v1/integrations
+  static const String integrations = '$_v1/integrations';
+
+  /// Update integration status
+  /// PATCH /api/v1/integrations/{id}
+  static String integration(String id) => '$_v1/integrations/$id';
+
+  // ============================================
+  // ML ANALYSIS
+  // ============================================
+
+  /// Get ML models
+  /// GET /api/v1/ml/models
+  static const String mlModels = '$_v1/ml/models';
+
+  /// Get anomaly detections
+  /// GET /api/v1/ml/anomalies
+  static const String mlAnomalies = '$_v1/ml/anomalies';
+
+  /// Run ML analysis
+  /// POST /api/v1/ml/analyze
+  static const String mlAnalyze = '$_v1/ml/analyze';
+
+  /// Get ML insights
+  /// GET /api/v1/ml/insights
+  static const String mlInsights = '$_v1/ml/insights';
+
+  // ============================================
+  // PLAYBOOKS
+  // ============================================
+
+  /// List playbooks
+  /// GET /api/v1/playbooks
+  static const String playbooks = '$_v1/playbooks';
+
+  /// Get playbook executions
+  /// GET /api/v1/playbooks/executions
+  static const String playbookExecutions = '$_v1/playbooks/executions';
+
+  /// Execute playbook
+  /// POST /api/v1/playbooks/{id}/execute
+  static String playbookExecute(String id) => '$_v1/playbooks/$id/execute';
+
+  // ============================================
+  // DESKTOP SECURITY
+  // ============================================
+
+  /// Get persistence items
+  /// GET /api/v1/desktop/persistence
+  static const String desktopPersistence = '$_v1/desktop/persistence';
+
+  /// Get signed apps
+  /// GET /api/v1/desktop/apps
+  static const String desktopApps = '$_v1/desktop/apps';
+
+  /// Get firewall rules
+  /// GET /api/v1/desktop/firewall
+  static const String desktopFirewall = '$_v1/desktop/firewall';
+
+  // ============================================
+  // VPN SERVERS
+  // ============================================
+
+  /// List VPN servers
+  /// GET /api/v1/vpn/servers
+  static const String vpnServers = '$_v1/vpn/servers';
+
+  /// Get blocked domains for VPN
+  /// GET /api/v1/vpn/blocked
+  static const String vpnBlocked = '$_v1/vpn/blocked';
+
+  /// Get VPN connection stats
+  /// GET /api/v1/vpn/stats
+  static const String vpnStats = '$_v1/vpn/stats';
+
+  // ============================================
+  // THREAT GRAPH
+  // ============================================
+
+  /// Get graph nodes
+  /// GET /api/v1/graph/nodes
+  static const String graphNodes = '$_v1/graph/nodes';
+
+  /// Get graph relations
+  /// GET /api/v1/graph/relations
+  static const String graphRelations = '$_v1/graph/relations';
+
+  /// Search graph
+  /// POST /api/v1/graph/search
+  static const String graphSearch = '$_v1/graph/search';
+
+  // ============================================
+  // SUPPLY CHAIN SECURITY
+  // ============================================
+
+  /// Get known vulnerabilities
+  /// GET /api/v1/supply-chain/vulnerabilities
+  static const String supplyChainVulnerabilities = '$_v1/supply-chain/vulnerabilities';
+
+  /// Check library vulnerabilities
+  /// POST /api/v1/supply-chain/check
+  /// Body: { "libraries": [{ "name": "...", "version": "..." }] }
+  static const String supplyChainCheck = '$_v1/supply-chain/check';
+
+  /// Get tracker signatures
+  /// GET /api/v1/supply-chain/trackers
+  static const String supplyChainTrackers = '$_v1/supply-chain/trackers';
 }

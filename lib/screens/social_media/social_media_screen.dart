@@ -1,7 +1,6 @@
 /// Social Media Monitor Screen
 /// Monitors social media for security and privacy issues
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/social_media_provider.dart';
 import '../../services/security/social_media_monitor_service.dart';
 
@@ -19,16 +19,13 @@ class SocialMediaScreen extends StatefulWidget {
   State<SocialMediaScreen> createState() => _SocialMediaScreenState();
 }
 
-class _SocialMediaScreenState extends State<SocialMediaScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SocialMediaScreenState extends State<SocialMediaScreen> {
   final _usernameController = TextEditingController();
   SocialPlatform _selectedPlatform = SocialPlatform.twitter;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SocialMediaProvider>().initialize();
     });
@@ -36,7 +33,6 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _usernameController.dispose();
     super.dispose();
   }
@@ -45,27 +41,34 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
   Widget build(BuildContext context) {
     return Consumer<SocialMediaProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Social Media Monitor',
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _showAddAccountDialog,
-            backgroundColor: GlassTheme.primaryAccent,
-            foregroundColor: Colors.black,
-            icon: const DuotoneIcon('add_circle', size: 24),
-            label: const Text('Add Account'),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
-                )
+          hasSearch: true,
+          searchHint: 'Search accounts...',
+          headerContent: provider.isLoading
+              ? const SizedBox.shrink()
               : Column(
                   children: [
                     // Actions row
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Add Account button
+                          ElevatedButton.icon(
+                            onPressed: _showAddAccountDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: GlassTheme.primaryAccent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                            ),
+                            icon: const DuotoneIcon('add_circle', size: 20),
+                            label: const Text('Add Account'),
+                          ),
                           IconButton(
                             icon: DuotoneIcon(
                               provider.isScanning ? 'stop' : 'refresh',
@@ -89,23 +92,46 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
                     // Stats row
                     _buildStatsRow(provider),
                     const SizedBox(height: 16),
-                    // Tab bar
-                    _buildTabBar(),
-                    const SizedBox(height: 16),
-                    // Tab content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildAccountsTab(provider),
-                          _buildAlertsTab(provider),
-                          _buildPrivacyTab(provider),
-                          _buildExposuresTab(provider),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
+          tabs: [
+            GlassTab(
+              label: 'Accounts',
+              iconPath: 'user_circle',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildAccountsTab(provider),
+            ),
+            GlassTab(
+              label: 'Alerts',
+              iconPath: 'danger_triangle',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildAlertsTab(provider),
+            ),
+            GlassTab(
+              label: 'Privacy',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildPrivacyTab(provider),
+            ),
+            GlassTab(
+              label: 'Exposure',
+              iconPath: 'magnifier',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildExposuresTab(provider),
+            ),
+          ],
         );
       },
     );
@@ -230,34 +256,6 @@ class _SocialMediaScreenState extends State<SocialMediaScreen>
               textAlign: TextAlign.center,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: GlassTheme.glassDecoration(),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: GlassTheme.primaryAccent,
-              unselectedLabelColor: Colors.white54,
-              isScrollable: true,
-              tabs: const [
-                Tab(icon: DuotoneIcon('user_circle', size: 20), text: 'Accounts'),
-                Tab(icon: DuotoneIcon('danger_triangle', size: 20), text: 'Alerts'),
-                Tab(icon: DuotoneIcon('shield_check', size: 20), text: 'Privacy'),
-                Tab(icon: DuotoneIcon('eye', size: 20), text: 'Exposure'),
-              ],
-            ),
-          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/mitre_provider.dart';
 import '../../widgets/mitre/mitre_widgets.dart';
@@ -19,22 +20,18 @@ class MitreScreen extends StatefulWidget {
   State<MitreScreen> createState() => _MitreScreenState();
 }
 
-class _MitreScreenState extends State<MitreScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MitreScreenState extends State<MitreScreen> {
   late MitreProvider _provider;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _provider = MitreProvider();
     _provider.init();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _provider.dispose();
     super.dispose();
   }
@@ -43,55 +40,29 @@ class _MitreScreenState extends State<MitreScreen>
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
       value: _provider,
-      child: GlassPage(
+      child: GlassTabPage(
         title: 'MITRE ATT&CK',
-        body: Column(
-          children: [
-            // Actions row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: const DuotoneIcon('info_circle', size: 22, color: Colors.white),
-                    onPressed: _showInfoDialog,
-                    tooltip: 'Info',
-                  ),
-                ],
-              ),
-            ),
-            // Tab bar
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                child: Container(
-                  decoration: GlassTheme.glassDecoration(),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorColor: GlassTheme.primaryAccent,
-                    labelColor: GlassTheme.primaryAccent,
-                    unselectedLabelColor: Colors.white54,
-                    tabs: [
-                      Tab(text: 'Matrix', icon: DuotoneIcon('widget_4', size: 24)),
-                      Tab(text: 'Detections', icon: DuotoneIcon('danger_triangle', size: 24)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: const [
-                  _MatrixTab(),
-                  _DetectionsTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
+        hasSearch: true,
+        searchHint: 'Search techniques...',
+        actions: [
+          IconButton(
+            icon: const DuotoneIcon('info_circle', size: 22, color: Colors.white),
+            onPressed: _showInfoDialog,
+            tooltip: 'Info',
+          ),
+        ],
+        tabs: [
+          GlassTab(
+            label: 'Matrix',
+            iconPath: 'chart',
+            content: const _MatrixTab(),
+          ),
+          GlassTab(
+            label: 'Detections',
+            iconPath: 'danger_triangle',
+            content: const _DetectionsTab(),
+          ),
+        ],
       ),
     );
   }

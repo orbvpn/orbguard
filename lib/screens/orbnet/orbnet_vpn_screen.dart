@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class OrbNetVpnScreen extends StatefulWidget {
   const OrbNetVpnScreen({super.key});
@@ -14,89 +16,182 @@ class OrbNetVpnScreen extends StatefulWidget {
   State<OrbNetVpnScreen> createState() => _OrbNetVpnScreenState();
 }
 
-class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _OrbNetVpnScreenState extends State<OrbNetVpnScreen> {
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _isLoading = true;
+  String? _error;
   String _selectedServer = 'Auto';
   final List<VpnServer> _servers = [];
   final List<BlockedDomain> _blockedDomains = [];
+  final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey<GlassTabPageState>();
+
+  // VPN stats
+  int _blockedCount = 0;
+  int _protectedCount = 0;
+  String _uptime = '0m';
+  String _dataUsage = '0 MB';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
-    await Future.delayed(const Duration(milliseconds: 300));
     setState(() {
-      _servers.addAll(_getSampleServers());
-      _blockedDomains.addAll(_getSampleBlockedDomains());
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final api = OrbGuardApiClient.instance;
+      final results = await Future.wait([
+        api.getVpnServers(),
+        api.getVpnBlockedDomains(),
+        api.getVpnStats(),
+      ]);
+
+      final serversData = results[0] as List<Map<String, dynamic>>;
+      final blockedDomainsData = results[1] as List<Map<String, dynamic>>;
+      final statsData = results[2] as Map<String, dynamic>;
+
+      setState(() {
+        _servers.clear();
+        _servers.addAll(serversData.map((data) => VpnServer.fromJson(data)));
+
+        _blockedDomains.clear();
+        _blockedDomains.addAll(blockedDomainsData.map((data) => BlockedDomain.fromJson(data)));
+
+        // Parse VPN stats
+        _blockedCount = statsData['blocked_count'] as int? ?? _blockedDomains.length;
+        _protectedCount = statsData['protected_count'] as int? ?? 0;
+        _uptime = statsData['uptime'] as String? ?? '0m';
+        _dataUsage = statsData['data_usage'] as String? ?? '0 MB';
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+
+    if (_error != null) {
+      return _buildErrorState();
+    }
+
+    return GlassTabPage(
+      key: _tabPageKey,
       title: 'OrbNet VPN',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+      tabs: [
+        GlassTab(
+          label: 'Connect',
+          iconPath: 'lock',
+          content: _buildConnectTab(),
+        ),
+        GlassTab(
+          label: 'Servers',
+          iconPath: 'server',
+          content: _buildServersTab(),
+        ),
+        GlassTab(
+          label: 'DNS Filter',
+          iconPath: 'shield',
+          content: _buildDnsFilterTab(),
+        ),
+      ],
+      actions: [
+        IconButton(
+          icon: DuotoneIcon(AppIcons.settings, size: 22, color: Colors.white),
+          onPressed: () => _showSettingsDialog(context),
+          tooltip: 'Settings',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text('OrbNet VPN', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text('OrbNet VPN', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.settings, size: 22, color: Colors.white),
-                  onPressed: () => _showSettingsDialog(context),
-                  tooltip: 'Settings',
+                DuotoneIcon(AppIcons.dangerCircle, size: 64, color: GlassTheme.errorColor),
+                const SizedBox(height: 16),
+                const Text(
+                  'Failed to load VPN data',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error ?? 'Unknown error',
+                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GlassTheme.primaryAccent,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ],
             ),
           ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Connect'),
-                    Tab(text: 'Servers'),
-                    Tab(text: 'DNS Filter'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildConnectTab(),
-                _buildServersTab(),
-                _buildDnsFilterTab(),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -170,7 +265,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _tabController.animateTo(1),
+                  onPressed: () => _tabPageKey.currentState?.animateToTab(1),
                   child: const Text('Change'),
                 ),
               ],
@@ -182,17 +277,17 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
             const SizedBox(height: 24),
             Row(
               children: [
-                _buildStatCard('Blocked', '127', GlassTheme.errorColor),
+                _buildStatCard('Blocked', _formatCount(_blockedCount), GlassTheme.errorColor),
                 const SizedBox(width: 12),
-                _buildStatCard('Protected', '2.4K', GlassTheme.successColor),
+                _buildStatCard('Protected', _formatCount(_protectedCount), GlassTheme.successColor),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildStatCard('Uptime', '2h 34m', GlassTheme.primaryAccent),
+                _buildStatCard('Uptime', _uptime, GlassTheme.primaryAccent),
                 const SizedBox(width: 12),
-                _buildStatCard('Data', '145 MB', const Color(0xFF9C27B0)),
+                _buildStatCard('Data', _dataUsage, const Color(0xFF9C27B0)),
               ],
             ),
           ],
@@ -207,6 +302,12 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
         ],
       ),
     );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
   }
 
   Widget _buildStatCard(String label, String value, Color color) {
@@ -339,7 +440,7 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
           children: [
             _buildStatCard('Blocked Today', '${_blockedDomains.length}', GlassTheme.errorColor),
             const SizedBox(width: 12),
-            _buildStatCard('Categories', '5', GlassTheme.primaryAccent),
+            _buildStatCard('Categories', '${_blockedDomains.map((d) => d.category).toSet().length}', GlassTheme.primaryAccent),
           ],
         ),
         const SizedBox(height: 24),
@@ -450,25 +551,6 @@ class _OrbNetVpnScreenState extends State<OrbNetVpnScreen>
     return '${diff.inDays}d ago';
   }
 
-  List<VpnServer> _getSampleServers() {
-    return [
-      VpnServer(name: 'US - New York', location: 'New York, USA', flag: '\u{1F1FA}\u{1F1F8}', latency: 32, load: 45),
-      VpnServer(name: 'US - Los Angeles', location: 'Los Angeles, USA', flag: '\u{1F1FA}\u{1F1F8}', latency: 45, load: 62),
-      VpnServer(name: 'UK - London', location: 'London, UK', flag: '\u{1F1EC}\u{1F1E7}', latency: 78, load: 38),
-      VpnServer(name: 'Germany - Frankfurt', location: 'Frankfurt, DE', flag: '\u{1F1E9}\u{1F1EA}', latency: 85, load: 51),
-      VpnServer(name: 'Japan - Tokyo', location: 'Tokyo, JP', flag: '\u{1F1EF}\u{1F1F5}', latency: 142, load: 28),
-      VpnServer(name: 'Singapore', location: 'Singapore', flag: '\u{1F1F8}\u{1F1EC}', latency: 156, load: 35),
-    ];
-  }
-
-  List<BlockedDomain> _getSampleBlockedDomains() {
-    return [
-      BlockedDomain(domain: 'malware-c2.evil.com', category: 'Malware', blockedAt: DateTime.now().subtract(const Duration(minutes: 5))),
-      BlockedDomain(domain: 'tracking.ads.net', category: 'Tracker', blockedAt: DateTime.now().subtract(const Duration(minutes: 12))),
-      BlockedDomain(domain: 'phishing-bank.com', category: 'Phishing', blockedAt: DateTime.now().subtract(const Duration(hours: 1))),
-      BlockedDomain(domain: 'ad-serve.network', category: 'Ads', blockedAt: DateTime.now().subtract(const Duration(hours: 2))),
-    ];
-  }
 }
 
 class VpnServer {
@@ -485,6 +567,16 @@ class VpnServer {
     required this.latency,
     required this.load,
   });
+
+  factory VpnServer.fromJson(Map<String, dynamic> json) {
+    return VpnServer(
+      name: json['name'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+      flag: json['flag'] as String? ?? '',
+      latency: json['latency'] as int? ?? 0,
+      load: json['load'] as int? ?? 0,
+    );
+  }
 }
 
 class BlockedDomain {
@@ -497,4 +589,22 @@ class BlockedDomain {
     required this.category,
     required this.blockedAt,
   });
+
+  factory BlockedDomain.fromJson(Map<String, dynamic> json) {
+    DateTime parsedTime;
+    final blockedAtValue = json['blocked_at'];
+    if (blockedAtValue is String) {
+      parsedTime = DateTime.tryParse(blockedAtValue) ?? DateTime.now();
+    } else if (blockedAtValue is int) {
+      parsedTime = DateTime.fromMillisecondsSinceEpoch(blockedAtValue);
+    } else {
+      parsedTime = DateTime.now();
+    }
+
+    return BlockedDomain(
+      domain: json['domain'] as String? ?? '',
+      category: json['category'] as String? ?? 'Unknown',
+      blockedAt: parsedTime,
+    );
+  }
 }

@@ -4,10 +4,12 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import '../services/api/orbguard_api_client.dart';
 import '../services/security/threat_hunting_service.dart';
 
 class ThreatHuntingProvider extends ChangeNotifier {
   final ThreatHuntingService _service = ThreatHuntingService();
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
 
   // State
   List<ThreatHunt> _availableHunts = [];
@@ -25,6 +27,17 @@ class ThreatHuntingProvider extends ChangeNotifier {
 
   // Error state
   String? _error;
+
+  // Graph state
+  List<Map<String, dynamic>> _graphNodes = [];
+  List<Map<String, dynamic>> _graphRelations = [];
+  bool _isLoadingGraph = false;
+
+  // Correlation and ML state
+  List<Map<String, dynamic>> _correlationRules = [];
+  List<Map<String, dynamic>> _mlModels = [];
+  bool _isLoadingCorrelation = false;
+  bool _isLoadingModels = false;
 
   // Stream subscriptions
   StreamSubscription<HuntProgress>? _progressSub;
@@ -45,6 +58,13 @@ class ThreatHuntingProvider extends ChangeNotifier {
   bool get isHunting => _isHunting;
   String? get error => _error;
   List<HuntFinding> get recentFindings => _recentFindings;
+  List<Map<String, dynamic>> get graphNodes => _graphNodes;
+  List<Map<String, dynamic>> get graphRelations => _graphRelations;
+  bool get isLoadingGraph => _isLoadingGraph;
+  List<Map<String, dynamic>> get correlationRules => _correlationRules;
+  List<Map<String, dynamic>> get mlModels => _mlModels;
+  bool get isLoadingCorrelation => _isLoadingCorrelation;
+  bool get isLoadingModels => _isLoadingModels;
 
   // Computed getters
   List<ThreatHunt> get criticalHunts =>
@@ -291,6 +311,64 @@ class ThreatHuntingProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Load graph data from API
+  Future<void> loadGraphData({String? query}) async {
+    if (_isLoadingGraph) return;
+
+    _isLoadingGraph = true;
+    notifyListeners();
+
+    try {
+      final nodes = await _api.getGraphNodes(query: query);
+      final relations = await _api.getGraphRelations();
+      _graphNodes = nodes;
+      _graphRelations = relations;
+    } catch (e) {
+      debugPrint('Failed to load graph data: $e');
+      _graphNodes = [];
+      _graphRelations = [];
+    } finally {
+      _isLoadingGraph = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load correlation rules from API
+  Future<void> loadCorrelationRules() async {
+    if (_isLoadingCorrelation) return;
+
+    _isLoadingCorrelation = true;
+    notifyListeners();
+
+    try {
+      _correlationRules = await _api.getCorrelationResults();
+    } catch (e) {
+      debugPrint('Failed to load correlation rules: $e');
+      _correlationRules = [];
+    } finally {
+      _isLoadingCorrelation = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load ML models from API
+  Future<void> loadMLModels() async {
+    if (_isLoadingModels) return;
+
+    _isLoadingModels = true;
+    notifyListeners();
+
+    try {
+      _mlModels = await _api.getMLModels();
+    } catch (e) {
+      debugPrint('Failed to load ML models: $e');
+      _mlModels = [];
+    } finally {
+      _isLoadingModels = false;
+      notifyListeners();
+    }
   }
 
   /// Dispose

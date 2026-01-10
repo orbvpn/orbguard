@@ -26,6 +26,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       builder: (context, provider, child) {
         return GlassTabPage(
           title: 'Dark Web Monitor',
+          hasSearch: true,
+          searchHint: 'Search breaches...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -51,12 +53,12 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           tabs: [
             GlassTab(
               label: 'Email',
-              iconPath: 'globe',
+              iconPath: 'global',
               content: _buildEmailTab(provider),
             ),
             GlassTab(
               label: 'Password',
-              iconPath: 'magnifier',
+              iconPath: 'magnifer',
               content: _buildPasswordTab(provider),
             ),
             GlassTab(

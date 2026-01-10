@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class CorrelationScreen extends StatefulWidget {
   const CorrelationScreen({super.key});
@@ -15,8 +16,10 @@ class CorrelationScreen extends StatefulWidget {
 }
 
 class _CorrelationScreenState extends State<CorrelationScreen> {
+  final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
   bool _isCorrelating = false;
+  String? _error;
   final List<CorrelationResult> _results = [];
   String _selectedEngine = 'All';
 
@@ -29,12 +32,25 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   }
 
   Future<void> _loadResults() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _results.addAll(_getSampleResults());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final data = await _apiClient.getCorrelationResults();
+
+      setState(() {
+        _results.clear();
+        _results.addAll(data.map((json) => CorrelationResult.fromJson(json)));
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load correlation results: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -298,24 +314,34 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     );
   }
 
-  void _runCorrelation() {
+  Future<void> _runCorrelation() async {
     setState(() => _isCorrelating = true);
 
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      final result = await _apiClient.runCorrelation();
+
       setState(() {
         _isCorrelating = false;
-        _results.insert(0, CorrelationResult(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: 'New Correlation Found',
-          description: 'Detected relationship between recent phishing campaign and known threat actor.',
-          engine: 'Campaign Attribution',
-          confidence: 0.87,
-          linkedEntities: 5,
-          timestamp: DateTime.now(),
-          relatedIndicators: ['185.192.69.x', 'fake-login.com', 'APT41'],
-        ));
+        // Add new correlations to results
+        if (result['correlations'] != null) {
+          final newCorrelations = (result['correlations'] as List)
+              .map((json) => CorrelationResult.fromJson(json as Map<String, dynamic>))
+              .toList();
+          for (final correlation in newCorrelations) {
+            if (!_results.any((r) => r.id == correlation.id)) {
+              _results.insert(0, correlation);
+            }
+          }
+        }
       });
-    });
+    } catch (e) {
+      setState(() => _isCorrelating = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Correlation failed: $e'), backgroundColor: GlassTheme.errorColor),
+        );
+      }
+    }
   }
 
   void _showResultDetails(BuildContext context, CorrelationResult result) {
@@ -427,40 +453,6 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     return '${diff.inDays}d ago';
   }
 
-  List<CorrelationResult> _getSampleResults() {
-    return [
-      CorrelationResult(
-        id: '1',
-        title: 'APT41 Campaign Link',
-        description: 'Multiple indicators from recent scan match known APT41 infrastructure.',
-        engine: 'Campaign Attribution',
-        confidence: 0.92,
-        linkedEntities: 8,
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        relatedIndicators: ['185.192.69.44', 'cobaltstrike.com', 'mimikatz.exe'],
-      ),
-      CorrelationResult(
-        id: '2',
-        title: 'Credential Theft Pattern',
-        description: 'Behavior pattern matches known credential theft techniques (T1003).',
-        engine: 'MITRE Mapping',
-        confidence: 0.85,
-        linkedEntities: 5,
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        relatedIndicators: ['T1003', 'lsass.exe', 'procdump.exe'],
-      ),
-      CorrelationResult(
-        id: '3',
-        title: 'Phishing Infrastructure',
-        description: 'Domain registration patterns indicate coordinated phishing campaign.',
-        engine: 'IOC Matching',
-        confidence: 0.78,
-        linkedEntities: 12,
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        relatedIndicators: ['fake-login*.com', '192.168.x.x', 'phishing-kit.zip'],
-      ),
-    ];
-  }
 }
 
 class CorrelationResult {
@@ -483,4 +475,19 @@ class CorrelationResult {
     required this.timestamp,
     required this.relatedIndicators,
   });
+
+  factory CorrelationResult.fromJson(Map<String, dynamic> json) {
+    return CorrelationResult(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Correlation',
+      description: json['description'] as String? ?? '',
+      engine: json['engine'] as String? ?? 'Unknown',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+      linkedEntities: json['linked_entities'] as int? ?? 0,
+      timestamp: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'] as String)
+          : DateTime.now(),
+      relatedIndicators: (json['related_indicators'] as List<dynamic>?)?.cast<String>() ?? [],
+    );
+  }
 }

@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class SiemIntegrationScreen extends StatefulWidget {
   const SiemIntegrationScreen({super.key});
@@ -15,10 +17,9 @@ class SiemIntegrationScreen extends StatefulWidget {
   State<SiemIntegrationScreen> createState() => _SiemIntegrationScreenState();
 }
 
-class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
   bool _isLoading = false;
+  String? _error;
   final List<SiemConnection> _connections = [];
   final List<EventForwarder> _forwarders = [];
   final List<SiemAlert> _alerts = [];
@@ -26,87 +27,102 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _connections.addAll(_getSampleConnections());
-      _forwarders.addAll(_getSampleForwarders());
-      _alerts.addAll(_getSampleAlerts());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final api = OrbGuardApiClient.instance;
+      final results = await Future.wait([
+        api.getSiemConnections(),
+        api.getSiemForwarders(),
+        api.getSiemAlerts(),
+      ]);
+
+      final connectionsData = results[0];
+      final forwardersData = results[1];
+      final alertsData = results[2];
+
+      setState(() {
+        _connections.clear();
+        _forwarders.clear();
+        _alerts.clear();
+
+        _connections.addAll(
+          connectionsData.map((json) => SiemConnection.fromJson(json)),
+        );
+        _forwarders.addAll(
+          forwardersData.map((json) => EventForwarder.fromJson(json)),
+        );
+        _alerts.addAll(
+          alertsData.map((json) => SiemAlert.fromJson(json)),
+        );
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    return GlassTabPage(
       title: 'SIEM Integration',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-                  tooltip: 'Add Connection',
-                  onPressed: () => _showAddConnectionDialog(context),
-                ),
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadData,
-                  tooltip: 'Refresh',
-                ),
-              ],
+      tabs: [
+        GlassTab(
+          label: 'Connections',
+          iconPath: 'server',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState(_error!)
+                  : _buildConnectionsTab(),
+        ),
+        GlassTab(
+          label: 'Forwarders',
+          iconPath: 'cloud_storage',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState(_error!)
+                  : _buildForwardersTab(),
+        ),
+        GlassTab(
+          label: 'Alerts',
+          iconPath: 'shield',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState(_error!)
+                  : _buildAlertsTab(),
+        ),
+      ],
+      headerContent: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+              tooltip: 'Add Connection',
+              onPressed: () => _showAddConnectionDialog(context),
             ),
-          ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Connections'),
-                    Tab(text: 'Forwarders'),
-                    Tab(text: 'Alerts'),
-                  ],
-                ),
-              ),
+            IconButton(
+              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              onPressed: _isLoading ? null : _loadData,
+              tooltip: 'Refresh',
             ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildConnectionsTab(),
-                      _buildForwardersTab(),
-                      _buildAlertsTab(),
-                    ],
-                  ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -120,9 +136,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
           children: [
             _buildStatCard('Connected', _connections.where((c) => c.isConnected).length.toString(), GlassTheme.successColor),
             const SizedBox(width: 12),
-            _buildStatCard('Events/min', '2.4K', GlassTheme.primaryAccent),
+            _buildStatCard('Events/min', _formatEventsPerMin(_connections.fold(0, (sum, c) => sum + c.eventsPerMinute)), GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Errors', '3', GlassTheme.errorColor),
+            _buildStatCard('Errors', _connections.fold(0, (sum, c) => sum + c.errors).toString(), GlassTheme.errorColor),
           ],
         ),
         const SizedBox(height: 24),
@@ -443,6 +459,43 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
     );
   }
 
+  Widget _buildErrorState(String error) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to Load Data',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _loadData,
+              icon: const DuotoneIcon('refresh', size: 18),
+              label: const Text('Retry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: GlassTheme.primaryAccent,
+                side: const BorderSide(color: GlassTheme.primaryAccent),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAddConnectionDialog(BuildContext context, {String? siemType}) {
     final nameController = TextEditingController();
     final endpointController = TextEditingController();
@@ -728,104 +781,17 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen>
     }
   }
 
+  String _formatEventsPerMin(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
+  }
+
   String _formatTime(DateTime time) {
     final diff = DateTime.now().difference(time);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
-  }
-
-  List<SiemConnection> _getSampleConnections() {
-    return [
-      SiemConnection(
-        id: '1',
-        name: 'Production Splunk',
-        type: 'Splunk',
-        endpoint: 'https://splunk.company.com:8088/services/collector',
-        isConnected: true,
-        eventsPerMinute: 2400,
-        eventsSent: 1847293,
-        errors: 12,
-        lastSync: DateTime.now().subtract(const Duration(seconds: 30)),
-      ),
-      SiemConnection(
-        id: '2',
-        name: 'Azure Sentinel',
-        type: 'Sentinel',
-        endpoint: 'https://company.sentinel.azure.com',
-        isConnected: true,
-        eventsPerMinute: 890,
-        eventsSent: 524891,
-        errors: 0,
-        lastSync: DateTime.now().subtract(const Duration(minutes: 2)),
-      ),
-      SiemConnection(
-        id: '3',
-        name: 'Backup ELK',
-        type: 'Elastic',
-        endpoint: 'https://elk.company.com:9200',
-        isConnected: false,
-        eventsPerMinute: 0,
-        eventsSent: 98234,
-        errors: 47,
-        lastSync: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-    ];
-  }
-
-  List<EventForwarder> _getSampleForwarders() {
-    return [
-      EventForwarder(
-        id: '1',
-        name: 'Security Events',
-        destination: 'Production Splunk',
-        eventTypes: ['threat.detected', 'alert.critical', 'scan.complete'],
-        format: 'JSON',
-        batchSize: 100,
-        isEnabled: true,
-      ),
-      EventForwarder(
-        id: '2',
-        name: 'Compliance Events',
-        destination: 'Azure Sentinel',
-        eventTypes: ['policy.violation', 'access.denied', 'audit.log'],
-        format: 'CEF',
-        batchSize: 50,
-        isEnabled: true,
-      ),
-    ];
-  }
-
-  List<SiemAlert> _getSampleAlerts() {
-    return [
-      SiemAlert(
-        id: '1',
-        title: 'High Volume Data Transfer',
-        description: 'Unusual data transfer detected from endpoint LAPTOP-042',
-        source: 'Splunk',
-        severity: 'Critical',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-        isAcknowledged: false,
-      ),
-      SiemAlert(
-        id: '2',
-        title: 'Multiple Failed Logins',
-        description: 'Brute force attack detected on user account',
-        source: 'Sentinel',
-        severity: 'High',
-        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-        isAcknowledged: false,
-      ),
-      SiemAlert(
-        id: '3',
-        title: 'Suspicious Process',
-        description: 'PowerShell execution with encoded command detected',
-        source: 'Splunk',
-        severity: 'Medium',
-        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-        isAcknowledged: true,
-      ),
-    ];
   }
 }
 
@@ -851,6 +817,24 @@ class SiemConnection {
     required this.errors,
     required this.lastSync,
   });
+
+  factory SiemConnection.fromJson(Map<String, dynamic> json) {
+    return SiemConnection(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      endpoint: json['endpoint'] as String? ?? '',
+      isConnected: json['is_connected'] as bool? ?? json['isConnected'] as bool? ?? false,
+      eventsPerMinute: json['events_per_minute'] as int? ?? json['eventsPerMinute'] as int? ?? 0,
+      eventsSent: json['events_sent'] as int? ?? json['eventsSent'] as int? ?? 0,
+      errors: json['errors'] as int? ?? 0,
+      lastSync: json['last_sync'] != null
+          ? DateTime.tryParse(json['last_sync'].toString()) ?? DateTime.now()
+          : json['lastSync'] != null
+              ? DateTime.tryParse(json['lastSync'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+    );
+  }
 }
 
 class EventForwarder {
@@ -871,6 +855,23 @@ class EventForwarder {
     required this.batchSize,
     required this.isEnabled,
   });
+
+  factory EventForwarder.fromJson(Map<String, dynamic> json) {
+    final eventTypesRaw = json['event_types'] ?? json['eventTypes'] ?? [];
+    final List<String> eventTypes = eventTypesRaw is List
+        ? eventTypesRaw.map((e) => e.toString()).toList()
+        : <String>[];
+
+    return EventForwarder(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] as String? ?? '',
+      destination: json['destination'] as String? ?? '',
+      eventTypes: eventTypes,
+      format: json['format'] as String? ?? 'JSON',
+      batchSize: json['batch_size'] as int? ?? json['batchSize'] as int? ?? 100,
+      isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? false,
+    );
+  }
 }
 
 class SiemAlert {
@@ -891,4 +892,18 @@ class SiemAlert {
     required this.timestamp,
     required this.isAcknowledged,
   });
+
+  factory SiemAlert.fromJson(Map<String, dynamic> json) {
+    return SiemAlert(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      source: json['source'] as String? ?? '',
+      severity: json['severity'] as String? ?? 'Low',
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      isAcknowledged: json['is_acknowledged'] as bool? ?? json['isAcknowledged'] as bool? ?? false,
+    );
+  }
 }

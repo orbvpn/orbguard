@@ -192,10 +192,36 @@ class AppSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Use platform channel to get actual installed apps
-      // For now, add some mock data for UI development
+      // Get list of installed apps from API (previously submitted/analyzed)
+      final appsData = await _api.getInstalledApps();
+
       _apps.clear();
-      _apps.addAll(_getMockApps());
+      for (final appJson in appsData) {
+        final app = InstalledApp(
+          packageName: appJson['package_name'] as String? ?? '',
+          appName: appJson['app_name'] as String? ?? 'Unknown',
+          version: appJson['version'] as String? ?? '0.0.0',
+          iconPath: appJson['icon_path'] as String?,
+          permissions: (appJson['permissions'] as List<dynamic>?)?.cast<String>() ?? [],
+          installSource: appJson['install_source'] as String? ?? 'unknown',
+          installTime: appJson['install_time'] != null
+              ? DateTime.parse(appJson['install_time'] as String)
+              : DateTime.now(),
+          updateTime: appJson['update_time'] != null
+              ? DateTime.parse(appJson['update_time'] as String)
+              : null,
+          apkSize: appJson['apk_size'] as int?,
+        );
+
+        // Check if there's an analysis result
+        AppAnalysisResult? result;
+        if (appJson['analysis_result'] != null) {
+          result = AppAnalysisResult.fromJson(appJson['analysis_result'] as Map<String, dynamic>);
+        }
+
+        _apps.add(AnalyzedApp(app: app, result: result));
+      }
+
       _updateStats();
     } catch (e) {
       _error = 'Failed to load apps: $e';
@@ -445,75 +471,4 @@ class AppSecurityProvider extends ChangeNotifier {
     return 'security';
   }
 
-  /// Get mock apps for UI development
-  List<AnalyzedApp> _getMockApps() {
-    final mockApps = [
-      InstalledApp(
-        packageName: 'com.whatsapp',
-        appName: 'WhatsApp',
-        version: '2.24.1.5',
-        permissions: [
-          'android.permission.CAMERA',
-          'android.permission.RECORD_AUDIO',
-          'android.permission.READ_CONTACTS',
-          'android.permission.ACCESS_FINE_LOCATION',
-        ],
-        installSource: 'com.android.vending',
-        installTime: DateTime.now().subtract(const Duration(days: 365)),
-      ),
-      InstalledApp(
-        packageName: 'com.facebook.katana',
-        appName: 'Facebook',
-        version: '442.0.0.0',
-        permissions: [
-          'android.permission.CAMERA',
-          'android.permission.RECORD_AUDIO',
-          'android.permission.READ_CONTACTS',
-          'android.permission.ACCESS_FINE_LOCATION',
-          'android.permission.READ_EXTERNAL_STORAGE',
-        ],
-        installSource: 'com.android.vending',
-        installTime: DateTime.now().subtract(const Duration(days: 200)),
-      ),
-      InstalledApp(
-        packageName: 'com.instagram.android',
-        appName: 'Instagram',
-        version: '312.0.0.0',
-        permissions: [
-          'android.permission.CAMERA',
-          'android.permission.RECORD_AUDIO',
-          'android.permission.ACCESS_FINE_LOCATION',
-        ],
-        installSource: 'com.android.vending',
-        installTime: DateTime.now().subtract(const Duration(days: 150)),
-      ),
-      InstalledApp(
-        packageName: 'com.unknown.flashlight',
-        appName: 'Super Flashlight Pro',
-        version: '1.0.0',
-        permissions: [
-          'android.permission.CAMERA',
-          'android.permission.READ_CONTACTS',
-          'android.permission.SEND_SMS',
-          'android.permission.READ_SMS',
-          'android.permission.ACCESS_FINE_LOCATION',
-        ],
-        installSource: 'unknown',
-        installTime: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      InstalledApp(
-        packageName: 'com.spotify.music',
-        appName: 'Spotify',
-        version: '8.9.0.1234',
-        permissions: [
-          'android.permission.INTERNET',
-          'android.permission.WAKE_LOCK',
-        ],
-        installSource: 'com.android.vending',
-        installTime: DateTime.now().subtract(const Duration(days: 500)),
-      ),
-    ];
-
-    return mockApps.map((app) => AnalyzedApp(app: app)).toList();
-  }
 }

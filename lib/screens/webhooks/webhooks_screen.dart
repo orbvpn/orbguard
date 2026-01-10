@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class WebhooksScreen extends StatefulWidget {
   const WebhooksScreen({super.key});
@@ -16,7 +17,9 @@ class WebhooksScreen extends StatefulWidget {
 
 class _WebhooksScreenState extends State<WebhooksScreen> {
   bool _isLoading = false;
+  String? _error;
   final List<Webhook> _webhooks = [];
+  final _api = OrbGuardApiClient.instance;
 
   @override
   void initState() {
@@ -25,12 +28,25 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
   }
 
   Future<void> _loadWebhooks() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _webhooks.addAll(_getSampleWebhooks());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final webhooksData = await _api.getWebhooks();
+      final webhooks = webhooksData.map((data) => Webhook.fromJson(data)).toList();
+      setState(() {
+        _webhooks.clear();
+        _webhooks.addAll(webhooks);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -39,7 +55,9 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       title: 'Webhooks',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : Column(
+          : _error != null
+              ? _buildErrorState()
+              : Column(
               children: [
                 // Actions row
                 Padding(
@@ -71,7 +89,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                               children: [
                                 _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), GlassTheme.successColor),
                                 const SizedBox(width: 12),
-                                _buildStatCard('Total Sent', '1,247', GlassTheme.primaryAccent),
+                                _buildStatCard('Total Sent', _formatSentCount(_webhooks.fold(0, (sum, w) => sum + w.sentCount)), GlassTheme.primaryAccent),
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -84,6 +102,12 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
               ],
             ),
     );
+  }
+
+  String _formatSentCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+    return count.toString();
   }
 
   Widget _buildStatCard(String label, String value, Color color) {
@@ -206,6 +230,80 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DuotoneIcon('danger_circle', size: 64, color: GlassTheme.errorColor.withAlpha(128)),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to Load Webhooks',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'An unknown error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadWebhooks,
+              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createWebhook(String name, String url) async {
+    try {
+      final data = {
+        'name': name,
+        'url': url,
+        'type': 'Custom',
+        'events': ['threat.detected'],
+        'is_enabled': true,
+      };
+      await _api.createWebhook(data);
+      await _loadWebhooks();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create webhook: $e'),
+            backgroundColor: GlassTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteWebhook(Webhook webhook) async {
+    try {
+      await _api.deleteWebhook(webhook.id);
+      await _loadWebhooks();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete webhook: $e'),
+            backgroundColor: GlassTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
   void _showAddWebhookDialog(BuildContext context) {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
@@ -246,16 +344,8 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           TextButton(
             onPressed: () {
               if (nameController.text.isNotEmpty && urlController.text.isNotEmpty) {
-                setState(() {
-                  _webhooks.add(Webhook(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text,
-                    url: urlController.text,
-                    type: 'Custom',
-                    events: ['threat.detected'],
-                  ));
-                });
                 Navigator.pop(context);
+                _createWebhook(nameController.text, urlController.text);
               }
             },
             child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
@@ -339,7 +429,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        setState(() => _webhooks.remove(webhook));
+                        _deleteWebhook(webhook);
                       },
                       icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: GlassTheme.errorColor),
                       label: const Text('Delete'),
@@ -385,39 +475,6 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         return 'link';
     }
   }
-
-  List<Webhook> _getSampleWebhooks() {
-    return [
-      Webhook(
-        id: '1',
-        name: 'Slack Security Channel',
-        url: 'https://hooks.slack.com/services/xxx/yyy/zzz',
-        type: 'Slack',
-        events: ['threat.detected', 'scan.complete', 'alert.critical'],
-        sentCount: 847,
-        lastStatus: 'success',
-      ),
-      Webhook(
-        id: '2',
-        name: 'PagerDuty Alerts',
-        url: 'https://events.pagerduty.com/v2/enqueue',
-        type: 'PagerDuty',
-        events: ['alert.critical', 'alert.high'],
-        sentCount: 23,
-        lastStatus: 'success',
-      ),
-      Webhook(
-        id: '3',
-        name: 'SIEM Integration',
-        url: 'https://siem.company.com/api/v1/events',
-        type: 'Custom',
-        events: ['threat.detected', 'indicator.matched'],
-        sentCount: 377,
-        lastStatus: 'failed',
-        isEnabled: false,
-      ),
-    ];
-  }
 }
 
 class Webhook {
@@ -440,4 +497,17 @@ class Webhook {
     this.lastStatus = 'success',
     this.isEnabled = true,
   });
+
+  factory Webhook.fromJson(Map<String, dynamic> json) {
+    return Webhook(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      type: json['type'] as String? ?? 'Custom',
+      events: (json['events'] as List<dynamic>?)?.cast<String>() ?? [],
+      sentCount: json['sent_count'] as int? ?? json['sentCount'] as int? ?? 0,
+      lastStatus: json['last_status'] as String? ?? json['lastStatus'] as String? ?? 'success',
+      isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? true,
+    );
+  }
 }

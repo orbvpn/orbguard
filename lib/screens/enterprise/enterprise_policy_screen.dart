@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/enterprise_policy_provider.dart';
 import '../../services/security/enterprise/policy_management_service.dart';
@@ -17,103 +18,88 @@ class EnterprisePolicyScreen extends StatefulWidget {
   State<EnterprisePolicyScreen> createState() => _EnterprisePolicyScreenState();
 }
 
-class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EnterprisePolicyProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<EnterprisePolicyProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Enterprise Policies',
-          body: Column(
-            children: [
-              // Actions row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-                      onPressed: () => _showCreatePolicySheet(context, provider),
-                      tooltip: 'Add Policy',
-                    ),
-                    IconButton(
-                      icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                      onPressed: () => provider.loadPolicies(),
-                      tooltip: 'Refresh',
-                    ),
-                  ],
-                ),
-              ),
-              // Tab bar
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                  child: Container(
-                    decoration: GlassTheme.glassDecoration(),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: GlassTheme.primaryAccent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white54,
-                      isScrollable: true,
-                      tabs: const [
-                        Tab(text: 'Policies'),
-                        Tab(text: 'Violations'),
-                        Tab(text: 'Templates'),
-                        Tab(text: 'BYOD'),
+          tabs: [
+            GlassTab(
+              label: 'Policies',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : Column(
+                      children: [
+                        _buildStats(provider),
+                        Expanded(child: _buildPoliciesTab(provider)),
                       ],
                     ),
-                  ),
+            ),
+            GlassTab(
+              label: 'Violations',
+              iconPath: 'chart',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : Column(
+                      children: [
+                        _buildStats(provider),
+                        Expanded(child: _buildViolationsTab(provider)),
+                      ],
+                    ),
+            ),
+            GlassTab(
+              label: 'Templates',
+              iconPath: 'file',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : Column(
+                      children: [
+                        _buildStats(provider),
+                        Expanded(child: _buildTemplatesTab(provider)),
+                      ],
+                    ),
+            ),
+            GlassTab(
+              label: 'BYOD',
+              iconPath: 'settings',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : Column(
+                      children: [
+                        _buildStats(provider),
+                        Expanded(child: _buildBYODTab(provider)),
+                      ],
+                    ),
+            ),
+          ],
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                  onPressed: () => _showCreatePolicySheet(context, provider),
+                  tooltip: 'Add Policy',
                 ),
-              ),
-              // Content
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: GlassTheme.primaryAccent,
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          // Stats
-                          _buildStats(provider),
-                          // Tab content
-                          Expanded(
-                            child: TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildPoliciesTab(provider),
-                                _buildViolationsTab(provider),
-                                _buildTemplatesTab(provider),
-                                _buildBYODTab(provider),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: () => provider.loadPolicies(),
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
         );
       },

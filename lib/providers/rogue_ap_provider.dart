@@ -2,6 +2,9 @@
 /// State management for detecting rogue access points and WiFi threats
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
+import '../services/api/orbguard_api_client.dart';
 
 /// AP threat level
 enum APThreatLevel {
@@ -117,6 +120,10 @@ class RogueAPStats {
 }
 
 class RogueAPProvider extends ChangeNotifier {
+  // API client
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+  static const _wifiChannel = MethodChannel('com.orb.guard/wifi');
+
   // State
   List<DetectedAP> _detectedAPs = [];
   List<TrustedAP> _trustedAPs = [];
@@ -174,26 +181,26 @@ class RogueAPProvider extends ChangeNotifier {
     }
   }
 
-  /// Load trusted APs
+  /// Load trusted APs from API
   Future<void> _loadTrustedAPs() async {
-    _trustedAPs = [
-      TrustedAP(
-        id: '1',
-        ssid: 'Home-Network',
-        bssid: 'AA:BB:CC:DD:EE:FF',
-        addedAt: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      TrustedAP(
-        id: '2',
-        ssid: 'Office-WiFi',
-        bssid: '11:22:33:44:55:66',
-        addedAt: DateTime.now().subtract(const Duration(days: 15)),
-      ),
-    ];
+    try {
+      final trustedData = await _api.getTrustedAPs();
+      _trustedAPs = trustedData.map((data) => TrustedAP(
+        id: data['id'] as String? ?? '',
+        ssid: data['ssid'] as String? ?? '',
+        bssid: data['bssid'] as String? ?? '',
+        addedAt: data['added_at'] != null
+            ? DateTime.parse(data['added_at'] as String)
+            : DateTime.now(),
+      )).toList();
+    } catch (e) {
+      debugPrint('Failed to load trusted APs: $e');
+      _trustedAPs = [];
+    }
     notifyListeners();
   }
 
-  /// Scan for access points
+  /// Scan for access points using platform channel and API
   Future<void> scanForAPs() async {
     if (_isScanning) return;
 
@@ -203,112 +210,61 @@ class RogueAPProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final steps = [
-        'Scanning 2.4GHz band...',
-        'Scanning 5GHz band...',
-        'Analyzing access points...',
-        'Checking for evil twins...',
-        'Verifying security...',
-        'Generating report...',
-      ];
+      // Step 1: Scan for nearby APs using platform channel
+      _scanStatus = 'Scanning nearby networks...';
+      _scanProgress = 0.2;
+      notifyListeners();
 
-      for (int i = 0; i < steps.length; i++) {
-        _scanStatus = steps[i];
-        _scanProgress = (i + 1) / steps.length;
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 400));
+      List<Map<String, dynamic>> nearbyAPs = [];
+      try {
+        final result = await _wifiChannel.invokeMethod<List<dynamic>>('scanWifiNetworks');
+        if (result != null) {
+          nearbyAPs = result.map((ap) => Map<String, dynamic>.from(ap as Map)).toList();
+        }
+      } on PlatformException catch (e) {
+        debugPrint('Platform WiFi scan failed: $e');
       }
 
-      // Simulated detected APs
-      _detectedAPs = [
-        DetectedAP(
-          id: '1',
-          ssid: 'Home-Network',
-          bssid: 'AA:BB:CC:DD:EE:FF',
-          signalStrength: -45,
-          security: WiFiSecurity.wpa3,
-          threatLevel: APThreatLevel.safe,
-          vendor: 'ASUS',
-          channel: 6,
-          isConnected: true,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-        DetectedAP(
-          id: '2',
-          ssid: 'Free_WiFi',
-          bssid: '00:11:22:33:44:55',
-          signalStrength: -55,
-          security: WiFiSecurity.open,
-          threatLevel: APThreatLevel.suspicious,
-          threats: [APThreatType.openNetwork, APThreatType.suspiciousSSID],
-          vendor: 'Unknown',
-          channel: 11,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-        DetectedAP(
-          id: '3',
-          ssid: 'Home-Network',
-          bssid: 'XX:YY:ZZ:AA:BB:CC',
-          signalStrength: -60,
-          security: WiFiSecurity.wpa2,
-          threatLevel: APThreatLevel.dangerous,
-          threats: [APThreatType.evilTwin, APThreatType.macSpoofing],
-          vendor: 'Unknown',
-          channel: 6,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-        DetectedAP(
-          id: '4',
-          ssid: 'Office-WiFi',
-          bssid: '11:22:33:44:55:66',
-          signalStrength: -70,
-          security: WiFiSecurity.wpa2,
-          threatLevel: APThreatLevel.safe,
-          vendor: 'Cisco',
-          channel: 1,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-        DetectedAP(
-          id: '5',
-          ssid: 'Starbucks',
-          bssid: 'FF:EE:DD:CC:BB:AA',
-          signalStrength: -75,
-          security: WiFiSecurity.open,
-          threatLevel: APThreatLevel.caution,
-          threats: [APThreatType.openNetwork],
-          vendor: 'Aruba',
-          channel: 36,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-        DetectedAP(
-          id: '6',
-          ssid: 'NetGear-Guest',
-          bssid: '99:88:77:66:55:44',
-          signalStrength: -80,
-          security: WiFiSecurity.wep,
-          threatLevel: APThreatLevel.suspicious,
-          threats: [APThreatType.weakEncryption],
-          vendor: 'Netgear',
-          channel: 11,
-          detectedAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        ),
-      ];
+      // Step 2: Send to API for threat analysis
+      _scanStatus = 'Analyzing threats...';
+      _scanProgress = 0.5;
+      notifyListeners();
 
-      _currentConnection = _detectedAPs.firstWhere(
-        (a) => a.isConnected,
-        orElse: () => _detectedAPs.first,
-      );
+      final analysisResult = await _api.scanRogueAPs(nearbyAPs);
+
+      // Step 3: Parse results
+      _scanStatus = 'Processing results...';
+      _scanProgress = 0.8;
+      notifyListeners();
+
+      final detectedList = analysisResult['access_points'] as List<dynamic>? ?? [];
+      _detectedAPs = detectedList.map((data) {
+        final apData = data as Map<String, dynamic>;
+        return DetectedAP(
+          id: apData['id'] as String? ?? '',
+          ssid: apData['ssid'] as String? ?? 'Unknown',
+          bssid: apData['bssid'] as String? ?? '',
+          signalStrength: apData['signal_strength'] as int? ?? -100,
+          security: _parseWifiSecurity(apData['security'] as String?),
+          threatLevel: _parseThreatLevel(apData['threat_level'] as String?),
+          threats: _parseThreats(apData['threats'] as List<dynamic>?),
+          vendor: apData['vendor'] as String?,
+          channel: apData['channel'] as int? ?? 0,
+          isConnected: apData['is_connected'] as bool? ?? false,
+          detectedAt: DateTime.now(),
+          lastSeen: DateTime.now(),
+        );
+      }).toList();
+
+      // Find current connection
+      _currentConnection = _detectedAPs.where((a) => a.isConnected).firstOrNull;
 
       _scanStatus = 'Scan complete';
+      _scanProgress = 1.0;
       _updateStats();
     } catch (e) {
-      _error = 'Scan failed';
+      _error = 'Scan failed: $e';
+      debugPrint('Rogue AP scan failed: $e');
     } finally {
       _isScanning = false;
       notifyListeners();
@@ -318,8 +274,9 @@ class RogueAPProvider extends ChangeNotifier {
   /// Add AP to trusted list
   Future<bool> addTrustedAP(DetectedAP ap) async {
     try {
+      final result = await _api.addTrustedAP(ap.ssid, ap.bssid);
       final trusted = TrustedAP(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: result['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
         ssid: ap.ssid,
         bssid: ap.bssid,
         addedAt: DateTime.now(),
@@ -330,6 +287,7 @@ class RogueAPProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Failed to add trusted AP';
+      debugPrint('Failed to add trusted AP: $e');
       notifyListeners();
       return false;
     }
@@ -338,11 +296,13 @@ class RogueAPProvider extends ChangeNotifier {
   /// Remove from trusted list
   Future<bool> removeTrustedAP(String apId) async {
     try {
+      await _api.removeTrustedAP(apId);
       _trustedAPs.removeWhere((a) => a.id == apId);
       _updateStats();
       notifyListeners();
       return true;
     } catch (e) {
+      debugPrint('Failed to remove trusted AP: $e');
       return false;
     }
   }
@@ -399,5 +359,83 @@ class RogueAPProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Parse WiFi security from API response
+  WiFiSecurity _parseWifiSecurity(String? security) {
+    if (security == null) return WiFiSecurity.unknown;
+    switch (security.toUpperCase()) {
+      case 'WPA3':
+        return WiFiSecurity.wpa3;
+      case 'WPA2':
+        return WiFiSecurity.wpa2;
+      case 'WPA':
+        return WiFiSecurity.wpa;
+      case 'WEP':
+        return WiFiSecurity.wep;
+      case 'OPEN':
+      case 'NONE':
+        return WiFiSecurity.open;
+      default:
+        return WiFiSecurity.unknown;
+    }
+  }
+
+  /// Parse threat level from API response
+  APThreatLevel _parseThreatLevel(String? level) {
+    if (level == null) return APThreatLevel.unknown;
+    switch (level.toLowerCase()) {
+      case 'dangerous':
+      case 'critical':
+      case 'high':
+        return APThreatLevel.dangerous;
+      case 'suspicious':
+      case 'medium':
+        return APThreatLevel.suspicious;
+      case 'caution':
+      case 'low':
+        return APThreatLevel.caution;
+      case 'safe':
+      case 'none':
+        return APThreatLevel.safe;
+      default:
+        return APThreatLevel.unknown;
+    }
+  }
+
+  /// Parse threats list from API response
+  List<APThreatType> _parseThreats(List<dynamic>? threats) {
+    if (threats == null || threats.isEmpty) return [];
+    return threats.map((t) {
+      final threatStr = (t as String?)?.toLowerCase() ?? '';
+      switch (threatStr) {
+        case 'evil_twin':
+        case 'eviltwin':
+          return APThreatType.evilTwin;
+        case 'fake_hotspot':
+        case 'fakehotspot':
+          return APThreatType.fakeHotspot;
+        case 'ssl_stripping':
+        case 'sslstripping':
+          return APThreatType.sslStripping;
+        case 'deauth_attack':
+        case 'deauthattack':
+          return APThreatType.deauthAttack;
+        case 'weak_encryption':
+        case 'weakencryption':
+          return APThreatType.weakEncryption;
+        case 'open_network':
+        case 'opennetwork':
+          return APThreatType.openNetwork;
+        case 'suspicious_ssid':
+        case 'suspiciousssid':
+          return APThreatType.suspiciousSSID;
+        case 'mac_spoofing':
+        case 'macspoofing':
+          return APThreatType.macSpoofing;
+        default:
+          return null;
+      }
+    }).whereType<APThreatType>().toList();
   }
 }

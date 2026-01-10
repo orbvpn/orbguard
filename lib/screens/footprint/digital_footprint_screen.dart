@@ -46,6 +46,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         return GlassTabPage(
           key: _tabPageKey,
           title: 'Digital Footprint',
+          hasSearch: true,
+          searchHint: 'Search assets...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(

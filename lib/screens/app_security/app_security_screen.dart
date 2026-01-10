@@ -20,6 +20,8 @@ class AppSecurityScreen extends StatelessWidget {
       builder: (context, provider, child) {
         return GlassTabPage(
           title: 'App Security',
+          hasSearch: true,
+          searchHint: 'Search apps...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -57,7 +59,7 @@ class AppSecurityScreen extends StatelessWidget {
           tabs: [
             GlassTab(
               label: 'Apps',
-              iconPath: 'apps',
+              iconPath: 'widget',
               content: _AppsTab(provider: provider),
             ),
             GlassTab(

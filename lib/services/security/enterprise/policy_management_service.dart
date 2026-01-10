@@ -9,6 +9,8 @@
 
 import 'dart:async';
 
+import '../../api/orbguard_api_client.dart';
+
 /// Policy type
 enum PolicyType {
   security('Security', 'Security requirements'),
@@ -474,6 +476,9 @@ class PolicyTemplate {
 /// Policy Management Service
 /// Uses local in-memory storage (enterprise API not yet implemented)
 class PolicyManagementService {
+  // API client
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+
   // Cached data (local storage)
   List<SecurityPolicy> _policies = [];
   List<PolicyTemplate> _templates = [];
@@ -582,32 +587,41 @@ class PolicyManagementService {
     return true;
   }
 
-  /// Assign policy to groups (stub)
+  /// Assign policy to groups
   Future<bool> assignPolicyToGroups(
     String policyId,
     List<String> groupIds,
   ) async {
-    // Local stub - would sync with API in real impl
-    return true;
+    try {
+      return await _api.assignPolicyToGroups(policyId, groupIds);
+    } catch (e) {
+      return false;
+    }
   }
 
-  /// Assign policy to devices (stub)
+  /// Assign policy to devices
   Future<bool> assignPolicyToDevices(
     String policyId,
     List<String> deviceIds,
   ) async {
-    // Local stub - would sync with API in real impl
-    return true;
+    try {
+      return await _api.assignPolicyToDevices(policyId, deviceIds);
+    } catch (e) {
+      return false;
+    }
   }
 
-  /// Remove policy assignment (stub)
+  /// Remove policy assignment
   Future<bool> removePolicyAssignment(
     String policyId, {
     List<String>? groupIds,
     List<String>? deviceIds,
   }) async {
-    // Local stub - would sync with API in real impl
-    return true;
+    try {
+      return await _api.removePolicyAssignment(policyId, groupIds: groupIds, deviceIds: deviceIds);
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Add rule to policy (local storage)
@@ -794,14 +808,18 @@ class PolicyManagementService {
     return true;
   }
 
-  /// Evaluate device compliance (stub)
+  /// Evaluate device compliance
   Future<Map<String, dynamic>> evaluateCompliance(String deviceId) async {
-    // Local stub - would evaluate against policies in real impl
-    return {
-      'is_compliant': true,
-      'violations': <Map<String, dynamic>>[],
-      'evaluated_at': DateTime.now().toIso8601String(),
-    };
+    try {
+      return await _api.evaluateDeviceCompliance(deviceId);
+    } catch (e) {
+      return {
+        'is_compliant': true,
+        'violations': <Map<String, dynamic>>[],
+        'evaluated_at': DateTime.now().toIso8601String(),
+        'error': e.toString(),
+      };
+    }
   }
 
   // ========== BYOD POLICY METHODS ==========
@@ -930,35 +948,38 @@ class PolicyManagementService {
     return rules;
   }
 
-  /// Enroll device as BYOD (stub)
+  /// Enroll device as BYOD
   Future<Map<String, dynamic>> enrollBYODDevice(BYODEnrollmentRequest request) async {
-    // Local stub - would call API in real impl
-    return {
-      'success': true,
-      'device_id': 'device-${DateTime.now().millisecondsSinceEpoch}',
-      'enrollment_id': 'enroll-${DateTime.now().millisecondsSinceEpoch}',
-      'policy_id': 'policy-byod-default',
-      'message': 'Device enrolled successfully (local)',
-    };
+    try {
+      return await _api.enrollBYODDevice(request.toJson());
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
   }
 
-  /// Get BYOD enrollment status (stub)
+  /// Get BYOD enrollment status
   Future<Map<String, dynamic>> getBYODEnrollmentStatus(String deviceId) async {
-    // Local stub - would call API in real impl
-    return {
-      'is_enrolled': false,
-      'ownership_type': 'unknown',
-      'enrollment_date': null,
-      'policy_name': null,
-      'is_compliant': true,
-      'work_profile_enabled': false,
-    };
+    try {
+      return await _api.getBYODEnrollmentStatus(deviceId);
+    } catch (e) {
+      return {
+        'is_enrolled': false,
+        'ownership_type': 'unknown',
+        'error': e.toString(),
+      };
+    }
   }
 
-  /// Unenroll BYOD device (stub)
+  /// Unenroll BYOD device
   Future<bool> unenrollBYODDevice(String deviceId, {bool wipeWorkData = true}) async {
-    // Local stub - would call API in real impl
-    return true;
+    try {
+      return await _api.unenrollBYODDevice(deviceId, wipeWorkData: wipeWorkData);
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Get BYOD policy templates
@@ -1027,16 +1048,26 @@ class PolicyManagementService {
     ];
   }
 
-  /// Check device ownership type (stub)
+  /// Check device ownership type
   Future<DeviceOwnershipType> detectDeviceOwnership(String deviceId) async {
-    // Local stub - would call API in real impl
-    return DeviceOwnershipType.unknown;
+    try {
+      final ownershipStr = await _api.detectDeviceOwnership(deviceId);
+      return DeviceOwnershipType.values.firstWhere(
+        (t) => t.name == ownershipStr,
+        orElse: () => DeviceOwnershipType.unknown,
+      );
+    } catch (e) {
+      return DeviceOwnershipType.unknown;
+    }
   }
 
-  /// Set device ownership type (stub)
+  /// Set device ownership type
   Future<bool> setDeviceOwnership(String deviceId, DeviceOwnershipType ownershipType) async {
-    // Local stub - would call API in real impl
-    return true;
+    try {
+      return await _api.setDeviceOwnership(deviceId, ownershipType.name);
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Dispose resources

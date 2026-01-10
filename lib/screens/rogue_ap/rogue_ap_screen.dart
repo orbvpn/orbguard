@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/rogue_ap_provider.dart';
 
 class RogueAPScreen extends StatefulWidget {
@@ -16,32 +17,24 @@ class RogueAPScreen extends StatefulWidget {
   State<RogueAPScreen> createState() => _RogueAPScreenState();
 }
 
-class _RogueAPScreenState extends State<RogueAPScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _RogueAPScreenState extends State<RogueAPScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RogueAPProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<RogueAPProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Rogue AP Detection',
-          body: Column(
+          hasSearch: true,
+          searchHint: 'Search networks...',
+          headerContent: Column(
             children: [
               // Actions row
               Padding(
@@ -75,60 +68,50 @@ class _RogueAPScreenState extends State<RogueAPScreen>
                   ],
                 ),
               ),
-              // Tab bar
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                  child: Container(
-                    decoration: GlassTheme.glassDecoration(),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: GlassTheme.primaryAccent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white54,
-                      tabs: const [
-                        Tab(text: 'Nearby APs'),
-                        Tab(text: 'Threats'),
-                        Tab(text: 'Trusted'),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Content
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: GlassTheme.primaryAccent,
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          // Scan progress
-                          if (provider.isScanning) _buildScanProgress(provider),
-                          // Current connection status
-                          if (provider.currentConnection != null && !provider.isScanning)
-                            _buildCurrentConnection(provider),
-                          // Stats summary
-                          if (!provider.isScanning) _buildStats(provider),
-                          // Tab content
-                          Expanded(
-                            child: TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildNearbyAPsTab(provider),
-                                _buildThreatsTab(provider),
-                                _buildTrustedTab(provider),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
+              // Scan progress
+              if (provider.isScanning) _buildScanProgress(provider),
+              // Current connection status
+              if (provider.currentConnection != null && !provider.isScanning)
+                _buildCurrentConnection(provider),
+              // Stats summary
+              if (!provider.isScanning && !provider.isLoading) _buildStats(provider),
             ],
           ),
+          tabs: [
+            GlassTab(
+              label: 'Nearby',
+              iconPath: 'wi_fi_router',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildNearbyAPsTab(provider),
+            ),
+            GlassTab(
+              label: 'Threats',
+              iconPath: 'danger_triangle',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildThreatsTab(provider),
+            ),
+            GlassTab(
+              label: 'Trusted',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: GlassTheme.primaryAccent,
+                      ),
+                    )
+                  : _buildTrustedTab(provider),
+            ),
+          ],
         );
       },
     );

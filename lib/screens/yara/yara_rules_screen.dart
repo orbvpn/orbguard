@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class YaraRulesScreen extends StatefulWidget {
   const YaraRulesScreen({super.key});
@@ -14,97 +16,122 @@ class YaraRulesScreen extends StatefulWidget {
   State<YaraRulesScreen> createState() => _YaraRulesScreenState();
 }
 
-class _YaraRulesScreenState extends State<YaraRulesScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _YaraRulesScreenState extends State<YaraRulesScreen> {
+  final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey<GlassTabPageState>();
   bool _isLoading = false;
   bool _isScanning = false;
+  String? _errorMessage;
   final List<YaraRule> _rules = [];
   final List<YaraScanResult> _scanResults = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadRules();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadRules() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _rules.addAll(_getSampleRules());
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      final apiRules = await OrbGuardApiClient.instance.getYaraRules();
+      setState(() {
+        _rules.clear();
+        _rules.addAll(apiRules.map((json) => YaraRule.fromJson(json)));
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    if (_isLoading) {
+      return GlassPage(
+        title: 'YARA Rules',
+        body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return GlassPage(
+        title: 'YARA Rules',
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DuotoneIcon(AppIcons.dangerTriangle, size: 64, color: GlassTheme.errorColor.withAlpha(180)),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to Load Rules',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.white.withAlpha(153)),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadRules,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: GlassTheme.primaryAccent,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GlassTabPage(
+      key: _tabPageKey,
       title: 'YARA Rules',
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : Column(
-              children: [
-                // Actions row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.fileDownload, size: 22, color: Colors.white),
-                        onPressed: () => _showUploadDialog(context),
-                        tooltip: 'Upload',
-                      ),
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
-                        onPressed: _isLoading ? null : _loadRules,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                ),
-                // Tab bar
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                    child: Container(
-                      decoration: GlassTheme.glassDecoration(),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicatorColor: GlassTheme.primaryAccent,
-                        labelColor: Colors.white,
-                        unselectedLabelColor: Colors.white54,
-                        tabs: const [
-                          Tab(text: 'Rules'),
-                          Tab(text: 'Scan'),
-                          Tab(text: 'Results'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildRulesTab(),
-                      _buildScanTab(),
-                      _buildResultsTab(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      hasSearch: true,
+      searchHint: 'Search rules...',
+      actions: [
+        IconButton(
+          icon: DuotoneIcon(AppIcons.fileDownload, size: 22, color: Colors.white),
+          onPressed: () => _showUploadDialog(context),
+          tooltip: 'Upload',
+        ),
+        IconButton(
+          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+          onPressed: _isLoading ? null : _loadRules,
+          tooltip: 'Refresh',
+        ),
+      ],
+      tabs: [
+        GlassTab(
+          label: 'Rules',
+          iconPath: 'file',
+          content: _buildRulesTab(),
+        ),
+        GlassTab(
+          label: 'Scan',
+          iconPath: 'magnifer',
+          content: _buildScanTab(),
+        ),
+        GlassTab(
+          label: 'Results',
+          iconPath: 'chart',
+          content: _buildResultsTab(),
+        ),
+      ],
     );
   }
 
@@ -416,7 +443,7 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
           matches: type == 'device' ? ['Mimikatz_Generic', 'CobaltStrike_Beacon'] : [],
           severity: type == 'device' ? 'high' : 'low',
         ));
-        _tabController.animateTo(2);
+        _tabPageKey.currentState?.animateToTab(2);
       });
     });
   }
@@ -521,16 +548,6 @@ class _YaraRulesScreenState extends State<YaraRulesScreen>
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
-
-  List<YaraRule> _getSampleRules() {
-    return [
-      YaraRule(name: 'Mimikatz_Generic', category: 'Credential Theft', severity: 'critical', author: 'Florian Roth', matchCount: 42, description: 'Detects Mimikatz credential dumping tool'),
-      YaraRule(name: 'CobaltStrike_Beacon', category: 'C2 Framework', severity: 'critical', author: 'OTX', matchCount: 28, description: 'Detects Cobalt Strike Beacon payloads'),
-      YaraRule(name: 'Ransomware_Generic', category: 'Ransomware', severity: 'high', author: 'ESET', matchCount: 15, description: 'Generic ransomware detection rule'),
-      YaraRule(name: 'Webshell_PHP', category: 'Webshell', severity: 'high', author: 'SANS', matchCount: 8, description: 'Detects PHP webshells'),
-      YaraRule(name: 'Emotet_Dropper', category: 'Banking Trojan', severity: 'high', author: 'Proofpoint', matchCount: 22, description: 'Detects Emotet malware dropper'),
-    ];
-  }
 }
 
 class YaraRule {
@@ -551,6 +568,18 @@ class YaraRule {
     this.matchCount = 0,
     this.isEnabled = true,
   });
+
+  factory YaraRule.fromJson(Map<String, dynamic> json) {
+    return YaraRule(
+      name: json['name'] as String? ?? 'Unknown Rule',
+      category: json['category'] as String? ?? 'Uncategorized',
+      severity: json['severity'] as String? ?? 'medium',
+      author: json['author'] as String?,
+      description: json['description'] as String?,
+      matchCount: json['match_count'] as int? ?? json['matchCount'] as int? ?? 0,
+      isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? true,
+    );
+  }
 }
 
 class YaraScanResult {

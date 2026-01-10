@@ -32,6 +32,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
       builder: (context, provider, _) {
         return GlassTabPage(
           title: 'Privacy Protection',
+          hasSearch: true,
+          searchHint: 'Search permissions...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(

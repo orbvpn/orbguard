@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
+import '../../models/api/threat_indicator.dart' as api;
 
 class IntelligenceCoreScreen extends StatefulWidget {
   const IntelligenceCoreScreen({super.key});
@@ -15,15 +18,15 @@ class IntelligenceCoreScreen extends StatefulWidget {
   State<IntelligenceCoreScreen> createState() => _IntelligenceCoreScreenState();
 }
 
-class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   bool _isLoading = false;
   bool _isSearching = false;
+  String? _error;
   final TextEditingController _searchController = TextEditingController();
-  final List<ThreatIndicator> _indicators = [];
-  final List<ThreatIndicator> _searchResults = [];
-  final List<IndicatorCheckResult> _checkHistory = [];
+  final TextEditingController _checkInputController = TextEditingController();
+  final List<api.ThreatIndicator> _indicators = [];
+  final List<api.ThreatIndicator> _searchResults = [];
+  final List<api.IndicatorCheckResult> _checkHistory = [];
   String _selectedType = 'All';
 
   final List<String> _indicatorTypes = [
@@ -40,94 +43,111 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadIndicators();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
+    _checkInputController.dispose();
     super.dispose();
   }
 
   Future<void> _loadIndicators() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _indicators.addAll(_getSampleIndicators());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final response = await OrbGuardApiClient.instance.listIndicators();
+      setState(() {
+        _indicators.clear();
+        _indicators.addAll(response.items);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load indicators: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    if (_isLoading) {
+      return GlassPage(
+        title: 'Intelligence Core',
+        body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+      );
+    }
+
+    return GlassTabPage(
       title: 'Intelligence Core',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const DuotoneIcon('file', size: 22, color: Colors.white),
-                  tooltip: 'Import Indicators',
-                  onPressed: () => _showImportDialog(context),
-                ),
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadIndicators,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Browse'),
-                    Tab(text: 'Check'),
-                    Tab(text: 'History'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildBrowseTab(),
-                      _buildCheckTab(),
-                      _buildHistoryTab(),
-                    ],
-                  ),
-          ),
-        ],
-      ),
+      hasSearch: true,
+      searchHint: 'Search IOCs...',
+      actions: [
+        IconButton(
+          icon: const DuotoneIcon('file', size: 22, color: Colors.white),
+          tooltip: 'Import Indicators',
+          onPressed: () => _showImportDialog(context),
+        ),
+        IconButton(
+          icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+          onPressed: _isLoading ? null : _loadIndicators,
+          tooltip: 'Refresh',
+        ),
+      ],
+      tabs: [
+        GlassTab(
+          label: 'Browse',
+          iconPath: 'file',
+          content: _buildBrowseTab(),
+        ),
+        GlassTab(
+          label: 'Check',
+          iconPath: 'magnifier',
+          content: _buildCheckTab(),
+        ),
+        GlassTab(
+          label: 'History',
+          iconPath: 'chart',
+          content: _buildHistoryTab(),
+        ),
+      ],
     );
+  }
+
+  String _getTypeDisplayName(api.IndicatorType type) {
+    switch (type) {
+      case api.IndicatorType.ipv4:
+      case api.IndicatorType.ipv6:
+        return 'IP Address';
+      case api.IndicatorType.domain:
+        return 'Domain';
+      case api.IndicatorType.url:
+        return 'URL';
+      case api.IndicatorType.md5:
+        return 'Hash (MD5)';
+      case api.IndicatorType.sha256:
+      case api.IndicatorType.sha1:
+        return 'Hash (SHA256)';
+      case api.IndicatorType.email:
+        return 'Email';
+      case api.IndicatorType.processName:
+      case api.IndicatorType.bundleId:
+      case api.IndicatorType.packageName:
+        return 'File Name';
+      default:
+        return type.name;
+    }
   }
 
   Widget _buildBrowseTab() {
     final filteredIndicators = _selectedType == 'All'
         ? _indicators
-        : _indicators.where((i) => i.type == _selectedType).toList();
+        : _indicators.where((i) => _getTypeDisplayName(i.type) == _selectedType).toList();
 
     return Column(
       children: [
@@ -203,9 +223,9 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
             children: [
               _buildStatCard('Total', _indicators.length.toString(), GlassTheme.primaryAccent),
               const SizedBox(width: 12),
-              _buildStatCard('Malicious', _indicators.where((i) => i.isMalicious).length.toString(), GlassTheme.errorColor),
+              _buildStatCard('Critical', _indicators.where((i) => i.severity == api.SeverityLevel.critical || i.severity == api.SeverityLevel.high).length.toString(), GlassTheme.errorColor),
               const SizedBox(width: 12),
-              _buildStatCard('Suspicious', _indicators.where((i) => i.isSuspicious).length.toString(), GlassTheme.warningColor),
+              _buildStatCard('Medium', _indicators.where((i) => i.severity == api.SeverityLevel.medium).length.toString(), GlassTheme.warningColor),
             ],
           ),
         ),
@@ -244,26 +264,16 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     );
   }
 
-  Widget _buildIndicatorCard(ThreatIndicator indicator) {
-    Color statusColor;
-    String statusText;
-    if (indicator.isMalicious) {
-      statusColor = GlassTheme.errorColor;
-      statusText = 'Malicious';
-    } else if (indicator.isSuspicious) {
-      statusColor = GlassTheme.warningColor;
-      statusText = 'Suspicious';
-    } else {
-      statusColor = GlassTheme.successColor;
-      statusText = 'Clean';
-    }
+  Widget _buildIndicatorCard(api.ThreatIndicator indicator) {
+    final statusColor = Color(indicator.severity.color);
+    final statusText = indicator.severity.displayName;
 
     return GlassCard(
       onTap: () => _showIndicatorDetails(context, indicator),
       child: Row(
         children: [
           GlassSvgIconBox(
-            icon: _getIndicatorSvgIcon(indicator.type),
+            icon: _getIndicatorSvgIcon(_getTypeDisplayName(indicator.type)),
             color: statusColor,
           ),
           const SizedBox(width: 12),
@@ -285,10 +295,10 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    GlassBadge(text: indicator.type, color: GlassTheme.primaryAccent, fontSize: 10),
+                    GlassBadge(text: _getTypeDisplayName(indicator.type), color: GlassTheme.primaryAccent, fontSize: 10),
                     const SizedBox(width: 8),
                     Text(
-                      indicator.source,
+                      indicator.sourceName ?? 'Unknown',
                       style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                     ),
                   ],
@@ -302,7 +312,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
               GlassBadge(text: statusText, color: statusColor, fontSize: 10),
               const SizedBox(height: 4),
               Text(
-                '${indicator.confidence}% conf',
+                '${(indicator.confidence * 100).toInt()}% conf',
                 style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
               ),
             ],
@@ -334,6 +344,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  controller: _checkInputController,
                   style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
                   maxLines: 3,
                   decoration: InputDecoration(
@@ -346,9 +357,6 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  onChanged: (value) {
-                    // Store for checking
-                  },
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -459,13 +467,13 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     );
   }
 
-  Widget _buildHistoryCard(IndicatorCheckResult result) {
+  Widget _buildHistoryCard(api.IndicatorCheckResult result) {
     return GlassCard(
       child: Row(
         children: [
           GlassSvgIconBox(
-            icon: result.found ? 'danger_triangle' : 'check_circle',
-            color: result.found ? GlassTheme.errorColor : GlassTheme.successColor,
+            icon: result.isThreat ? 'danger_triangle' : 'check_circle',
+            color: result.isThreat ? GlassTheme.errorColor : GlassTheme.successColor,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -478,20 +486,18 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 ),
                 Row(
                   children: [
-                    GlassBadge(text: result.type, color: GlassTheme.primaryAccent, fontSize: 10),
+                    GlassBadge(text: result.type?.name ?? 'Unknown', color: GlassTheme.primaryAccent, fontSize: 10),
                     const SizedBox(width: 8),
-                    Text(
-                      _formatTime(result.checkedAt),
-                      style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
-                    ),
+                    if (result.severity != null)
+                      GlassBadge(text: result.severity!.displayName, color: Color(result.severity!.color), fontSize: 10),
                   ],
                 ),
               ],
             ),
           ),
           GlassBadge(
-            text: result.found ? 'Found' : 'Clean',
-            color: result.found ? GlassTheme.errorColor : GlassTheme.successColor,
+            text: result.isThreat ? 'Threat' : 'Clean',
+            color: result.isThreat ? GlassTheme.errorColor : GlassTheme.successColor,
             fontSize: 10,
           ),
         ],
@@ -499,41 +505,42 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     );
   }
 
-  void _checkIndicators() {
+  Future<void> _checkIndicators() async {
+    final input = _checkInputController.text.trim();
+    if (input.isEmpty) return;
+
     setState(() => _isSearching = true);
-    Future.delayed(const Duration(seconds: 2), () {
+
+    try {
+      // Parse input lines into indicator requests
+      final lines = input.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      final requests = lines.map((value) => api.IndicatorCheckRequest(value: value.trim())).toList();
+
+      // Call the real API
+      final results = await OrbGuardApiClient.instance.checkIndicators(requests);
+
       if (!mounted) return;
       setState(() {
         _isSearching = false;
-        _searchResults.clear();
-        _searchResults.addAll([
-          ThreatIndicator(
-            id: 'search-1',
-            type: 'IP Address',
-            value: '192.168.1.100',
-            source: 'Local Check',
-            confidence: 85,
-            isMalicious: true,
-            isSuspicious: false,
-            tags: ['malware', 'c2'],
-            firstSeen: DateTime.now().subtract(const Duration(days: 30)),
-            lastSeen: DateTime.now(),
-          ),
-        ]);
-        _checkHistory.insert(
-          0,
-          IndicatorCheckResult(
-            value: '192.168.1.100',
-            type: 'IP Address',
-            found: true,
-            checkedAt: DateTime.now(),
-          ),
-        );
+        _checkHistory.insertAll(0, results);
       });
-    });
+
+      // Clear input after successful check
+      _checkInputController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSearching = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to check indicators: $e')),
+      );
+    }
   }
 
-  void _showIndicatorDetails(BuildContext context, ThreatIndicator indicator) {
+  void _showIndicatorDetails(BuildContext context, api.ThreatIndicator indicator) {
+    final statusColor = Color(indicator.severity.color);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -558,8 +565,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
               Row(
                 children: [
                   GlassSvgIconBox(
-                    icon: _getIndicatorSvgIcon(indicator.type),
-                    color: indicator.isMalicious ? GlassTheme.errorColor : GlassTheme.primaryAccent,
+                    icon: _getIndicatorSvgIcon(_getTypeDisplayName(indicator.type)),
+                    color: statusColor,
                     size: 56,
                   ),
                   const SizedBox(width: 16),
@@ -568,7 +575,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          indicator.type,
+                          _getTypeDisplayName(indicator.type),
                           style: TextStyle(color: GlassTheme.primaryAccent, fontSize: 14),
                         ),
                         const SizedBox(height: 4),
@@ -591,14 +598,21 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildDetailRow('Status', indicator.isMalicious ? 'Malicious' : (indicator.isSuspicious ? 'Suspicious' : 'Clean')),
-                    _buildDetailRow('Confidence', '${indicator.confidence}%'),
-                    _buildDetailRow('Source', indicator.source),
-                    _buildDetailRow('First Seen', _formatDate(indicator.firstSeen)),
-                    _buildDetailRow('Last Seen', _formatDate(indicator.lastSeen)),
+                    _buildDetailRow('Severity', indicator.severity.displayName),
+                    _buildDetailRow('Confidence', '${(indicator.confidence * 100).toInt()}%'),
+                    _buildDetailRow('Source', indicator.sourceName ?? 'Unknown'),
+                    if (indicator.firstSeen != null) _buildDetailRow('First Seen', _formatDate(indicator.firstSeen!)),
+                    if (indicator.lastSeen != null) _buildDetailRow('Last Seen', _formatDate(indicator.lastSeen!)),
+                    if (indicator.campaignName != null) _buildDetailRow('Campaign', indicator.campaignName!),
                   ],
                 ),
               ),
+              if (indicator.description != null) ...[
+                const SizedBox(height: 20),
+                const Text('Description', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(indicator.description!, style: TextStyle(color: Colors.white.withAlpha(179))),
+              ],
               const SizedBox(height: 20),
               const Text('Tags', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
@@ -607,18 +621,15 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
                 runSpacing: 8,
                 children: indicator.tags.map((tag) => GlassBadge(text: tag, color: GlassTheme.primaryAccent)).toList(),
               ),
-              if (indicator.relatedIndicators != null && indicator.relatedIndicators!.isNotEmpty) ...[
+              if (indicator.mitreTechniques != null && indicator.mitreTechniques!.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('Related Indicators', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const Text('MITRE Techniques', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                ...indicator.relatedIndicators!.map((related) => GlassContainer(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        related,
-                        style: const TextStyle(color: Colors.white70, fontFamily: 'monospace', fontSize: 12),
-                      ),
-                    )),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: indicator.mitreTechniques!.map((t) => GlassBadge(text: t, color: GlassTheme.warningColor)).toList(),
+                ),
               ],
               const SizedBox(height: 24),
               Row(
@@ -774,134 +785,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen>
     }
   }
 
-  String _formatTime(DateTime time) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
-  }
-
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-
-  List<ThreatIndicator> _getSampleIndicators() {
-    return [
-      ThreatIndicator(
-        id: '1',
-        type: 'IP Address',
-        value: '45.33.32.156',
-        source: 'AlienVault OTX',
-        confidence: 95,
-        isMalicious: true,
-        isSuspicious: false,
-        tags: ['malware', 'botnet', 'c2'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 45)),
-        lastSeen: DateTime.now().subtract(const Duration(hours: 2)),
-        relatedIndicators: ['evil-domain.com', 'malware.exe'],
-      ),
-      ThreatIndicator(
-        id: '2',
-        type: 'Domain',
-        value: 'phishing-bank-login.com',
-        source: 'PhishTank',
-        confidence: 99,
-        isMalicious: true,
-        isSuspicious: false,
-        tags: ['phishing', 'banking', 'credential-theft'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 7)),
-        lastSeen: DateTime.now().subtract(const Duration(minutes: 30)),
-      ),
-      ThreatIndicator(
-        id: '3',
-        type: 'Hash (SHA256)',
-        value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        source: 'VirusTotal',
-        confidence: 87,
-        isMalicious: true,
-        isSuspicious: false,
-        tags: ['ransomware', 'lockbit'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 14)),
-        lastSeen: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      ThreatIndicator(
-        id: '4',
-        type: 'URL',
-        value: 'https://suspicious-download.net/update.exe',
-        source: 'URLhaus',
-        confidence: 78,
-        isMalicious: false,
-        isSuspicious: true,
-        tags: ['dropper', 'suspicious'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 3)),
-        lastSeen: DateTime.now().subtract(const Duration(hours: 6)),
-      ),
-      ThreatIndicator(
-        id: '5',
-        type: 'Email',
-        value: 'support@fake-microsoft.xyz',
-        source: 'SpamHaus',
-        confidence: 92,
-        isMalicious: true,
-        isSuspicious: false,
-        tags: ['phishing', 'impersonation', 'tech-support-scam'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 21)),
-        lastSeen: DateTime.now().subtract(const Duration(hours: 12)),
-      ),
-      ThreatIndicator(
-        id: '6',
-        type: 'IP Address',
-        value: '8.8.8.8',
-        source: 'Internal',
-        confidence: 100,
-        isMalicious: false,
-        isSuspicious: false,
-        tags: ['google', 'dns', 'safe'],
-        firstSeen: DateTime.now().subtract(const Duration(days: 365)),
-        lastSeen: DateTime.now(),
-      ),
-    ];
-  }
-}
-
-class ThreatIndicator {
-  final String id;
-  final String type;
-  final String value;
-  final String source;
-  final int confidence;
-  final bool isMalicious;
-  final bool isSuspicious;
-  final List<String> tags;
-  final DateTime firstSeen;
-  final DateTime lastSeen;
-  final List<String>? relatedIndicators;
-
-  ThreatIndicator({
-    required this.id,
-    required this.type,
-    required this.value,
-    required this.source,
-    required this.confidence,
-    required this.isMalicious,
-    required this.isSuspicious,
-    required this.tags,
-    required this.firstSeen,
-    required this.lastSeen,
-    this.relatedIndicators,
-  });
-}
-
-class IndicatorCheckResult {
-  final String value;
-  final String type;
-  final bool found;
-  final DateTime checkedAt;
-
-  IndicatorCheckResult({
-    required this.value,
-    required this.type,
-    required this.found,
-    required this.checkedAt,
-  });
 }

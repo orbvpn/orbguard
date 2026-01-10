@@ -32,6 +32,7 @@ import 'screens/enterprise/siem_integration_screen.dart';
 import 'screens/enterprise/compliance_reporting_screen.dart';
 import 'screens/enterprise/stix_taxii_screen.dart';
 import 'screens/intelligence/intelligence_core_screen.dart';
+import 'screens/security_center_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -961,27 +962,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Home tab content
+  /// Home tab content - Security Center
   Widget _buildHomeContent() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_permissionsChecked && _detectionCapability < 80)
-            _buildCapabilityBanner(),
-          _buildStatusCard(),
-          const SizedBox(height: 16),
-          _buildDeviceInfoCard(),
-          const SizedBox(height: 16),
-          _buildDetectionCapabilityCard(),
-          const SizedBox(height: 16),
-          _buildScanButton(),
-          const SizedBox(height: 16),
-          if (_threats.isNotEmpty) _buildThreatsSummary(),
-        ],
-      ),
-    );
+    return const SecurityCenterScreen();
   }
 
   /// Scan tab content

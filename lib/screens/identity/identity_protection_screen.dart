@@ -34,6 +34,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
       builder: (context, provider, _) {
         return GlassTabPage(
           title: 'Identity Protection',
+          hasSearch: true,
+          searchHint: 'Search assets...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(

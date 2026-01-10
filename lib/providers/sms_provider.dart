@@ -359,10 +359,18 @@ class SmsProvider extends ChangeNotifier {
 
   /// Report false positive
   Future<void> reportFalsePositive(String messageId) async {
-    // TODO: Implement API call to report false positive
-    // For now, just clear the analysis result
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index >= 0) {
+      final message = _messages[index];
+
+      // Report to API
+      try {
+        await _api.reportSmsFalsePositive(messageId, message.content);
+      } catch (e) {
+        debugPrint('Failed to report false positive: $e');
+      }
+
+      // Clear the analysis result locally
       _messages[index] = _messages[index].copyWith(
         analysisResult: null,
       );

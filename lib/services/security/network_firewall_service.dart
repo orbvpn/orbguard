@@ -9,7 +9,11 @@
 /// - Connection alerts
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import '../api/orbguard_api_client.dart';
+import '../../models/api/threat_indicator.dart';
 
 /// Connection direction
 enum ConnectionDirection {
@@ -276,30 +280,65 @@ class NetworkFirewallService {
   bool _isEnabled = false;
   bool get isEnabled => _isEnabled;
 
-  // Known malicious domains (sample list)
-  static const _maliciousDomains = [
-    'malware-domain.com',
-    'phishing-site.net',
-    'c2-server.org',
-    // Would be populated from threat intelligence
-  ];
-
-  // Known malicious IPs (sample list)
-  static const _maliciousIps = [
-    '185.220.101.0/24', // Example Tor exit nodes
-    '192.42.116.0/24',
-    // Would be populated from threat intelligence
-  ];
-
   /// Initialize the firewall service
   Future<void> initialize() async {
     try {
       await _channel.invokeMethod('initialize');
 
-      // Load default malicious entries
-      _blockedDomains.addAll(_maliciousDomains);
+      // Load malicious domains and IPs from API
+      await _loadMaliciousIndicators();
     } on PlatformException catch (e) {
-      print('Firewall initialization failed: ${e.message}');
+      debugPrint('Firewall initialization failed: ${e.message}');
+    }
+  }
+
+  /// Load malicious indicators from threat intelligence API
+  Future<void> _loadMaliciousIndicators() async {
+    try {
+      final api = OrbGuardApiClient.instance;
+
+      // Fetch blocked domains from VPN blocklist
+      try {
+        final blockedDomains = await api.getVpnBlockedDomains();
+        for (final domain in blockedDomains) {
+          final domainValue = domain['domain']?.toString();
+          if (domainValue != null) {
+            _blockedDomains.add(domainValue);
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch blocked domains: $e');
+      }
+
+      // Fetch malicious domain indicators
+      try {
+        final domainIndicators = await api.listIndicators(
+          type: IndicatorType.domain,
+          severity: SeverityLevel.critical,
+          limit: 500,
+        );
+        for (final indicator in domainIndicators.items) {
+          _blockedDomains.add(indicator.value);
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch domain indicators: $e');
+      }
+
+      // Fetch malicious IP indicators
+      try {
+        final ipIndicators = await api.listIndicators(
+          type: IndicatorType.ipv4,
+          severity: SeverityLevel.critical,
+          limit: 500,
+        );
+        for (final indicator in ipIndicators.items) {
+          _blockedIps.add(indicator.value);
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch IP indicators: $e');
+      }
+    } catch (e) {
+      debugPrint('Failed to load malicious indicators: $e');
     }
   }
 
@@ -319,7 +358,7 @@ class NetworkFirewallService {
 
       _isEnabled = true;
     } on PlatformException catch (e) {
-      print('Failed to enable firewall: ${e.message}');
+      debugPrint('Failed to enable firewall: ${e.message}');
     }
   }
 
@@ -333,7 +372,7 @@ class NetworkFirewallService {
       _eventSubscription = null;
       _isEnabled = false;
     } on PlatformException catch (e) {
-      print('Failed to disable firewall: ${e.message}');
+      debugPrint('Failed to disable firewall: ${e.message}');
     }
   }
 

@@ -1,5 +1,6 @@
 /// Threat Actors Screen
 /// Threat actor profiles and intelligence interface
+library;
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +9,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/campaign.dart';
+import '../../models/api/threat_indicator.dart';
 
 class ThreatActorsScreen extends StatefulWidget {
   const ThreatActorsScreen({super.key});
@@ -18,6 +20,7 @@ class ThreatActorsScreen extends StatefulWidget {
 
 class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   bool _isLoading = true;
+  String? _errorMessage;
   List<ThreatActor> _actors = [];
   String _selectedCategory = 'All';
 
@@ -30,7 +33,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Future<void> _loadActors() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       final response = await OrbGuardApiClient.instance.listActors();
@@ -41,8 +47,23 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _actors = _getSampleActors();
+        _errorMessage = 'Failed to load threat actors. Please try again.';
       });
+    }
+  }
+
+  String _getActorCategory(ThreatActor actor) {
+    switch (actor.type) {
+      case ActorType.nationState:
+        return 'Nation-State';
+      case ActorType.criminalGroup:
+        return 'Cybercrime';
+      case ActorType.hacktivist:
+        return 'Hacktivism';
+      case ActorType.insider:
+        return 'APT';
+      case ActorType.unknown:
+        return 'Unknown';
     }
   }
 
@@ -50,13 +71,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   Widget build(BuildContext context) {
     final filteredActors = _selectedCategory == 'All'
         ? _actors
-        : _actors.where((a) => a.category == _selectedCategory).toList();
+        : _actors.where((a) => _getActorCategory(a) == _selectedCategory).toList();
 
     return GlassPage(
       title: 'Threat Actors',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : Column(
+          : _errorMessage != null
+              ? _buildErrorState()
+              : Column(
               children: [
                 // Actions row
                 Padding(
@@ -118,7 +141,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildActorCard(ThreatActor actor) {
-    final sophisticationColor = _getSophisticationColor(actor.sophistication);
+    final category = _getActorCategory(actor);
+    final sophisticationColor = _getSophisticationColor(actor.sophisticationLevel);
 
     return GlassCard(
       onTap: () => _showActorDetails(context, actor),
@@ -128,8 +152,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           Row(
             children: [
               GlassSvgIconBox(
-                icon: _getCategoryIcon(actor.category),
-                color: _getCategoryColor(actor.category),
+                icon: _getCategoryIcon(category),
+                color: _getCategoryColor(category),
                 size: 48,
               ),
               const SizedBox(width: 12),
@@ -150,21 +174,21 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _getCategoryColor(actor.category).withAlpha(40),
+                            color: _getCategoryColor(category).withAlpha(40),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            actor.category,
+                            category,
                             style: TextStyle(
-                              color: _getCategoryColor(actor.category),
+                              color: _getCategoryColor(category),
                               fontSize: 10,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        if (actor.countryCode != null)
+                        if (actor.country != null)
                           Text(
-                            actor.countryCode!,
+                            actor.country!,
                             style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                           ),
                       ],
@@ -175,10 +199,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  GlassBadge(text: actor.sophistication, color: sophisticationColor, fontSize: 10),
+                  GlassBadge(text: actor.sophisticationLevel.value.toUpperCase(), color: sophisticationColor, fontSize: 10),
                   const SizedBox(height: 4),
                   Text(
-                    '${actor.campaignCount} campaigns',
+                    '${actor.associatedCampaigns.length} campaigns',
                     style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
                   ),
                 ],
@@ -256,7 +280,44 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DuotoneIcon(AppIcons.warning, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
+            const SizedBox(height: 16),
+            const Text(
+              'Error Loading Data',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'An unexpected error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadActors,
+              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: Colors.white),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showActorDetails(BuildContext context, ThreatActor actor) {
+    final category = _getActorCategory(actor);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -282,8 +343,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               Row(
                 children: [
                   GlassSvgIconBox(
-                    icon: _getCategoryIcon(actor.category),
-                    color: _getCategoryColor(actor.category),
+                    icon: _getCategoryIcon(category),
+                    color: _getCategoryColor(category),
                     size: 64,
                     iconSize: 32,
                   ),
@@ -304,8 +365,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         Row(
                           children: [
                             GlassBadge(
-                              text: actor.category,
-                              color: _getCategoryColor(actor.category),
+                              text: category,
+                              color: _getCategoryColor(category),
                             ),
                             const SizedBox(width: 8),
                             if (actor.isActive)
@@ -333,13 +394,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildDetailRow('Sophistication', actor.sophistication),
-                    _buildDetailRow('Campaigns', '${actor.campaignCount} known'),
-                    if (actor.countryCode != null)
-                      _buildDetailRow('Origin', actor.countryCode!),
-                    _buildDetailRow('First Seen', _formatDate(actor.firstSeen)),
+                    _buildDetailRow('Sophistication', actor.sophisticationLevel.value.toUpperCase()),
+                    _buildDetailRow('Campaigns', '${actor.associatedCampaigns.length} known'),
+                    if (actor.country != null)
+                      _buildDetailRow('Origin', actor.country!),
+                    if (actor.firstSeen != null)
+                      _buildDetailRow('First Seen', _formatDate(actor.firstSeen!)),
                     if (actor.lastSeen != null)
                       _buildDetailRow('Last Seen', _formatDate(actor.lastSeen!)),
+                    _buildDetailRow('Indicators', '${actor.indicatorCount}'),
                   ],
                 ),
               ),
@@ -379,31 +442,31 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           color: const Color(0xFF9C27B0).withAlpha(40),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(m, style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 12)),
+                        child: Text(m.value, style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 12)),
                       )).toList(),
                 ),
               ],
 
-              // Targeted Sectors
-              if (actor.targetedSectors.isNotEmpty) ...[
+              // Targeted Industries
+              if (actor.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const Text(
-                  'Targeted Sectors',
+                  'Targeted Industries',
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: actor.targetedSectors.map((s) => GlassBadge(
+                  children: actor.targetedIndustries.map((s) => GlassBadge(
                         text: s,
                         color: GlassTheme.warningColor,
                       )).toList(),
                 ),
               ],
 
-              // TTPs
-              if (actor.ttps.isNotEmpty) ...[
+              // MITRE Techniques
+              if (actor.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const Text(
                   'MITRE ATT&CK TTPs',
@@ -413,7 +476,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: actor.ttps.map((ttp) => Container(
+                  children: actor.mitreTechniques.map((ttp) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
@@ -427,6 +490,24 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                             fontFamily: 'monospace',
                           ),
                         ),
+                      )).toList(),
+                ),
+              ],
+
+              // Tools
+              if (actor.tools.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Known Tools',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actor.tools.map((tool) => GlassBadge(
+                        text: tool,
+                        color: const Color(0xFFFF5722),
                       )).toList(),
                 ),
               ],
@@ -511,15 +592,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
     }
   }
 
-  Color _getSophisticationColor(String level) {
-    switch (level.toLowerCase()) {
-      case 'expert':
+  Color _getSophisticationColor(SeverityLevel level) {
+    switch (level) {
+      case SeverityLevel.critical:
         return GlassTheme.errorColor;
-      case 'advanced':
+      case SeverityLevel.high:
         return const Color(0xFFFF5722);
-      case 'intermediate':
+      case SeverityLevel.medium:
         return GlassTheme.warningColor;
-      case 'basic':
+      case SeverityLevel.low:
         return const Color(0xFF4CAF50);
       default:
         return Colors.grey;
@@ -528,71 +609,5 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.month}/${date.year}';
-  }
-
-  List<ThreatActor> _getSampleActors() {
-    return [
-      ThreatActor(
-        id: '1',
-        name: 'APT41',
-        category: 'APT',
-        description: 'Chinese state-sponsored threat group known for espionage and financially motivated operations.',
-        sophistication: 'Expert',
-        isActive: true,
-        countryCode: 'CN',
-        firstSeen: DateTime(2012, 1, 1),
-        lastSeen: DateTime.now(),
-        campaignCount: 28,
-        aliases: ['Double Dragon', 'Winnti', 'Barium'],
-        motivations: ['Espionage', 'Financial Gain'],
-        targetedSectors: ['Technology', 'Healthcare', 'Gaming'],
-        ttps: ['T1566', 'T1195', 'T1027', 'T1059'],
-      ),
-      ThreatActor(
-        id: '2',
-        name: 'FIN7',
-        category: 'Cybercrime',
-        description: 'Financially motivated threat group targeting retail and hospitality sectors.',
-        sophistication: 'Advanced',
-        isActive: true,
-        firstSeen: DateTime(2015, 1, 1),
-        lastSeen: DateTime.now(),
-        campaignCount: 42,
-        aliases: ['Carbanak', 'Navigator Group'],
-        motivations: ['Financial Gain'],
-        targetedSectors: ['Retail', 'Hospitality', 'Financial'],
-        ttps: ['T1566.001', 'T1204', 'T1059.001'],
-      ),
-      ThreatActor(
-        id: '3',
-        name: 'Lazarus Group',
-        category: 'Nation-State',
-        description: 'North Korean state-sponsored group responsible for high-profile attacks.',
-        sophistication: 'Expert',
-        isActive: true,
-        countryCode: 'KP',
-        firstSeen: DateTime(2009, 1, 1),
-        lastSeen: DateTime.now(),
-        campaignCount: 35,
-        aliases: ['Hidden Cobra', 'Guardians of Peace', 'ZINC'],
-        motivations: ['Financial Gain', 'Espionage', 'Sabotage'],
-        targetedSectors: ['Financial', 'Cryptocurrency', 'Defense'],
-        ttps: ['T1566', 'T1486', 'T1059', 'T1071'],
-      ),
-      ThreatActor(
-        id: '4',
-        name: 'Anonymous',
-        category: 'Hacktivism',
-        description: 'Decentralized hacktivist collective known for DDoS attacks and data leaks.',
-        sophistication: 'Intermediate',
-        isActive: true,
-        firstSeen: DateTime(2003, 1, 1),
-        campaignCount: 100,
-        aliases: ['Anon', 'Legion'],
-        motivations: ['Ideology', 'Political'],
-        targetedSectors: ['Government', 'Corporate'],
-        ttps: ['T1498', 'T1499', 'T1491'],
-      ),
-    ];
   }
 }

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class PlaybooksScreen extends StatefulWidget {
   const PlaybooksScreen({super.key});
@@ -15,7 +17,9 @@ class PlaybooksScreen extends StatefulWidget {
 }
 
 class _PlaybooksScreenState extends State<PlaybooksScreen> {
+  final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
+  String? _error;
   final List<Playbook> _playbooks = [];
   final List<PlaybookExecution> _executions = [];
 
@@ -26,82 +30,82 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _playbooks.addAll(_getSamplePlaybooks());
-      _executions.addAll(_getSampleExecutions());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      // Load playbooks from API
+      final playbooksData = await _apiClient.getPlaybooks();
+      final executionsData = await _apiClient.getPlaybookExecutions();
+
+      setState(() {
+        _playbooks.clear();
+        _playbooks.addAll(playbooksData.map((json) => Playbook.fromJson(json)));
+
+        _executions.clear();
+        _executions.addAll(executionsData.map((json) => PlaybookExecution.fromJson(json)));
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load playbooks: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    return GlassTabPage(
       title: 'Playbooks',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
-                  onPressed: () => _showCreatePlaybookDialog(context),
-                  tooltip: 'Create Playbook',
-                ),
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadData,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : DefaultTabController(
-                    length: 2,
-                    child: Column(
-                      children: [
-                        // Tab bar
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                            child: Container(
-                              decoration: GlassTheme.glassDecoration(),
-                              child: const TabBar(
-                                indicatorColor: GlassTheme.primaryAccent,
-                                labelColor: Colors.white,
-                                unselectedLabelColor: Colors.white54,
-                                tabs: [
-                                  Tab(text: 'Playbooks'),
-                                  Tab(text: 'Executions'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _buildPlaybooksTab(),
-                              _buildExecutionsTab(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
+      hasSearch: true,
+      searchHint: 'Search playbooks...',
+      tabs: [
+        GlassTab(
+          label: 'Playbooks',
+          iconPath: 'file',
+          content: _buildPlaybooksContent(),
+        ),
+        GlassTab(
+          label: 'Executions',
+          iconPath: 'chart',
+          content: _buildExecutionsContent(),
+        ),
+      ],
+      actions: [
+        IconButton(
+          icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
+          onPressed: () => _showCreatePlaybookDialog(context),
+          tooltip: 'Create Playbook',
+        ),
+        IconButton(
+          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+          onPressed: _isLoading ? null : _loadData,
+          tooltip: 'Refresh',
+        ),
+      ],
     );
+  }
+
+  Widget _buildPlaybooksContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildPlaybooksTab();
+  }
+
+  Widget _buildExecutionsContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildExecutionsTab();
   }
 
   Widget _buildPlaybooksTab() {
@@ -443,7 +447,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     );
   }
 
-  void _executePlaybook(Playbook playbook) {
+  Future<void> _executePlaybook(Playbook playbook) async {
+    // Optimistically add a running execution
     setState(() {
       _executions.insert(0, PlaybookExecution(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -457,22 +462,38 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       ));
     });
 
-    // Simulate completion
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      // Execute playbook via API
+      final result = await _apiClient.executePlaybook(playbook.id);
+
+      setState(() {
+        final exec = _executions.first;
+        _executions[0] = PlaybookExecution(
+          id: result['id'] as String? ?? exec.id,
+          playbookName: exec.playbookName,
+          status: result['status'] as String? ?? 'success',
+          triggeredBy: exec.triggeredBy,
+          startedAt: exec.startedAt,
+          stepsCompleted: result['steps_completed'] as int? ?? exec.totalSteps,
+          totalSteps: exec.totalSteps,
+          duration: result['duration'] as int? ?? 0,
+        );
+      });
+    } catch (e) {
       setState(() {
         final exec = _executions.first;
         _executions[0] = PlaybookExecution(
           id: exec.id,
           playbookName: exec.playbookName,
-          status: 'success',
+          status: 'failed',
           triggeredBy: exec.triggeredBy,
           startedAt: exec.startedAt,
-          stepsCompleted: exec.totalSteps,
+          stepsCompleted: 0,
           totalSteps: exec.totalSteps,
-          duration: 3,
+          duration: 0,
         );
       });
-    });
+    }
   }
 
   String _getActionIcon(String action) {
@@ -499,82 +520,6 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     return '${diff.inDays}d ago';
   }
 
-  List<Playbook> _getSamplePlaybooks() {
-    return [
-      Playbook(
-        id: '1',
-        name: 'Phishing Response',
-        description: 'Automated response to detected phishing attempts.',
-        trigger: 'phishing.detected',
-        steps: [
-          PlaybookStep(name: 'Block URL', action: 'block'),
-          PlaybookStep(name: 'Notify Security Team', action: 'notify'),
-          PlaybookStep(name: 'Log Incident', action: 'log'),
-          PlaybookStep(name: 'Scan for Similar Threats', action: 'scan'),
-        ],
-        executionCount: 47,
-      ),
-      Playbook(
-        id: '2',
-        name: 'Malware Containment',
-        description: 'Isolate and contain detected malware infections.',
-        trigger: 'malware.detected',
-        steps: [
-          PlaybookStep(name: 'Isolate Device', action: 'isolate'),
-          PlaybookStep(name: 'Alert SOC', action: 'notify'),
-          PlaybookStep(name: 'Collect Forensics', action: 'scan'),
-          PlaybookStep(name: 'Create Incident Ticket', action: 'log'),
-        ],
-        executionCount: 12,
-      ),
-      Playbook(
-        id: '3',
-        name: 'Suspicious Login Alert',
-        description: 'Handle unusual login patterns and potential account compromise.',
-        trigger: 'login.suspicious',
-        steps: [
-          PlaybookStep(name: 'Send User Alert', action: 'notify'),
-          PlaybookStep(name: 'Log Event', action: 'log'),
-        ],
-        executionCount: 89,
-      ),
-    ];
-  }
-
-  List<PlaybookExecution> _getSampleExecutions() {
-    return [
-      PlaybookExecution(
-        id: '1',
-        playbookName: 'Phishing Response',
-        status: 'success',
-        triggeredBy: 'phishing.detected',
-        startedAt: DateTime.now().subtract(const Duration(hours: 1)),
-        stepsCompleted: 4,
-        totalSteps: 4,
-        duration: 8,
-      ),
-      PlaybookExecution(
-        id: '2',
-        playbookName: 'Suspicious Login Alert',
-        status: 'success',
-        triggeredBy: 'login.suspicious',
-        startedAt: DateTime.now().subtract(const Duration(hours: 3)),
-        stepsCompleted: 2,
-        totalSteps: 2,
-        duration: 2,
-      ),
-      PlaybookExecution(
-        id: '3',
-        playbookName: 'Malware Containment',
-        status: 'failed',
-        triggeredBy: 'malware.detected',
-        startedAt: DateTime.now().subtract(const Duration(days: 1)),
-        stepsCompleted: 2,
-        totalSteps: 4,
-        duration: 15,
-      ),
-    ];
-  }
 }
 
 class Playbook {
@@ -595,6 +540,21 @@ class Playbook {
     this.executionCount = 0,
     this.isEnabled = true,
   });
+
+  factory Playbook.fromJson(Map<String, dynamic> json) {
+    return Playbook(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unnamed Playbook',
+      description: json['description'] as String? ?? '',
+      trigger: json['trigger'] as String? ?? '',
+      steps: (json['steps'] as List<dynamic>?)
+              ?.map((s) => PlaybookStep.fromJson(s as Map<String, dynamic>))
+              .toList() ??
+          [],
+      executionCount: json['execution_count'] as int? ?? 0,
+      isEnabled: json['is_enabled'] as bool? ?? true,
+    );
+  }
 }
 
 class PlaybookStep {
@@ -602,6 +562,13 @@ class PlaybookStep {
   final String action;
 
   PlaybookStep({required this.name, required this.action});
+
+  factory PlaybookStep.fromJson(Map<String, dynamic> json) {
+    return PlaybookStep(
+      name: json['name'] as String? ?? '',
+      action: json['action'] as String? ?? '',
+    );
+  }
 }
 
 class PlaybookExecution {
@@ -624,4 +591,19 @@ class PlaybookExecution {
     required this.totalSteps,
     required this.duration,
   });
+
+  factory PlaybookExecution.fromJson(Map<String, dynamic> json) {
+    return PlaybookExecution(
+      id: json['id'] as String? ?? '',
+      playbookName: json['playbook_name'] as String? ?? '',
+      status: json['status'] as String? ?? 'unknown',
+      triggeredBy: json['triggered_by'] as String? ?? '',
+      startedAt: json['started_at'] != null
+          ? DateTime.parse(json['started_at'] as String)
+          : DateTime.now(),
+      stepsCompleted: json['steps_completed'] as int? ?? 0,
+      totalSteps: json['total_steps'] as int? ?? 0,
+      duration: json['duration'] as int? ?? 0,
+    );
+  }
 }

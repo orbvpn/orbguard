@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/executive_protection_provider.dart';
 import '../../services/security/executive_protection_service.dart';
@@ -18,91 +19,61 @@ class ExecutiveProtectionScreen extends StatefulWidget {
       _ExecutiveProtectionScreenState();
 }
 
-class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExecutiveProtectionProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<ExecutiveProtectionProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Executive Protection',
-          body: Column(
-            children: [
-              // Actions row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const DuotoneIcon('user_plus', size: 22, color: Colors.white),
-                      onPressed: () => _showAddExecutiveSheet(context, provider),
-                      tooltip: 'Add VIP',
-                    ),
-                    IconButton(
-                      icon: const DuotoneIcon('letter', size: 22, color: Colors.white),
-                      onPressed: () => _showAnalyzeMessageSheet(context, provider),
-                      tooltip: 'Analyze Message',
-                    ),
-                  ],
+          tabs: [
+            GlassTab(
+              label: 'Dashboard',
+              iconPath: 'chart',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildDashboardTab(provider),
+            ),
+            GlassTab(
+              label: 'Alerts',
+              iconPath: 'shield',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildAlertsTab(provider),
+            ),
+            GlassTab(
+              label: 'VIPs',
+              iconPath: 'lock',
+              content: provider.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  : _buildVIPsTab(provider),
+            ),
+          ],
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const DuotoneIcon('user_plus', size: 22, color: Colors.white),
+                  onPressed: () => _showAddExecutiveSheet(context, provider),
+                  tooltip: 'Add VIP',
                 ),
-              ),
-              // Tab bar
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                  child: Container(
-                    decoration: GlassTheme.glassDecoration(),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: GlassTheme.primaryAccent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white54,
-                      tabs: const [
-                        Tab(text: 'Dashboard'),
-                        Tab(text: 'Alerts'),
-                        Tab(text: 'VIPs'),
-                      ],
-                    ),
-                  ),
+                IconButton(
+                  icon: const DuotoneIcon('letter', size: 22, color: Colors.white),
+                  onPressed: () => _showAnalyzeMessageSheet(context, provider),
+                  tooltip: 'Analyze Message',
                 ),
-              ),
-              // Content
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: GlassTheme.primaryAccent,
-                        ),
-                      )
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildDashboardTab(provider),
-                          _buildAlertsTab(provider),
-                          _buildVIPsTab(provider),
-                        ],
-                      ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

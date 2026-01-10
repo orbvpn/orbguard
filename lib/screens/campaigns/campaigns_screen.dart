@@ -37,14 +37,14 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       final response = await OrbGuardApiClient.instance.listCampaigns(active: _showActiveOnly);
       setState(() {
         _campaigns = response.items;
+        _error = null;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load campaigns';
+        _error = 'Failed to load campaigns: ${e.toString()}';
         _isLoading = false;
-        // Load sample data
-        _campaigns = _getSampleCampaigns();
+        _campaigns = [];
       });
     }
   }
@@ -53,6 +53,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   Widget build(BuildContext context) {
     return GlassTabPage(
       title: 'Threat Campaigns',
+      hasSearch: true,
+      searchHint: 'Search campaigns...',
       headerContent: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -82,28 +84,36 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           iconPath: 'shield',
           content: _isLoading
               ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
         ),
         GlassTab(
           label: 'Critical',
           iconPath: 'danger_triangle',
           content: _isLoading
               ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : _buildCampaignsList(_campaigns.where((c) => c.severity == SeverityLevel.critical).toList()),
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildCampaignsList(_campaigns.where((c) => c.severity == SeverityLevel.critical).toList()),
         ),
         GlassTab(
           label: 'Stats',
           iconPath: 'chart',
           content: _isLoading
               ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : _buildStatsView(),
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildStatsView(),
         ),
         GlassTab(
           label: 'History',
           iconPath: 'history',
           content: _isLoading
               ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : _buildCampaignsList(_campaigns),
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildCampaignsList(_campaigns),
         ),
       ],
     );
@@ -331,6 +341,41 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DuotoneIcon(AppIcons.dangerTriangle, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
+            const SizedBox(height: 16),
+            const Text(
+              'Error Loading Campaigns',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'An unknown error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadCampaigns,
+              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showCampaignDetails(BuildContext context, Campaign campaign) {
     final severityColor = _getSeverityColor(campaign.severity);
 
@@ -554,85 +599,5 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     if (diff.inDays < 7) return '${diff.inDays} days ago';
     if (diff.inDays < 30) return '${(diff.inDays / 7).floor()} weeks ago';
     return '${date.month}/${date.day}/${date.year}';
-  }
-
-  List<Campaign> _getSampleCampaigns() {
-    final now = DateTime.now();
-    return [
-      Campaign(
-        id: '1',
-        name: 'PhishHook 2025',
-        objective: 'phishing',
-        description: 'Large-scale phishing campaign targeting financial institutions with fake login pages.',
-        severity: SeverityLevel.critical,
-        isActive: true,
-        firstSeen: now.subtract(const Duration(days: 14)),
-        lastSeen: now.subtract(const Duration(hours: 2)),
-        indicatorCount: 245,
-        associatedActors: ['FIN7'],
-        targetedCountries: ['North America', 'Europe'],
-        targetedIndustries: ['Financial', 'Banking'],
-        mitreTechniques: ['T1566.001', 'T1204', 'T1078'],
-        aliases: [],
-        targetedPlatforms: [],
-        createdAt: now,
-        updatedAt: now,
-      ),
-      Campaign(
-        id: '2',
-        name: 'RansomCloud',
-        objective: 'ransomware',
-        description: 'Cloud-targeting ransomware campaign exploiting misconfigured S3 buckets.',
-        severity: SeverityLevel.high,
-        isActive: true,
-        firstSeen: now.subtract(const Duration(days: 30)),
-        indicatorCount: 89,
-        targetedCountries: ['Global'],
-        targetedIndustries: ['Technology', 'Healthcare'],
-        mitreTechniques: ['T1486', 'T1490', 'T1027'],
-        aliases: [],
-        associatedActors: [],
-        targetedPlatforms: [],
-        createdAt: now,
-        updatedAt: now,
-      ),
-      Campaign(
-        id: '3',
-        name: 'MobileHunter',
-        objective: 'espionage',
-        description: 'Android spyware distributed through fake app stores targeting mobile banking users.',
-        severity: SeverityLevel.high,
-        isActive: true,
-        firstSeen: now.subtract(const Duration(days: 45)),
-        indicatorCount: 156,
-        associatedActors: ['APT41'],
-        targetedCountries: ['Asia Pacific'],
-        targetedIndustries: ['Mobile Banking', 'Cryptocurrency'],
-        mitreTechniques: ['T1437', 'T1533', 'T1417'],
-        aliases: [],
-        targetedPlatforms: ['android'],
-        createdAt: now,
-        updatedAt: now,
-      ),
-      Campaign(
-        id: '4',
-        name: 'CredentialStorm',
-        objective: 'financial',
-        description: 'Sophisticated credential harvesting campaign using supply chain compromise.',
-        severity: SeverityLevel.critical,
-        isActive: false,
-        firstSeen: now.subtract(const Duration(days: 90)),
-        lastSeen: now.subtract(const Duration(days: 15)),
-        indicatorCount: 312,
-        associatedActors: ['Lazarus Group'],
-        targetedCountries: ['South Korea', 'Japan', 'USA'],
-        targetedIndustries: ['Defense', 'Government'],
-        mitreTechniques: ['T1195', 'T1078', 'T1003'],
-        aliases: [],
-        targetedPlatforms: [],
-        createdAt: now,
-        updatedAt: now,
-      ),
-    ];
   }
 }

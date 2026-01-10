@@ -2,11 +2,11 @@
 /// AI-powered scam detection and analysis interface
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/scam_detection_provider.dart';
 
@@ -17,9 +17,7 @@ class ScamDetectionScreen extends StatefulWidget {
   State<ScamDetectionScreen> createState() => _ScamDetectionScreenState();
 }
 
-class _ScamDetectionScreenState extends State<ScamDetectionScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   final _textController = TextEditingController();
   final _urlController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -28,7 +26,6 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ScamDetectionProvider>().init();
     });
@@ -36,7 +33,6 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _textController.dispose();
     _urlController.dispose();
     _phoneController.dispose();
@@ -47,13 +43,29 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   Widget build(BuildContext context) {
     return Consumer<ScamDetectionProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Scam Detection',
-          body: Column(
-            children: [
-              // Actions row
-              if (provider.analysisHistory.isNotEmpty)
-                Padding(
+          hasSearch: true,
+          searchHint: 'Search scams...',
+          tabs: [
+            GlassTab(
+              label: 'Analyze',
+              iconPath: 'magnifer',
+              content: _buildAnalyzeTab(provider),
+            ),
+            GlassTab(
+              label: 'History',
+              iconPath: 'chart',
+              content: _buildHistoryTab(provider),
+            ),
+            GlassTab(
+              label: 'Patterns',
+              iconPath: 'link_round',
+              content: _buildPatternsTab(provider),
+            ),
+          ],
+          headerContent: provider.analysisHistory.isNotEmpty
+              ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -65,41 +77,8 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
                       ),
                     ],
                   ),
-                ),
-              // Tab bar
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                  child: Container(
-                    decoration: GlassTheme.glassDecoration(),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: GlassTheme.primaryAccent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white54,
-                      tabs: const [
-                        Tab(text: 'Analyze'),
-                        Tab(text: 'History'),
-                        Tab(text: 'Patterns'),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAnalyzeTab(provider),
-                    _buildHistoryTab(provider),
-                    _buildPatternsTab(provider),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                )
+              : null,
         );
       },
     );
@@ -340,7 +319,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
             const SizedBox(height: 16),
             GlassContainer(
               padding: const EdgeInsets.all(12),
-              withBlur: false,
+              blur: false,
               child: Row(
                 children: [
                   const DuotoneIcon('tag', size: 18, color: Colors.white54),
@@ -408,7 +387,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
   Widget _buildHistoryTab(ScamDetectionProvider provider) {
     if (provider.analysisHistory.isEmpty) {
       return _buildEmptyState(
-        icon: 'history',
+        icon: 'chart',
         title: 'No History',
         subtitle: 'Your scam analysis history will appear here',
       );
@@ -476,7 +455,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen>
 
     if (provider.patterns.isEmpty) {
       return _buildEmptyState(
-        icon: 'structure',
+        icon: 'link_round',
         title: 'No Patterns',
         subtitle: 'Scam patterns will be displayed here',
       );

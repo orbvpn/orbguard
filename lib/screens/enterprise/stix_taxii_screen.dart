@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class StixTaxiiScreen extends StatefulWidget {
   const StixTaxiiScreen({super.key});
@@ -15,98 +17,157 @@ class StixTaxiiScreen extends StatefulWidget {
   State<StixTaxiiScreen> createState() => _StixTaxiiScreenState();
 }
 
-class _StixTaxiiScreenState extends State<StixTaxiiScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
   bool _isLoading = false;
+  String? _error;
   final List<TaxiiServer> _servers = [];
   final List<TaxiiCollection> _collections = [];
   final List<StixObject> _stixObjects = [];
 
+  final _api = OrbGuardApiClient.instance;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Load servers, collections, and objects in parallel
+      final results = await Future.wait([
+        _api.getTaxiiServers(),
+        _api.getTaxiiCollections(),
+      ]);
+
+      final serversData = results[0];
+      final collectionsData = results[1];
+
+      // Load STIX objects from all collections
+      final List<Map<String, dynamic>> allObjects = [];
+      for (final collection in collectionsData) {
+        final collectionId = collection['id'] as String?;
+        if (collectionId != null) {
+          try {
+            final objects = await _api.getStixObjects(collectionId);
+            allObjects.addAll(objects);
+          } catch (_) {
+            // Continue loading other collections if one fails
+          }
+        }
+      }
+
+      setState(() {
+        _servers.clear();
+        _servers.addAll(serversData.map((json) => TaxiiServer.fromJson(json)));
+
+        _collections.clear();
+        _collections.addAll(collectionsData.map((json) => TaxiiCollection.fromJson(json)));
+
+        _stixObjects.clear();
+        _stixObjects.addAll(allObjects.map((json) => StixObject.fromJson(json)));
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() {
-      _servers.addAll(_getSampleServers());
-      _collections.addAll(_getSampleCollections());
-      _stixObjects.addAll(_getSampleStixObjects());
-      _isLoading = false;
-    });
+  Widget _buildTabContent(Widget content) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+    }
+    if (_error != null) {
+      return _buildErrorState(_error!);
+    }
+    return content;
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon('danger_triangle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to Load Data',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: _loadData,
+              icon: const DuotoneIcon('refresh', size: 18),
+              label: const Text('Retry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: GlassTheme.primaryAccent,
+                side: const BorderSide(color: GlassTheme.primaryAccent),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    return GlassTabPage(
       title: 'STIX/TAXII 2.1',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-                  tooltip: 'Add Server',
-                  onPressed: () => _showAddServerDialog(context),
-                ),
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadData,
-                  tooltip: 'Refresh',
-                ),
-              ],
+      tabs: [
+        GlassTab(
+          label: 'Servers',
+          iconPath: 'server',
+          content: _buildTabContent(_buildServersTab()),
+        ),
+        GlassTab(
+          label: 'Collections',
+          iconPath: 'file',
+          content: _buildTabContent(_buildCollectionsTab()),
+        ),
+        GlassTab(
+          label: 'Objects',
+          iconPath: 'shield',
+          content: _buildTabContent(_buildObjectsTab()),
+        ),
+      ],
+      headerContent: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+              tooltip: 'Add Server',
+              onPressed: () => _showAddServerDialog(context),
             ),
-          ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Servers'),
-                    Tab(text: 'Collections'),
-                    Tab(text: 'Objects'),
-                  ],
-                ),
-              ),
+            IconButton(
+              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              onPressed: _isLoading ? null : _loadData,
+              tooltip: 'Refresh',
             ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildServersTab(),
-                      _buildCollectionsTab(),
-                      _buildObjectsTab(),
-                    ],
-                  ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -791,126 +852,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen>
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-
-  List<TaxiiServer> _getSampleServers() {
-    return [
-      TaxiiServer(
-        id: '1',
-        title: 'MITRE ATT&CK',
-        description: 'MITRE ATT&CK knowledge base of adversary tactics and techniques',
-        discoveryUrl: 'https://cti-taxii.mitre.org/taxii2/',
-        version: '2.1',
-        isConnected: true,
-        collectionCount: 2,
-        lastSync: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      TaxiiServer(
-        id: '2',
-        title: 'AlienVault OTX',
-        description: 'Open Threat Exchange by AlienVault',
-        discoveryUrl: 'https://otx.alienvault.com/taxii/',
-        version: '2.1',
-        isConnected: true,
-        collectionCount: 5,
-        lastSync: DateTime.now().subtract(const Duration(minutes: 30)),
-      ),
-      TaxiiServer(
-        id: '3',
-        title: 'Internal CTI',
-        description: 'Internal threat intelligence repository',
-        discoveryUrl: 'https://cti.company.com/taxii2/',
-        version: '2.1',
-        isConnected: false,
-        collectionCount: 3,
-        lastSync: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-    ];
-  }
-
-  List<TaxiiCollection> _getSampleCollections() {
-    return [
-      TaxiiCollection(
-        id: 'enterprise-attack',
-        title: 'Enterprise ATT&CK',
-        description: 'ATT&CK for Enterprise covers behaviors adversaries may exhibit',
-        serverName: 'MITRE ATT&CK',
-        canRead: true,
-        canWrite: false,
-        objectCount: 1247,
-        mediaTypes: ['application/stix+json;version=2.1'],
-      ),
-      TaxiiCollection(
-        id: 'mobile-attack',
-        title: 'Mobile ATT&CK',
-        description: 'ATT&CK for Mobile covers behaviors against mobile devices',
-        serverName: 'MITRE ATT&CK',
-        canRead: true,
-        canWrite: false,
-        objectCount: 342,
-        mediaTypes: ['application/stix+json;version=2.1'],
-      ),
-      TaxiiCollection(
-        id: 'otx-pulses',
-        title: 'OTX Pulses',
-        description: 'Community-contributed threat intelligence pulses',
-        serverName: 'AlienVault OTX',
-        canRead: true,
-        canWrite: true,
-        objectCount: 48293,
-        mediaTypes: ['application/stix+json;version=2.1', 'application/stix+json;version=2.0'],
-      ),
-    ];
-  }
-
-  List<StixObject> _getSampleStixObjects() {
-    return [
-      StixObject(
-        id: 'indicator--8e2e2d2b-17d4-4cbf-938f-98ee46b3cd3f',
-        type: 'indicator',
-        specVersion: '2.1',
-        name: 'Malicious IP Address',
-        description: 'IP address associated with command and control activity',
-        created: DateTime.now().subtract(const Duration(hours: 4)),
-        modified: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      StixObject(
-        id: 'malware--fdd60b30-b67c-41e3-b0b9-f01faf20d111',
-        type: 'malware',
-        specVersion: '2.1',
-        name: 'Emotet',
-        description: 'Banking trojan that has evolved into a modular malware platform',
-        created: DateTime.now().subtract(const Duration(days: 1)),
-        modified: DateTime.now().subtract(const Duration(hours: 6)),
-      ),
-      StixObject(
-        id: 'threat-actor--56f3f0db-b5d5-431c-ae56-c18f02caf500',
-        type: 'threat-actor',
-        specVersion: '2.1',
-        name: 'APT29',
-        description: 'Russian state-sponsored threat actor group',
-        created: DateTime.now().subtract(const Duration(days: 7)),
-        modified: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      StixObject(
-        id: 'attack-pattern--970cdb5c-02fb-4c38-b17e-d6327cf3c810',
-        type: 'attack-pattern',
-        specVersion: '2.1',
-        name: 'Spearphishing Attachment',
-        description: 'Sending emails with a malicious attachment',
-        created: DateTime.now().subtract(const Duration(days: 30)),
-        modified: DateTime.now().subtract(const Duration(days: 14)),
-      ),
-      StixObject(
-        id: 'campaign--83422c77-904c-4dc1-aff5-5c38f3a2c55c',
-        type: 'campaign',
-        specVersion: '2.1',
-        name: 'Operation SolarWinds',
-        description: 'Supply chain attack targeting IT management software',
-        created: DateTime.now().subtract(const Duration(days: 60)),
-        modified: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-    ];
-  }
 }
 
 class TaxiiServer {
@@ -933,6 +874,21 @@ class TaxiiServer {
     required this.collectionCount,
     required this.lastSync,
   });
+
+  factory TaxiiServer.fromJson(Map<String, dynamic> json) {
+    return TaxiiServer(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? json['name'] as String? ?? 'Unknown Server',
+      description: json['description'] as String? ?? '',
+      discoveryUrl: json['discovery_url'] as String? ?? json['url'] as String? ?? '',
+      version: json['version'] as String? ?? '2.1',
+      isConnected: json['is_connected'] as bool? ?? json['connected'] as bool? ?? false,
+      collectionCount: json['collection_count'] as int? ?? json['collections'] as int? ?? 0,
+      lastSync: json['last_sync'] != null
+          ? DateTime.tryParse(json['last_sync'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }
 
 class TaxiiCollection {
@@ -955,6 +911,22 @@ class TaxiiCollection {
     required this.objectCount,
     required this.mediaTypes,
   });
+
+  factory TaxiiCollection.fromJson(Map<String, dynamic> json) {
+    return TaxiiCollection(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? json['name'] as String? ?? 'Unknown Collection',
+      description: json['description'] as String? ?? '',
+      serverName: json['server_name'] as String? ?? json['server'] as String? ?? 'Unknown Server',
+      canRead: json['can_read'] as bool? ?? true,
+      canWrite: json['can_write'] as bool? ?? false,
+      objectCount: json['object_count'] as int? ?? json['objects'] as int? ?? 0,
+      mediaTypes: (json['media_types'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          ['application/stix+json;version=2.1'],
+    );
+  }
 }
 
 class StixObject {
@@ -975,4 +947,29 @@ class StixObject {
     required this.created,
     required this.modified,
   });
+
+  factory StixObject.fromJson(Map<String, dynamic> json) {
+    // Extract type from STIX ID if not provided (format: type--uuid)
+    String type = json['type'] as String? ?? '';
+    if (type.isEmpty && json['id'] != null) {
+      final id = json['id'] as String;
+      if (id.contains('--')) {
+        type = id.split('--').first;
+      }
+    }
+
+    return StixObject(
+      id: json['id'] as String? ?? '',
+      type: type,
+      specVersion: json['spec_version'] as String? ?? '2.1',
+      name: json['name'] as String?,
+      description: json['description'] as String?,
+      created: json['created'] != null
+          ? DateTime.tryParse(json['created'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      modified: json['modified'] != null
+          ? DateTime.tryParse(json['modified'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_firewall_provider.dart';
 import '../../services/security/network_firewall_service.dart';
@@ -19,16 +20,13 @@ class NetworkFirewallScreen extends StatefulWidget {
   State<NetworkFirewallScreen> createState() => _NetworkFirewallScreenState();
 }
 
-class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
   final _domainController = TextEditingController();
   final _ipController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NetworkFirewallProvider>().initialize();
     });
@@ -36,7 +34,6 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _domainController.dispose();
     _ipController.dispose();
     super.dispose();
@@ -46,9 +43,31 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
   Widget build(BuildContext context) {
     return Consumer<NetworkFirewallProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Network Firewall',
-          body: Column(
+          tabs: [
+            GlassTab(
+              label: 'Live',
+              iconPath: 'chart',
+              content: _buildLiveContent(provider),
+            ),
+            GlassTab(
+              label: 'Alerts',
+              iconPath: 'shield',
+              content: _buildAlertsContent(provider),
+            ),
+            GlassTab(
+              label: 'Rules',
+              iconPath: 'settings',
+              content: _buildRulesContent(provider),
+            ),
+            GlassTab(
+              label: 'Apps',
+              iconPath: 'file',
+              content: _buildAppsContent(provider),
+            ),
+          ],
+          headerContent: Column(
             children: [
               // Actions row
               Padding(
@@ -67,43 +86,55 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
                   ],
                 ),
               ),
-              // Content
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
-                      )
-                    : Column(
-                        children: [
-                          // Status card
-                          _buildStatusCard(provider),
-                          const SizedBox(height: 16),
-                          // Stats row
-                          _buildStatsRow(provider),
-                          const SizedBox(height: 16),
-                          // Tab bar
-                          _buildTabBar(),
-                          const SizedBox(height: 16),
-                          // Tab content
-                          Expanded(
-                            child: TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildConnectionsTab(provider),
-                                _buildAlertsTab(provider),
-                                _buildRulesTab(provider),
-                                _buildAppsTab(provider),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
+              if (!provider.isLoading) ...[
+                // Status card
+                _buildStatusCard(provider),
+                const SizedBox(height: 16),
+                // Stats row
+                _buildStatsRow(provider),
+                const SizedBox(height: 16),
+              ],
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildLiveContent(NetworkFirewallProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildConnectionsTab(provider);
+  }
+
+  Widget _buildAlertsContent(NetworkFirewallProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildAlertsTab(provider);
+  }
+
+  Widget _buildRulesContent(NetworkFirewallProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildRulesTab(provider);
+  }
+
+  Widget _buildAppsContent(NetworkFirewallProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildAppsTab(provider);
   }
 
   Widget _buildStatusCard(NetworkFirewallProvider provider) {
@@ -222,34 +253,6 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: GlassTheme.glassDecoration(),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: GlassTheme.primaryAccent,
-              unselectedLabelColor: Colors.white54,
-              isScrollable: true,
-              tabs: [
-                Tab(icon: DuotoneIcon('transfer_vertical', size: 20, color: null), text: 'Live'),
-                Tab(icon: DuotoneIcon('bell', size: 20, color: null), text: 'Alerts'),
-                Tab(icon: DuotoneIcon('filter', size: 20, color: null), text: 'Rules'),
-                Tab(icon: DuotoneIcon('smartphone', size: 20, color: null), text: 'Apps'),
-              ],
-            ),
-          ),
         ),
       ),
     );

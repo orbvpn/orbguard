@@ -14,6 +14,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../api/orbguard_api_client.dart';
+
 /// Threat prediction
 class ThreatPrediction {
   final String id;
@@ -215,12 +217,31 @@ class PredictiveThreatIntelService {
 
   /// Load initial threat data
   Future<void> _loadInitialData() async {
-    // Generate sample predictions based on current threat landscape
-    _predictions.addAll(_generateInitialPredictions());
-    _campaigns.addAll(_generateSampleCampaigns());
-    _forecasts.addAll(_generateExploitForecasts());
+    // Try to fetch campaigns from API first
+    try {
+      final api = OrbGuardApiClient.instance;
+      final campaignResponse = await api.listCampaigns(limit: 50);
+      for (final campaign in campaignResponse.items) {
+        _campaigns.add(EmergingCampaign(
+          id: campaign.id,
+          name: campaign.name,
+          attribution: campaign.associatedActors.isNotEmpty
+              ? campaign.associatedActors.first
+              : 'Unknown',
+          firstSeen: campaign.firstSeen ?? DateTime.now(),
+          victimCount: campaign.indicatorCount,
+          targetedSectors: campaign.targetedIndustries,
+          attackVectors: campaign.mitreTechniques,
+          iocs: campaign.aliases,
+          status: campaign.isActive ? 'active' : 'inactive',
+          spreadRate: 0.1,
+        ));
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch campaigns from API: $e');
+    }
 
-    // Fetch latest from API if available
+    // Fetch predictions from API
     if (_apiKey != null) {
       try {
         await _fetchLatestPredictions();
@@ -228,6 +249,9 @@ class PredictiveThreatIntelService {
         debugPrint('Failed to fetch predictions: $e');
       }
     }
+
+    // Generate forecasts based on current data
+    _forecasts.addAll(_generateExploitForecasts());
   }
 
   /// Start periodic updates
@@ -412,99 +436,6 @@ class PredictiveThreatIntelService {
     }
 
     return trends..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-  }
-
-  /// Generate initial predictions
-  List<ThreatPrediction> _generateInitialPredictions() {
-    return [
-      ThreatPrediction(
-        id: 'pred_mobile_phishing_2026',
-        title: 'Mobile Banking Phishing Wave',
-        description: 'Increased phishing campaigns targeting mobile banking apps using '
-            'sophisticated deepfake voice cloning for vishing attacks.',
-        threatType: ThreatType.phishing,
-        probability: 0.85,
-        severity: 0.8,
-        predictedTimeframe: DateTime.now().add(const Duration(days: 14)),
-        targetedPlatforms: ['Android', 'iOS'],
-        targetedIndustries: ['Financial Services', 'Banking', 'Retail'],
-        indicators: ['Fake banking app domains', 'SMS with shortened URLs', 'Caller ID spoofing'],
-        mitigations: [
-          'Enable multi-factor authentication',
-          'Verify caller identity through official channels',
-          'Use OrbGuard Safe SMS protection',
-        ],
-        confidence: 'High',
-      ),
-      ThreatPrediction(
-        id: 'pred_supply_chain_sdk',
-        title: 'Malicious SDK Supply Chain Attack',
-        description: 'Compromised popular mobile SDK expected to distribute malware '
-            'through legitimate app updates.',
-        threatType: ThreatType.supplyChain,
-        probability: 0.65,
-        severity: 0.9,
-        predictedTimeframe: DateTime.now().add(const Duration(days: 30)),
-        targetedPlatforms: ['Android'],
-        targetedIndustries: ['Technology', 'Gaming', 'Social Media'],
-        indicators: ['Unusual SDK network traffic', 'New permissions in updates', 'Code obfuscation changes'],
-        mitigations: [
-          'Review app updates carefully',
-          'Monitor app permissions',
-          'Use OrbGuard Supply Chain Monitor',
-        ],
-        confidence: 'Medium',
-      ),
-      ThreatPrediction(
-        id: 'pred_smishing_2026',
-        title: 'AI-Generated Smishing Campaign',
-        description: 'Large-scale SMS phishing using AI-generated personalized messages '
-            'based on leaked personal data.',
-        threatType: ThreatType.socialEngineering,
-        probability: 0.9,
-        severity: 0.7,
-        predictedTimeframe: DateTime.now().add(const Duration(days: 7)),
-        targetedPlatforms: ['Android', 'iOS'],
-        targetedIndustries: ['All'],
-        indicators: ['Personalized SMS messages', 'References to recent purchases', 'Urgent language'],
-        mitigations: [
-          'Enable OrbGuard Safe SMS',
-          'Never click links in unexpected messages',
-          'Verify through official apps',
-        ],
-        confidence: 'High',
-      ),
-    ];
-  }
-
-  /// Generate sample campaigns
-  List<EmergingCampaign> _generateSampleCampaigns() {
-    return [
-      EmergingCampaign(
-        id: 'camp_anatsa_2026',
-        name: 'Anatsa Banking Trojan',
-        attribution: 'Unknown',
-        firstSeen: DateTime.now().subtract(const Duration(days: 5)),
-        victimCount: 50000,
-        targetedSectors: ['Banking', 'Finance'],
-        attackVectors: ['Fake cleaner apps', 'PDF reader trojans'],
-        iocs: ['hxxps://anatsa[.]xyz', 'com.cleaner.super.fake'],
-        status: 'active',
-        spreadRate: 0.15,
-      ),
-      EmergingCampaign(
-        id: 'camp_hydra_2026',
-        name: 'Hydra Mobile Malware',
-        attribution: 'Hydra Group',
-        firstSeen: DateTime.now().subtract(const Duration(days: 3)),
-        victimCount: 25000,
-        targetedSectors: ['Cryptocurrency', 'Technology'],
-        attackVectors: ['Fake wallet apps', 'Malicious updates'],
-        iocs: ['hxxps://hydra-wallet[.]com', 'com.crypto.wallet.fake'],
-        status: 'active',
-        spreadRate: 0.25,
-      ),
-    ];
   }
 
   /// Generate exploit forecasts

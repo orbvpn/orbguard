@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class ThreatGraphScreen extends StatefulWidget {
   const ThreatGraphScreen({super.key});
@@ -15,7 +16,9 @@ class ThreatGraphScreen extends StatefulWidget {
 }
 
 class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
+  final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
+  String? _error;
   String _selectedEntity = '';
   final List<GraphNode> _nodes = [];
   final List<GraphRelation> _relations = [];
@@ -27,13 +30,30 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Future<void> _loadGraphData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _nodes.addAll(_getSampleNodes());
-      _relations.addAll(_getSampleRelations());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final nodesData = await _apiClient.getGraphNodes();
+      final relationsData = await _apiClient.getGraphRelations();
+
+      setState(() {
+        _nodes.clear();
+        _nodes.addAll(nodesData.map((json) => GraphNode.fromJson(json)));
+
+        _relations.clear();
+        _relations.addAll(relationsData.map((json) => GraphRelation.fromJson(json)));
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load graph data: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -397,30 +417,6 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
     return '${date.month}/${date.day}/${date.year}';
   }
 
-  List<GraphNode> _getSampleNodes() {
-    return [
-      GraphNode(id: '1', name: 'APT41', type: 'actor', relationCount: 15, confidence: 0.95, firstSeen: DateTime(2012, 1, 1)),
-      GraphNode(id: '2', name: 'PhishHook Campaign', type: 'campaign', relationCount: 28, confidence: 0.88),
-      GraphNode(id: '3', name: '185.192.69.x', type: 'indicator', relationCount: 8, confidence: 0.92),
-      GraphNode(id: '4', name: 'Cobalt Strike', type: 'malware', relationCount: 42, confidence: 0.99),
-      GraphNode(id: '5', name: 'fake-bank.com', type: 'indicator', relationCount: 5, confidence: 0.87),
-      GraphNode(id: '6', name: 'Mimikatz', type: 'tool', relationCount: 35, confidence: 0.98),
-      GraphNode(id: '7', name: 'FIN7', type: 'actor', relationCount: 22, confidence: 0.91),
-      GraphNode(id: '8', name: 'RansomCloud', type: 'campaign', relationCount: 18, confidence: 0.85),
-    ];
-  }
-
-  List<GraphRelation> _getSampleRelations() {
-    return [
-      GraphRelation(id: 'r1', sourceId: '1', targetId: '2', relationType: 'attributed-to'),
-      GraphRelation(id: 'r2', sourceId: '2', targetId: '3', relationType: 'uses'),
-      GraphRelation(id: 'r3', sourceId: '2', targetId: '5', relationType: 'uses'),
-      GraphRelation(id: 'r4', sourceId: '1', targetId: '4', relationType: 'uses'),
-      GraphRelation(id: 'r5', sourceId: '7', targetId: '4', relationType: 'uses'),
-      GraphRelation(id: 'r6', sourceId: '7', targetId: '6', relationType: 'uses'),
-      GraphRelation(id: 'r7', sourceId: '8', targetId: '4', relationType: 'uses'),
-    ];
-  }
 }
 
 class GraphNode {
@@ -439,6 +435,19 @@ class GraphNode {
     this.confidence,
     this.firstSeen,
   });
+
+  factory GraphNode.fromJson(Map<String, dynamic> json) {
+    return GraphNode(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unknown',
+      type: json['type'] as String? ?? 'unknown',
+      relationCount: json['relation_count'] as int? ?? 0,
+      confidence: (json['confidence'] as num?)?.toDouble(),
+      firstSeen: json['first_seen'] != null
+          ? DateTime.parse(json['first_seen'] as String)
+          : null,
+    );
+  }
 }
 
 class GraphRelation {
@@ -453,4 +462,13 @@ class GraphRelation {
     required this.targetId,
     required this.relationType,
   });
+
+  factory GraphRelation.fromJson(Map<String, dynamic> json) {
+    return GraphRelation(
+      id: json['id'] as String? ?? '',
+      sourceId: json['source_id'] as String? ?? '',
+      targetId: json['target_id'] as String? ?? '',
+      relationType: json['relation_type'] as String? ?? '',
+    );
+  }
 }

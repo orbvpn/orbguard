@@ -2,12 +2,15 @@
 /// Threat analytics, statistics, and reporting interface
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../models/api/threat_indicator.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -16,92 +19,75 @@ class AnalyticsDashboardScreen extends StatefulWidget {
   State<AnalyticsDashboardScreen> createState() => _AnalyticsDashboardScreenState();
 }
 
-class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   String _selectedTimeRange = '7d';
+  final _numberFormat = NumberFormat('#,###');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<DashboardProvider>();
+      if (!provider.hasData) {
+        provider.refresh();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        if (provider.isLoading && !provider.hasData) {
+          return GlassPage(
+            title: 'Analytics',
+            body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+          );
+        }
+
+        return GlassTabPage(
           title: 'Analytics',
-          body: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-              : Column(
-                  children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          PopupMenuButton<String>(
-                            icon: const DuotoneIcon('calendar', size: 22, color: Colors.white),
-                            color: GlassTheme.gradientTop,
-                            onSelected: (value) => setState(() => _selectedTimeRange = value),
-                            itemBuilder: (context) => [
-                              _buildTimeRangeItem('24h', 'Last 24 Hours'),
-                              _buildTimeRangeItem('7d', 'Last 7 Days'),
-                              _buildTimeRangeItem('30d', 'Last 30 Days'),
-                              _buildTimeRangeItem('90d', 'Last 90 Days'),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                            onPressed: provider.isLoading ? null : () => provider.refreshDashboard(),
-                            tooltip: 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Tab bar
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                        child: Container(
-                          decoration: GlassTheme.glassDecoration(),
-                          child: TabBar(
-                            controller: _tabController,
-                            indicatorColor: GlassTheme.primaryAccent,
-                            labelColor: Colors.white,
-                            unselectedLabelColor: Colors.white54,
-                            tabs: const [
-                              Tab(text: 'Overview'),
-                              Tab(text: 'Threats'),
-                              Tab(text: 'Protection'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildOverviewTab(provider),
-                          _buildThreatsTab(provider),
-                          _buildProtectionTab(provider),
-                        ],
-                      ),
-                    ),
+          tabs: [
+            GlassTab(
+              label: 'Overview',
+              iconPath: 'chart',
+              content: _buildOverviewTab(provider),
+            ),
+            GlassTab(
+              label: 'Threats',
+              iconPath: 'danger_triangle',
+              content: _buildThreatsTab(provider),
+            ),
+            GlassTab(
+              label: 'Protection',
+              iconPath: 'shield',
+              content: _buildProtectionTab(provider),
+            ),
+          ],
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                PopupMenuButton<String>(
+                  icon: const DuotoneIcon('calendar', size: 22, color: Colors.white),
+                  color: GlassTheme.gradientTop,
+                  onSelected: (value) => setState(() => _selectedTimeRange = value),
+                  itemBuilder: (context) => [
+                    _buildTimeRangeItem('24h', 'Last 24 Hours'),
+                    _buildTimeRangeItem('7d', 'Last 7 Days'),
+                    _buildTimeRangeItem('30d', 'Last 30 Days'),
+                    _buildTimeRangeItem('90d', 'Last 90 Days'),
                   ],
                 ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  onPressed: provider.isLoading ? null : () => provider.refresh(),
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -124,6 +110,25 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   }
 
   Widget _buildOverviewTab(DashboardProvider provider) {
+    final stats = provider.stats;
+
+    // Get metric values from real data
+    final totalIndicators = stats?.totalIndicators ?? 0;
+    final threatsBlocked = provider.threatsBlockedToday;
+    final urlsChecked = stats?.getCountByType(IndicatorType.url) ?? 0;
+    final smsAnalyzed = stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
+
+    // Calculate threat distribution from stats
+    final total = stats?.totalIndicators ?? 1;
+    final phishingCount = stats?.getCountByType(IndicatorType.url) ?? 0;
+    final malwareCount = (stats?.getCountByType(IndicatorType.sha256) ?? 0) +
+        (stats?.getCountByType(IndicatorType.sha1) ?? 0) +
+        (stats?.getCountByType(IndicatorType.md5) ?? 0);
+    final domainCount = stats?.getCountByType(IndicatorType.domain) ?? 0;
+    final ipCount = (stats?.getCountByType(IndicatorType.ipv4) ?? 0) +
+        (stats?.getCountByType(IndicatorType.ipv6) ?? 0);
+    final otherCount = total - phishingCount - malwareCount - domainCount - ipCount;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -136,22 +141,22 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           // Key metrics
           Row(
             children: [
-              _buildMetricCard('Total Scans', '1,247', 'magnifer', GlassTheme.primaryAccent),
+              _buildMetricCard('Total Indicators', _numberFormat.format(totalIndicators), 'magnifer', GlassTheme.primaryAccent),
               const SizedBox(width: 12),
-              _buildMetricCard('Threats Blocked', '89', 'forbidden', GlassTheme.errorColor),
+              _buildMetricCard('Threats Blocked', _numberFormat.format(threatsBlocked), 'forbidden', GlassTheme.errorColor),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildMetricCard('URLs Checked', '3,521', 'link', const Color(0xFF9C27B0)),
+              _buildMetricCard('URLs Checked', _numberFormat.format(urlsChecked), 'link', const Color(0xFF9C27B0)),
               const SizedBox(width: 12),
-              _buildMetricCard('SMS Analyzed', '245', 'chat_dots', const Color(0xFF2196F3)),
+              _buildMetricCard('Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', const Color(0xFF2196F3)),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Threat distribution chart placeholder
+          // Threat distribution chart
           const Text(
             'Threat Distribution',
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
@@ -160,53 +165,110 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           GlassCard(
             child: Column(
               children: [
-                _buildDistributionBar('Phishing', 0.35, GlassTheme.errorColor),
-                _buildDistributionBar('Malware', 0.25, const Color(0xFFFF5722)),
-                _buildDistributionBar('Scam', 0.20, GlassTheme.warningColor),
-                _buildDistributionBar('Suspicious', 0.15, const Color(0xFF9C27B0)),
-                _buildDistributionBar('Other', 0.05, Colors.grey),
+                _buildDistributionBar('URLs/Phishing', total > 0 ? phishingCount / total : 0, GlassTheme.errorColor),
+                _buildDistributionBar('Malware Hashes', total > 0 ? malwareCount / total : 0, const Color(0xFFFF5722)),
+                _buildDistributionBar('Domains', total > 0 ? domainCount / total : 0, GlassTheme.warningColor),
+                _buildDistributionBar('IP Addresses', total > 0 ? ipCount / total : 0, const Color(0xFF9C27B0)),
+                _buildDistributionBar('Other', total > 0 ? otherCount / total : 0, Colors.grey),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-          // Activity timeline
+          // Activity timeline from real alerts
           const Text(
             'Recent Activity',
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildActivityCard(
-            icon: 'forbidden',
-            title: 'Phishing URL Blocked',
-            subtitle: 'hxxps://fake-bank.com/login',
-            time: '2 min ago',
-            color: GlassTheme.errorColor,
-          ),
-          _buildActivityCard(
-            icon: 'chat_dots',
-            title: 'Smishing SMS Detected',
-            subtitle: 'Suspicious message from +1234567890',
-            time: '15 min ago',
-            color: GlassTheme.warningColor,
-          ),
-          _buildActivityCard(
-            icon: 'qr_code',
-            title: 'Safe QR Code Scanned',
-            subtitle: 'https://example.com',
-            time: '1 hour ago',
-            color: GlassTheme.successColor,
-          ),
-          _buildActivityCard(
-            icon: 'wi_fi_router',
-            title: 'Network Scan Complete',
-            subtitle: 'No threats detected',
-            time: '3 hours ago',
-            color: GlassTheme.primaryAccent,
-          ),
+          if (provider.recentAlerts.isEmpty && provider.realtimeEvents.isEmpty)
+            GlassCard(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'No recent activity',
+                    style: TextStyle(color: Colors.white.withAlpha(128)),
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            // Show real alerts from provider
+            ...provider.recentAlerts.take(4).map((alert) => _buildActivityCard(
+                  icon: _getAlertIcon(alert.type),
+                  title: alert.title,
+                  subtitle: alert.message,
+                  time: _formatTime(alert.timestamp),
+                  color: _getSeverityColorFromLevel(alert.severity),
+                )),
+            // Show realtime events if available
+            ...provider.realtimeEvents.take(4 - provider.recentAlerts.length).map((event) => _buildActivityCard(
+                  icon: _getAlertIcon(event.type),
+                  title: event.type.toUpperCase(),
+                  subtitle: event.description ?? event.value,
+                  time: _formatTime(event.timestamp),
+                  color: _getSeverityColorFromLevel(event.severity),
+                )),
+          ],
         ],
       ),
     );
+  }
+
+  String _getAlertIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'url':
+      case 'phishing':
+        return 'link';
+      case 'sms':
+      case 'smishing':
+        return 'chat_dots';
+      case 'qr':
+        return 'qr_code';
+      case 'network':
+        return 'wi_fi_router';
+      case 'app':
+        return 'smartphone';
+      default:
+        return 'danger_triangle';
+    }
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'critical':
+      case 'high':
+        return GlassTheme.errorColor;
+      case 'medium':
+        return GlassTheme.warningColor;
+      case 'low':
+        return GlassTheme.primaryAccent;
+      default:
+        return GlassTheme.successColor;
+    }
+  }
+
+  Color _getSeverityColorFromLevel(SeverityLevel severity) {
+    switch (severity) {
+      case SeverityLevel.critical:
+      case SeverityLevel.high:
+        return GlassTheme.errorColor;
+      case SeverityLevel.medium:
+        return GlassTheme.warningColor;
+      case SeverityLevel.low:
+        return GlassTheme.primaryAccent;
+      case SeverityLevel.info:
+      case SeverityLevel.unknown:
+        return GlassTheme.successColor;
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   Widget _buildMetricCard(String label, String value, String icon, Color color) {
@@ -298,6 +360,32 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   }
 
   Widget _buildThreatsTab(DashboardProvider provider) {
+    final stats = provider.stats;
+    final totalThreats = stats?.activeIndicators ?? 0;
+
+    // Get counts by severity for the threat types breakdown
+    final criticalCount = provider.getThreatsBySeverity(SeverityLevel.critical);
+    final highCount = provider.getThreatsBySeverity(SeverityLevel.high);
+    final mediumCount = provider.getThreatsBySeverity(SeverityLevel.medium);
+    final lowCount = provider.getThreatsBySeverity(SeverityLevel.low);
+
+    // Get counts by type
+    final urlCount = provider.getIndicatorsByType(IndicatorType.url);
+    final domainCount = provider.getIndicatorsByType(IndicatorType.domain);
+    final ipCount = provider.getIndicatorsByType(IndicatorType.ipv4) +
+        provider.getIndicatorsByType(IndicatorType.ipv6);
+    final hashCount = provider.getIndicatorsByType(IndicatorType.sha256) +
+        provider.getIndicatorsByType(IndicatorType.sha1) +
+        provider.getIndicatorsByType(IndicatorType.md5);
+    final phoneCount = provider.getIndicatorsByType(IndicatorType.phoneNumber);
+
+    // Calculate percentages for sources
+    final total = totalThreats > 0 ? totalThreats : 1;
+    final urlPercent = (urlCount * 100 / total).round();
+    final domainPercent = (domainCount * 100 / total).round();
+    final ipPercent = (ipCount * 100 / total).round();
+    final otherPercent = 100 - urlPercent - domainPercent - ipPercent;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -305,20 +393,27 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         children: [
           // Threat summary
           GlassCard(
-            tintColor: GlassTheme.errorColor,
+            tintColor: totalThreats > 0 ? GlassTheme.errorColor : GlassTheme.successColor,
             child: Column(
               children: [
                 Row(
                   children: [
-                    const GlassDuotoneIconBox(icon: 'danger_triangle', color: GlassTheme.errorColor, size: 56, iconSize: 28),
+                    GlassDuotoneIconBox(
+                      icon: totalThreats > 0 ? 'danger_triangle' : 'verified_check',
+                      color: totalThreats > 0 ? GlassTheme.errorColor : GlassTheme.successColor,
+                      size: 56,
+                      iconSize: 28,
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '89 Threats Detected',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          Text(
+                            totalThreats > 0
+                                ? '${_numberFormat.format(totalThreats)} Active Threats'
+                                : 'No Active Threats',
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'In the $_selectedTimeRange period',
@@ -334,29 +429,41 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           ),
           const SizedBox(height: 24),
 
-          // Threat types
+          // Threat types by indicator type
           const Text(
             'Threat Types',
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard('Phishing URLs', 35, 'link', GlassTheme.errorColor),
-          _buildThreatTypeCard('Malware Apps', 22, 'smartphone', const Color(0xFFFF5722)),
-          _buildThreatTypeCard('Smishing SMS', 18, 'chat_dots', GlassTheme.warningColor),
-          _buildThreatTypeCard('Scam Calls', 8, 'smartphone', const Color(0xFF9C27B0)),
-          _buildThreatTypeCard('Rogue Networks', 6, 'wi_fi_router', const Color(0xFF2196F3)),
+          _buildThreatTypeCard('Phishing URLs', urlCount, 'link', GlassTheme.errorColor),
+          _buildThreatTypeCard('Malicious Domains', domainCount, 'globe', const Color(0xFFFF5722)),
+          _buildThreatTypeCard('Malicious IPs', ipCount, 'server', GlassTheme.warningColor),
+          _buildThreatTypeCard('Malware Hashes', hashCount, 'code', const Color(0xFF9C27B0)),
+          _buildThreatTypeCard('Phone/SMS Threats', phoneCount, 'chat_dots', const Color(0xFF2196F3)),
+          const SizedBox(height: 24),
+
+          // Threat severity breakdown
+          const Text(
+            'By Severity',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          _buildThreatTypeCard('Critical', criticalCount, 'danger_circle', GlassTheme.errorColor),
+          _buildThreatTypeCard('High', highCount, 'danger_triangle', const Color(0xFFFF5722)),
+          _buildThreatTypeCard('Medium', mediumCount, 'info_circle', GlassTheme.warningColor),
+          _buildThreatTypeCard('Low', lowCount, 'info_square', Colors.grey),
           const SizedBox(height: 24),
 
           // Top threat sources
           const Text(
-            'Top Threat Sources',
+            'Threat Distribution',
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatSourceCard('Unknown Senders', 42),
-          _buildThreatSourceCard('Suspicious Domains', 28),
-          _buildThreatSourceCard('Untrusted Apps', 15),
-          _buildThreatSourceCard('Public Networks', 4),
+          _buildThreatSourceCard('URLs', urlPercent > 0 ? urlPercent : 0),
+          _buildThreatSourceCard('Domains', domainPercent > 0 ? domainPercent : 0),
+          _buildThreatSourceCard('IP Addresses', ipPercent > 0 ? ipPercent : 0),
+          _buildThreatSourceCard('Other', otherPercent > 0 ? otherPercent : 0),
         ],
       ),
     );
@@ -408,13 +515,28 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   }
 
   Widget _buildProtectionTab(DashboardProvider provider) {
+    final protectionScore = provider.protectionScore.round();
+    final stats = provider.stats;
+
+    // Get feature statuses
+    final smsStatus = provider.getFeatureStatus('sms');
+    final webStatus = provider.getFeatureStatus('web');
+    final appStatus = provider.getFeatureStatus('app');
+    final networkStatus = provider.getFeatureStatus('network');
+    final vpnStatus = provider.getFeatureStatus('vpn');
+
+    // Calculate stats from real data
+    final threatsBlocked = provider.threatsBlockedToday + provider.threatsBlockedWeek;
+    final safeScans = (stats?.totalIndicators ?? 0) - (stats?.activeIndicators ?? 0);
+    final highSeverity = provider.highSeverityThreats;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Protection score
-          _buildProtectionScoreCard(92),
+          _buildProtectionScoreCard(protectionScore),
           const SizedBox(height: 24),
 
           // Protection modules
@@ -423,12 +545,46 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildProtectionModuleCard('URL Protection', true, '3,521 URLs checked', 'link'),
-          _buildProtectionModuleCard('SMS Protection', true, '245 messages scanned', 'chat_dots'),
-          _buildProtectionModuleCard('App Security', true, '48 apps analyzed', 'smartphone'),
-          _buildProtectionModuleCard('Network Security', true, '12 networks audited', 'wi_fi_router'),
-          _buildProtectionModuleCard('Dark Web Monitor', true, '2 emails monitored', 'incognito'),
-          _buildProtectionModuleCard('Privacy Protection', false, 'Enable for full protection', 'eye_closed'),
+          _buildProtectionModuleCard(
+            'URL Protection',
+            webStatus?.isEnabled ?? false,
+            webStatus?.isEnabled == true
+                ? '${_numberFormat.format(stats?.getCountByType(IndicatorType.url) ?? 0)} URLs monitored'
+                : 'Enable for URL scanning',
+            'link',
+          ),
+          _buildProtectionModuleCard(
+            'SMS Protection',
+            smsStatus?.isEnabled ?? false,
+            smsStatus?.isEnabled == true
+                ? '${_numberFormat.format(stats?.getCountByType(IndicatorType.phoneNumber) ?? 0)} messages scanned'
+                : 'Enable for SMS protection',
+            'chat_dots',
+          ),
+          _buildProtectionModuleCard(
+            'App Security',
+            appStatus?.isEnabled ?? false,
+            appStatus?.isEnabled == true
+                ? 'App scanning active'
+                : 'Enable for app analysis',
+            'smartphone',
+          ),
+          _buildProtectionModuleCard(
+            'Network Security',
+            networkStatus?.isEnabled ?? false,
+            networkStatus?.isEnabled == true
+                ? 'Network monitoring active'
+                : 'Enable for network protection',
+            'wi_fi_router',
+          ),
+          _buildProtectionModuleCard(
+            'VPN Protection',
+            vpnStatus?.isEnabled ?? false,
+            vpnStatus?.isEnabled == true
+                ? 'VPN connected'
+                : 'Enable for encrypted connection',
+            'shield',
+          ),
           const SizedBox(height: 24),
 
           // Quick stats
@@ -439,17 +595,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard('Blocked', '89', GlassTheme.errorColor),
+              _buildQuickStatCard('Blocked', _numberFormat.format(threatsBlocked), GlassTheme.errorColor),
               const SizedBox(width: 12),
-              _buildQuickStatCard('Safe', '4,589', GlassTheme.successColor),
+              _buildQuickStatCard('Safe', _numberFormat.format(safeScans), GlassTheme.successColor),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard('Warnings', '23', GlassTheme.warningColor),
+              _buildQuickStatCard('High Risk', _numberFormat.format(highSeverity), GlassTheme.warningColor),
               const SizedBox(width: 12),
-              _buildQuickStatCard('Uptime', '99.9%', GlassTheme.primaryAccent),
+              _buildQuickStatCard('Score', '$protectionScore%', GlassTheme.primaryAccent),
             ],
           ),
         ],

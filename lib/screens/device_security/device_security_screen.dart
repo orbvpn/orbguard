@@ -32,6 +32,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       builder: (context, provider, _) {
         return GlassTabPage(
           title: 'Device Security',
+          hasSearch: true,
+          searchHint: 'Search...',
           headerContent: (provider.status.isLost || provider.status.isStolen)
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),

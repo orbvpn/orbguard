@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/threat_hunting_provider.dart';
 import '../../services/security/threat_hunting_service.dart';
 
@@ -17,117 +18,161 @@ class ThreatHuntingScreen extends StatefulWidget {
   State<ThreatHuntingScreen> createState() => _ThreatHuntingScreenState();
 }
 
-class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ThreatHuntingProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<ThreatHuntingProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Threat Hunting',
-          body: provider.isLoading
-              ? const Center(
+          hasSearch: true,
+          searchHint: 'Search hunts...',
+          tabs: [
+            GlassTab(
+              label: 'Hunts',
+              iconPath: 'magnifier',
+              content: _buildHuntsContent(provider),
+            ),
+            GlassTab(
+              label: 'Findings',
+              iconPath: 'shield',
+              content: _buildFindingsContent(provider),
+            ),
+            GlassTab(
+              label: 'Cases',
+              iconPath: 'file',
+              content: _buildCasesContent(provider),
+            ),
+            GlassTab(
+              label: 'MITRE',
+              iconPath: 'chart',
+              content: _buildMitreContent(provider),
+            ),
+            GlassTab(
+              label: 'Graph',
+              iconPath: 'server',
+              content: _buildGraphContent(provider),
+            ),
+            GlassTab(
+              label: 'Correlate',
+              iconPath: 'lock',
+              content: _buildCorrelationContent(provider),
+            ),
+            GlassTab(
+              label: 'ML',
+              iconPath: 'cloud_storage',
+              content: _buildMLContent(provider),
+            ),
+          ],
+          headerContent: _buildHeaderContent(provider),
+          actions: [
+            if (provider.isHunting)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(
+                    strokeWidth: 2,
                     color: GlassTheme.primaryAccent,
                   ),
-                )
-              : Column(
-                  children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (provider.isHunting)
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: GlassTheme.primaryAccent,
-                                ),
-                              ),
-                            )
-                          else
-                            IconButton(
-                              icon: const DuotoneIcon('play', size: 22, color: Colors.white),
-                              tooltip: 'Run All Critical Hunts',
-                              onPressed: () => provider.executeAllCriticalHunts(),
-                            ),
-                        ],
-                      ),
-                    ),
-                    // Tab bar
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-                        child: Container(
-                          decoration: GlassTheme.glassDecoration(),
-                          child: TabBar(
-                            controller: _tabController,
-                            indicatorColor: GlassTheme.primaryAccent,
-                            labelColor: Colors.white,
-                            unselectedLabelColor: Colors.white54,
-                            isScrollable: true,
-                            tabs: const [
-                              Tab(text: 'Hunts'),
-                              Tab(text: 'Findings'),
-                              Tab(text: 'Cases'),
-                              Tab(text: 'MITRE'),
-                              Tab(text: 'Graph'),
-                              Tab(text: 'Correlation'),
-                              Tab(text: 'ML'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Hunt Progress
-                    if (provider.isHunting && provider.currentProgress != null)
-                      _buildHuntProgress(provider),
-                    // Stats
-                    if (!provider.isHunting) _buildStats(provider),
-                    // Tab content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildHuntsTab(provider),
-                          _buildFindingsTab(provider),
-                          _buildCasesTab(provider),
-                          _buildMitreTab(provider),
-                          _buildGraphTab(provider),
-                          _buildCorrelationTab(provider),
-                          _buildMLTab(provider),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
+              )
+            else
+              IconButton(
+                icon: const DuotoneIcon('play', size: 22, color: Colors.white),
+                tooltip: 'Run All Critical Hunts',
+                onPressed: () => provider.executeAllCriticalHunts(),
+              ),
+          ],
         );
       },
     );
+  }
+
+  Widget _buildHeaderContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        // Hunt Progress
+        if (provider.isHunting && provider.currentProgress != null)
+          _buildHuntProgress(provider),
+        // Stats
+        if (!provider.isHunting) _buildStats(provider),
+      ],
+    );
+  }
+
+  Widget _buildHuntsContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildHuntsTab(provider);
+  }
+
+  Widget _buildFindingsContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildFindingsTab(provider);
+  }
+
+  Widget _buildCasesContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildCasesTab(provider);
+  }
+
+  Widget _buildMitreContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildMitreTab(provider);
+  }
+
+  Widget _buildGraphContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildGraphTab(provider);
+  }
+
+  Widget _buildCorrelationContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildCorrelationTab(provider);
+  }
+
+  Widget _buildMLContent(ThreatHuntingProvider provider) {
+    if (provider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      );
+    }
+    return _buildMLTab(provider);
   }
 
   Widget _buildHuntProgress(ThreatHuntingProvider provider) {
@@ -1205,14 +1250,48 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   }
 
   Widget _buildGraphTab(ThreatHuntingProvider provider) {
-    // Sample graph nodes for threat visualization
-    final nodes = [
-      _GraphNode(id: '1', label: 'APT29', type: 'threat-actor', x: 150, y: 100),
-      _GraphNode(id: '2', label: 'Emotet', type: 'malware', x: 300, y: 50),
-      _GraphNode(id: '3', label: 'Phishing', type: 'attack-pattern', x: 300, y: 180),
-      _GraphNode(id: '4', label: '192.168.1.100', type: 'indicator', x: 450, y: 100),
-      _GraphNode(id: '5', label: 'Finance Dept', type: 'target', x: 450, y: 200),
-    ];
+    // Convert API graph nodes to _GraphNode objects for visualization
+    final nodes = provider.graphNodes.asMap().entries.map((entry) {
+      final data = entry.value;
+      // Position nodes in a grid pattern
+      final row = entry.key ~/ 3;
+      final col = entry.key % 3;
+      return _GraphNode(
+        id: data['id']?.toString() ?? entry.key.toString(),
+        label: data['label']?.toString() ?? data['name']?.toString() ?? 'Unknown',
+        type: data['type']?.toString() ?? 'unknown',
+        x: 150.0 + (col * 150),
+        y: 100.0 + (row * 100),
+      );
+    }).toList();
+
+    // Show loading state if fetching
+    if (provider.isLoadingGraph) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Show empty state if no nodes
+    if (nodes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('structure', color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            Text('No threat graph data available', style: TextStyle(color: Colors.white.withAlpha(153))),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => provider.loadGraphData(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Load Graph Data'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1332,7 +1411,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const Text('8', style: TextStyle(color: GlassTheme.warningColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('${provider.graphRelations.length}', style: const TextStyle(color: GlassTheme.warningColor, fontSize: 24, fontWeight: FontWeight.bold)),
                     Text('Edges', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
                   ],
                 ),
@@ -1344,7 +1423,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const Text('3', style: TextStyle(color: GlassTheme.errorColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('${nodes.map((n) => n.type).toSet().length}', style: const TextStyle(color: GlassTheme.errorColor, fontSize: 24, fontWeight: FontWeight.bold)),
                     Text('Clusters', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
                   ],
                 ),
@@ -1437,44 +1516,44 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   }
 
   Widget _buildCorrelationTab(ThreatHuntingProvider provider) {
-    final correlations = [
-      _CorrelationRule(
-        id: '1',
-        name: 'Lateral Movement Detection',
-        description: 'Correlates failed logins with successful RDP connections',
-        severity: 'High',
-        matchCount: 12,
-        isEnabled: true,
-        sources: ['Windows Event Logs', 'Network Flows'],
-      ),
-      _CorrelationRule(
-        id: '2',
-        name: 'Data Exfiltration Pattern',
-        description: 'Large outbound transfers following privilege escalation',
-        severity: 'Critical',
-        matchCount: 3,
-        isEnabled: true,
-        sources: ['DLP', 'Endpoint', 'Firewall'],
-      ),
-      _CorrelationRule(
-        id: '3',
-        name: 'Brute Force to Compromise',
-        description: 'Multiple failed logins followed by successful access',
-        severity: 'Medium',
-        matchCount: 28,
-        isEnabled: true,
-        sources: ['Auth Logs', 'Active Directory'],
-      ),
-      _CorrelationRule(
-        id: '4',
-        name: 'Suspicious Process Chain',
-        description: 'Office apps spawning command interpreters',
-        severity: 'High',
-        matchCount: 7,
-        isEnabled: false,
-        sources: ['Endpoint', 'EDR'],
-      ),
-    ];
+    // Convert API data to _CorrelationRule objects
+    final correlations = provider.correlationRules.map((data) {
+      return _CorrelationRule(
+        id: data['id']?.toString() ?? '',
+        name: data['name']?.toString() ?? 'Unknown Rule',
+        description: data['description']?.toString() ?? '',
+        severity: data['severity']?.toString() ?? 'Medium',
+        matchCount: data['match_count'] as int? ?? 0,
+        isEnabled: data['is_enabled'] as bool? ?? true,
+        sources: (data['sources'] as List<dynamic>?)?.cast<String>() ?? [],
+      );
+    }).toList();
+
+    // Show loading state
+    if (provider.isLoadingCorrelation) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Show empty state if no rules
+    if (correlations.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('link', color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            Text('No correlation rules available', style: TextStyle(color: Colors.white.withAlpha(153))),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => provider.loadCorrelationRules(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Load Rules'),
+              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1594,48 +1673,47 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
   }
 
   Widget _buildMLTab(ThreatHuntingProvider provider) {
-    final models = [
-      _MLModel(
-        id: '1',
-        name: 'Anomaly Detection',
-        description: 'Detects unusual patterns in network traffic and user behavior',
-        type: 'Unsupervised',
-        accuracy: 94.2,
-        isActive: true,
-        lastTrained: DateTime.now().subtract(const Duration(days: 3)),
-        anomaliesDetected: 47,
-      ),
-      _MLModel(
-        id: '2',
-        name: 'Malware Classification',
-        description: 'Classifies files as malicious or benign using deep learning',
-        type: 'Supervised',
-        accuracy: 97.8,
-        isActive: true,
-        lastTrained: DateTime.now().subtract(const Duration(days: 7)),
-        anomaliesDetected: 23,
-      ),
-      _MLModel(
-        id: '3',
-        name: 'Phishing Detection',
-        description: 'Identifies phishing attempts in emails and URLs',
-        type: 'NLP',
-        accuracy: 96.1,
-        isActive: true,
-        lastTrained: DateTime.now().subtract(const Duration(days: 1)),
-        anomaliesDetected: 156,
-      ),
-      _MLModel(
-        id: '4',
-        name: 'User Behavior Analytics',
-        description: 'Baseline and anomaly detection for user activities',
-        type: 'Unsupervised',
-        accuracy: 89.5,
-        isActive: false,
-        lastTrained: DateTime.now().subtract(const Duration(days: 14)),
-        anomaliesDetected: 12,
-      ),
-    ];
+    // Convert API data to _MLModel objects
+    final models = provider.mlModels.map((data) {
+      return _MLModel(
+        id: data['id']?.toString() ?? '',
+        name: data['name']?.toString() ?? 'Unknown Model',
+        description: data['description']?.toString() ?? '',
+        type: data['type']?.toString() ?? 'Unknown',
+        accuracy: (data['accuracy'] as num?)?.toDouble() ?? 0.0,
+        isActive: data['is_active'] as bool? ?? false,
+        lastTrained: data['last_trained'] != null
+            ? DateTime.tryParse(data['last_trained'] as String) ?? DateTime.now()
+            : DateTime.now(),
+        anomaliesDetected: data['anomalies_detected'] as int? ?? 0,
+      );
+    }).toList();
+
+    // Show loading state
+    if (provider.isLoadingModels) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Show empty state if no models
+    if (models.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('cpu', color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            Text('No ML models available', style: TextStyle(color: Colors.white.withAlpha(153))),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => provider.loadMLModels(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Load Models'),
+              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1652,7 +1730,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                   color: GlassTheme.primaryAccent.withAlpha(40),
                 ),
                 child: const Center(
-                  child: const DuotoneIcon('cpu', size: 40, color: GlassTheme.primaryAccent),
+                  child: DuotoneIcon('cpu', size: 40, color: GlassTheme.primaryAccent),
                 ),
               ),
               const SizedBox(width: 20),
@@ -1671,7 +1749,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
                         const Text('Healthy', style: TextStyle(color: GlassTheme.successColor, fontSize: 12)),
                         const SizedBox(width: 16),
                         Text(
-                          '238 anomalies today',
+                          '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)} anomalies today',
                           style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                         ),
                       ],
@@ -1689,7 +1767,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen>
           children: [
             _buildMLStat('Models', '${models.length}', GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildMLStat('Avg Accuracy', '94.4%', GlassTheme.successColor),
+            _buildMLStat('Avg Accuracy', models.isEmpty ? 'N/A' : '${(models.fold(0.0, (sum, m) => sum + m.accuracy) / models.length * 100).toStringAsFixed(1)}%', GlassTheme.successColor),
             const SizedBox(width: 12),
             _buildMLStat('Anomalies', '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)}', GlassTheme.warningColor),
           ],

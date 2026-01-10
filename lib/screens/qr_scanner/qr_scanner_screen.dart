@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
 import '../../widgets/qr/qr_widgets.dart';
@@ -20,9 +21,8 @@ class QrScannerScreen extends StatefulWidget {
   State<QrScannerScreen> createState() => _QrScannerScreenState();
 }
 
-class _QrScannerScreenState extends State<QrScannerScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _QrScannerScreenState extends State<QrScannerScreen> {
+  final GlobalKey<GlassTabPageState> _tabKey = GlobalKey<GlassTabPageState>();
   MobileScannerController? _scannerController;
   bool _isCameraActive = false;
   bool _isFlashOn = false;
@@ -31,24 +31,16 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_onTabChanged);
+    // Start camera after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startCamera();
+    });
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
     _scannerController?.dispose();
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (_tabController.index == 0 && !_isCameraActive) {
-      _startCamera();
-    } else if (_tabController.index != 0 && _isCameraActive) {
-      _stopCamera();
-    }
   }
 
   void _startCamera() {
@@ -273,76 +265,58 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
-      title: 'QR Scanner',
-      body: Column(
-        children: [
-          // Actions row
-          if (_tabController.index == 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    onPressed: _isCameraActive ? _toggleFlash : null,
-                    icon: DuotoneIcon(
-                      'bolt',
-                      size: 22,
-                      color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
-                    ),
-                    tooltip: 'Flash',
+    return Consumer<QrProvider>(
+      builder: (context, provider, child) {
+        return GlassTabPage(
+          key: _tabKey,
+          title: 'QR Scanner',
+          hasSearch: true,
+          searchHint: 'Search history...',
+          headerContent: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  onPressed: _isCameraActive ? _toggleFlash : null,
+                  icon: DuotoneIcon(
+                    'bolt',
+                    size: 22,
+                    color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
                   ),
-                  IconButton(
-                    onPressed: _isCameraActive ? _switchCamera : null,
-                    icon: const DuotoneIcon(
-                      'camera',
-                      size: 22,
-                      color: Colors.white,
-                    ),
-                    tooltip: 'Switch Camera',
-                  ),
-                ],
-              ),
-            ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: GlassTheme.primaryAccent,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(icon: DuotoneIcon('qr_code', size: 24), text: 'Scan'),
-                    Tab(icon: DuotoneIcon('history', size: 24), text: 'History'),
-                    Tab(icon: DuotoneIcon('chart', size: 24), text: 'Stats'),
-                  ],
+                  tooltip: 'Flash',
                 ),
-              ),
+                IconButton(
+                  onPressed: _isCameraActive ? _switchCamera : null,
+                  icon: const DuotoneIcon(
+                    'camera',
+                    size: 22,
+                    color: Colors.white,
+                  ),
+                  tooltip: 'Switch Camera',
+                ),
+              ],
             ),
           ),
-          Expanded(
-            child: Consumer<QrProvider>(
-              builder: (context, provider, child) {
-                return TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildScannerTab(provider),
-                    _buildHistoryTab(provider),
-                    _buildStatsTab(provider),
-                  ],
-                );
-              },
+          tabs: [
+            GlassTab(
+              label: 'Scan',
+              iconPath: 'camera',
+              content: _buildScannerTab(provider),
             ),
-          ),
-        ],
-      ),
+            GlassTab(
+              label: 'History',
+              iconPath: 'history',
+              content: _buildHistoryTab(provider),
+            ),
+            GlassTab(
+              label: 'Stats',
+              iconPath: 'chart',
+              content: _buildStatsTab(provider),
+            ),
+          ],
+        );
+      },
     );
   }
 

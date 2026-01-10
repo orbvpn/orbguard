@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class ComplianceReportingScreen extends StatefulWidget {
   const ComplianceReportingScreen({super.key});
@@ -15,99 +17,107 @@ class ComplianceReportingScreen extends StatefulWidget {
   State<ComplianceReportingScreen> createState() => _ComplianceReportingScreenState();
 }
 
-class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   bool _isLoading = false;
   bool _isGenerating = false;
+  String? _error;
   final List<ComplianceFramework> _frameworks = [];
   final List<ComplianceReport> _reports = [];
   final List<ComplianceControl> _controls = [];
 
+  final _api = OrbGuardApiClient.instance;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _frameworks.addAll(_getSampleFrameworks());
-      _reports.addAll(_getSampleReports());
-      _controls.addAll(_getSampleControls());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final results = await Future.wait([
+        _api.getComplianceFrameworks(),
+        _api.getComplianceReports(),
+        _api.getComplianceControls(),
+      ]);
+
+      final frameworksData = results[0];
+      final reportsData = results[1];
+      final controlsData = results[2];
+
+      setState(() {
+        _frameworks.clear();
+        _reports.clear();
+        _controls.clear();
+
+        _frameworks.addAll(frameworksData.map((data) => ComplianceFramework.fromJson(data)));
+        _reports.addAll(reportsData.map((data) => ComplianceReport.fromJson(data)));
+        _controls.addAll(controlsData.map((data) => ComplianceControl.fromJson(data)));
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    return GlassTabPage(
       title: 'Compliance Reporting',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const DuotoneIcon('clock_circle', size: 22, color: Colors.white),
-                  tooltip: 'Schedule Reports',
-                  onPressed: () => _showScheduleDialog(context),
-                ),
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadData,
-                  tooltip: 'Refresh',
-                ),
-              ],
+      tabs: [
+        GlassTab(
+          label: 'Frameworks',
+          iconPath: 'shield',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildFrameworksTab(),
+        ),
+        GlassTab(
+          label: 'Reports',
+          iconPath: 'file',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildReportsTab(),
+        ),
+        GlassTab(
+          label: 'Controls',
+          iconPath: 'settings',
+          content: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildControlsTab(),
+        ),
+      ],
+      headerContent: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const DuotoneIcon('clock_circle', size: 22, color: Colors.white),
+              tooltip: 'Schedule Reports',
+              onPressed: () => _showScheduleDialog(context),
             ),
-          ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Frameworks'),
-                    Tab(text: 'Reports'),
-                    Tab(text: 'Controls'),
-                  ],
-                ),
-              ),
+            IconButton(
+              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              onPressed: _isLoading ? null : _loadData,
+              tooltip: 'Refresh',
             ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildFrameworksTab(),
-                      _buildReportsTab(),
-                      _buildControlsTab(),
-                    ],
-                  ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -514,23 +524,52 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
     );
   }
 
-  void _generateFullReport() {
+  Widget _buildErrorState() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon('danger_triangle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to Load Data',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'An unknown error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const DuotoneIcon('refresh', size: 18),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _generateFullReport() async {
     setState(() => _isGenerating = true);
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      final reportData = await _api.generateComplianceReport(
+        frameworks: _frameworks.where((f) => f.isEnabled).map((f) => f.id).toList(),
+        format: 'PDF',
+      );
       if (!mounted) return;
       setState(() {
         _isGenerating = false;
-        _reports.insert(
-          0,
-          ComplianceReport(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            title: 'Full Compliance Report',
-            framework: 'All Frameworks',
-            format: 'PDF',
-            generatedAt: DateTime.now(),
-            size: '2.4 MB',
-          ),
-        );
+        _reports.insert(0, ComplianceReport.fromJson(reportData));
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -538,7 +577,16 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
           backgroundColor: GlassTheme.successColor,
         ),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate report: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
   }
 
   void _showFrameworkDetails(BuildContext context, ComplianceFramework framework) {
@@ -783,150 +831,6 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen>
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-
-  List<ComplianceFramework> _getSampleFrameworks() {
-    return [
-      ComplianceFramework(
-        id: 'SOC2',
-        name: 'SOC 2 Type II',
-        description: 'Service Organization Control 2',
-        isEnabled: true,
-        complianceScore: 94,
-        totalControls: 64,
-        passedControls: 60,
-        failedControls: 4,
-        lastAssessment: DateTime.now().subtract(const Duration(days: 7)),
-        nextAssessment: DateTime.now().add(const Duration(days: 23)),
-      ),
-      ComplianceFramework(
-        id: 'GDPR',
-        name: 'GDPR',
-        description: 'General Data Protection Regulation',
-        isEnabled: true,
-        complianceScore: 89,
-        totalControls: 48,
-        passedControls: 43,
-        failedControls: 5,
-        lastAssessment: DateTime.now().subtract(const Duration(days: 14)),
-        nextAssessment: DateTime.now().add(const Duration(days: 16)),
-      ),
-      ComplianceFramework(
-        id: 'HIPAA',
-        name: 'HIPAA',
-        description: 'Health Insurance Portability and Accountability Act',
-        isEnabled: false,
-        complianceScore: 0,
-        totalControls: 42,
-        passedControls: 0,
-        failedControls: 0,
-        lastAssessment: DateTime.now(),
-        nextAssessment: DateTime.now(),
-      ),
-      ComplianceFramework(
-        id: 'PCI-DSS',
-        name: 'PCI-DSS',
-        description: 'Payment Card Industry Data Security Standard',
-        isEnabled: true,
-        complianceScore: 78,
-        totalControls: 56,
-        passedControls: 44,
-        failedControls: 12,
-        lastAssessment: DateTime.now().subtract(const Duration(days: 3)),
-        nextAssessment: DateTime.now().add(const Duration(days: 27)),
-      ),
-      ComplianceFramework(
-        id: 'ISO27001',
-        name: 'ISO 27001',
-        description: 'Information Security Management System',
-        isEnabled: false,
-        complianceScore: 0,
-        totalControls: 114,
-        passedControls: 0,
-        failedControls: 0,
-        lastAssessment: DateTime.now(),
-        nextAssessment: DateTime.now(),
-      ),
-    ];
-  }
-
-  List<ComplianceReport> _getSampleReports() {
-    return [
-      ComplianceReport(
-        id: '1',
-        title: 'SOC 2 Quarterly Report',
-        framework: 'SOC2',
-        format: 'PDF',
-        generatedAt: DateTime.now().subtract(const Duration(days: 2)),
-        size: '1.8 MB',
-      ),
-      ComplianceReport(
-        id: '2',
-        title: 'GDPR Data Processing Report',
-        framework: 'GDPR',
-        format: 'PDF',
-        generatedAt: DateTime.now().subtract(const Duration(days: 7)),
-        size: '2.1 MB',
-      ),
-      ComplianceReport(
-        id: '3',
-        title: 'PCI-DSS Gap Analysis',
-        framework: 'PCI-DSS',
-        format: 'CSV',
-        generatedAt: DateTime.now().subtract(const Duration(days: 14)),
-        size: '458 KB',
-      ),
-    ];
-  }
-
-  List<ComplianceControl> _getSampleControls() {
-    return [
-      ComplianceControl(
-        id: '1',
-        controlId: 'CC6.1',
-        title: 'Logical Access Security',
-        description: 'System boundaries are defined and access is restricted',
-        category: 'Access Control',
-        status: 'pass',
-        frameworks: ['SOC2', 'ISO27001'],
-      ),
-      ComplianceControl(
-        id: '2',
-        controlId: 'CC6.2',
-        title: 'Authentication Mechanisms',
-        description: 'Multi-factor authentication is implemented',
-        category: 'Access Control',
-        status: 'pass',
-        frameworks: ['SOC2', 'PCI-DSS'],
-      ),
-      ComplianceControl(
-        id: '3',
-        controlId: 'Art.32',
-        title: 'Security of Processing',
-        description: 'Appropriate technical measures to ensure security',
-        category: 'Data Protection',
-        status: 'pass',
-        frameworks: ['GDPR'],
-      ),
-      ComplianceControl(
-        id: '4',
-        controlId: 'Req.3.4',
-        title: 'Encryption of Cardholder Data',
-        description: 'PAN is rendered unreadable anywhere it is stored',
-        category: 'Data Protection',
-        status: 'fail',
-        frameworks: ['PCI-DSS'],
-      ),
-      ComplianceControl(
-        id: '5',
-        controlId: 'CC7.2',
-        title: 'System Monitoring',
-        description: 'Security events are monitored and logged',
-        category: 'Monitoring',
-        status: 'pass',
-        frameworks: ['SOC2', 'ISO27001', 'PCI-DSS'],
-      ),
-    ];
-  }
 }
 
 class ComplianceFramework {
@@ -953,6 +857,29 @@ class ComplianceFramework {
     required this.lastAssessment,
     required this.nextAssessment,
   });
+
+  factory ComplianceFramework.fromJson(Map<String, dynamic> json) {
+    return ComplianceFramework(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? false,
+      complianceScore: json['compliance_score'] as int? ?? json['complianceScore'] as int? ?? 0,
+      totalControls: json['total_controls'] as int? ?? json['totalControls'] as int? ?? 0,
+      passedControls: json['passed_controls'] as int? ?? json['passedControls'] as int? ?? 0,
+      failedControls: json['failed_controls'] as int? ?? json['failedControls'] as int? ?? 0,
+      lastAssessment: json['last_assessment'] != null
+          ? DateTime.tryParse(json['last_assessment'] as String) ?? DateTime.now()
+          : json['lastAssessment'] != null
+              ? DateTime.tryParse(json['lastAssessment'] as String) ?? DateTime.now()
+              : DateTime.now(),
+      nextAssessment: json['next_assessment'] != null
+          ? DateTime.tryParse(json['next_assessment'] as String) ?? DateTime.now()
+          : json['nextAssessment'] != null
+              ? DateTime.tryParse(json['nextAssessment'] as String) ?? DateTime.now()
+              : DateTime.now(),
+    );
+  }
 }
 
 class ComplianceReport {
@@ -971,6 +898,21 @@ class ComplianceReport {
     required this.generatedAt,
     required this.size,
   });
+
+  factory ComplianceReport.fromJson(Map<String, dynamic> json) {
+    return ComplianceReport(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      framework: json['framework'] as String? ?? '',
+      format: json['format'] as String? ?? 'PDF',
+      generatedAt: json['generated_at'] != null
+          ? DateTime.tryParse(json['generated_at'] as String) ?? DateTime.now()
+          : json['generatedAt'] != null
+              ? DateTime.tryParse(json['generatedAt'] as String) ?? DateTime.now()
+              : DateTime.now(),
+      size: json['size'] as String? ?? '0 KB',
+    );
+  }
 }
 
 class ComplianceControl {
@@ -991,4 +933,18 @@ class ComplianceControl {
     required this.status,
     required this.frameworks,
   });
+
+  factory ComplianceControl.fromJson(Map<String, dynamic> json) {
+    return ComplianceControl(
+      id: json['id'] as String? ?? '',
+      controlId: json['control_id'] as String? ?? json['controlId'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      status: json['status'] as String? ?? 'unknown',
+      frameworks: (json['frameworks'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ?? [],
+    );
+  }
 }

@@ -1,7 +1,6 @@
 /// Supply Chain Monitor Screen
 /// Monitors app dependencies for vulnerabilities and trackers
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/supply_chain_provider.dart';
 import '../../services/security/supply_chain_monitor_service.dart';
 
@@ -19,50 +19,47 @@ class SupplyChainScreen extends StatefulWidget {
   State<SupplyChainScreen> createState() => _SupplyChainScreenState();
 }
 
-class _SupplyChainScreenState extends State<SupplyChainScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _SupplyChainScreenState extends State<SupplyChainScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SupplyChainProvider>().initialize();
     });
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<SupplyChainProvider>(
       builder: (context, provider, _) {
-        return GlassPage(
+        return GlassTabPage(
           title: 'Supply Chain Monitor',
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _startScan,
-            backgroundColor: GlassTheme.primaryAccent,
-            foregroundColor: Colors.black,
-            icon: const DuotoneIcon('magnifer', size: 20),
-            label: const Text('Scan Apps'),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
-                )
+          hasSearch: true,
+          searchHint: 'Search vulnerabilities...',
+          headerContent: provider.isLoading
+              ? const SizedBox.shrink()
               : Column(
                   children: [
                     // Actions row
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Scan Apps button
+                          ElevatedButton.icon(
+                            onPressed: _startScan,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: GlassTheme.primaryAccent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                            ),
+                            icon: const DuotoneIcon('magnifier', size: 20),
+                            label: const Text('Scan Apps'),
+                          ),
                           IconButton(
                             icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
                             onPressed: () => _startScan(),
@@ -74,22 +71,37 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
                     // Stats summary
                     _buildStatsSummary(provider),
                     const SizedBox(height: 16),
-                    // Tab bar
-                    _buildTabBar(),
-                    const SizedBox(height: 16),
-                    // Tab content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildVulnerabilitiesTab(provider),
-                          _buildTrackersTab(provider),
-                          _buildLibrariesTab(provider),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
+          tabs: [
+            GlassTab(
+              label: 'CVEs',
+              iconPath: 'danger_triangle',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildVulnerabilitiesTab(provider),
+            ),
+            GlassTab(
+              label: 'Trackers',
+              iconPath: 'magnifer',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildTrackersTab(provider),
+            ),
+            GlassTab(
+              label: 'Libraries',
+              iconPath: 'chart',
+              content: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                    )
+                  : _buildLibrariesTab(provider),
+            ),
+          ],
         );
       },
     );
@@ -257,32 +269,6 @@ class _SupplyChainScreenState extends State<SupplyChainScreen>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: GlassTheme.glassDecoration(),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: GlassTheme.primaryAccent,
-              labelColor: GlassTheme.primaryAccent,
-              unselectedLabelColor: Colors.white54,
-              tabs: [
-                Tab(icon: DuotoneIcon('bug', size: 20), text: 'CVEs'),
-                Tab(icon: DuotoneIcon('radar', size: 20), text: 'Trackers'),
-                Tab(icon: DuotoneIcon('file_text', size: 20), text: 'Libraries'),
-              ],
-            ),
-          ),
         ),
       ),
     );

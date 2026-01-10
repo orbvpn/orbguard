@@ -195,6 +195,38 @@ class BrowserAccessibilityService : AccessibilityService() {
     fun stopMonitoring() { isMonitoring = false }
     fun isMonitoringActive(): Boolean = isMonitoring
 
+    /**
+     * Update monitoring settings
+     */
+    fun updateSettings(protectionEnabled: Boolean, monitoringEnabled: Boolean) {
+        isMonitoring = protectionEnabled && monitoringEnabled
+        Log.d(TAG, "Settings updated: protection=$protectionEnabled, monitoring=$monitoringEnabled, active=$isMonitoring")
+    }
+
+    /**
+     * Show warning overlay for detected threat
+     * Note: In a full implementation, this would show an overlay window.
+     * For now, we log the threat and could integrate with Flutter for UI.
+     */
+    fun showWarningOverlay(url: String, threatInfo: UrlThreatInfo) {
+        Log.w(TAG, "⚠️ THREAT DETECTED: $url")
+        Log.w(TAG, "  Level: ${threatInfo.threatLevel}")
+        Log.w(TAG, "  Reason: ${threatInfo.reason}")
+        Log.w(TAG, "  Categories: ${threatInfo.categories.joinToString(", ")}")
+
+        // Notify callback about malicious URL
+        callback?.onMaliciousURL(
+            url,
+            threatInfo.threatLevel,
+            when (threatInfo.threatLevel) {
+                "critical" -> 1.0f
+                "dangerous" -> 0.8f
+                "suspicious" -> 0.6f
+                else -> 0.4f
+            }
+        )
+    }
+
     override fun onInterrupt() {}
     override fun onDestroy() { super.onDestroy(); instance = null; isMonitoring = false }
 }

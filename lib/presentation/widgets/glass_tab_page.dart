@@ -135,7 +135,8 @@ class GlassTabPageState extends State<GlassTabPage>
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    // Note: GlassPage wraps body in SafeArea, so bottomPadding is already handled
+    // We only need to add margin for the nav bar itself (12px)
 
     return GlassPage(
       title: widget.title,
@@ -158,8 +159,8 @@ class GlassTabPageState extends State<GlassTabPage>
                 ),
               ),
 
-              // Space for bottom nav
-              SizedBox(height: 60 + bottomPadding + 24),
+              // Space for bottom nav (height + margin only, SafeArea handles safe area)
+              const SizedBox(height: 60 + 12),
             ],
           ),
 
@@ -168,22 +169,24 @@ class GlassTabPageState extends State<GlassTabPage>
             bottom: 0,
             left: 0,
             right: 0,
-            child: _buildBottomNav(bottomPadding),
+            child: _buildBottomNav(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomNav(double bottomPadding) {
+  Widget _buildBottomNav() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
 
+    // SafeArea in GlassPage already handles safe area insets
+    // We only add 12px margin from the safe area boundary
     return Padding(
-      padding: EdgeInsets.only(
+      padding: const EdgeInsets.only(
         left: 16,
         right: 16,
-        bottom: bottomPadding + 12,
+        bottom: 12,
       ),
       child: AnimatedBuilder(
         animation: _searchExpandAnimation,
@@ -305,7 +308,7 @@ class GlassTabPageState extends State<GlassTabPage>
             filter: GlassTheme.blurFilter,
             child: Center(
               child: DuotoneIcon(
-                'magnifier',
+                'magnifer',
                 size: 24,
                 color: isDark ? Colors.white.withAlpha(180) : Colors.black.withAlpha(120),
               ),
@@ -361,7 +364,7 @@ class GlassTabPageState extends State<GlassTabPage>
             child: Row(
               children: [
                 DuotoneIcon(
-                  'magnifier',
+                  'magnifer',
                   size: 22,
                   color: textColor.withAlpha(150),
                 ),

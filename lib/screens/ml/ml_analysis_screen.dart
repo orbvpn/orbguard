@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class MLAnalysisScreen extends StatefulWidget {
   const MLAnalysisScreen({super.key});
@@ -14,98 +16,103 @@ class MLAnalysisScreen extends StatefulWidget {
   State<MLAnalysisScreen> createState() => _MLAnalysisScreenState();
 }
 
-class _MLAnalysisScreenState extends State<MLAnalysisScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
+  final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey<GlassTabPageState>();
+  final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
   bool _isAnalyzing = false;
+  String? _error;
   final List<MLModel> _models = [];
   final List<AnomalyDetection> _anomalies = [];
+  final List<MLInsight> _insights = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _models.addAll(_getSampleModels());
-      _anomalies.addAll(_getSampleAnomalies());
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      // Load ML models, anomalies, and insights from API
+      final results = await Future.wait([
+        _apiClient.getMLModels(),
+        _apiClient.getAnomalies(),
+        _apiClient.getMLInsights(),
+      ]);
+
+      final modelsData = results[0];
+      final anomaliesData = results[1];
+      final insightsData = results[2];
+
+      setState(() {
+        _models.clear();
+        _models.addAll(modelsData.map((json) => MLModel.fromJson(json)));
+
+        _anomalies.clear();
+        _anomalies.addAll(anomaliesData.map((json) => AnomalyDetection.fromJson(json)));
+
+        _insights.clear();
+        _insights.addAll(insightsData.map((json) => MLInsight.fromJson(json)));
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load ML data: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPage(
+    if (_isLoading) {
+      return GlassPage(
+        title: 'ML Analysis',
+        body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+      );
+    }
+
+    return GlassTabPage(
+      key: _tabPageKey,
       title: 'ML Analysis',
-      body: Column(
-        children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
-                  onPressed: _isAnalyzing ? null : _runAnalysis,
-                  tooltip: 'Run Analysis',
-                ),
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
-                  onPressed: _isLoading ? null : _loadData,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
-              child: Container(
-                decoration: GlassTheme.glassDecoration(),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: GlassTheme.primaryAccent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Models'),
-                    Tab(text: 'Anomalies'),
-                    Tab(text: 'Insights'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildModelsTab(),
-                      _buildAnomaliesTab(),
-                      _buildInsightsTab(),
-                    ],
-                  ),
-          ),
-        ],
-      ),
+      hasSearch: true,
+      searchHint: 'Search anomalies...',
+      actions: [
+        IconButton(
+          icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
+          onPressed: _isAnalyzing ? null : _runAnalysis,
+          tooltip: 'Run Analysis',
+        ),
+        IconButton(
+          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+          onPressed: _isLoading ? null : _loadData,
+          tooltip: 'Refresh',
+        ),
+      ],
+      tabs: [
+        GlassTab(
+          label: 'Models',
+          iconPath: 'settings',
+          content: _buildModelsTab(),
+        ),
+        GlassTab(
+          label: 'Anomalies',
+          iconPath: 'danger_triangle',
+          content: _buildAnomaliesTab(),
+        ),
+        GlassTab(
+          label: 'Insights',
+          iconPath: 'chart',
+          content: _buildInsightsTab(),
+        ),
+      ],
     );
   }
 
@@ -301,30 +308,25 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
           const Text('AI Insights', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
-          _buildInsightCard(
-            icon: AppIcons.graphUp,
-            title: 'Threat Trend Analysis',
-            insight: 'Phishing attempts increased 23% this week compared to last week.',
-            color: GlassTheme.errorColor,
-          ),
-          _buildInsightCard(
-            icon: AppIcons.clock,
-            title: 'Attack Pattern',
-            insight: 'Most threats detected between 9 AM - 11 AM local time.',
-            color: GlassTheme.warningColor,
-          ),
-          _buildInsightCard(
-            icon: AppIcons.global,
-            title: 'Geographic Analysis',
-            insight: '45% of threat origins from Eastern European IP ranges.',
-            color: GlassTheme.primaryAccent,
-          ),
-          _buildInsightCard(
-            icon: AppIcons.shieldWarning,
-            title: 'Vulnerability Prediction',
-            insight: 'High probability of credential-based attacks in next 24 hours.',
-            color: const Color(0xFF9C27B0),
-          ),
+          if (_insights.isEmpty)
+            GlassCard(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'No insights available yet',
+                    style: TextStyle(color: Colors.white.withAlpha(153)),
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._insights.map((insight) => _buildInsightCard(
+              icon: insight.icon,
+              title: insight.title,
+              insight: insight.insight,
+              color: insight.color,
+            )),
 
           const SizedBox(height: 24),
           const Text('Model Performance', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -332,12 +334,17 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
 
           GlassCard(
             child: Column(
-              children: [
-                _buildPerformanceBar('URL Classifier', 0.94),
-                _buildPerformanceBar('SMS Analyzer', 0.91),
-                _buildPerformanceBar('Behavior Model', 0.87),
-                _buildPerformanceBar('Anomaly Detector', 0.82),
-              ],
+              children: _models.isEmpty
+                  ? [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'No model data available',
+                          style: TextStyle(color: Colors.white.withAlpha(153)),
+                        ),
+                      ),
+                    ]
+                  : _models.map((model) => _buildPerformanceBar(model.name, model.accuracy)).toList(),
             ),
           ),
         ],
@@ -419,24 +426,38 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
     );
   }
 
-  void _runAnalysis() {
+  Future<void> _runAnalysis() async {
     setState(() => _isAnalyzing = true);
-    _tabController.animateTo(1);
+    _tabPageKey.currentState?.animateToTab(1);
 
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      // Run ML analysis via API
+      final result = await _apiClient.runMLAnalysis();
+
       setState(() {
         _isAnalyzing = false;
-        _anomalies.insert(0, AnomalyDetection(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: 'Unusual Network Traffic',
-          description: 'Detected abnormal data exfiltration pattern from device.',
-          model: 'Behavior Model',
-          severity: 'high',
-          anomalyScore: 0.89,
-          detectedAt: DateTime.now(),
-        ));
+        // Add any new anomalies detected
+        if (result['anomalies'] != null) {
+          final newAnomalies = (result['anomalies'] as List)
+              .map((json) => AnomalyDetection.fromJson(json as Map<String, dynamic>))
+              .toList();
+          for (final anomaly in newAnomalies) {
+            if (!_anomalies.any((a) => a.id == anomaly.id)) {
+              _anomalies.insert(0, anomaly);
+            }
+          }
+        }
       });
-    });
+    } catch (e) {
+      setState(() {
+        _isAnalyzing = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Analysis failed: $e'), backgroundColor: GlassTheme.errorColor),
+        );
+      }
+    }
   }
 
   void _showAnomalyDetails(BuildContext context, AnomalyDetection anomaly) {
@@ -546,37 +567,6 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen>
     return '${diff.inDays}d ago';
   }
 
-  List<MLModel> _getSampleModels() {
-    return [
-      MLModel(name: 'URL Threat Classifier', type: 'Classifier', description: 'Classifies URLs as malicious, suspicious, or safe.', accuracy: 0.94, precision: 0.92, recall: 0.89),
-      MLModel(name: 'SMS Phishing Detector', type: 'NLP', description: 'Detects smishing attempts using NLP analysis.', accuracy: 0.91, precision: 0.88, recall: 0.93),
-      MLModel(name: 'Network Anomaly Detector', type: 'Anomaly Detection', description: 'Detects unusual network behavior patterns.', accuracy: 0.87, precision: 0.85, recall: 0.82),
-      MLModel(name: 'App Behavior Analyzer', type: 'Behavior Analysis', description: 'Analyzes app behavior for malicious activity.', accuracy: 0.82, precision: 0.79, recall: 0.84),
-    ];
-  }
-
-  List<AnomalyDetection> _getSampleAnomalies() {
-    return [
-      AnomalyDetection(
-        id: '1',
-        title: 'Unusual Login Pattern',
-        description: 'Multiple failed login attempts detected from new location.',
-        model: 'Behavior Model',
-        severity: 'high',
-        anomalyScore: 0.92,
-        detectedAt: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      AnomalyDetection(
-        id: '2',
-        title: 'Suspicious DNS Query',
-        description: 'DNS query to known malicious domain detected.',
-        model: 'Network Anomaly Detector',
-        severity: 'critical',
-        anomalyScore: 0.95,
-        detectedAt: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-    ];
-  }
 }
 
 class MLModel {
@@ -597,6 +587,18 @@ class MLModel {
     required this.recall,
     this.isEnabled = true,
   });
+
+  factory MLModel.fromJson(Map<String, dynamic> json) {
+    return MLModel(
+      name: json['name'] as String? ?? 'Unknown Model',
+      type: json['type'] as String? ?? 'Unknown',
+      description: json['description'] as String? ?? '',
+      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
+      precision: (json['precision'] as num?)?.toDouble() ?? 0.0,
+      recall: (json['recall'] as num?)?.toDouble() ?? 0.0,
+      isEnabled: json['is_enabled'] as bool? ?? true,
+    );
+  }
 }
 
 class AnomalyDetection {
@@ -617,4 +619,52 @@ class AnomalyDetection {
     required this.anomalyScore,
     required this.detectedAt,
   });
+
+  factory AnomalyDetection.fromJson(Map<String, dynamic> json) {
+    return AnomalyDetection(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Anomaly Detected',
+      description: json['description'] as String? ?? '',
+      model: json['model'] as String? ?? 'Unknown',
+      severity: json['severity'] as String? ?? 'medium',
+      anomalyScore: (json['anomaly_score'] as num?)?.toDouble() ?? 0.0,
+      detectedAt: json['detected_at'] != null
+          ? DateTime.parse(json['detected_at'] as String)
+          : DateTime.now(),
+    );
+  }
+}
+
+class MLInsight {
+  final String id;
+  final String icon;
+  final String title;
+  final String insight;
+  final String colorHex;
+
+  MLInsight({
+    required this.id,
+    required this.icon,
+    required this.title,
+    required this.insight,
+    required this.colorHex,
+  });
+
+  factory MLInsight.fromJson(Map<String, dynamic> json) {
+    return MLInsight(
+      id: json['id'] as String? ?? '',
+      icon: json['icon'] as String? ?? 'chart_line',
+      title: json['title'] as String? ?? 'Insight',
+      insight: json['insight'] as String? ?? '',
+      colorHex: json['color'] as String? ?? '#2196F3',
+    );
+  }
+
+  Color get color {
+    try {
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF2196F3);
+    }
+  }
 }

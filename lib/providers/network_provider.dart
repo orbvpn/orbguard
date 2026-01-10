@@ -2,6 +2,10 @@
 /// State management for network security features
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
+import '../models/api/url_reputation.dart';
+import '../services/api/orbguard_api_client.dart';
 
 /// WiFi security level
 enum WifiSecurityLevel {
@@ -173,6 +177,11 @@ class NetworkSecurityStats {
 
 /// Network Provider
 class NetworkProvider extends ChangeNotifier {
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+
+  // Platform channel for native WiFi scanning
+  static const _wifiChannel = MethodChannel('com.orb.guard/wifi');
+
   // State
   WifiNetwork? _currentNetwork;
   final List<WifiNetwork> _nearbyNetworks = [];
@@ -217,24 +226,30 @@ class NetworkProvider extends ChangeNotifier {
     await refreshNetworkInfo();
     await refreshDnsStatus();
     await refreshVpnStatus();
-    _loadMockData();
+    await loadNetworkThreats();
   }
 
-  /// Refresh network information
+  /// Refresh network information using platform channel
   Future<void> refreshNetworkInfo() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // TODO: Use platform channel to get real network info
-      _currentNetwork = WifiNetwork(
-        ssid: 'Home Network',
-        bssid: 'AA:BB:CC:DD:EE:FF',
-        security: WifiSecurityLevel.wpa2Psk,
-        signalStrength: -55,
-        frequency: 5180,
-        isConnected: true,
-      );
+      // Use platform channel to get current network info from device
+      final result = await _wifiChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentNetwork');
+
+      if (result != null) {
+        _currentNetwork = WifiNetwork(
+          ssid: result['ssid'] as String? ?? 'Unknown',
+          bssid: result['bssid'] as String? ?? '',
+          security: _parseSecurityLevel(result['security'] as String?),
+          signalStrength: result['signal_strength'] as int? ?? -100,
+          frequency: result['frequency'] as int? ?? 2400,
+          isConnected: true,
+        );
+      }
+    } on PlatformException catch (e) {
+      _error = 'Failed to get network info: ${e.message}';
     } catch (e) {
       _error = 'Failed to get network info: $e';
     }
@@ -243,7 +258,7 @@ class NetworkProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Scan nearby networks
+  /// Scan nearby networks using platform channel
   Future<void> scanNetworks() async {
     if (_isScanning) return;
 
@@ -251,12 +266,34 @@ class NetworkProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Use platform channel to scan networks
-      await Future.delayed(const Duration(seconds: 2));
+      // Use platform channel to scan nearby networks
+      final result = await _wifiChannel.invokeMethod<List<dynamic>>('scanNetworks');
+
       _nearbyNetworks.clear();
-      _nearbyNetworks.addAll(_getMockNetworks());
+      if (result != null) {
+        for (final networkData in result) {
+          final network = networkData as Map<dynamic, dynamic>;
+          _nearbyNetworks.add(WifiNetwork(
+            ssid: network['ssid'] as String? ?? 'Hidden Network',
+            bssid: network['bssid'] as String? ?? '',
+            security: _parseSecurityLevel(network['security'] as String?),
+            signalStrength: network['signal_strength'] as int? ?? -100,
+            frequency: network['frequency'] as int? ?? 2400,
+            isConnected: network['is_connected'] as bool? ?? false,
+            isHidden: network['is_hidden'] as bool? ?? false,
+          ));
+        }
+      }
+
+      // Also audit the current network via API
+      if (_currentNetwork != null) {
+        await _auditCurrentNetwork();
+      }
+
       _checkForThreats();
       _updateStats();
+    } on PlatformException catch (e) {
+      _error = 'Failed to scan networks: ${e.message}';
     } catch (e) {
       _error = 'Failed to scan networks: $e';
     }
@@ -265,34 +302,124 @@ class NetworkProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Refresh VPN status
+  /// Audit current network via API
+  Future<void> _auditCurrentNetwork() async {
+    if (_currentNetwork == null) return;
+
+    try {
+      final request = WifiAuditRequest(
+        ssid: _currentNetwork!.ssid,
+        bssid: _currentNetwork!.bssid,
+        securityType: _currentNetwork!.security.name,
+        signalStrength: _currentNetwork!.signalStrength,
+      );
+
+      final auditResult = await _api.auditWifi(request);
+
+      // Add any threats from the audit
+      if (auditResult.threats.isNotEmpty) {
+        for (var i = 0; i < auditResult.threats.length; i++) {
+          final threat = auditResult.threats[i];
+          final threatId = 'wifi_${_currentNetwork!.bssid}_${threat.type}_$i';
+          if (!_threats.any((t) => t.id == threatId)) {
+            _threats.add(NetworkThreat(
+              id: threatId,
+              type: threat.type,
+              title: _getThreatTitle(threat.type),
+              description: threat.description,
+              severity: threat.severity.name,
+              detectedAt: DateTime.now(),
+              recommendation: _getThreatRecommendation(threat.type),
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      // Audit failure shouldn't break the scan
+      debugPrint('Failed to audit network: $e');
+    }
+  }
+
+  /// Load network threats from API
+  Future<void> loadNetworkThreats() async {
+    try {
+      final threatsData = await _api.getNetworkThreats();
+
+      _threats.clear();
+      for (final threatJson in threatsData) {
+        _threats.add(NetworkThreat(
+          id: threatJson['id'] as String? ?? '',
+          type: threatJson['type'] as String? ?? 'unknown',
+          title: threatJson['title'] as String? ?? 'Network Threat',
+          description: threatJson['description'] as String? ?? '',
+          severity: threatJson['severity'] as String? ?? 'medium',
+          detectedAt: threatJson['detected_at'] != null
+              ? DateTime.parse(threatJson['detected_at'] as String)
+              : DateTime.now(),
+          isActive: threatJson['is_active'] as bool? ?? true,
+          recommendation: threatJson['recommendation'] as String?,
+        ));
+      }
+      _updateStats();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to load network threats: $e');
+    }
+  }
+
+  /// Parse security level from string
+  WifiSecurityLevel _parseSecurityLevel(String? security) {
+    if (security == null) return WifiSecurityLevel.open;
+    final lower = security.toLowerCase();
+    if (lower.contains('wpa3')) return WifiSecurityLevel.wpa3;
+    if (lower.contains('wpa2') && lower.contains('enterprise')) return WifiSecurityLevel.enterprise;
+    if (lower.contains('wpa2')) return WifiSecurityLevel.wpa2Psk;
+    if (lower.contains('wpa')) return WifiSecurityLevel.wpaPsk;
+    if (lower.contains('wep')) return WifiSecurityLevel.wep;
+    return WifiSecurityLevel.open;
+  }
+
+  /// Refresh VPN status from API
   Future<void> refreshVpnStatus() async {
-    // TODO: Get actual VPN status
-    _vpnStatus = VpnStatus(
-      isConnected: false,
-      serverLocation: null,
-    );
+    try {
+      final statusData = await _api.getVpnStatus();
+
+      _vpnStatus = VpnStatus(
+        isConnected: statusData['is_connected'] as bool? ?? false,
+        serverLocation: statusData['server_location'] as String?,
+        serverIp: statusData['server_ip'] as String?,
+        protocol: statusData['protocol'] as String?,
+        connectedAt: statusData['connected_at'] != null
+            ? DateTime.parse(statusData['connected_at'] as String)
+            : null,
+        bytesIn: statusData['bytes_in'] as int?,
+        bytesOut: statusData['bytes_out'] as int?,
+      );
+    } catch (e) {
+      // VPN status failure shouldn't crash the app
+      _vpnStatus = VpnStatus(isConnected: false);
+    }
     notifyListeners();
   }
 
-  /// Connect to VPN
+  /// Connect to VPN via API
   Future<bool> connectVpn(String server) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // TODO: Actually connect to VPN
-      await Future.delayed(const Duration(seconds: 2));
+      final result = await _api.connectVpn(server);
+
       _vpnStatus = VpnStatus(
-        isConnected: true,
-        serverLocation: server,
-        serverIp: '10.0.0.1',
-        protocol: 'WireGuard',
+        isConnected: result['success'] as bool? ?? false,
+        serverLocation: result['server_location'] as String? ?? server,
+        serverIp: result['server_ip'] as String?,
+        protocol: result['protocol'] as String?,
         connectedAt: DateTime.now(),
       );
       _isLoading = false;
       notifyListeners();
-      return true;
+      return _vpnStatus.isConnected;
     } catch (e) {
       _error = 'Failed to connect VPN: $e';
       _isLoading = false;
@@ -301,55 +428,82 @@ class NetworkProvider extends ChangeNotifier {
     }
   }
 
-  /// Disconnect VPN
+  /// Disconnect VPN via API
   Future<void> disconnectVpn() async {
+    try {
+      await _api.disconnectVpn();
+    } catch (e) {
+      debugPrint('Failed to disconnect VPN: $e');
+    }
     _vpnStatus = VpnStatus(isConnected: false);
     notifyListeners();
   }
 
-  /// Refresh DNS status
+  /// Refresh DNS status from API
   Future<void> refreshDnsStatus() async {
-    // TODO: Get actual DNS status
-    _dnsStatus = DnsProtectionStatus(
-      isEnabled: true,
-      provider: 'OrbGuard DNS',
-      primaryDns: '1.1.1.3',
-      secondaryDns: '1.0.0.3',
-      isMalwareBlocking: true,
-      isAdBlocking: false,
-      isTrackingBlocking: true,
-      blockedQueries: 1247,
-    );
+    try {
+      final statusData = await _api.getDnsStatus();
+
+      _dnsStatus = DnsProtectionStatus(
+        isEnabled: statusData['is_enabled'] as bool? ?? false,
+        provider: statusData['provider'] as String? ?? 'Default',
+        primaryDns: statusData['primary_dns'] as String? ?? '',
+        secondaryDns: statusData['secondary_dns'] as String?,
+        isMalwareBlocking: statusData['malware_blocking'] as bool? ?? false,
+        isAdBlocking: statusData['ad_blocking'] as bool? ?? false,
+        isTrackingBlocking: statusData['tracking_blocking'] as bool? ?? false,
+        blockedQueries: statusData['blocked_queries'] as int? ?? 0,
+      );
+    } catch (e) {
+      // DNS status failure shouldn't crash the app
+      _dnsStatus = DnsProtectionStatus();
+    }
     notifyListeners();
   }
 
-  /// Enable DNS protection
+  /// Enable DNS protection via API
   Future<void> enableDnsProtection({
     bool malwareBlocking = true,
     bool adBlocking = false,
     bool trackingBlocking = true,
   }) async {
-    _dnsStatus = DnsProtectionStatus(
-      isEnabled: true,
-      provider: 'OrbGuard DNS',
-      primaryDns: '1.1.1.3',
-      secondaryDns: '1.0.0.3',
-      isMalwareBlocking: malwareBlocking,
-      isAdBlocking: adBlocking,
-      isTrackingBlocking: trackingBlocking,
-      blockedQueries: _dnsStatus.blockedQueries,
-    );
+    try {
+      final result = await _api.enableDnsProtection(
+        malwareBlocking: malwareBlocking,
+        adBlocking: adBlocking,
+        trackingBlocking: trackingBlocking,
+      );
+
+      _dnsStatus = DnsProtectionStatus(
+        isEnabled: true,
+        provider: result['provider'] as String? ?? 'OrbGuard DNS',
+        primaryDns: result['primary_dns'] as String? ?? '',
+        secondaryDns: result['secondary_dns'] as String?,
+        isMalwareBlocking: malwareBlocking,
+        isAdBlocking: adBlocking,
+        isTrackingBlocking: trackingBlocking,
+        blockedQueries: _dnsStatus.blockedQueries,
+      );
+    } catch (e) {
+      _error = 'Failed to enable DNS protection: $e';
+    }
     notifyListeners();
   }
 
-  /// Disable DNS protection
+  /// Disable DNS protection via API
   Future<void> disableDnsProtection() async {
-    _dnsStatus = DnsProtectionStatus(
-      isEnabled: false,
-      provider: 'Default',
-      primaryDns: '',
-      blockedQueries: _dnsStatus.blockedQueries,
-    );
+    try {
+      await _api.disableDnsProtection();
+
+      _dnsStatus = DnsProtectionStatus(
+        isEnabled: false,
+        provider: 'Default',
+        primaryDns: '',
+        blockedQueries: _dnsStatus.blockedQueries,
+      );
+    } catch (e) {
+      _error = 'Failed to disable DNS protection: $e';
+    }
     notifyListeners();
   }
 
@@ -418,58 +572,6 @@ class NetworkProvider extends ChangeNotifier {
     );
   }
 
-  /// Get mock nearby networks
-  List<WifiNetwork> _getMockNetworks() {
-    return [
-      WifiNetwork(
-        ssid: 'Home Network',
-        bssid: 'AA:BB:CC:DD:EE:FF',
-        security: WifiSecurityLevel.wpa2Psk,
-        signalStrength: -55,
-        frequency: 5180,
-        isConnected: true,
-      ),
-      WifiNetwork(
-        ssid: 'Neighbor_5G',
-        bssid: '11:22:33:44:55:66',
-        security: WifiSecurityLevel.wpa3,
-        signalStrength: -72,
-        frequency: 5240,
-      ),
-      WifiNetwork(
-        ssid: 'FreeWifi',
-        bssid: '77:88:99:AA:BB:CC',
-        security: WifiSecurityLevel.open,
-        signalStrength: -65,
-        frequency: 2437,
-      ),
-      WifiNetwork(
-        ssid: 'CoffeeShop',
-        bssid: 'DD:EE:FF:00:11:22',
-        security: WifiSecurityLevel.wpa2Psk,
-        signalStrength: -78,
-        frequency: 2462,
-      ),
-      WifiNetwork(
-        ssid: 'DIRECT-xxx',
-        bssid: '33:44:55:66:77:88',
-        security: WifiSecurityLevel.wpa2Psk,
-        signalStrength: -80,
-        frequency: 2412,
-        isHidden: true,
-      ),
-    ];
-  }
-
-  /// Load mock data
-  void _loadMockData() {
-    _nearbyNetworks.clear();
-    _nearbyNetworks.addAll(_getMockNetworks());
-    _checkForThreats();
-    _updateStats();
-    notifyListeners();
-  }
-
   /// Clear error
   void clearError() {
     _error = null;
@@ -489,5 +591,53 @@ class NetworkProvider extends ChangeNotifier {
     if (strength > -70) return 'Good';
     if (strength > -80) return 'Fair';
     return 'Poor';
+  }
+
+  /// Get threat title from type
+  String _getThreatTitle(String type) {
+    switch (type.toLowerCase()) {
+      case 'evil_twin':
+        return 'Evil Twin Detected';
+      case 'rogue_ap':
+        return 'Rogue Access Point';
+      case 'deauth_attack':
+        return 'Deauthentication Attack';
+      case 'mitm':
+        return 'Man-in-the-Middle Attack';
+      case 'weak_security':
+        return 'Weak Security Protocol';
+      case 'open_network':
+        return 'Open Network Risk';
+      case 'arp_spoofing':
+        return 'ARP Spoofing Detected';
+      case 'dns_hijacking':
+        return 'DNS Hijacking Attempt';
+      default:
+        return 'Network Threat: ${type.replaceAll('_', ' ').toUpperCase()}';
+    }
+  }
+
+  /// Get threat recommendation from type
+  String _getThreatRecommendation(String type) {
+    switch (type.toLowerCase()) {
+      case 'evil_twin':
+        return 'Disconnect immediately and verify the legitimate network with your administrator.';
+      case 'rogue_ap':
+        return 'Avoid connecting to this network. Report to your network security team.';
+      case 'deauth_attack':
+        return 'Consider using a VPN and avoid sensitive activities until the network is secure.';
+      case 'mitm':
+        return 'Disconnect immediately. Do not enter any credentials or sensitive data.';
+      case 'weak_security':
+        return 'Upgrade to WPA3 or WPA2. Avoid WEP and open networks.';
+      case 'open_network':
+        return 'Use a VPN if you must connect. Avoid sensitive activities.';
+      case 'arp_spoofing':
+        return 'Disconnect and alert your network administrator immediately.';
+      case 'dns_hijacking':
+        return 'Use secure DNS (DNS over HTTPS) and verify your DNS settings.';
+      default:
+        return 'Investigate this threat and consider disconnecting from the network.';
+    }
   }
 }

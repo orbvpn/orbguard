@@ -13,6 +13,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
+import '../api/orbguard_api_client.dart';
+
 /// Third-party library/SDK information
 class ThirdPartyLibrary {
   final String name;
@@ -402,106 +404,49 @@ class SupplyChainMonitorService {
     });
   }
 
-  /// Load vulnerability database
+  /// Load vulnerability database from API
   Future<void> _loadVulnerabilityDatabase() async {
-    // Sample known vulnerabilities (in production, fetch from CVE database)
-    _vulnDatabase['com.google.android.exoplayer'] = [
-      Vulnerability(
-        cveId: 'CVE-2023-4863',
-        description: 'Heap buffer overflow in ExoPlayer',
-        cvssScore: 8.8,
-        severity: 'HIGH',
-        affectedVersions: '< 2.19.0',
-        fixedVersion: '2.19.0',
-        publishedDate: DateTime(2023, 9, 11),
-      ),
-    ];
+    try {
+      final api = OrbGuardApiClient.instance;
+      final vulnerabilities = await api.getSupplyChainVulnerabilities();
 
-    _vulnDatabase['org.apache.log4j'] = [
-      Vulnerability(
-        cveId: 'CVE-2021-44228',
-        description: 'Log4Shell - Remote code execution via JNDI lookup',
-        cvssScore: 10.0,
-        severity: 'CRITICAL',
-        affectedVersions: '2.0-beta9 to 2.14.1',
-        fixedVersion: '2.15.0',
-        exploitAvailable: 'Public exploits available',
-        publishedDate: DateTime(2021, 12, 10),
-      ),
-    ];
+      for (final vuln in vulnerabilities) {
+        final libraryName = vuln['library_name'] as String?;
+        if (libraryName == null) continue;
 
-    _vulnDatabase['com.squareup.okhttp3'] = [
-      Vulnerability(
-        cveId: 'CVE-2023-0833',
-        description: 'OkHttp connection pool memory leak',
-        cvssScore: 5.3,
-        severity: 'MEDIUM',
-        affectedVersions: '< 4.10.0',
-        fixedVersion: '4.10.0',
-        publishedDate: DateTime(2023, 2, 15),
-      ),
-    ];
+        final vulnerability = Vulnerability(
+          cveId: vuln['cve_id'] as String? ?? '',
+          description: vuln['description'] as String? ?? '',
+          cvssScore: (vuln['cvss_score'] as num?)?.toDouble() ?? 0.0,
+          severity: vuln['severity'] as String? ?? 'UNKNOWN',
+          affectedVersions: vuln['affected_versions'] as String? ?? '',
+          fixedVersion: vuln['fixed_version'] as String?,
+          exploitAvailable: vuln['exploit_available'] as String?,
+          publishedDate: vuln['published_date'] != null
+              ? DateTime.tryParse(vuln['published_date'] as String) ?? DateTime.now()
+              : DateTime.now(),
+        );
 
-    _vulnDatabase['io.netty'] = [
-      Vulnerability(
-        cveId: 'CVE-2023-34462',
-        description: 'Netty SniHandler denial of service',
-        cvssScore: 6.5,
-        severity: 'MEDIUM',
-        affectedVersions: '< 4.1.94',
-        fixedVersion: '4.1.94.Final',
-        publishedDate: DateTime(2023, 6, 22),
-      ),
-    ];
-
-    _vulnDatabase['com.fasterxml.jackson.core'] = [
-      Vulnerability(
-        cveId: 'CVE-2022-42003',
-        description: 'Jackson Databind deep wrapper array nesting DoS',
-        cvssScore: 7.5,
-        severity: 'HIGH',
-        affectedVersions: '< 2.13.4.1',
-        fixedVersion: '2.13.4.1',
-        publishedDate: DateTime(2022, 10, 2),
-      ),
-    ];
+        if (_vulnDatabase.containsKey(libraryName)) {
+          _vulnDatabase[libraryName]!.add(vulnerability);
+        } else {
+          _vulnDatabase[libraryName] = [vulnerability];
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load vulnerability database from API: $e');
+    }
   }
 
-  /// Load tracker signatures
+  /// Load tracker signatures from API
   Future<void> _loadTrackerSignatures() async {
-    _trackerSignatures.addAll([
-      'com.google.firebase.analytics',
-      'com.google.android.gms.analytics',
-      'com.google.android.gms.ads',
-      'com.facebook.ads',
-      'com.facebook.appevents',
-      'com.appsflyer',
-      'com.adjust.sdk',
-      'io.branch',
-      'com.mixpanel',
-      'com.amplitude',
-      'com.segment',
-      'com.chartboost',
-      'com.unity3d.ads',
-      'com.mopub',
-      'com.ironsource',
-      'com.vungle',
-      'com.applovin',
-      'com.tapjoy',
-      'com.inmobi',
-      'com.flurry',
-      'com.localytics',
-      'com.urbanairship',
-      'com.onesignal',
-      'com.braze',
-      'com.clevertap',
-      'com.moengage',
-      'com.webengage',
-      'com.kochava',
-      'com.singular.sdk',
-      'com.tenjin',
-      'io.radar',
-    ]);
+    try {
+      final api = OrbGuardApiClient.instance;
+      final trackers = await api.getTrackerSignatures();
+      _trackerSignatures.addAll(trackers);
+    } catch (e) {
+      debugPrint('Failed to load tracker signatures from API: $e');
+    }
   }
 
   /// Scan an installed app for dependencies

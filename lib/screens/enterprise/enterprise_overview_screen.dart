@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class EnterpriseOverviewScreen extends StatefulWidget {
   const EnterpriseOverviewScreen({super.key});
@@ -16,10 +17,12 @@ class EnterpriseOverviewScreen extends StatefulWidget {
 }
 
 class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
+  final _api = OrbGuardApiClient.instance;
   bool _isLoading = false;
-  final EnterpriseStats _stats = EnterpriseStats.sample();
-  final List<SecurityEvent> _recentEvents = [];
-  final List<DeviceHealth> _deviceHealth = [];
+  String? _errorMessage;
+  EnterpriseStats _stats = EnterpriseStats.empty();
+  List<SecurityEvent> _recentEvents = [];
+  List<DeviceHealth> _deviceHealth = [];
 
   @override
   void initState() {
@@ -28,13 +31,70 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _recentEvents.addAll(_getSampleEvents());
-      _deviceHealth.addAll(_getSampleDeviceHealth());
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      // Fetch all data in parallel
+      final results = await Future.wait([
+        _api.getEnterpriseStats(),
+        _api.getEnterpriseEvents(),
+        _api.getEnterpriseDevices(),
+      ]);
+
+      final statsData = results[0] as Map<String, dynamic>;
+      final eventsData = results[1] as List<Map<String, dynamic>>;
+      final devicesData = results[2] as List<Map<String, dynamic>>;
+
+      setState(() {
+        _stats = EnterpriseStats.fromJson(statsData);
+        _recentEvents = eventsData.map((e) => SecurityEvent.fromJson(e)).toList();
+        _deviceHealth = devicesData.map((d) => DeviceHealth.fromJson(d)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load enterprise data: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('danger_circle', size: 64, color: GlassTheme.errorColor),
+            const SizedBox(height: 16),
+            Text(
+              'Error Loading Data',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'An unknown error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -43,7 +103,9 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
       title: 'Enterprise Overview',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-          : Column(
+          : _errorMessage != null
+              ? _buildErrorState()
+              : Column(
               children: [
                 // Actions row
                 Padding(
@@ -588,64 +650,6 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
-
-  List<SecurityEvent> _getSampleEvents() {
-    return [
-      SecurityEvent(
-        id: '1',
-        title: 'Malware Blocked',
-        description: 'Ransomware attempt blocked on device LAPTOP-042',
-        type: 'Malware',
-        severity: 'Critical',
-        source: 'Endpoint Protection',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-      ),
-      SecurityEvent(
-        id: '2',
-        title: 'Phishing Attempt Detected',
-        description: 'Phishing email blocked for user john.doe@company.com',
-        type: 'Phishing',
-        severity: 'High',
-        source: 'Email Security',
-        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      ),
-      SecurityEvent(
-        id: '3',
-        title: 'Policy Violation',
-        description: 'USB storage device connected to restricted workstation',
-        type: 'Policy Violation',
-        severity: 'Medium',
-        source: 'DLP',
-        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      SecurityEvent(
-        id: '4',
-        title: 'Failed Login Attempts',
-        description: 'Multiple failed login attempts from IP 192.168.1.100',
-        type: 'Unauthorized Access',
-        severity: 'Medium',
-        source: 'IAM',
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-      SecurityEvent(
-        id: '5',
-        title: 'Suspicious Download',
-        description: 'Potentially malicious file downloaded by user',
-        type: 'Malware',
-        severity: 'Low',
-        source: 'Web Gateway',
-        timestamp: DateTime.now().subtract(const Duration(hours: 8)),
-      ),
-    ];
-  }
-
-  List<DeviceHealth> _getSampleDeviceHealth() {
-    return [
-      DeviceHealth(deviceId: 'LAPTOP-001', status: 'healthy', lastSeen: DateTime.now()),
-      DeviceHealth(deviceId: 'LAPTOP-002', status: 'at_risk', lastSeen: DateTime.now().subtract(const Duration(hours: 2))),
-      DeviceHealth(deviceId: 'DESKTOP-001', status: 'healthy', lastSeen: DateTime.now()),
-    ];
-  }
 }
 
 class EnterpriseStats {
@@ -691,26 +695,50 @@ class EnterpriseStats {
     required this.isoCompliance,
   });
 
-  factory EnterpriseStats.sample() {
+  factory EnterpriseStats.fromJson(Map<String, dynamic> json) {
     return EnterpriseStats(
-      securityScore: 78,
-      totalDevices: 247,
-      activeUsers: 189,
-      openIncidents: 12,
-      threatsBlocked: 1847,
-      activePolicies: 34,
-      complianceRate: 92,
-      criticalThreats: 3,
-      highThreats: 8,
-      mediumThreats: 24,
-      lowThreats: 45,
-      healthyDevices: 218,
-      atRiskDevices: 23,
-      criticalDevices: 6,
-      soc2Compliance: 94,
-      gdprCompliance: 89,
+      securityScore: json['security_score'] as int? ?? 0,
+      totalDevices: json['total_devices'] as int? ?? 0,
+      activeUsers: json['active_users'] as int? ?? 0,
+      openIncidents: json['open_incidents'] as int? ?? 0,
+      threatsBlocked: json['threats_blocked'] as int? ?? 0,
+      activePolicies: json['active_policies'] as int? ?? 0,
+      complianceRate: json['compliance_rate'] as int? ?? 0,
+      criticalThreats: json['critical_threats'] as int? ?? 0,
+      highThreats: json['high_threats'] as int? ?? 0,
+      mediumThreats: json['medium_threats'] as int? ?? 0,
+      lowThreats: json['low_threats'] as int? ?? 0,
+      healthyDevices: json['healthy_devices'] as int? ?? 0,
+      atRiskDevices: json['at_risk_devices'] as int? ?? 0,
+      criticalDevices: json['critical_devices'] as int? ?? 0,
+      soc2Compliance: json['soc2_compliance'] as int? ?? 0,
+      gdprCompliance: json['gdpr_compliance'] as int? ?? 0,
+      hipaaCompliance: json['hipaa_compliance'] as int? ?? 0,
+      pciCompliance: json['pci_compliance'] as int? ?? 0,
+      isoCompliance: json['iso_compliance'] as int? ?? 0,
+    );
+  }
+
+  factory EnterpriseStats.empty() {
+    return EnterpriseStats(
+      securityScore: 0,
+      totalDevices: 0,
+      activeUsers: 0,
+      openIncidents: 0,
+      threatsBlocked: 0,
+      activePolicies: 0,
+      complianceRate: 0,
+      criticalThreats: 0,
+      highThreats: 0,
+      mediumThreats: 0,
+      lowThreats: 0,
+      healthyDevices: 0,
+      atRiskDevices: 0,
+      criticalDevices: 0,
+      soc2Compliance: 0,
+      gdprCompliance: 0,
       hipaaCompliance: 0,
-      pciCompliance: 78,
+      pciCompliance: 0,
       isoCompliance: 0,
     );
   }
@@ -734,6 +762,20 @@ class SecurityEvent {
     required this.source,
     required this.timestamp,
   });
+
+  factory SecurityEvent.fromJson(Map<String, dynamic> json) {
+    return SecurityEvent(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      severity: json['severity'] as String? ?? 'low',
+      source: json['source'] as String? ?? '',
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }
 
 class DeviceHealth {
@@ -746,4 +788,14 @@ class DeviceHealth {
     required this.status,
     required this.lastSeen,
   });
+
+  factory DeviceHealth.fromJson(Map<String, dynamic> json) {
+    return DeviceHealth(
+      deviceId: json['device_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'unknown',
+      lastSeen: json['last_seen'] != null
+          ? DateTime.tryParse(json['last_seen'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }

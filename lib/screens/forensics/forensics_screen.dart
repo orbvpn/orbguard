@@ -33,6 +33,8 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       builder: (context, provider, child) {
         return GlassTabPage(
           title: 'Forensic Analysis',
+          hasSearch: true,
+          searchHint: 'Search analysis...',
           headerContent: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -49,7 +51,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           tabs: [
             GlassTab(
               label: 'Analyze',
-              iconPath: 'magnifier',
+              iconPath: 'magnifer',
               content: _buildAnalyzeTab(provider),
             ),
             GlassTab(

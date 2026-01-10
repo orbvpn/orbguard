@@ -1,11 +1,12 @@
-/// Integrations Screen
-/// Third-party integrations management interface
+// Integrations Screen
+// Third-party integrations management interface
 
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({super.key});
@@ -16,6 +17,7 @@ class IntegrationsScreen extends StatefulWidget {
 
 class _IntegrationsScreenState extends State<IntegrationsScreen> {
   bool _isLoading = false;
+  String? _errorMessage;
   final List<Integration> _integrations = [];
 
   @override
@@ -25,12 +27,26 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Future<void> _loadIntegrations() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
-      _integrations.addAll(_getSampleIntegrations());
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      final apiData = await OrbGuardApiClient.instance.getIntegrations();
+      final integrations = apiData.map((json) => Integration.fromJson(json)).toList();
+
+      setState(() {
+        _integrations.clear();
+        _integrations.addAll(integrations);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load integrations: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -57,7 +73,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                : ListView(
+                : _errorMessage != null
+                    ? _buildErrorState()
+                    : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
                       // Stats
@@ -228,8 +246,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                 child: integration.isConnected
                     ? OutlinedButton(
                         onPressed: () {
-                          setState(() => integration.isConnected = false);
                           Navigator.pop(context);
+                          _disconnectIntegration(integration);
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: GlassTheme.errorColor,
@@ -247,8 +265,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       )
                     : ElevatedButton(
                         onPressed: () {
-                          _connectIntegration(integration);
                           Navigator.pop(context);
+                          _connectIntegration(integration);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: GlassTheme.primaryAccent,
@@ -287,14 +305,93 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     );
   }
 
-  void _connectIntegration(Integration integration) {
-    setState(() => integration.isConnected = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${integration.name} connected successfully'),
-        backgroundColor: GlassTheme.successColor,
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon(AppIcons.shieldWarning, size: 48, color: GlassTheme.errorColor),
+            const SizedBox(height: 16),
+            Text(
+              'Error Loading Integrations',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'An unknown error occurred',
+              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: _loadIntegrations,
+              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: GlassTheme.primaryAccent),
+              label: const Text('Retry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: GlassTheme.primaryAccent,
+                side: const BorderSide(color: GlassTheme.primaryAccent),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _connectIntegration(Integration integration) async {
+    try {
+      await OrbGuardApiClient.instance.updateIntegration(
+        integration.id,
+        {'is_connected': true},
+      );
+      setState(() => integration.isConnected = true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${integration.name} connected successfully'),
+            backgroundColor: GlassTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to connect ${integration.name}: ${e.toString()}'),
+            backgroundColor: GlassTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _disconnectIntegration(Integration integration) async {
+    try {
+      await OrbGuardApiClient.instance.updateIntegration(
+        integration.id,
+        {'is_connected': false},
+      );
+      setState(() => integration.isConnected = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${integration.name} disconnected'),
+            backgroundColor: Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to disconnect ${integration.name}: ${e.toString()}'),
+            backgroundColor: GlassTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   String _getIntegrationIcon(String type) {
@@ -316,108 +413,6 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     }
   }
 
-  List<Integration> _getSampleIntegrations() {
-    return [
-      Integration(
-        id: '1',
-        name: 'Slack',
-        type: 'Messaging',
-        description: 'Send alerts and notifications to Slack channels.',
-        color: const Color(0xFF4A154B),
-        features: [
-          'Real-time threat alerts',
-          'Daily summary reports',
-          'Interactive incident response',
-          'Custom channel routing',
-        ],
-        isConnected: true,
-      ),
-      Integration(
-        id: '2',
-        name: 'Microsoft Teams',
-        type: 'Messaging',
-        description: 'Integrate with Microsoft Teams for collaboration.',
-        color: const Color(0xFF5558AF),
-        features: [
-          'Threat notifications',
-          'Team collaboration',
-          'Adaptive cards support',
-          'Bot interactions',
-        ],
-        isConnected: true,
-      ),
-      Integration(
-        id: '3',
-        name: 'Splunk',
-        type: 'SIEM',
-        description: 'Send events to Splunk for advanced analysis.',
-        color: const Color(0xFF65A637),
-        features: [
-          'Event forwarding',
-          'Custom dashboards',
-          'Correlation rules',
-          'Historical analysis',
-        ],
-        isConnected: false,
-      ),
-      Integration(
-        id: '4',
-        name: 'ServiceNow',
-        type: 'Ticketing',
-        description: 'Create and manage security incidents.',
-        color: const Color(0xFF81B5A1),
-        features: [
-          'Auto ticket creation',
-          'Incident management',
-          'SLA tracking',
-          'Workflow automation',
-        ],
-        isConnected: false,
-      ),
-      Integration(
-        id: '5',
-        name: 'AWS Security Hub',
-        type: 'Cloud',
-        description: 'Integrate with AWS Security Hub findings.',
-        color: const Color(0xFFFF9900),
-        features: [
-          'Finding export',
-          'Compliance checks',
-          'Multi-account support',
-          'Resource monitoring',
-        ],
-        isConnected: false,
-      ),
-      Integration(
-        id: '6',
-        name: 'PagerDuty',
-        type: 'Ticketing',
-        description: 'Alert on-call teams for critical threats.',
-        color: const Color(0xFF06AC38),
-        features: [
-          'Critical alerts',
-          'On-call scheduling',
-          'Escalation policies',
-          'Incident response',
-        ],
-        isConnected: false,
-      ),
-      Integration(
-        id: '7',
-        name: 'Jira',
-        type: 'Ticketing',
-        description: 'Create Jira issues for security incidents.',
-        color: const Color(0xFF0052CC),
-        features: [
-          'Issue creation',
-          'Custom fields',
-          'Project mapping',
-          'Status sync',
-        ],
-        isConnected: false,
-      ),
-    ];
-  }
 }
 
 class Integration {
@@ -438,4 +433,31 @@ class Integration {
     required this.features,
     this.isConnected = false,
   });
+
+  factory Integration.fromJson(Map<String, dynamic> json) {
+    return Integration(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unknown',
+      type: json['type'] as String? ?? 'other',
+      description: json['description'] as String? ?? '',
+      color: _parseColor(json['color']),
+      features: (json['features'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      isConnected: json['is_connected'] as bool? ?? false,
+    );
+  }
+
+  static Color _parseColor(dynamic colorValue) {
+    if (colorValue == null) return const Color(0xFF6B7280);
+    if (colorValue is int) return Color(colorValue);
+    if (colorValue is String) {
+      // Handle hex color strings like "#FF5500" or "0xFFFF5500"
+      String hex = colorValue.replaceAll('#', '').replaceAll('0x', '');
+      if (hex.length == 6) hex = 'FF$hex'; // Add alpha if missing
+      return Color(int.parse(hex, radix: 16));
+    }
+    return const Color(0xFF6B7280);
+  }
 }
