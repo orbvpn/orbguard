@@ -11,6 +11,7 @@
 /// - Spotlight Importers
 /// - Scripting Additions
 /// - Security Agent Plugins
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -260,26 +261,55 @@ class MacOSPersistenceScannerService {
   Stream<PersistenceItem> get itemStream => _itemController.stream;
 
   /// Run full persistence scan
-  Future<PersistenceScanResult> runFullScan() async {
+  Future<PersistenceScanResult> runFullScan({
+    void Function(String phase, double progress)? onProgress,
+  }) async {
     final scanId = 'scan_${DateTime.now().millisecondsSinceEpoch}';
     final startTime = DateTime.now();
     final items = <PersistenceItem>[];
     final itemsByType = <PersistenceType, int>{};
 
-    // Scan all persistence locations
+    // Scan all persistence locations with progress reporting
+    onProgress?.call('Scanning Launch Agents...', 0.05);
     items.addAll(await _scanLaunchAgents());
+
+    onProgress?.call('Scanning Launch Daemons...', 0.15);
     items.addAll(await _scanLaunchDaemons());
+
+    onProgress?.call('Scanning Login Items...', 0.25);
     items.addAll(await _scanLoginItems());
+
+    onProgress?.call('Scanning Kernel Extensions...', 0.35);
     items.addAll(await _scanKernelExtensions());
+
+    onProgress?.call('Scanning Browser Extensions...', 0.45);
     items.addAll(await _scanBrowserExtensions());
+
+    onProgress?.call('Scanning Cron Jobs...', 0.55);
     items.addAll(await _scanCronJobs());
+
+    onProgress?.call('Scanning Auth Plugins...', 0.65);
     items.addAll(await _scanAuthPlugins());
+
+    onProgress?.call('Scanning Directory Plugins...', 0.70);
     items.addAll(await _scanDirectoryPlugins());
+
+    onProgress?.call('Scanning Spotlight Importers...', 0.75);
     items.addAll(await _scanSpotlightImporters());
+
+    onProgress?.call('Scanning Scripting Additions...', 0.80);
     items.addAll(await _scanScriptingAdditions());
+
+    onProgress?.call('Scanning Startup Items...', 0.85);
     items.addAll(await _scanStartupItems());
+
+    onProgress?.call('Scanning Periodic Tasks...', 0.90);
     items.addAll(await _scanPeriodicTasks());
+
+    onProgress?.call('Scanning Event Monitor Rules...', 0.95);
     items.addAll(await _scanEmond());
+
+    onProgress?.call('Analyzing results...', 0.98);
 
     // Count by type
     for (final item in items) {
@@ -288,6 +318,7 @@ class MacOSPersistenceScannerService {
     }
 
     final endTime = DateTime.now();
+    onProgress?.call('Scan complete', 1.0);
 
     final result = PersistenceScanResult(
       scanId: scanId,

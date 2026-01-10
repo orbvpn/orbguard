@@ -2,12 +2,16 @@
 /// code signing verification, and firewall management
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../providers/desktop_security_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
@@ -26,10 +30,25 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   final List<SignedApp> _signedApps = [];
   final List<FirewallRule> _firewallRules = [];
 
+  bool get _isDesktopPlatform =>
+      Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+
+  String _getPlatformName() {
+    if (Platform.isMacOS) return 'macOS';
+    if (Platform.isWindows) return 'Windows';
+    if (Platform.isLinux) return 'Linux';
+    return 'Desktop';
+  }
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    if (_isDesktopPlatform) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<DesktopSecurityProvider>().init();
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -111,45 +130,110 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         // Scan button
-        GlassCard(
-          onTap: _isScanning ? null : _runScan,
-          tintColor: _isScanning ? GlassTheme.primaryAccent : null,
-          child: Row(
-            children: [
-              GlassSvgIconBox(
-                icon: 'radar',
-                color: GlassTheme.primaryAccent,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        _isDesktopPlatform
+            ? Consumer<DesktopSecurityProvider>(
+                builder: (context, provider, child) {
+                  final scanPhase = provider.isScanning ? provider.currentPhase : '';
+                  final progress = provider.scanProgress;
+
+                  return GlassCard(
+                    onTap: (_isScanning || provider.isScanning) ? null : _runScan,
+                    tintColor: (_isScanning || provider.isScanning) ? GlassTheme.primaryAccent : null,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            GlassSvgIconBox(
+                              icon: 'radar',
+                              color: GlassTheme.primaryAccent,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_getPlatformName()} Persistence Scanner',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    provider.isScanning
+                                        ? scanPhase
+                                        : 'Native scan for persistence mechanisms',
+                                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_isScanning || provider.isScanning)
+                              const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: GlassTheme.primaryAccent,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              const DuotoneIcon('play', color: GlassTheme.primaryAccent),
+                          ],
+                        ),
+                        if (provider.isScanning) ...[
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              backgroundColor: Colors.white.withAlpha(30),
+                              color: GlassTheme.primaryAccent,
+                              minHeight: 4,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              )
+            : GlassCard(
+                onTap: _isScanning ? null : _runScan,
+                tintColor: _isScanning ? GlassTheme.primaryAccent : null,
+                child: Row(
                   children: [
-                    const Text(
-                      'Persistence Scanner',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    GlassSvgIconBox(
+                      icon: 'radar',
+                      color: GlassTheme.primaryAccent,
                     ),
-                    Text(
-                      _isScanning ? 'Scanning...' : 'Scan for persistence mechanisms',
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Persistence Scanner',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            _isScanning ? 'Scanning...' : 'Scan for persistence mechanisms',
+                            style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
+                    if (_isScanning)
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: GlassTheme.primaryAccent,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    else
+                      const DuotoneIcon('play', color: GlassTheme.primaryAccent),
                   ],
                 ),
               ),
-              if (_isScanning)
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: GlassTheme.primaryAccent,
-                    strokeWidth: 2,
-                  ),
-                )
-              else
-                const DuotoneIcon('play', color: GlassTheme.primaryAccent),
-            ],
-          ),
-        ),
 
         // Stats
         const SizedBox(height: 16),
@@ -169,14 +253,60 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         // Categories info
         const SizedBox(height: 24),
         const GlassSectionHeader(title: 'Scan Coverage'),
-        _buildCoverageRow('play_circle', 'Launch Agents', true),
-        _buildCoverageRow('settings', 'Launch Daemons', true),
-        _buildCoverageRow('user', 'Login Items', true),
-        _buildCoverageRow('clock_circle', 'Scheduled Tasks', true),
-        _buildCoverageRow('widget', 'Browser Extensions', true),
-        _buildCoverageRow('cpu', 'Kernel Extensions', true),
+        ..._buildPlatformCoverage(),
       ],
     );
+  }
+
+  List<Widget> _buildPlatformCoverage() {
+    if (Platform.isMacOS) {
+      return [
+        _buildCoverageRow('play_circle', 'Launch Agents & Daemons', true),
+        _buildCoverageRow('user', 'Login Items', true),
+        _buildCoverageRow('clock_circle', 'Cron Jobs & Periodic Tasks', true),
+        _buildCoverageRow('widget', 'Browser Extensions', true),
+        _buildCoverageRow('cpu', 'Kernel Extensions', true),
+        _buildCoverageRow('server', 'Auth & Directory Plugins', true),
+        _buildCoverageRow('code', 'Scripting Additions', true),
+        _buildCoverageRow('danger_circle', 'Event Monitor Rules', true),
+        _buildCoverageRow('folder', 'Startup Items', true),
+        _buildCoverageRow('settings', 'Spotlight Importers', true),
+      ];
+    } else if (Platform.isWindows) {
+      return [
+        _buildCoverageRow('key', 'Registry Run Keys', true),
+        _buildCoverageRow('clock_circle', 'Scheduled Tasks', true),
+        _buildCoverageRow('settings', 'Windows Services', true),
+        _buildCoverageRow('folder', 'Startup Folders', true),
+        _buildCoverageRow('server', 'WMI Subscriptions', true),
+        _buildCoverageRow('widget', 'Browser Extensions', true),
+        _buildCoverageRow('code', 'COM Objects & DLL Hijacks', true),
+        _buildCoverageRow('danger_circle', 'IFEO & Winlogon', true),
+        _buildCoverageRow('cpu', 'AppInit DLLs & LSA Packages', true),
+        _buildCoverageRow('link_round', 'Netsh Helpers & Print Monitors', true),
+      ];
+    } else if (Platform.isLinux) {
+      return [
+        _buildCoverageRow('settings', 'Systemd Services & Timers', true),
+        _buildCoverageRow('play_circle', 'Init Scripts & RC Local', true),
+        _buildCoverageRow('clock_circle', 'Cron Jobs (System & User)', true),
+        _buildCoverageRow('code', 'Shell RC Files & Profile.d', true),
+        _buildCoverageRow('cpu', 'Kernel Modules', true),
+        _buildCoverageRow('danger_circle', 'LD_PRELOAD Hijacking', true),
+        _buildCoverageRow('key', 'SSH Keys & Sudoers.d', true),
+        _buildCoverageRow('folder', 'XDG Autostart & Desktop Entries', true),
+        _buildCoverageRow('server', 'D-Bus Services & Polkit Rules', true),
+        _buildCoverageRow('user', 'MOTD Scripts & Udev Rules', true),
+      ];
+    }
+    return [
+      _buildCoverageRow('play_circle', 'Launch Agents', true),
+      _buildCoverageRow('settings', 'Launch Daemons', true),
+      _buildCoverageRow('user', 'Login Items', true),
+      _buildCoverageRow('clock_circle', 'Scheduled Tasks', true),
+      _buildCoverageRow('widget', 'Browser Extensions', true),
+      _buildCoverageRow('cpu', 'Kernel Extensions', true),
+    ];
   }
 
   Widget _buildStatCard(String label, String value, Color color) {
@@ -522,28 +652,61 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     setState(() => _isScanning = true);
 
     try {
-      // Run persistence scan via API
-      final results = await _apiClient.scanPersistence();
+      if (_isDesktopPlatform) {
+        // Use native scanning on desktop platforms
+        final provider = context.read<DesktopSecurityProvider>();
+        final result = await provider.runFullScan();
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setState(() {
-        _isScanning = false;
-        // Update persistence items with new scan results
-        if (results['items'] != null) {
+        setState(() {
+          _isScanning = false;
+          // Update persistence items with native scan results
           _persistenceItems.clear();
           _persistenceItems.addAll(
-            (results['items'] as List).map((json) => PersistenceItem.fromJson(json as Map<String, dynamic>)),
+            result.items.map((item) => PersistenceItem(
+              id: item.id,
+              name: item.name,
+              type: item.typeDisplayName,
+              path: item.path,
+              isRunning: item.isEnabled,
+              autoStart: item.isEnabled,
+              isSuspicious: item.risk.level >= DesktopItemRisk.high.level,
+              reason: item.indicators.isNotEmpty ? item.indicators.first : null,
+            )),
           );
-        }
-      });
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Persistence scan complete'),
-          backgroundColor: GlassTheme.successColor,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Native scan complete: ${result.totalItems} items found'),
+            backgroundColor: GlassTheme.successColor,
+          ),
+        );
+      } else {
+        // Run persistence scan via API for non-desktop
+        final results = await _apiClient.scanPersistence();
+
+        if (!mounted) return;
+
+        setState(() {
+          _isScanning = false;
+          // Update persistence items with new scan results
+          if (results['items'] != null) {
+            _persistenceItems.clear();
+            _persistenceItems.addAll(
+              (results['items'] as List).map((json) => PersistenceItem.fromJson(json as Map<String, dynamic>)),
+            );
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Persistence scan complete'),
+            backgroundColor: GlassTheme.successColor,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isScanning = false);
@@ -797,22 +960,52 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   String _getPersistenceIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'launch agent':
-        return 'play_circle';
-      case 'launch daemon':
-        return 'settings';
-      case 'login item':
-        return 'user';
-      case 'scheduled task':
-        return 'clock_circle';
-      case 'browser extension':
-        return 'widget';
-      case 'kernel extension':
-        return 'cpu';
-      default:
-        return 'code';
-    }
+    final lowerType = type.toLowerCase();
+    // macOS types
+    if (lowerType.contains('launch agent')) return 'play_circle';
+    if (lowerType.contains('launch daemon')) return 'settings';
+    if (lowerType.contains('login item')) return 'user';
+    if (lowerType.contains('kernel extension')) return 'cpu';
+    if (lowerType.contains('browser extension')) return 'widget';
+    if (lowerType.contains('cron')) return 'clock_circle';
+    if (lowerType.contains('auth plugin')) return 'shield';
+    if (lowerType.contains('spotlight')) return 'eye';
+    if (lowerType.contains('scripting')) return 'code';
+    if (lowerType.contains('startup')) return 'play_circle';
+    if (lowerType.contains('periodic')) return 'clock_circle';
+    if (lowerType.contains('emond')) return 'danger_circle';
+    // Windows types
+    if (lowerType.contains('registry')) return 'key';
+    if (lowerType.contains('scheduled task')) return 'clock_circle';
+    if (lowerType.contains('service')) return 'settings';
+    if (lowerType.contains('wmi')) return 'server';
+    if (lowerType.contains('com object')) return 'code';
+    if (lowerType.contains('ifeo')) return 'danger_circle';
+    if (lowerType.contains('winlogon')) return 'user';
+    if (lowerType.contains('appinit')) return 'danger_circle';
+    if (lowerType.contains('lsa')) return 'shield';
+    if (lowerType.contains('print')) return 'document';
+    if (lowerType.contains('boot')) return 'cpu';
+    if (lowerType.contains('netsh')) return 'link_round';
+    // Linux types
+    if (lowerType.contains('systemd')) return 'settings';
+    if (lowerType.contains('init')) return 'play_circle';
+    if (lowerType.contains('shell rc')) return 'code';
+    if (lowerType.contains('xdg') || lowerType.contains('autostart')) return 'folder';
+    if (lowerType.contains('kernel module')) return 'cpu';
+    if (lowerType.contains('ld_preload')) return 'danger_circle';
+    if (lowerType.contains('ssh')) return 'key';
+    if (lowerType.contains('at job')) return 'clock_circle';
+    if (lowerType.contains('udev')) return 'server';
+    if (lowerType.contains('rc local')) return 'code';
+    if (lowerType.contains('profile')) return 'user';
+    if (lowerType.contains('motd')) return 'letter';
+    if (lowerType.contains('pam')) return 'shield';
+    if (lowerType.contains('polkit')) return 'shield';
+    if (lowerType.contains('sudoers')) return 'key';
+    if (lowerType.contains('dbus') || lowerType.contains('d-bus')) return 'link_round';
+    if (lowerType.contains('desktop')) return 'smartphone';
+    return 'code';
   }
 
   String _getAppIcon(String name) {
