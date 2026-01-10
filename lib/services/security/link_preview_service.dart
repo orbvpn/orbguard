@@ -465,9 +465,9 @@ class LinkPreviewService {
 
       // Extract Open Graph tags
       final ogPatterns = {
-        'description': r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']',
-        'image': r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
-        'site_name': r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']',
+        'description': '<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']',
+        'image': '<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        'site_name': '<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']',
       };
 
       for (final entry in ogPatterns.entries) {
@@ -478,7 +478,7 @@ class LinkPreviewService {
       // Fallback to meta description
       if (metadata['description'] == null) {
         final descMatch = RegExp(
-          r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
+          '<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
           caseSensitive: false,
         ).firstMatch(body);
         metadata['description'] = descMatch?.group(1);
@@ -486,7 +486,7 @@ class LinkPreviewService {
 
       // Extract favicon
       final faviconMatch = RegExp(
-        r'<link[^>]+rel=["\'](?:shortcut )?icon["\'][^>]+href=["\']([^"\']+)["\']',
+        '<link[^>]+rel=["\'](?:shortcut )?icon["\'][^>]+href=["\']([^"\']+)["\']',
         caseSensitive: false,
       ).firstMatch(body);
       if (faviconMatch != null) {

@@ -343,7 +343,7 @@ class LLMAnalysisService {
       ],
       'urgency_scam': [
         RegExp(r'\b(urgent|immediately|asap|expire|limited time)\b', caseSensitive: false),
-        RegExp(r'\b(act now|don\'t wait|hurry)\b', caseSensitive: false),
+        RegExp(r"\b(act now|don't wait|hurry)\b", caseSensitive: false),
       ],
       'impersonation': [
         RegExp(r'\b(ceo|cfo|director|manager|hr|it department)\b', caseSensitive: false),
@@ -504,7 +504,7 @@ class LLMAnalysisService {
       (RegExp(r'\b(urgent|urgently|emergency)\b', caseSensitive: false), 0.3, 'Urgency keyword'),
       (RegExp(r'\b(immediately|right away|asap|now)\b', caseSensitive: false), 0.25, 'Immediate action'),
       (RegExp(r'\b(expire|expires|expiring|deadline)\b', caseSensitive: false), 0.2, 'Time pressure'),
-      (RegExp(r'\b(limited time|act fast|don\'t wait)\b', caseSensitive: false), 0.25, 'Scarcity tactic'),
+      (RegExp(r"\b(limited time|act fast|don't wait)\b", caseSensitive: false), 0.25, 'Scarcity tactic'),
       (RegExp(r'\b(last chance|final notice|final warning)\b', caseSensitive: false), 0.3, 'Finality pressure'),
       (RegExp(r'!!!|!!!|\?\?\?', caseSensitive: false), 0.1, 'Excessive punctuation'),
       (RegExp(r'\b[A-Z]{4,}\b'), 0.1, 'Shouting (all caps)'),

@@ -10,7 +10,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import '../../../data/api/rest/orbguard_client.dart';
+import '../../api/orbguard_api_client.dart';
 
 /// Supported SIEM platforms
 enum SIEMPlatform {
@@ -417,7 +417,7 @@ class SIEMStatistics {
 
 /// SIEM Integration Service
 class SIEMIntegrationService {
-  final OrbGuardClient _client = OrbGuardClient.instance;
+  final OrbGuardApiClient _client = OrbGuardApiClient.instance;
 
   // Configurations
   final List<SIEMConfiguration> _configurations = [];

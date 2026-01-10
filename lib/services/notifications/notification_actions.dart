@@ -63,7 +63,7 @@ class NotificationCategories {
   static const String generalCategory = 'GENERAL_CATEGORY';
 
   /// iOS notification categories for DarwinInitializationSettings
-  static const List<DarwinNotificationCategory> iosCategories = [
+  static final List<DarwinNotificationCategory> iosCategories = [
     // Threat category with actions
     DarwinNotificationCategory(
       threatCategory,

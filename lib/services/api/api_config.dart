@@ -578,4 +578,152 @@ class ApiEndpoints {
   /// Get tracker signatures
   /// GET /api/v1/supply-chain/trackers
   static const String supplyChainTrackers = '$_v1/supply-chain/trackers';
+
+  // ============================================
+  // DEVICE SECURITY
+  // ============================================
+
+  /// Device base endpoint
+  /// GET/POST /api/v1/devices
+  static const String devices = '$_v1/devices';
+
+  /// Register device
+  /// POST /api/v1/devices/register
+  static const String devicesRegister = '$_v1/devices/register';
+
+  /// Get device security status
+  /// GET /api/v1/devices/{id}/security
+  static String deviceSecurity(String id) => '$_v1/devices/$id/security';
+
+  /// Get anti-theft settings
+  /// GET /api/v1/devices/{id}/anti-theft
+  static String deviceAntiTheft(String id) => '$_v1/devices/$id/anti-theft';
+
+  /// Locate device
+  /// POST /api/v1/devices/{id}/locate
+  static String deviceLocate(String id) => '$_v1/devices/$id/locate';
+
+  /// Send device command
+  /// POST /api/v1/devices/{id}/command
+  static String deviceCommand(String id) => '$_v1/devices/$id/command';
+
+  /// Mark device as lost
+  /// POST /api/v1/devices/{id}/lost
+  static String deviceLost(String id) => '$_v1/devices/$id/lost';
+
+  /// Mark device as stolen
+  /// POST /api/v1/devices/{id}/stolen
+  static String deviceStolen(String id) => '$_v1/devices/$id/stolen';
+
+  /// Mark device as recovered
+  /// POST /api/v1/devices/{id}/recovered
+  static String deviceRecovered(String id) => '$_v1/devices/$id/recovered';
+
+  /// Get device location history
+  /// GET /api/v1/devices/{id}/location-history
+  static String deviceLocationHistory(String id) => '$_v1/devices/$id/location-history';
+
+  /// Get SIM history
+  /// GET /api/v1/devices/{id}/sim-history
+  static String deviceSimHistory(String id) => '$_v1/devices/$id/sim-history';
+
+  /// Add trusted SIM
+  /// POST /api/v1/devices/{id}/trusted-sim
+  static String deviceTrustedSim(String id) => '$_v1/devices/$id/trusted-sim';
+
+  /// Audit OS vulnerabilities
+  /// POST /api/v1/devices/{id}/audit-os
+  static String deviceAuditOs(String id) => '$_v1/devices/$id/audit-os';
+
+  // ============================================
+  // FORENSICS
+  // ============================================
+
+  /// Forensics base endpoint
+  /// GET /api/v1/forensics
+  static const String forensics = '$_v1/forensics';
+
+  /// Get forensic capabilities
+  /// GET /api/v1/forensics/capabilities
+  static const String forensicsCapabilities = '$_v1/forensics/capabilities';
+
+  /// Get IOC stats
+  /// GET /api/v1/forensics/iocs/stats
+  static const String forensicsIocStats = '$_v1/forensics/iocs/stats';
+
+  /// Analyze shutdown log
+  /// POST /api/v1/forensics/analyze/shutdown-log
+  static const String forensicsAnalyzeShutdownLog = '$_v1/forensics/analyze/shutdown-log';
+
+  /// Analyze backup
+  /// POST /api/v1/forensics/analyze/backup
+  static const String forensicsAnalyzeBackup = '$_v1/forensics/analyze/backup';
+
+  /// Analyze data usage
+  /// POST /api/v1/forensics/analyze/data-usage
+  static const String forensicsAnalyzeDataUsage = '$_v1/forensics/analyze/data-usage';
+
+  /// Analyze sysdiagnose
+  /// POST /api/v1/forensics/analyze/sysdiagnose
+  static const String forensicsAnalyzeSysdiagnose = '$_v1/forensics/analyze/sysdiagnose';
+
+  /// Analyze logcat
+  /// POST /api/v1/forensics/analyze/logcat
+  static const String forensicsAnalyzeLogcat = '$_v1/forensics/analyze/logcat';
+
+  /// Run full forensic analysis
+  /// POST /api/v1/forensics/full-analysis
+  static const String forensicsFullAnalysis = '$_v1/forensics/full-analysis';
+
+  /// Quick forensic check
+  /// POST /api/v1/forensics/quick-check
+  static const String forensicsQuickCheck = '$_v1/forensics/quick-check';
+
+  // ============================================
+  // PRIVACY
+  // ============================================
+
+  /// Privacy base endpoint
+  /// GET /api/v1/privacy
+  static const String privacy = '$_v1/privacy';
+
+  /// Audit privacy
+  /// POST /api/v1/privacy/audit
+  static const String privacyAudit = '$_v1/privacy/audit';
+
+  /// Record privacy event
+  /// POST /api/v1/privacy/events
+  static const String privacyEvents = '$_v1/privacy/events';
+
+  /// Check clipboard
+  /// POST /api/v1/privacy/clipboard/check
+  static const String privacyClipboardCheck = '$_v1/privacy/clipboard/check';
+
+  // ============================================
+  // SCAM DETECTION
+  // ============================================
+
+  /// Scam base endpoint
+  /// GET /api/v1/scam
+  static const String scam = '$_v1/scam';
+
+  /// Analyze scam
+  /// POST /api/v1/scam/analyze
+  static const String scamAnalyze = '$_v1/scam/analyze';
+
+  /// Get scam patterns
+  /// GET /api/v1/scam/patterns
+  static const String scamPatterns = '$_v1/scam/patterns';
+
+  /// Report scam
+  /// POST /api/v1/scam/report
+  static const String scamReport = '$_v1/scam/report';
+
+  /// Get phone reputation
+  /// GET /api/v1/scam/phone/{number}
+  static String scamPhoneReputation(String number) => '$_v1/scam/phone/$number';
+
+  /// Report phone number
+  /// POST /api/v1/scam/phone/report
+  static const String scamPhoneReport = '$_v1/scam/phone/report';
 }

@@ -135,6 +135,364 @@ class OrbGuardApiClient {
   bool get isAuthenticated => _authInterceptor.isAuthenticated;
 
   // ============================================
+  // GENERIC HTTP METHODS (for services that need direct access)
+  // ============================================
+
+  /// Generic GET request
+  Future<T> get<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+    final response = await _dio.get(path, queryParameters: queryParameters);
+    return response.data as T;
+  }
+
+  /// Generic POST request
+  Future<T> post<T>(String path, {dynamic data}) async {
+    final response = await _dio.post(path, data: data);
+    return response.data as T;
+  }
+
+  /// Generic PUT request
+  Future<T> put<T>(String path, {dynamic data}) async {
+    final response = await _dio.put(path, data: data);
+    return response.data as T;
+  }
+
+  /// Generic DELETE request
+  Future<T> delete<T>(String path) async {
+    final response = await _dio.delete(path);
+    return response.data as T;
+  }
+
+  // ============================================
+  // DEVICE SECURITY
+  // ============================================
+
+  /// Register device with backend
+  Future<Map<String, dynamic>> registerDevice(Map<String, dynamic> deviceData) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.authDevice, data: deviceData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get device security status
+  Future<Map<String, dynamic>> getDeviceSecurityStatus() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.devices}/security/status');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get anti-theft settings
+  Future<Map<String, dynamic>> getAntiTheftSettings() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.devices}/anti-theft/settings');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Update anti-theft settings
+  Future<bool> updateAntiTheftSettings(Map<String, dynamic> settings) async {
+    try {
+      await _dio.put('${ApiEndpoints.devices}/anti-theft/settings', data: settings);
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Locate device
+  Future<Map<String, dynamic>> locateDevice() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.devices}/locate');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Send device command (lock, wipe, alarm, etc.)
+  Future<bool> sendDeviceCommand(String command, {Map<String, dynamic>? data}) async {
+    try {
+      await _dio.post('${ApiEndpoints.devices}/command/$command', data: data);
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Mark device as lost
+  Future<bool> markDeviceLost({String? message}) async {
+    try {
+      await _dio.post('${ApiEndpoints.devices}/status/lost', data: {'message': message});
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Mark device as stolen
+  Future<bool> markDeviceStolen({String? reportNumber}) async {
+    try {
+      await _dio.post('${ApiEndpoints.devices}/status/stolen', data: {'report_number': reportNumber});
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Mark device as recovered
+  Future<bool> markDeviceRecovered() async {
+    try {
+      await _dio.post('${ApiEndpoints.devices}/status/recovered');
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get location history
+  Future<List<Map<String, dynamic>>> getLocationHistory({int days = 7}) async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.devices}/location/history', queryParameters: {'days': days});
+      return (response.data['locations'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get SIM history
+  Future<List<Map<String, dynamic>>> getSIMHistory() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.devices}/sim/history');
+      return (response.data['sim_history'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Add trusted SIM
+  Future<bool> addTrustedSIM(String simId, String name) async {
+    try {
+      await _dio.post('${ApiEndpoints.devices}/sim/trusted', data: {'sim_id': simId, 'name': name});
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Audit OS vulnerabilities
+  Future<Map<String, dynamic>> auditOSVulnerabilities() async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.devices}/security/audit-os');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
+  // FORENSICS
+  // ============================================
+
+  /// Get forensic capabilities
+  Future<Map<String, dynamic>> getForensicCapabilities() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.forensics}/capabilities');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get IOC stats
+  Future<Map<String, dynamic>> getIOCStats() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.forensics}/ioc/stats');
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Analyze shutdown log
+  Future<Map<String, dynamic>> analyzeShutdownLog(Map<String, dynamic> logData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/shutdown', data: logData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Analyze backup
+  Future<Map<String, dynamic>> analyzeBackup(Map<String, dynamic> backupData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/backup', data: backupData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Analyze data usage
+  Future<Map<String, dynamic>> analyzeDataUsage(Map<String, dynamic> usageData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/data-usage', data: usageData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Analyze sysdiagnose (iOS)
+  Future<Map<String, dynamic>> analyzeSysdiagnose(Map<String, dynamic> sysdiagnoseData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/sysdiagnose', data: sysdiagnoseData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Analyze logcat (Android)
+  Future<Map<String, dynamic>> analyzeLogcat(Map<String, dynamic> logcatData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/logcat', data: logcatData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Run full forensic analysis
+  Future<Map<String, dynamic>> runFullForensicAnalysis(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/full', data: data);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Quick forensic check
+  Future<Map<String, dynamic>> quickForensicCheck(List<Map<String, dynamic>> indicators) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.forensics}/check', data: {'indicators': indicators});
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
+  // PRIVACY
+  // ============================================
+
+  /// Audit privacy
+  Future<Map<String, dynamic>> auditPrivacy(Map<String, dynamic> appData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.privacy}/audit', data: appData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Record privacy event
+  Future<bool> recordPrivacyEvent(Map<String, dynamic> event) async {
+    try {
+      await _dio.post('${ApiEndpoints.privacy}/events', data: event);
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Check clipboard content
+  Future<Map<String, dynamic>> checkClipboard(String content) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.privacy}/check/clipboard', data: {'content': content});
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
+  // SCAM DETECTION
+  // ============================================
+
+  /// Analyze potential scam
+  Future<Map<String, dynamic>> analyzeScam(Map<String, dynamic> scamData) async {
+    try {
+      final response = await _dio.post('${ApiEndpoints.scam}/analyze', data: scamData);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get scam patterns
+  Future<List<Map<String, dynamic>>> getScamPatterns() async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.scam}/patterns');
+      return (response.data['patterns'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Report scam
+  Future<bool> reportScam(Map<String, dynamic> report) async {
+    try {
+      await _dio.post('${ApiEndpoints.scam}/report', data: report);
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get phone reputation
+  Future<Map<String, dynamic>> getPhoneReputation(String phoneNumber) async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.scam}/phone/reputation', queryParameters: {'number': phoneNumber});
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Report phone number
+  Future<bool> reportPhoneNumber(String phoneNumber, String reason) async {
+    try {
+      await _dio.post('${ApiEndpoints.scam}/phone/report', data: {'number': phoneNumber, 'reason': reason});
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
+  // NETWORK
+  // ============================================
+
+  /// Check if domain should be blocked
+  Future<bool> shouldBlockDomain(String domain) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.networkDnsCheck, data: {'domain': domain});
+      return response.data['should_block'] as bool? ?? false;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
   // INDICATORS
   // ============================================
 

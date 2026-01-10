@@ -201,7 +201,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> analyzeShutdownLog(String logContent) async {
     return _runAnalysis(
       ForensicAnalysisType.shutdownLog,
-      () => _api.analyzeShutdownLog(logContent),
+      () => _api.analyzeShutdownLog({'content': logContent}),
     );
   }
 
@@ -209,7 +209,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> analyzeBackup(String backupPath) async {
     return _runAnalysis(
       ForensicAnalysisType.backup,
-      () => _api.analyzeBackup(backupPath),
+      () => _api.analyzeBackup({'path': backupPath}),
     );
   }
 
@@ -226,7 +226,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> analyzeSysdiagnose(String diagPath) async {
     return _runAnalysis(
       ForensicAnalysisType.sysdiagnose,
-      () => _api.analyzeSysdiagnose(diagPath),
+      () => _api.analyzeSysdiagnose({'path': diagPath}),
     );
   }
 
@@ -234,7 +234,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> analyzeLogcat(String logcatContent) async {
     return _runAnalysis(
       ForensicAnalysisType.logcat,
-      () => _api.analyzeLogcat(logcatContent),
+      () => _api.analyzeLogcat({'content': logcatContent}),
     );
   }
 
@@ -242,7 +242,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> runFullAnalysis() async {
     return _runAnalysis(
       ForensicAnalysisType.fullScan,
-      () => _api.runFullForensicAnalysis(),
+      () => _api.runFullForensicAnalysis({}),
     );
   }
 
@@ -261,7 +261,8 @@ class ForensicsProvider extends ChangeNotifier {
     );
 
     try {
-      final response = await _api.quickForensicCheck(indicators);
+      final indicatorMaps = indicators.map((i) => {'value': i}).toList();
+      final response = await _api.quickForensicCheck(indicatorMaps);
       final findings = <ForensicFinding>[];
 
       if (response['matches'] != null) {

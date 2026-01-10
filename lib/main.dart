@@ -62,6 +62,10 @@ import 'providers/social_media_provider.dart';
 import 'providers/rogue_ap_provider.dart' show RogueAPProvider;
 import 'providers/enterprise_policy_provider.dart';
 
+// API Client
+import 'services/api/orbguard_api_client.dart';
+import 'services/api/api_config.dart';
+
 // Global instances
 late ThreatIntelligenceManager threatIntel;
 late AdvancedDetectionManager advancedDetection;
@@ -70,10 +74,16 @@ late SpecialPermissionsManager specialPermissions;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize OrbGuard API Client first
+  await OrbGuardApiClient.instance.init(
+    baseUrl: ApiConfig.baseUrl,
+    enableLogging: false,
+  );
+
   // Initialize threat intelligence
   threatIntel = ThreatIntelligenceManager(
-    apiUrl: 'http://localhost:8080/api/v1/intelligence',
-    apiKey: 'secret123',
+    apiUrl: '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/intelligence',
+    apiKey: '', // API key managed by auth interceptor
   );
 
   await threatIntel.initialize();

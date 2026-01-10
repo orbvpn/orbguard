@@ -212,7 +212,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
   /// Register device
   Future<void> _registerDevice() async {
     try {
-      final result = await _api.registerDevice();
+      final result = await _api.registerDevice({});
       _deviceId = result['device_id'];
     } catch (e) {
       // Generate local ID
@@ -225,7 +225,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      final data = await _api.getDeviceSecurityStatus(_deviceId!);
+      final data = await _api.getDeviceSecurityStatus();
       _status = DeviceSecurityStatus(
         isLost: data['is_lost'] ?? false,
         isStolen: data['is_stolen'] ?? false,
@@ -246,7 +246,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      final data = await _api.getAntiTheftSettings(_deviceId!);
+      final data = await _api.getAntiTheftSettings();
       _settings = AntiTheftSettings(
         locateEnabled: data['locate_enabled'] ?? true,
         lockEnabled: data['lock_enabled'] ?? true,
@@ -270,7 +270,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
 
     if (_deviceId != null) {
       try {
-        await _api.updateAntiTheftSettings(_deviceId!, {
+        await _api.updateAntiTheftSettings({
           'locate_enabled': newSettings.locateEnabled,
           'lock_enabled': newSettings.lockEnabled,
           'wipe_enabled': newSettings.wipeEnabled,
@@ -296,7 +296,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await _api.locateDevice(_deviceId!);
+      final data = await _api.locateDevice();
       final location = DeviceLocation(
         latitude: data['latitude'],
         longitude: data['longitude'],
@@ -358,7 +358,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _api.sendDeviceCommand(_deviceId!, command.name, params);
+      await _api.sendDeviceCommand(command.name, data: params);
       _isSendingCommand = false;
       notifyListeners();
       return true;
@@ -375,7 +375,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      await _api.markDeviceLost(_deviceId!);
+      await _api.markDeviceLost();
       _status = DeviceSecurityStatus(
         isLost: true,
         isStolen: _status.isStolen,
@@ -397,7 +397,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      await _api.markDeviceStolen(_deviceId!);
+      await _api.markDeviceStolen();
       _status = DeviceSecurityStatus(
         isLost: _status.isLost,
         isStolen: true,
@@ -419,7 +419,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      await _api.markDeviceRecovered(_deviceId!);
+      await _api.markDeviceRecovered();
       _status = DeviceSecurityStatus(
         isLost: false,
         isStolen: false,
@@ -441,7 +441,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      final data = await _api.getLocationHistory(_deviceId!);
+      final data = await _api.getLocationHistory();
       _locationHistory.clear();
       for (final loc in data) {
         _locationHistory.add(DeviceLocation(
@@ -463,7 +463,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      final data = await _api.getSIMHistory(_deviceId!);
+      final data = await _api.getSIMHistory();
       _simHistory.clear();
       for (final sim in data) {
         _simHistory.add(SIMInfo(
@@ -490,7 +490,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     if (_deviceId == null) return;
 
     try {
-      await _api.addTrustedSIM(_deviceId!, iccid);
+      await _api.addTrustedSIM(iccid, 'Trusted SIM');
       await loadSIMHistory();
     } catch (e) {
       _error = 'Failed to add trusted SIM: $e';

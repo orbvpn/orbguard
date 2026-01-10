@@ -21,6 +21,22 @@ class MitreTactic {
     required this.description,
     required this.order,
   });
+
+  /// Standard MITRE ATT&CK Mobile tactics
+  static const List<MitreTactic> mobileTactics = [
+    MitreTactic(id: 'TA0027', name: 'Initial Access', shortName: 'Initial Access', description: 'Techniques for gaining an initial foothold on a mobile device.', order: 1),
+    MitreTactic(id: 'TA0041', name: 'Execution', shortName: 'Execution', description: 'Techniques for running malicious code on a mobile device.', order: 2),
+    MitreTactic(id: 'TA0028', name: 'Persistence', shortName: 'Persistence', description: 'Techniques for maintaining presence on a mobile device.', order: 3),
+    MitreTactic(id: 'TA0029', name: 'Privilege Escalation', shortName: 'Privilege Escalation', description: 'Techniques for gaining higher-level permissions.', order: 4),
+    MitreTactic(id: 'TA0030', name: 'Defense Evasion', shortName: 'Defense Evasion', description: 'Techniques for avoiding detection.', order: 5),
+    MitreTactic(id: 'TA0031', name: 'Credential Access', shortName: 'Credential Access', description: 'Techniques for stealing credentials.', order: 6),
+    MitreTactic(id: 'TA0032', name: 'Discovery', shortName: 'Discovery', description: 'Techniques for learning about the device environment.', order: 7),
+    MitreTactic(id: 'TA0033', name: 'Lateral Movement', shortName: 'Lateral Movement', description: 'Techniques for moving through the environment.', order: 8),
+    MitreTactic(id: 'TA0034', name: 'Collection', shortName: 'Collection', description: 'Techniques for gathering data of interest.', order: 9),
+    MitreTactic(id: 'TA0035', name: 'Command and Control', shortName: 'C2', description: 'Techniques for communicating with compromised devices.', order: 10),
+    MitreTactic(id: 'TA0036', name: 'Exfiltration', shortName: 'Exfiltration', description: 'Techniques for stealing data.', order: 11),
+    MitreTactic(id: 'TA0037', name: 'Impact', shortName: 'Impact', description: 'Techniques for disrupting availability or integrity.', order: 12),
+  ];
 }
 
 /// MITRE ATT&CK Technique

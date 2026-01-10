@@ -59,7 +59,8 @@ enum SigningStatus {
   thirdPartySigned('Third-Party Signed', 'Signed by verified developer'),
   adHocSigned('Ad-Hoc Signed', 'Self-signed'),
   unsigned('Unsigned', 'No code signature'),
-  invalid('Invalid', 'Signature is invalid or revoked');
+  invalid('Invalid', 'Signature is invalid or revoked'),
+  unknown('Unknown', 'Signing status could not be determined');
 
   final String displayName;
   final String description;

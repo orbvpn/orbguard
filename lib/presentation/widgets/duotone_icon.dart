@@ -148,6 +148,7 @@ class AppIcons {
   static const String dangerCircle = 'danger_circle';
   static const String dangerTriangle = 'danger_triangle';
   static const String dangerSquare = 'danger_square';
+  static const String warning = dangerTriangle;
   static const String forbidden = 'forbidden';
   static const String forbiddenCircle = 'forbidden_circle';
   static const String copy = 'copy';

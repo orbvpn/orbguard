@@ -307,7 +307,7 @@ class ScamDetectionProvider extends ChangeNotifier {
   /// Report phone number
   Future<bool> reportPhoneNumber(String phoneNumber, {String? reason}) async {
     try {
-      await _api.reportPhoneNumber(phoneNumber, reason: reason);
+      await _api.reportPhoneNumber(phoneNumber, reason ?? 'User reported');
       return true;
     } catch (e) {
       _error = 'Failed to report: $e';

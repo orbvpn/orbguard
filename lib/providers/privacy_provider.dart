@@ -167,13 +167,13 @@ class PrivacyProvider extends ChangeNotifier {
 
       for (final tracker in data) {
         _trackers.add(TrackerInfo(
-          id: tracker['id'],
-          name: tracker['name'],
-          company: tracker['company'],
-          category: tracker['category'],
-          description: tracker['description'],
-          domains: List<String>.from(tracker['domains'] ?? []),
-          isBlocked: tracker['is_blocked'] ?? false,
+          id: tracker.id,
+          name: tracker.name,
+          company: tracker.company ?? 'Unknown',
+          category: tracker.category,
+          description: tracker.description,
+          domains: tracker.domains ?? [],
+          isBlocked: false,
         ));
       }
 
@@ -256,8 +256,7 @@ class PrivacyProvider extends ChangeNotifier {
 
     // Check with API
     try {
-      final result = await _api.shouldBlockDomain(domain);
-      return result['should_block'] ?? false;
+      return await _api.shouldBlockDomain(domain);
     } catch (e) {
       return false;
     }
@@ -269,7 +268,7 @@ class PrivacyProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _api.auditPrivacy();
+      final result = await _api.auditPrivacy({});
       _lastAudit = PrivacyAuditResult(
         privacyScore: result['privacy_score'] ?? 100,
         totalAppsAudited: result['total_apps'] ?? 0,
