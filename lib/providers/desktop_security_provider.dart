@@ -2,6 +2,7 @@
 /// Unified provider for Windows, macOS, and Linux persistence scanning
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -252,6 +253,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
     _scanProgress = 1.0;
     notifyListeners();
 
+    // Save results to cache
+    await _saveCachedResults();
+
     return _lastScanResult!;
   }
 
@@ -404,7 +408,246 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   /// Load cached scan results
   Future<void> _loadCachedResults() async {
-    // TODO: Implement caching with shared_preferences or similar
+    try {
+      final cacheFile = await _getCacheFile();
+      if (await cacheFile.exists()) {
+        final content = await cacheFile.readAsString();
+        final json = jsonDecode(content) as Map<String, dynamic>;
+
+        // Check if cache is still valid (less than 1 hour old)
+        final cachedAt = DateTime.parse(json['cached_at'] as String);
+        if (DateTime.now().difference(cachedAt).inHours < 1) {
+          _items = (json['items'] as List).map((item) => DesktopPersistenceItem(
+            id: item['id'] as String,
+            name: item['name'] as String,
+            path: item['path'] as String,
+            command: item['command'] as String?,
+            type: item['type'] as String,
+            typeDisplayName: item['type_display_name'] as String,
+            risk: DesktopItemRisk.values.firstWhere(
+              (r) => r.name == item['risk'],
+              orElse: () => DesktopItemRisk.low,
+            ),
+            signingStatus: item['signing_status'] as String? ?? 'Unknown',
+            indicators: (item['indicators'] as List?)?.cast<String>() ?? [],
+          )).toList();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      // Cache load failed, will run fresh scan
+    }
+  }
+
+  /// Save scan results to cache
+  Future<void> _saveCachedResults() async {
+    try {
+      final cacheFile = await _getCacheFile();
+      final json = {
+        'cached_at': DateTime.now().toIso8601String(),
+        'platform': currentPlatform,
+        'items': _items.map((i) => {
+          'id': i.id,
+          'name': i.name,
+          'path': i.path,
+          'command': i.command,
+          'type': i.type,
+          'type_display_name': i.typeDisplayName,
+          'risk': i.risk.name,
+          'signing_status': i.signingStatus,
+          'indicators': i.indicators,
+        }).toList(),
+      };
+      await cacheFile.writeAsString(jsonEncode(json));
+    } catch (e) {
+      // Cache save failed, ignore
+    }
+  }
+
+  /// Get cache file path
+  Future<File> _getCacheFile() async {
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final cacheDir = Directory('$home/.orbguard/cache');
+    if (!await cacheDir.exists()) {
+      await cacheDir.create(recursive: true);
+    }
+    return File('${cacheDir.path}/persistence_scan_cache.json');
+  }
+
+  /// Clear cached results
+  Future<void> clearCache() async {
+    try {
+      final cacheFile = await _getCacheFile();
+      if (await cacheFile.exists()) {
+        await cacheFile.delete();
+      }
+      _items.clear();
+      _lastScanResult = null;
+      notifyListeners();
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  /// Disable/quarantine a persistence item
+  Future<bool> disableItem(DesktopPersistenceItem item) async {
+    try {
+      if (Platform.isMacOS) {
+        return await _disableMacOSItem(item);
+      } else if (Platform.isLinux) {
+        return await _disableLinuxItem(item);
+      } else if (Platform.isWindows) {
+        return await _disableWindowsItem(item);
+      }
+    } catch (e) {
+      _error = 'Failed to disable item: $e';
+      notifyListeners();
+    }
+    return false;
+  }
+
+  /// Disable macOS persistence item
+  Future<bool> _disableMacOSItem(DesktopPersistenceItem item) async {
+    final path = item.path;
+
+    // For LaunchAgents/Daemons, unload and move to quarantine
+    if (path.contains('LaunchAgents') || path.contains('LaunchDaemons')) {
+      // Unload the service
+      await Process.run('launchctl', ['unload', path]);
+
+      // Move to quarantine
+      final quarantineDir = await _getQuarantineDir();
+      final fileName = path.split('/').last;
+      final quarantinePath = '${quarantineDir.path}/$fileName';
+
+      await File(path).rename(quarantinePath);
+
+      // Update local state
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    // For login items, use osascript to remove
+    if (item.type.contains('loginItem')) {
+      await Process.run('osascript', [
+        '-e', 'tell application "System Events" to delete login item "${item.name}"'
+      ]);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Disable Linux persistence item
+  Future<bool> _disableLinuxItem(DesktopPersistenceItem item) async {
+    final path = item.path;
+
+    // For systemd services, disable them
+    if (item.type.contains('systemd')) {
+      final serviceName = path.split('/').last;
+      await Process.run('systemctl', ['--user', 'disable', serviceName]);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    // For other items, move to quarantine
+    final quarantineDir = await _getQuarantineDir();
+    final fileName = path.split('/').last;
+    final quarantinePath = '${quarantineDir.path}/$fileName';
+
+    try {
+      await File(path).rename(quarantinePath);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Disable Windows persistence item
+  Future<bool> _disableWindowsItem(DesktopPersistenceItem item) async {
+    // For registry items, delete the value
+    if (item.type.contains('registry')) {
+      final parts = item.path.split('\\');
+      final keyPath = parts.sublist(0, parts.length - 1).join('\\');
+      await Process.run('reg', ['delete', keyPath, '/v', item.name, '/f'], runInShell: true);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    // For scheduled tasks, disable them
+    if (item.type.contains('scheduledTask')) {
+      await Process.run('schtasks', ['/Change', '/TN', item.name, '/Disable'], runInShell: true);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    // For services, disable them
+    if (item.type.contains('service')) {
+      await Process.run('sc', ['config', item.name, 'start=', 'disabled'], runInShell: true);
+      _items.removeWhere((i) => i.id == item.id);
+      notifyListeners();
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Get quarantine directory
+  Future<Directory> _getQuarantineDir() async {
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final quarantineDir = Directory('$home/.orbguard/quarantine');
+    if (!await quarantineDir.exists()) {
+      await quarantineDir.create(recursive: true);
+    }
+    return quarantineDir;
+  }
+
+  /// Restore a quarantined item
+  Future<bool> restoreItem(String originalPath, String quarantinedFileName) async {
+    try {
+      final quarantineDir = await _getQuarantineDir();
+      final quarantinedFile = File('${quarantineDir.path}/$quarantinedFileName');
+
+      if (await quarantinedFile.exists()) {
+        await quarantinedFile.rename(originalPath);
+
+        // Reload if it's a launch agent/daemon
+        if (originalPath.contains('LaunchAgents') || originalPath.contains('LaunchDaemons')) {
+          await Process.run('launchctl', ['load', originalPath]);
+        }
+
+        return true;
+      }
+    } catch (e) {
+      _error = 'Failed to restore item: $e';
+      notifyListeners();
+    }
+    return false;
+  }
+
+  /// Get list of quarantined items
+  Future<List<String>> getQuarantinedItems() async {
+    try {
+      final quarantineDir = await _getQuarantineDir();
+      if (await quarantineDir.exists()) {
+        return await quarantineDir
+            .list()
+            .where((e) => e is File)
+            .map((e) => e.path.split('/').last)
+            .toList();
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return [];
   }
 
   /// Export scan results

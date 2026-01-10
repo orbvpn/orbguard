@@ -33,7 +33,12 @@ enum PersistenceType {
   periodicTask('Periodic Task', '/etc/periodic'),
   atJob('At Job', 'Scheduled at jobs'),
   emond('Event Monitor', '/etc/emond.d'),
-  reOpenedApps('Re-Opened Apps', 'Apps that reopen at login');
+  reOpenedApps('Re-Opened Apps', 'Apps that reopen at login'),
+  quickLookPlugin('Quick Look Plugin', '/Library/QuickLook'),
+  screenSaver('Screen Saver', '/Library/Screen Savers'),
+  folderAction('Folder Action', '~/Library/Workflows/Applications/Folder Actions'),
+  inputMethod('Input Method', '/Library/Input Methods'),
+  colorSync('ColorSync Profile', '/Library/ColorSync/Profiles');
 
   final String displayName;
   final String location;
@@ -208,6 +213,37 @@ class PersistenceScanResult {
 
   List<PersistenceItem> get unsignedItems =>
       items.where((i) => i.signingStatus == SigningStatus.unsigned).toList();
+
+  Map<String, dynamic> toJson() => {
+    'scan_id': scanId,
+    'start_time': startTime.toIso8601String(),
+    'end_time': endTime.toIso8601String(),
+    'total_scanned': totalScanned,
+    'suspicious_count': suspiciousCount,
+    'malicious_count': maliciousCount,
+    'items_by_type': itemsByType.map((k, v) => MapEntry(k.name, v)),
+    'items': items.map((i) => i.toJson()).toList(),
+  };
+
+  factory PersistenceScanResult.fromJson(Map<String, dynamic> json) {
+    return PersistenceScanResult(
+      scanId: json['scan_id'] as String,
+      startTime: DateTime.parse(json['start_time'] as String),
+      endTime: DateTime.parse(json['end_time'] as String),
+      totalScanned: json['total_scanned'] as int,
+      suspiciousCount: json['suspicious_count'] as int,
+      maliciousCount: json['malicious_count'] as int,
+      itemsByType: (json['items_by_type'] as Map<String, dynamic>).map(
+        (k, v) => MapEntry(
+          PersistenceType.values.firstWhere((t) => t.name == k),
+          v as int,
+        ),
+      ),
+      items: (json['items'] as List<dynamic>)
+          .map((i) => PersistenceItem.fromJson(i as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 /// macOS Persistence Scanner Service
@@ -306,8 +342,20 @@ class MacOSPersistenceScannerService {
     onProgress?.call('Scanning Periodic Tasks...', 0.90);
     items.addAll(await _scanPeriodicTasks());
 
-    onProgress?.call('Scanning Event Monitor Rules...', 0.95);
+    onProgress?.call('Scanning Event Monitor Rules...', 0.88);
     items.addAll(await _scanEmond());
+
+    onProgress?.call('Scanning Quick Look Plugins...', 0.90);
+    items.addAll(await _scanQuickLookPlugins());
+
+    onProgress?.call('Scanning Screen Savers...', 0.92);
+    items.addAll(await _scanScreenSavers());
+
+    onProgress?.call('Scanning Folder Actions...', 0.94);
+    items.addAll(await _scanFolderActions());
+
+    onProgress?.call('Scanning Input Methods...', 0.96);
+    items.addAll(await _scanInputMethods());
 
     onProgress?.call('Analyzing results...', 0.98);
 
@@ -757,6 +805,193 @@ class MacOSPersistenceScannerService {
     }
 
     return items;
+  }
+
+  /// Scan Quick Look plugins
+  Future<List<PersistenceItem>> _scanQuickLookPlugins() async {
+    final items = <PersistenceItem>[];
+    final locations = [
+      '/Library/QuickLook',
+      '${Platform.environment['HOME']}/Library/QuickLook',
+    ];
+
+    for (final location in locations) {
+      final dir = Directory(location);
+      if (await dir.exists()) {
+        await for (final entity in dir.list()) {
+          if (entity is Directory && entity.path.endsWith('.qlgenerator')) {
+            final infoPlist = File('${entity.path}/Contents/Info.plist');
+            String? bundleId;
+
+            if (await infoPlist.exists()) {
+              try {
+                final result = await Process.run('plutil', ['-convert', 'json', '-o', '-', infoPlist.path]);
+                if (result.exitCode == 0) {
+                  final plistData = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+                  bundleId = plistData['CFBundleIdentifier'] as String?;
+                }
+              } catch (e) {
+                // Skip
+              }
+            }
+
+            items.add(PersistenceItem(
+              id: 'ql_${entity.path.hashCode}',
+              type: PersistenceType.quickLookPlugin,
+              name: entity.path.split('/').last.replaceAll('.qlgenerator', ''),
+              path: entity.path,
+              bundleId: bundleId,
+              signingStatus: SigningStatus.unknown,
+              status: _isAppleBinary(entity.path) ? ItemStatus.legitimate : ItemStatus.unknown,
+            ));
+          }
+        }
+      }
+    }
+
+    return items;
+  }
+
+  /// Scan Screen Savers
+  Future<List<PersistenceItem>> _scanScreenSavers() async {
+    final items = <PersistenceItem>[];
+    final locations = [
+      '/Library/Screen Savers',
+      '${Platform.environment['HOME']}/Library/Screen Savers',
+      '/System/Library/Screen Savers',
+    ];
+
+    for (final location in locations) {
+      final dir = Directory(location);
+      if (await dir.exists()) {
+        await for (final entity in dir.list()) {
+          if (entity is Directory && entity.path.endsWith('.saver')) {
+            final isSystem = entity.path.startsWith('/System/Library/');
+
+            items.add(PersistenceItem(
+              id: 'saver_${entity.path.hashCode}',
+              type: PersistenceType.screenSaver,
+              name: entity.path.split('/').last.replaceAll('.saver', ''),
+              path: entity.path,
+              signingStatus: SigningStatus.unknown,
+              status: isSystem ? ItemStatus.legitimate : ItemStatus.unknown,
+              suspiciousIndicators: isSystem ? [] : ['Custom screen saver - can execute arbitrary code'],
+            ));
+          }
+        }
+      }
+    }
+
+    return items;
+  }
+
+  /// Scan Folder Actions
+  Future<List<PersistenceItem>> _scanFolderActions() async {
+    final items = <PersistenceItem>[];
+    final home = Platform.environment['HOME'] ?? '';
+
+    final locations = [
+      '$home/Library/Workflows/Applications/Folder Actions',
+      '/Library/Scripts/Folder Action Scripts',
+      '$home/Library/Scripts/Folder Action Scripts',
+    ];
+
+    for (final location in locations) {
+      final dir = Directory(location);
+      if (await dir.exists()) {
+        await for (final entity in dir.list(recursive: true)) {
+          if (entity is File &&
+              (entity.path.endsWith('.scpt') ||
+               entity.path.endsWith('.scptd') ||
+               entity.path.endsWith('.applescript') ||
+               entity.path.endsWith('.workflow'))) {
+            items.add(PersistenceItem(
+              id: 'folderaction_${entity.path.hashCode}',
+              type: PersistenceType.folderAction,
+              name: entity.path.split('/').last,
+              path: entity.path,
+              signingStatus: SigningStatus.unsigned,
+              status: ItemStatus.suspicious,
+              suspiciousIndicators: ['Folder Action script - executes on folder changes'],
+            ));
+          }
+        }
+      }
+    }
+
+    // Also check for configured folder actions via AppleScript
+    try {
+      final result = await Process.run('osascript', [
+        '-e',
+        'tell application "System Events" to get the name of every folder action',
+      ]);
+      if (result.exitCode == 0) {
+        final actions = (result.stdout as String).trim();
+        if (actions.isNotEmpty && actions != 'missing value') {
+          items.add(PersistenceItem(
+            id: 'folderaction_configured',
+            type: PersistenceType.folderAction,
+            name: 'Configured Folder Actions',
+            path: 'System Events',
+            signingStatus: SigningStatus.unknown,
+            status: ItemStatus.suspicious,
+            suspiciousIndicators: ['Active folder actions detected'],
+            plistData: {'actions': actions},
+          ));
+        }
+      }
+    } catch (e) {
+      // osascript not available or failed
+    }
+
+    return items;
+  }
+
+  /// Scan Input Methods
+  Future<List<PersistenceItem>> _scanInputMethods() async {
+    final items = <PersistenceItem>[];
+    final locations = [
+      '/Library/Input Methods',
+      '${Platform.environment['HOME']}/Library/Input Methods',
+    ];
+
+    for (final location in locations) {
+      final dir = Directory(location);
+      if (await dir.exists()) {
+        await for (final entity in dir.list()) {
+          if (entity is Directory && entity.path.endsWith('.app')) {
+            final signResult = await _checkCodeSignature(entity.path);
+            final signingStatus = signResult['status'] as SigningStatus;
+            final isSystem = _isAppleBinary(entity.path);
+
+            items.add(PersistenceItem(
+              id: 'inputmethod_${entity.path.hashCode}',
+              type: PersistenceType.inputMethod,
+              name: entity.path.split('/').last.replaceAll('.app', ''),
+              path: entity.path,
+              signingStatus: signingStatus,
+              signingAuthority: signResult['authority'] as String?,
+              teamId: signResult['teamId'] as String?,
+              status: isSystem
+                  ? ItemStatus.legitimate
+                  : (signingStatus == SigningStatus.unsigned
+                      ? ItemStatus.suspicious
+                      : ItemStatus.unknown),
+              suspiciousIndicators: signingStatus == SigningStatus.unsigned
+                  ? ['Unsigned input method - can capture keystrokes']
+                  : [],
+            ));
+          }
+        }
+      }
+    }
+
+    return items;
+  }
+
+  /// Check if path is an Apple system binary
+  bool _isAppleBinary(String path) {
+    return _appleBinaries.any((prefix) => path.startsWith(prefix));
   }
 
   /// Analyze plist file

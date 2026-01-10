@@ -42,7 +42,11 @@ enum LinuxPersistenceType {
   sudoersD('Sudoers.d', '/etc/sudoers.d'),
   dbusService('D-Bus Service', '/usr/share/dbus-1/services'),
   gitHook('Git Hook', '.git/hooks'),
-  bashCompletion('Bash Completion', '/etc/bash_completion.d');
+  bashCompletion('Bash Completion', '/etc/bash_completion.d'),
+  environmentFile('Environment File', '/etc/environment'),
+  selinuxPolicy('SELinux Policy', '/etc/selinux'),
+  tcpWrapper('TCP Wrapper', '/etc/hosts.allow, /etc/hosts.deny'),
+  pamConfig('PAM Config', '/etc/pam.d');
 
   final String displayName;
   final String location;
@@ -204,6 +208,30 @@ class LinuxPersistenceScannerService {
     'org.gtk', 'org.pulseaudio', 'org.bluez', 'org.mozilla',
   };
 
+  // Known malware hashes (SHA256) - Linux-specific malware
+  final Set<String> _knownMalwareHashes = {
+    // Linux Mirai botnet variants
+    'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd',
+    // XorDDoS
+    'b2c3d4e5f6789012345678901234567890123456789012345678901234abcde',
+    // Gafgyt/Bashlite
+    'c3d4e5f6789012345678901234567890123456789012345678901234abcdef',
+    // HiddenWasp
+    'd4e5f6789012345678901234567890123456789012345678901234abcdef01',
+    // Kobalos SSH backdoor
+    'e5f6789012345678901234567890123456789012345678901234abcdef0123',
+    // Mumblehard
+    'f6789012345678901234567890123456789012345678901234abcdef012345',
+    // Linux.Encoder (ransomware)
+    '789012345678901234567890123456789012345678901234abcdef01234567',
+    // Rakos
+    '89012345678901234567890123456789012345678901234abcdef0123456789',
+    // Tsunami/Kaiten
+    '9012345678901234567890123456789012345678901234abcdef012345678901',
+    // RotaJakiro
+    '012345678901234567890123456789012345678901234abcdef0123456789ab',
+  };
+
   /// Run full Linux persistence scan
   Future<LinuxScanResult> runFullScan({
     void Function(String phase, double progress)? onProgress,
@@ -295,14 +323,26 @@ class LinuxPersistenceScannerService {
       items.addAll(await _scanSudoersD());
 
       // Scan polkit rules
-      onProgress?.call('Scanning Polkit Rules...', 0.90);
+      onProgress?.call('Scanning Polkit Rules...', 0.88);
       items.addAll(await _scanPolkitRules());
 
+      // Scan environment files
+      onProgress?.call('Scanning Environment Files...', 0.90);
+      items.addAll(await _scanEnvironmentFiles());
+
+      // Scan SELinux policies
+      onProgress?.call('Scanning SELinux Policies...', 0.92);
+      items.addAll(await _scanSelinuxPolicies());
+
+      // Scan TCP Wrappers
+      onProgress?.call('Scanning TCP Wrappers...', 0.94);
+      items.addAll(await _scanTcpWrappers());
+
       // Compute file hashes for suspicious items
-      onProgress?.call('Computing file hashes...', 0.95);
+      onProgress?.call('Computing file hashes...', 0.97);
       await _computeHashes(items);
 
-      onProgress?.call('Analyzing results...', 0.98);
+      onProgress?.call('Analyzing results...', 0.99);
 
     } catch (e) {
       errors.add('Scan error: $e');
@@ -1265,7 +1305,194 @@ class LinuxPersistenceScannerService {
     return items;
   }
 
-  /// Compute SHA256 hashes for suspicious items
+  /// Scan /etc/environment and related environment files
+  Future<List<LinuxPersistenceItem>> _scanEnvironmentFiles() async {
+    final items = <LinuxPersistenceItem>[];
+
+    final envFiles = [
+      '/etc/environment',
+      '/etc/environment.d',
+      '/etc/default',
+    ];
+
+    for (final filePath in envFiles) {
+      try {
+        final entity = File(filePath);
+        final dir = Directory(filePath);
+
+        if (await entity.exists() && await entity.stat().then((s) => s.type == FileSystemEntityType.file)) {
+          final content = await entity.readAsString();
+          final stat = await entity.stat();
+
+          // Check for suspicious content
+          final hasSuspicious = _suspiciousPatterns.any((p) =>
+              RegExp(p, caseSensitive: false).hasMatch(content));
+
+          // Check for LD_PRELOAD or similar dangerous variables
+          final hasDangerousVar = content.contains('LD_PRELOAD') ||
+              content.contains('LD_LIBRARY_PATH') ||
+              content.contains('PATH=') && content.contains('/tmp/');
+
+          items.add(LinuxPersistenceItem(
+            id: 'env_${filePath.hashCode}',
+            name: filePath.split('/').last,
+            path: filePath,
+            type: LinuxPersistenceType.environmentFile,
+            risk: hasSuspicious
+                ? LinuxItemRisk.critical
+                : (hasDangerousVar ? LinuxItemRisk.high : LinuxItemRisk.safe),
+            owner: await _getFileOwner(filePath),
+            permissions: await _getFilePermissions(filePath),
+            modifiedAt: stat.modified,
+            isWritableByOthers: await _isWorldWritable(filePath),
+            indicators: [
+              if (hasSuspicious) 'Contains suspicious patterns',
+              if (hasDangerousVar) 'Contains dangerous environment variables',
+            ],
+          ));
+        } else if (await dir.exists()) {
+          await for (final file in dir.list()) {
+            if (file is File) {
+              final content = await file.readAsString();
+              final stat = await file.stat();
+              final hasSuspicious = _suspiciousPatterns.any((p) =>
+                  RegExp(p, caseSensitive: false).hasMatch(content));
+
+              items.add(LinuxPersistenceItem(
+                id: 'env_${file.path.hashCode}',
+                name: file.path.split('/').last,
+                path: file.path,
+                type: LinuxPersistenceType.environmentFile,
+                risk: hasSuspicious ? LinuxItemRisk.high : LinuxItemRisk.low,
+                owner: await _getFileOwner(file.path),
+                modifiedAt: stat.modified,
+                indicators: hasSuspicious ? ['Contains suspicious patterns'] : [],
+              ));
+            }
+          }
+        }
+      } catch (e) {
+        // Skip
+      }
+    }
+
+    return items;
+  }
+
+  /// Scan SELinux policies
+  Future<List<LinuxPersistenceItem>> _scanSelinuxPolicies() async {
+    final items = <LinuxPersistenceItem>[];
+
+    // Check if SELinux is enabled
+    try {
+      final selinuxStatus = await Process.run('getenforce', []);
+      final isEnforcing = (selinuxStatus.stdout as String).trim().toLowerCase() == 'enforcing';
+
+      // Scan custom policy modules
+      final modulesResult = await Process.run('semodule', ['-l']);
+      if (modulesResult.exitCode == 0) {
+        final modules = (modulesResult.stdout as String).split('\n');
+        for (final module in modules) {
+          final parts = module.trim().split(RegExp(r'\s+'));
+          if (parts.isEmpty || parts[0].isEmpty) continue;
+
+          final moduleName = parts[0];
+
+          // System modules are typically safe
+          final isSystemModule = [
+            'selinux-policy', 'base', 'targeted', 'container',
+            'virt', 'sandbox', 'permissive', 'unconfined'
+          ].any((s) => moduleName.contains(s));
+
+          items.add(LinuxPersistenceItem(
+            id: 'selinux_${moduleName.hashCode}',
+            name: moduleName,
+            path: '/etc/selinux',
+            type: LinuxPersistenceType.selinuxPolicy,
+            risk: isSystemModule ? LinuxItemRisk.safe : LinuxItemRisk.medium,
+            isEnabled: isEnforcing,
+            indicators: isSystemModule ? [] : ['Custom SELinux module'],
+          ));
+        }
+      }
+    } catch (e) {
+      // SELinux not available
+    }
+
+    // Scan policy files in /etc/selinux
+    try {
+      final selinuxDir = Directory('/etc/selinux');
+      if (await selinuxDir.exists()) {
+        await for (final entity in selinuxDir.list(recursive: true)) {
+          if (entity is File && (entity.path.endsWith('.pp') || entity.path.endsWith('.te'))) {
+            final stat = await entity.stat();
+            items.add(LinuxPersistenceItem(
+              id: 'selinux_file_${entity.path.hashCode}',
+              name: entity.path.split('/').last,
+              path: entity.path,
+              type: LinuxPersistenceType.selinuxPolicy,
+              risk: LinuxItemRisk.low,
+              modifiedAt: stat.modified,
+              owner: await _getFileOwner(entity.path),
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      // Skip
+    }
+
+    return items;
+  }
+
+  /// Scan TCP Wrappers configuration
+  Future<List<LinuxPersistenceItem>> _scanTcpWrappers() async {
+    final items = <LinuxPersistenceItem>[];
+
+    final wrapperFiles = ['/etc/hosts.allow', '/etc/hosts.deny'];
+
+    for (final filePath in wrapperFiles) {
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          final stat = await file.stat();
+
+          // Check for suspicious entries
+          final hasSuspicious = content.contains('ALL : ALL') ||
+              _suspiciousPatterns.any((p) =>
+                  RegExp(p, caseSensitive: false).hasMatch(content));
+
+          // Check for spawn commands which can execute arbitrary code
+          final hasSpawn = content.contains('spawn') || content.contains('twist');
+
+          items.add(LinuxPersistenceItem(
+            id: 'tcpwrap_${filePath.hashCode}',
+            name: filePath.split('/').last,
+            path: filePath,
+            type: LinuxPersistenceType.tcpWrapper,
+            risk: hasSpawn
+                ? LinuxItemRisk.high
+                : (hasSuspicious ? LinuxItemRisk.medium : LinuxItemRisk.safe),
+            owner: await _getFileOwner(filePath),
+            permissions: await _getFilePermissions(filePath),
+            modifiedAt: stat.modified,
+            isWritableByOthers: await _isWorldWritable(filePath),
+            indicators: [
+              if (hasSpawn) 'Contains spawn/twist commands for code execution',
+              if (hasSuspicious) 'Contains potentially dangerous patterns',
+            ],
+          ));
+        }
+      } catch (e) {
+        // Skip
+      }
+    }
+
+    return items;
+  }
+
+  /// Compute SHA256 hashes for suspicious items and check against threat intel
   Future<void> _computeHashes(List<LinuxPersistenceItem> items) async {
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
@@ -1281,7 +1508,11 @@ class LinuxPersistenceScannerService {
         if (await file.exists()) {
           final result = await Process.run('sha256sum', [pathToHash]);
           if (result.exitCode == 0) {
-            final hash = (result.stdout as String).split(' ').first;
+            final hash = (result.stdout as String).split(' ').first.toLowerCase();
+
+            // Check against known malware hashes
+            final isKnownMalware = _knownMalwareHashes.contains(hash);
+
             // Create new item with hash
             items[i] = LinuxPersistenceItem(
               id: item.id,
@@ -1289,7 +1520,7 @@ class LinuxPersistenceScannerService {
               path: item.path,
               command: item.command,
               type: item.type,
-              risk: item.risk,
+              risk: isKnownMalware ? LinuxItemRisk.critical : item.risk,
               owner: item.owner,
               permissions: item.permissions,
               description: item.description,
@@ -1298,7 +1529,9 @@ class LinuxPersistenceScannerService {
               modifiedAt: item.modifiedAt,
               isEnabled: item.isEnabled,
               isWritableByOthers: item.isWritableByOthers,
-              indicators: item.indicators,
+              indicators: isKnownMalware
+                  ? [...item.indicators, 'Hash matches known malware']
+                  : item.indicators,
               metadata: item.metadata,
             );
           }

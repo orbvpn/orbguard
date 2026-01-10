@@ -974,6 +974,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     if (lowerType.contains('startup')) return 'play_circle';
     if (lowerType.contains('periodic')) return 'clock_circle';
     if (lowerType.contains('emond')) return 'danger_circle';
+    if (lowerType.contains('quick look')) return 'eye';
+    if (lowerType.contains('screen saver')) return 'smartphone';
+    if (lowerType.contains('folder action')) return 'folder';
+    if (lowerType.contains('input method')) return 'code_square';
+    if (lowerType.contains('colorsync')) return 'settings';
     // Windows types
     if (lowerType.contains('registry')) return 'key';
     if (lowerType.contains('scheduled task')) return 'clock_circle';
@@ -987,6 +992,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     if (lowerType.contains('print')) return 'document';
     if (lowerType.contains('boot')) return 'cpu';
     if (lowerType.contains('netsh')) return 'link_round';
+    if (lowerType.contains('office')) return 'document';
+    if (lowerType.contains('powershell')) return 'code_square';
+    if (lowerType.contains('active setup')) return 'settings';
     // Linux types
     if (lowerType.contains('systemd')) return 'settings';
     if (lowerType.contains('init')) return 'play_circle';
@@ -1005,6 +1013,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     if (lowerType.contains('sudoers')) return 'key';
     if (lowerType.contains('dbus') || lowerType.contains('d-bus')) return 'link_round';
     if (lowerType.contains('desktop')) return 'smartphone';
+    if (lowerType.contains('environment')) return 'settings';
+    if (lowerType.contains('selinux')) return 'shield';
+    if (lowerType.contains('tcp wrapper') || lowerType.contains('hosts')) return 'link_round';
     return 'code';
   }
 
