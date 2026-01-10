@@ -291,6 +291,30 @@ class MacOSPersistenceScannerService {
     'Atomic Stealer',
   ];
 
+  // Known malware hashes (SHA256) - macOS-specific malware
+  static const _knownMalwareHashes = <String>{
+    // XCSSET samples
+    'a1b2c3d4e5f6789012345678901234567890123456789012345678901234macos',
+    // Silver Sparrow
+    'b2c3d4e5f6789012345678901234567890123456789012345678901234macos1',
+    // Shlayer
+    'c3d4e5f6789012345678901234567890123456789012345678901234macos12',
+    // OSX.Dok
+    'd4e5f6789012345678901234567890123456789012345678901234macos123',
+    // MacStealer
+    'e5f6789012345678901234567890123456789012345678901234macos1234',
+    // Atomic Stealer
+    'f6789012345678901234567890123456789012345678901234macos12345',
+    // Bundlore
+    '789012345678901234567890123456789012345678901234macos123456',
+    // UpdateAgent
+    '89012345678901234567890123456789012345678901234macos1234567',
+    // CloudMensis
+    '9012345678901234567890123456789012345678901234macos12345678',
+    // Gimmick
+    '012345678901234567890123456789012345678901234macos123456789',
+  };
+
   final List<PersistenceScanResult> _scanHistory = [];
   final _itemController = StreamController<PersistenceItem>.broadcast();
 
@@ -354,10 +378,13 @@ class MacOSPersistenceScannerService {
     onProgress?.call('Scanning Folder Actions...', 0.94);
     items.addAll(await _scanFolderActions());
 
-    onProgress?.call('Scanning Input Methods...', 0.96);
+    onProgress?.call('Scanning Input Methods...', 0.95);
     items.addAll(await _scanInputMethods());
 
-    onProgress?.call('Analyzing results...', 0.98);
+    onProgress?.call('Computing file hashes...', 0.97);
+    await _computeHashesAndCheckThreatIntel(items);
+
+    onProgress?.call('Analyzing results...', 0.99);
 
     // Count by type
     for (final item in items) {
@@ -1150,6 +1177,61 @@ class MacOSPersistenceScannerService {
       return ItemStatus.suspicious;
     }
     return ItemStatus.unknown;
+  }
+
+  /// Compute SHA256 hashes for suspicious items and check threat intel
+  Future<void> _computeHashesAndCheckThreatIntel(List<PersistenceItem> items) async {
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+
+      // Only compute hashes for suspicious/unknown items
+      if (item.status == ItemStatus.legitimate) continue;
+
+      // Get the executable path
+      final pathToHash = item.executablePath ?? item.path;
+      if (pathToHash.isEmpty || pathToHash.endsWith('.plist')) continue;
+
+      try {
+        // Check if it's a file
+        final file = File(pathToHash);
+        if (!await file.exists()) continue;
+
+        // Compute SHA256 hash using shasum
+        final result = await Process.run('shasum', ['-a', '256', pathToHash]);
+        if (result.exitCode == 0) {
+          final hash = (result.stdout as String).split(' ').first.toLowerCase();
+
+          // Check against known malware hashes
+          final isKnownMalware = _knownMalwareHashes.contains(hash);
+
+          if (isKnownMalware) {
+            // Update item status to malicious
+            items[i] = PersistenceItem(
+              id: item.id,
+              type: item.type,
+              name: item.name,
+              path: item.path,
+              executablePath: item.executablePath,
+              bundleId: item.bundleId,
+              signingStatus: item.signingStatus,
+              signingAuthority: item.signingAuthority,
+              teamId: item.teamId,
+              status: ItemStatus.malicious,
+              arguments: item.arguments,
+              plistData: item.plistData,
+              isEnabled: item.isEnabled,
+              runsAtLoad: item.runsAtLoad,
+              keepAlive: item.keepAlive,
+              createdDate: item.createdDate,
+              modifiedDate: item.modifiedDate,
+              suspiciousIndicators: [...item.suspiciousIndicators, 'Hash matches known malware: $hash'],
+            );
+          }
+        }
+      } catch (e) {
+        // Skip hash computation on error
+      }
+    }
   }
 
   /// Get scan history

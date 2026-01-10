@@ -118,6 +118,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           iconPath: 'link_round',
           content: _buildFirewallTab(),
         ),
+        GlassTab(
+          label: 'Quarantine',
+          iconPath: 'danger_circle',
+          content: _buildQuarantineTab(),
+        ),
       ],
     );
   }
@@ -648,6 +653,409 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
+  Widget _buildQuarantineTab() {
+    return FutureBuilder<List<String>>(
+      future: _isDesktopPlatform
+          ? context.read<DesktopSecurityProvider>().getQuarantinedItems()
+          : Future.value([]),
+      builder: (context, snapshot) {
+        final quarantinedItems = snapshot.data ?? [];
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Header stats
+            GlassCard(
+              child: Row(
+                children: [
+                  GlassSvgIconBox(
+                    icon: 'danger_circle',
+                    color: quarantinedItems.isEmpty
+                        ? GlassTheme.successColor
+                        : GlassTheme.warningColor,
+                    size: 48,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quarantine',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          quarantinedItems.isEmpty
+                              ? 'No items in quarantine'
+                              : '${quarantinedItems.length} item${quarantinedItems.length == 1 ? '' : 's'} quarantined',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(179),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (quarantinedItems.isNotEmpty)
+                    IconButton(
+                      icon: const DuotoneIcon('refresh', color: Colors.white),
+                      onPressed: () => setState(() {}),
+                      tooltip: 'Refresh',
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Info card
+            GlassCard(
+              child: Row(
+                children: [
+                  DuotoneIcon('info_circle', color: GlassTheme.primaryAccent, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Quarantined items are disabled and moved to a safe location. '
+                      'You can restore them if needed.',
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(179),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Quarantine location
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quarantine Location',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha(51),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const DuotoneIcon('folder', color: Colors.white54, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            _getQuarantinePath(),
+                            style: TextStyle(
+                              color: Colors.white.withAlpha(179),
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Quarantined items list
+            if (quarantinedItems.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      DuotoneIcon(
+                        'check_circle',
+                        color: GlassTheme.successColor,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No Quarantined Items',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Items you quarantine from the Persistence tab will appear here.',
+                        style: TextStyle(color: Colors.white.withAlpha(128)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              const Text(
+                'Quarantined Items',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...quarantinedItems.map((fileName) => _buildQuarantinedItemCard(fileName)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  String _getQuarantinePath() {
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '~';
+    return '$home/.orbguard/quarantine';
+  }
+
+  Widget _buildQuarantinedItemCard(String fileName) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        child: Row(
+          children: [
+            GlassSvgIconBox(
+              icon: 'danger_circle',
+              color: GlassTheme.warningColor,
+              size: 40,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Quarantined',
+                    style: TextStyle(
+                      color: GlassTheme.warningColor.withAlpha(179),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Restore button
+                IconButton(
+                  icon: DuotoneIcon('refresh', color: GlassTheme.successColor, size: 20),
+                  onPressed: () => _restoreQuarantinedItem(fileName),
+                  tooltip: 'Restore',
+                ),
+                // Delete permanently button
+                IconButton(
+                  icon: DuotoneIcon('trash_bin_minimalistic', color: GlassTheme.errorColor, size: 20),
+                  onPressed: () => _deleteQuarantinedItem(fileName),
+                  tooltip: 'Delete Permanently',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _restoreQuarantinedItem(String fileName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlassTheme.glassColor(true),
+        title: const Text('Restore Item?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to restore "$fileName"? '
+          'This will re-enable the persistence mechanism.',
+          style: TextStyle(color: Colors.white.withAlpha(204)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GlassTheme.warningColor,
+            ),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      // We need the original path to restore - for now just show a message
+      // In a real implementation, we'd store the original path in metadata
+      final scaffold = ScaffoldMessenger.of(context);
+      final provider = context.read<DesktopSecurityProvider>();
+
+      // Try to restore - this is a simplified version
+      // In production, you'd want to track original paths
+      final originalPath = await _promptForOriginalPath(fileName);
+
+      if (originalPath != null && originalPath.isNotEmpty) {
+        final success = await provider.restoreItem(originalPath, fileName);
+        if (mounted) {
+          if (success) {
+            scaffold.showSnackBar(
+              SnackBar(
+                content: Text('$fileName has been restored'),
+                backgroundColor: GlassTheme.successColor,
+              ),
+            );
+            setState(() {}); // Refresh the list
+          } else {
+            scaffold.showSnackBar(
+              SnackBar(
+                content: Text('Failed to restore $fileName'),
+                backgroundColor: GlassTheme.errorColor,
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  Future<String?> _promptForOriginalPath(String fileName) async {
+    String? path;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          backgroundColor: GlassTheme.glassColor(true),
+          title: const Text('Enter Original Path', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter the original path where "$fileName" should be restored:',
+                style: TextStyle(color: Colors.white.withAlpha(179)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: '/Library/LaunchAgents/$fileName',
+                  hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.black.withAlpha(51),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                path = controller.text;
+                Navigator.pop(context);
+              },
+              child: const Text('Restore'),
+            ),
+          ],
+        );
+      },
+    );
+    return path;
+  }
+
+  Future<void> _deleteQuarantinedItem(String fileName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlassTheme.glassColor(true),
+        title: const Text('Delete Permanently?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to permanently delete "$fileName"? '
+          'This action cannot be undone.',
+          style: TextStyle(color: Colors.white.withAlpha(204)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GlassTheme.errorColor,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final scaffold = ScaffoldMessenger.of(context);
+
+      try {
+        final quarantinePath = _getQuarantinePath();
+        final file = File('$quarantinePath/$fileName');
+        if (await file.exists()) {
+          await file.delete();
+          if (mounted) {
+            scaffold.showSnackBar(
+              SnackBar(
+                content: Text('$fileName has been permanently deleted'),
+                backgroundColor: GlassTheme.successColor,
+              ),
+            );
+            setState(() {}); // Refresh the list
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          scaffold.showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete $fileName: $e'),
+              backgroundColor: GlassTheme.errorColor,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _runScan() async {
     setState(() => _isScanning = true);
 
@@ -800,12 +1208,51 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               const SizedBox(height: 24),
               if (item.isSuspicious)
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    setState(() => _persistenceItems.remove(item));
+                  onPressed: () async {
+                    // Capture context before async gap
+                    final navigator = Navigator.of(context);
+                    final scaffold = ScaffoldMessenger.of(context);
+                    final provider = context.read<DesktopSecurityProvider>();
+
+                    navigator.pop();
+
+                    // Find the corresponding DesktopPersistenceItem from provider
+                    final providerItem = provider.items.firstWhere(
+                      (i) => i.id == item.id,
+                      orElse: () => DesktopPersistenceItem(
+                        id: item.id,
+                        name: item.name,
+                        path: item.path,
+                        type: item.type,
+                        typeDisplayName: item.type,
+                        risk: DesktopItemRisk.high,
+                      ),
+                    );
+
+                    // Attempt to disable/quarantine the item
+                    final success = await provider.disableItem(providerItem);
+
+                    if (mounted) {
+                      if (success) {
+                        setState(() => _persistenceItems.remove(item));
+                        scaffold.showSnackBar(
+                          SnackBar(
+                            content: Text('${item.name} has been quarantined'),
+                            backgroundColor: GlassTheme.successColor,
+                          ),
+                        );
+                      } else {
+                        scaffold.showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to quarantine ${item.name}. ${provider.error ?? ""}'),
+                            backgroundColor: GlassTheme.errorColor,
+                          ),
+                        );
+                      }
+                    }
                   },
                   icon: const DuotoneIcon('trash_bin_minimalistic', size: 20),
-                  label: const Text('Remove'),
+                  label: const Text('Quarantine'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
                     foregroundColor: Colors.white,
