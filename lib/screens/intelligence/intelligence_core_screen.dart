@@ -12,7 +12,10 @@ import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/threat_indicator.dart' as api;
 
 class IntelligenceCoreScreen extends StatefulWidget {
-  const IntelligenceCoreScreen({super.key});
+  /// When true, skips the outer page wrapper (for embedding in other screens)
+  final bool embedded;
+
+  const IntelligenceCoreScreen({super.key, this.embedded = false});
 
   @override
   State<IntelligenceCoreScreen> createState() => _IntelligenceCoreScreenState();
@@ -60,33 +63,36 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
     });
 
     try {
-      final response = await OrbGuardApiClient.instance.listIndicators();
-      setState(() {
-        _indicators.clear();
-        _indicators.addAll(response.items);
-        _isLoading = false;
+      // Add timeout to prevent hanging (5 seconds)
+      final response = await OrbGuardApiClient.instance.listIndicators()
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        throw Exception('Request timed out');
       });
+      if (mounted) {
+        setState(() {
+          _indicators.clear();
+          _indicators.addAll(response.items);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = 'Failed to load indicators: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load indicators: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return GlassPage(
-        title: 'Intelligence Core',
-        body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
-      );
-    }
-
+    // Show tabs immediately - don't block on loading
     return GlassTabPage(
       title: 'Intelligence Core',
       hasSearch: true,
       searchHint: 'Search IOCs...',
+      embedded: widget.embedded,
       actions: [
         IconButton(
           icon: const DuotoneIcon('file', size: 22, color: Colors.white),
@@ -145,6 +151,53 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   Widget _buildBrowseTab() {
+    // Show loading state inline
+    if (_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: GlassTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text(
+              'Loading indicators...',
+              style: TextStyle(color: Colors.white.withAlpha(179)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show error state
+    if (_error != null && _indicators.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load indicators',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadIndicators,
+              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+            ),
+          ],
+        ),
+      );
+    }
+
     final filteredIndicators = _selectedType == 'All'
         ? _indicators
         : _indicators.where((i) => _getTypeDisplayName(i.type) == _selectedType).toList();

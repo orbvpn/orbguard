@@ -443,6 +443,8 @@ class GlassPage extends StatelessWidget {
   final bool showBackButton;
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
+  /// When true, returns just the body without Scaffold/header (for embedding in other screens)
+  final bool embedded;
 
   const GlassPage({
     super.key,
@@ -454,10 +456,16 @@ class GlassPage extends StatelessWidget {
     this.showBackButton = true,
     this.bottomNavigationBar,
     this.floatingActionButton,
+    this.embedded = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // When embedded, just return the body without wrapping scaffold/header
+    if (embedded) {
+      return body;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimary;

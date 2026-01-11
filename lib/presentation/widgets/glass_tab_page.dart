@@ -35,6 +35,8 @@ class GlassTabPage extends StatefulWidget {
   final List<Widget>? actions;
   final Widget? headerContent;
   final int initialIndex;
+  /// When true, skips the outer GlassPage wrapper (for embedding in other screens)
+  final bool embedded;
 
   const GlassTabPage({
     super.key,
@@ -46,6 +48,7 @@ class GlassTabPage extends StatefulWidget {
     this.actions,
     this.headerContent,
     this.initialIndex = 0,
+    this.embedded = false,
   });
 
   @override
@@ -141,6 +144,7 @@ class GlassTabPageState extends State<GlassTabPage>
     return GlassPage(
       title: widget.title,
       actions: widget.actions,
+      embedded: widget.embedded,
       body: Stack(
         children: [
           // Header content + Tab content

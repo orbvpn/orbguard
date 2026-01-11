@@ -33,6 +33,7 @@ import 'screens/enterprise/compliance_reporting_screen.dart';
 import 'screens/enterprise/stix_taxii_screen.dart';
 import 'screens/intelligence/intelligence_core_screen.dart';
 import 'screens/security_center_screen.dart';
+import 'screens/desktop/desktop_security_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -981,6 +982,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Scan tab content
   Widget _buildScanContent() {
+    // On desktop platforms, show the DesktopSecurityScreen directly (embedded mode)
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      return const DesktopSecurityScreen(embedded: true);
+    }
+
+    // On mobile, show the scan button UI
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1017,8 +1024,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Intel tab content - navigate to Intelligence Core
+  /// Intel tab content - show Intelligence Core
   Widget _buildIntelContent() {
+    // On desktop platforms, show the IntelligenceCoreScreen directly (embedded mode)
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      return const IntelligenceCoreScreen(embedded: true);
+    }
+
+    // On mobile, show the button UI
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1059,8 +1072,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Settings tab content - navigate to Settings
+  /// Settings tab content - show Settings
   Widget _buildSettingsContent() {
+    // On desktop platforms, show the SettingsScreen directly (embedded mode)
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      return const SettingsScreen(embedded: true);
+    }
+
+    // On mobile, show the button UI
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

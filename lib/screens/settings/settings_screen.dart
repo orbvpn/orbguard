@@ -14,12 +14,16 @@ import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  /// When true, skips the outer page wrapper (for embedding in other screens)
+  final bool embedded;
+
+  const SettingsScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Settings',
+      embedded: embedded,
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return ListView(

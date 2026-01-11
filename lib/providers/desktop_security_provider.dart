@@ -109,6 +109,31 @@ class DesktopScanResult {
   }
 }
 
+/// Quarantined item with metadata
+class QuarantinedItem {
+  final String fileName;
+  final String originalPath;
+  final String name;
+  final String type;
+  final DateTime? quarantinedAt;
+  final bool isService;
+  final bool isRegistry;
+  final bool isTask;
+
+  QuarantinedItem({
+    required this.fileName,
+    required this.originalPath,
+    required this.name,
+    required this.type,
+    this.quarantinedAt,
+    this.isService = false,
+    this.isRegistry = false,
+    this.isTask = false,
+  });
+
+  bool get canAutoRestore => originalPath.isNotEmpty && !isRegistry;
+}
+
 /// Desktop Security Provider
 class DesktopSecurityProvider extends ChangeNotifier {
   // Platform scanners
@@ -522,6 +547,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
       await File(path).rename(quarantinePath);
 
+      // Save quarantine metadata for automatic restore
+      await _saveQuarantineMetadata(fileName, path, item);
+
       // Update local state
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
@@ -549,6 +577,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
     if (item.type.contains('systemd')) {
       final serviceName = path.split('/').last;
       await Process.run('systemctl', ['--user', 'disable', serviceName]);
+      // Save metadata for systemd services too
+      await _saveQuarantineMetadata(serviceName, path, item, isService: true);
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
       return true;
@@ -561,6 +591,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
     try {
       await File(path).rename(quarantinePath);
+      // Save quarantine metadata for automatic restore
+      await _saveQuarantineMetadata(fileName, path, item);
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
       return true;
@@ -576,6 +608,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
       final parts = item.path.split('\\');
       final keyPath = parts.sublist(0, parts.length - 1).join('\\');
       await Process.run('reg', ['delete', keyPath, '/v', item.name, '/f'], runInShell: true);
+      // Save metadata for registry restore
+      await _saveQuarantineMetadata(item.name, item.path, item, isRegistry: true);
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
       return true;
@@ -584,6 +618,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
     // For scheduled tasks, disable them
     if (item.type.contains('scheduledTask')) {
       await Process.run('schtasks', ['/Change', '/TN', item.name, '/Disable'], runInShell: true);
+      // Save metadata for task restore
+      await _saveQuarantineMetadata(item.name, item.path, item, isTask: true);
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
       return true;
@@ -592,6 +628,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
     // For services, disable them
     if (item.type.contains('service')) {
       await Process.run('sc', ['config', item.name, 'start=', 'disabled'], runInShell: true);
+      // Save metadata for service restore
+      await _saveQuarantineMetadata(item.name, item.path, item, isService: true);
       _items.removeWhere((i) => i.id == item.id);
       notifyListeners();
       return true;
@@ -610,20 +648,142 @@ class DesktopSecurityProvider extends ChangeNotifier {
     return quarantineDir;
   }
 
-  /// Restore a quarantined item
-  Future<bool> restoreItem(String originalPath, String quarantinedFileName) async {
+  /// Get quarantine metadata file
+  Future<File> _getQuarantineMetadataFile() async {
+    final quarantineDir = await _getQuarantineDir();
+    return File('${quarantineDir.path}/.metadata.json');
+  }
+
+  /// Save quarantine metadata for automatic restore
+  Future<void> _saveQuarantineMetadata(
+    String fileName,
+    String originalPath,
+    DesktopPersistenceItem item, {
+    bool isService = false,
+    bool isRegistry = false,
+    bool isTask = false,
+  }) async {
+    try {
+      final metadataFile = await _getQuarantineMetadataFile();
+      Map<String, dynamic> metadata = {};
+
+      // Load existing metadata
+      if (await metadataFile.exists()) {
+        final content = await metadataFile.readAsString();
+        metadata = jsonDecode(content) as Map<String, dynamic>;
+      }
+
+      // Add new entry
+      metadata[fileName] = {
+        'original_path': originalPath,
+        'name': item.name,
+        'type': item.type,
+        'type_display_name': item.typeDisplayName,
+        'quarantined_at': DateTime.now().toIso8601String(),
+        'is_service': isService,
+        'is_registry': isRegistry,
+        'is_task': isTask,
+        'platform': currentPlatform,
+        'command': item.command,
+        'risk': item.risk.name,
+      };
+
+      await metadataFile.writeAsString(jsonEncode(metadata));
+    } catch (e) {
+      // Metadata save failed, continue anyway
+    }
+  }
+
+  /// Load quarantine metadata
+  Future<Map<String, dynamic>> _loadQuarantineMetadata() async {
+    try {
+      final metadataFile = await _getQuarantineMetadataFile();
+      if (await metadataFile.exists()) {
+        final content = await metadataFile.readAsString();
+        return jsonDecode(content) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return {};
+  }
+
+  /// Delete quarantine metadata entry
+  Future<void> _deleteQuarantineMetadata(String fileName) async {
+    try {
+      final metadataFile = await _getQuarantineMetadataFile();
+      if (await metadataFile.exists()) {
+        final content = await metadataFile.readAsString();
+        final metadata = jsonDecode(content) as Map<String, dynamic>;
+        metadata.remove(fileName);
+        await metadataFile.writeAsString(jsonEncode(metadata));
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  /// Restore a quarantined item (automatic path lookup)
+  Future<bool> restoreItem(String quarantinedFileName, [String? originalPath]) async {
     try {
       final quarantineDir = await _getQuarantineDir();
       final quarantinedFile = File('${quarantineDir.path}/$quarantinedFileName');
 
-      if (await quarantinedFile.exists()) {
-        await quarantinedFile.rename(originalPath);
+      // Load metadata to get original path if not provided
+      String restorePath = originalPath ?? '';
+      final metadata = await _loadQuarantineMetadata();
+      final itemMeta = metadata[quarantinedFileName] as Map<String, dynamic>?;
 
-        // Reload if it's a launch agent/daemon
-        if (originalPath.contains('LaunchAgents') || originalPath.contains('LaunchDaemons')) {
-          await Process.run('launchctl', ['load', originalPath]);
+      if (restorePath.isEmpty && itemMeta != null) {
+        restorePath = itemMeta['original_path'] as String? ?? '';
+      }
+
+      if (restorePath.isEmpty) {
+        _error = 'Original path not found. Cannot restore without path.';
+        notifyListeners();
+        return false;
+      }
+
+      // Handle different item types
+      final isService = itemMeta?['is_service'] as bool? ?? false;
+      final isRegistry = itemMeta?['is_registry'] as bool? ?? false;
+      final isTask = itemMeta?['is_task'] as bool? ?? false;
+
+      if (isService) {
+        // Re-enable service
+        if (Platform.isLinux) {
+          await Process.run('systemctl', ['--user', 'enable', quarantinedFileName]);
+        } else if (Platform.isWindows) {
+          await Process.run('sc', ['config', quarantinedFileName, 'start=', 'auto'], runInShell: true);
+        }
+        await _deleteQuarantineMetadata(quarantinedFileName);
+        return true;
+      }
+
+      if (isTask && Platform.isWindows) {
+        // Re-enable scheduled task
+        await Process.run('schtasks', ['/Change', '/TN', quarantinedFileName, '/Enable'], runInShell: true);
+        await _deleteQuarantineMetadata(quarantinedFileName);
+        return true;
+      }
+
+      if (isRegistry && Platform.isWindows) {
+        // Registry items cannot be easily restored without backup
+        _error = 'Registry items require manual restoration';
+        notifyListeners();
+        return false;
+      }
+
+      // File-based quarantine - move file back
+      if (await quarantinedFile.exists()) {
+        await quarantinedFile.rename(restorePath);
+
+        // Reload if it's a launch agent/daemon on macOS
+        if (Platform.isMacOS && (restorePath.contains('LaunchAgents') || restorePath.contains('LaunchDaemons'))) {
+          await Process.run('launchctl', ['load', restorePath]);
         }
 
+        await _deleteQuarantineMetadata(quarantinedFileName);
         return true;
       }
     } catch (e) {
@@ -633,21 +793,55 @@ class DesktopSecurityProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Get list of quarantined items
-  Future<List<String>> getQuarantinedItems() async {
+  /// Get list of quarantined items with metadata
+  Future<List<QuarantinedItem>> getQuarantinedItems() async {
+    final items = <QuarantinedItem>[];
     try {
       final quarantineDir = await _getQuarantineDir();
+      final metadata = await _loadQuarantineMetadata();
+
       if (await quarantineDir.exists()) {
-        return await quarantineDir
-            .list()
-            .where((e) => e is File)
-            .map((e) => e.path.split('/').last)
-            .toList();
+        await for (final entity in quarantineDir.list()) {
+          if (entity is File && !entity.path.endsWith('.metadata.json')) {
+            final fileName = entity.path.split(Platform.pathSeparator).last;
+            final itemMeta = metadata[fileName] as Map<String, dynamic>?;
+
+            items.add(QuarantinedItem(
+              fileName: fileName,
+              originalPath: itemMeta?['original_path'] as String? ?? '',
+              name: itemMeta?['name'] as String? ?? fileName,
+              type: itemMeta?['type_display_name'] as String? ?? 'Unknown',
+              quarantinedAt: itemMeta?['quarantined_at'] != null
+                  ? DateTime.tryParse(itemMeta!['quarantined_at'] as String)
+                  : null,
+              isService: itemMeta?['is_service'] as bool? ?? false,
+              isRegistry: itemMeta?['is_registry'] as bool? ?? false,
+              isTask: itemMeta?['is_task'] as bool? ?? false,
+            ));
+          }
+        }
       }
     } catch (e) {
       // Ignore
     }
-    return [];
+    return items;
+  }
+
+  /// Delete a quarantined item permanently
+  Future<bool> deleteQuarantinedItem(String fileName) async {
+    try {
+      final quarantineDir = await _getQuarantineDir();
+      final file = File('${quarantineDir.path}/$fileName');
+      if (await file.exists()) {
+        await file.delete();
+        await _deleteQuarantineMetadata(fileName);
+        return true;
+      }
+    } catch (e) {
+      _error = 'Failed to delete item: $e';
+      notifyListeners();
+    }
+    return false;
   }
 
   /// Export scan results

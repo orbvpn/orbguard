@@ -2,6 +2,7 @@
 /// code signing verification, and firewall management
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -15,7 +16,10 @@ import '../../providers/desktop_security_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
-  const DesktopSecurityScreen({super.key});
+  /// When true, skips the outer page wrapper (for embedding in other screens)
+  final bool embedded;
+
+  const DesktopSecurityScreen({super.key, this.embedded = false});
 
   @override
   State<DesktopSecurityScreen> createState() => _DesktopSecurityScreenState();
@@ -89,11 +93,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       title: 'Desktop Security',
       hasSearch: true,
       searchHint: 'Search devices...',
+      embedded: widget.embedded,
       headerContent: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            IconButton(
+              icon: const DuotoneIcon('download_minimalistic', size: 22, color: Colors.white),
+              onPressed: _exportResults,
+              tooltip: 'Export Results',
+            ),
             IconButton(
               icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
               onPressed: _isScanning ? null : _runScan,
@@ -250,10 +260,51 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           ],
         ),
 
+        // Error display
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          GlassCard(
+            tintColor: GlassTheme.errorColor,
+            child: Row(
+              children: [
+                const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Error Loading Data',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const DuotoneIcon('refresh', color: Colors.white, size: 20),
+                  onPressed: _loadData,
+                  tooltip: 'Retry',
+                ),
+              ],
+            ),
+          ),
+        ],
+
         // Persistence items
         const SizedBox(height: 24),
         const GlassSectionHeader(title: 'Startup Items & Services'),
-        ..._persistenceItems.map((item) => _buildPersistenceCard(item)),
+        if (_persistenceItems.isEmpty && !_isLoading && !_isScanning)
+          _buildEmptyState(
+            'No Persistence Items',
+            'Run a scan to detect startup items and services.',
+            'radar',
+          )
+        else
+          ..._persistenceItems.map((item) => _buildPersistenceCard(item)),
 
         // Categories info
         const SizedBox(height: 24),
@@ -422,7 +473,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         // Apps list
         const SizedBox(height: 24),
         const GlassSectionHeader(title: 'Running Applications'),
-        ..._signedApps.map((app) => _buildSignedAppCard(app)),
+        if (_signedApps.isEmpty && !_isLoading)
+          _buildEmptyState(
+            'No Apps Detected',
+            'Code signing verification will appear here after scanning.',
+            'verified_check',
+          )
+        else
+          ..._signedApps.map((app) => _buildSignedAppCard(app)),
       ],
     );
   }
@@ -569,14 +627,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             ),
           ],
         ),
-        ..._firewallRules.map((rule) => _buildFirewallRuleCard(rule)),
+        if (_firewallRules.isEmpty && !_isLoading)
+          _buildEmptyState(
+            'No Firewall Rules',
+            'Add custom rules to control network access.',
+            'shield_network',
+          )
+        else
+          ..._firewallRules.map((rule) => _buildFirewallRuleCard(rule)),
       ],
     );
   }
 
   Widget _buildQuickAction(String icon, String title, String subtitle) {
     return GlassCard(
-      onTap: () {},
+      onTap: () => _showQuickActionDialog(icon),
       child: Row(
         children: [
           GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
@@ -654,7 +719,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   Widget _buildQuarantineTab() {
-    return FutureBuilder<List<String>>(
+    return FutureBuilder<List<QuarantinedItem>>(
       future: _isDesktopPlatform
           ? context.read<DesktopSecurityProvider>().getQuarantinedItems()
           : Future.value([]),
@@ -815,7 +880,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...quarantinedItems.map((fileName) => _buildQuarantinedItemCard(fileName)),
+              ...quarantinedItems.map((item) => _buildQuarantinedItemCard(item)),
             ],
           ],
         );
@@ -828,14 +893,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     return '$home/.orbguard/quarantine';
   }
 
-  Widget _buildQuarantinedItemCard(String fileName) {
+  Widget _buildQuarantinedItemCard(QuarantinedItem item) {
+    final dateStr = item.quarantinedAt != null
+        ? '${item.quarantinedAt!.day}/${item.quarantinedAt!.month}/${item.quarantinedAt!.year}'
+        : 'Unknown date';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
         child: Row(
           children: [
             GlassSvgIconBox(
-              icon: 'danger_circle',
+              icon: item.isService ? 'settings' : (item.isRegistry ? 'code' : 'danger_circle'),
               color: GlassTheme.warningColor,
               size: 40,
             ),
@@ -845,7 +914,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    fileName,
+                    item.name,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -853,12 +922,33 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Quarantined',
+                    item.type,
                     style: TextStyle(
-                      color: GlassTheme.warningColor.withAlpha(179),
+                      color: Colors.white.withAlpha(179),
                       fontSize: 12,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Quarantined $dateStr',
+                    style: TextStyle(
+                      color: GlassTheme.warningColor.withAlpha(179),
+                      fontSize: 11,
+                    ),
+                  ),
+                  if (item.originalPath.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      item.originalPath,
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(100),
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -866,15 +956,24 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Restore button
-                IconButton(
-                  icon: DuotoneIcon('refresh', color: GlassTheme.successColor, size: 20),
-                  onPressed: () => _restoreQuarantinedItem(fileName),
-                  tooltip: 'Restore',
-                ),
+                if (item.canAutoRestore)
+                  IconButton(
+                    icon: DuotoneIcon('refresh', color: GlassTheme.successColor, size: 20),
+                    onPressed: () => _restoreQuarantinedItem(item),
+                    tooltip: 'Restore',
+                  )
+                else
+                  Tooltip(
+                    message: item.isRegistry ? 'Registry items require manual restoration' : 'Cannot auto-restore',
+                    child: IconButton(
+                      icon: DuotoneIcon('refresh', color: Colors.white24, size: 20),
+                      onPressed: null,
+                    ),
+                  ),
                 // Delete permanently button
                 IconButton(
                   icon: DuotoneIcon('trash_bin_minimalistic', color: GlassTheme.errorColor, size: 20),
-                  onPressed: () => _deleteQuarantinedItem(fileName),
+                  onPressed: () => _deleteQuarantinedItem(item),
                   tooltip: 'Delete Permanently',
                 ),
               ],
@@ -885,16 +984,49 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
-  Future<void> _restoreQuarantinedItem(String fileName) async {
+  Future<void> _restoreQuarantinedItem(QuarantinedItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: GlassTheme.glassColor(true),
         title: const Text('Restore Item?', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Are you sure you want to restore "$fileName"? '
-          'This will re-enable the persistence mechanism.',
-          style: TextStyle(color: Colors.white.withAlpha(204)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to restore "${item.name}"?',
+              style: TextStyle(color: Colors.white.withAlpha(204)),
+            ),
+            if (item.originalPath.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Will restore to:',
+                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(51),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  item.originalPath,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(179),
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              'This will re-enable the persistence mechanism.',
+              style: TextStyle(color: GlassTheme.warningColor.withAlpha(179), fontSize: 12),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -913,99 +1045,40 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // We need the original path to restore - for now just show a message
-      // In a real implementation, we'd store the original path in metadata
       final scaffold = ScaffoldMessenger.of(context);
       final provider = context.read<DesktopSecurityProvider>();
 
-      // Try to restore - this is a simplified version
-      // In production, you'd want to track original paths
-      final originalPath = await _promptForOriginalPath(fileName);
-
-      if (originalPath != null && originalPath.isNotEmpty) {
-        final success = await provider.restoreItem(originalPath, fileName);
-        if (mounted) {
-          if (success) {
-            scaffold.showSnackBar(
-              SnackBar(
-                content: Text('$fileName has been restored'),
-                backgroundColor: GlassTheme.successColor,
-              ),
-            );
-            setState(() {}); // Refresh the list
-          } else {
-            scaffold.showSnackBar(
-              SnackBar(
-                content: Text('Failed to restore $fileName'),
-                backgroundColor: GlassTheme.errorColor,
-              ),
-            );
-          }
+      // Use metadata for automatic restore
+      final success = await provider.restoreItem(item.fileName);
+      if (mounted) {
+        if (success) {
+          scaffold.showSnackBar(
+            SnackBar(
+              content: Text('${item.name} has been restored'),
+              backgroundColor: GlassTheme.successColor,
+            ),
+          );
+          setState(() {}); // Refresh the list
+        } else {
+          scaffold.showSnackBar(
+            SnackBar(
+              content: Text('Failed to restore ${item.name}: ${provider.error ?? "Unknown error"}'),
+              backgroundColor: GlassTheme.errorColor,
+            ),
+          );
         }
       }
     }
   }
 
-  Future<String?> _promptForOriginalPath(String fileName) async {
-    String? path;
-    await showDialog(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          backgroundColor: GlassTheme.glassColor(true),
-          title: const Text('Enter Original Path', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Enter the original path where "$fileName" should be restored:',
-                style: TextStyle(color: Colors.white.withAlpha(179)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: '/Library/LaunchAgents/$fileName',
-                  hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.black.withAlpha(51),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                path = controller.text;
-                Navigator.pop(context);
-              },
-              child: const Text('Restore'),
-            ),
-          ],
-        );
-      },
-    );
-    return path;
-  }
-
-  Future<void> _deleteQuarantinedItem(String fileName) async {
+  Future<void> _deleteQuarantinedItem(QuarantinedItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: GlassTheme.glassColor(true),
         title: const Text('Delete Permanently?', style: TextStyle(color: Colors.white)),
         content: Text(
-          'Are you sure you want to permanently delete "$fileName"? '
+          'Are you sure you want to permanently delete "${item.name}"? '
           'This action cannot be undone.',
           style: TextStyle(color: Colors.white.withAlpha(204)),
         ),
@@ -1027,31 +1100,83 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
     if (confirmed == true && mounted) {
       final scaffold = ScaffoldMessenger.of(context);
+      final provider = context.read<DesktopSecurityProvider>();
 
-      try {
-        final quarantinePath = _getQuarantinePath();
-        final file = File('$quarantinePath/$fileName');
-        if (await file.exists()) {
-          await file.delete();
-          if (mounted) {
-            scaffold.showSnackBar(
-              SnackBar(
-                content: Text('$fileName has been permanently deleted'),
-                backgroundColor: GlassTheme.successColor,
-              ),
-            );
-            setState(() {}); // Refresh the list
-          }
-        }
-      } catch (e) {
-        if (mounted) {
+      final success = await provider.deleteQuarantinedItem(item.fileName);
+      if (mounted) {
+        if (success) {
           scaffold.showSnackBar(
             SnackBar(
-              content: Text('Failed to delete $fileName: $e'),
+              content: Text('${item.name} has been permanently deleted'),
+              backgroundColor: GlassTheme.successColor,
+            ),
+          );
+          setState(() {}); // Refresh the list
+        } else {
+          scaffold.showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete ${item.name}'),
               backgroundColor: GlassTheme.errorColor,
             ),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _exportResults() async {
+    final provider = context.read<DesktopSecurityProvider>();
+    final results = provider.exportResults();
+
+    if (results.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No scan results to export. Run a scan first.'),
+            backgroundColor: GlassTheme.warningColor,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(results);
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+      final exportPath = '$home/orbguard_scan_$timestamp.json';
+
+      await File(exportPath).writeAsString(jsonStr);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Exported to $exportPath'),
+            backgroundColor: GlassTheme.successColor,
+            action: SnackBarAction(
+              label: 'Open Folder',
+              textColor: Colors.white,
+              onPressed: () {
+                if (Platform.isMacOS) {
+                  Process.run('open', ['-R', exportPath]);
+                } else if (Platform.isWindows) {
+                  Process.run('explorer', ['/select,', exportPath]);
+                } else if (Platform.isLinux) {
+                  Process.run('xdg-open', [home]);
+                }
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: GlassTheme.errorColor,
+          ),
+        );
       }
     }
   }
@@ -1480,6 +1605,104 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       return 'folder';
     }
     return 'smartphone';
+  }
+
+  void _showQuickActionDialog(String action) {
+    String title;
+    String description;
+
+    switch (action) {
+      case 'forbidden':
+        title = 'Block All Incoming';
+        description = 'This will block all incoming network connections except for established connections and essential services.';
+        break;
+      case 'eye_closed':
+        title = 'Stealth Mode';
+        description = 'Your device will not respond to network discovery requests, making it invisible to port scans.';
+        break;
+      case 'smartphone':
+        title = 'App Permissions';
+        description = 'Manage which applications can access the network.';
+        break;
+      default:
+        return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlassTheme.glassColor(true),
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              description,
+              style: TextStyle(color: Colors.white.withAlpha(204)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Note: This feature requires system-level firewall access.',
+              style: TextStyle(color: GlassTheme.warningColor.withAlpha(204), fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$title enabled'),
+                  backgroundColor: GlassTheme.successColor,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GlassTheme.primaryAccent,
+            ),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle, String icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
+          children: [
+            DuotoneIcon(
+              icon,
+              color: Colors.white.withAlpha(100),
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
 }
