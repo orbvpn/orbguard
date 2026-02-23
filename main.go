@@ -564,7 +564,7 @@ func main() {
 	r := mux.NewRouter()
 
 	// Public endpoints
-	r.HandleFunc("/health", handleHealth).Methods("GET")
+	r.HandleFunc("/healthnya", handleHealth).Methods("GET")
 	r.HandleFunc("/api/v1/stats", handleGetStatistics).Methods("GET")
 
 	// Protected endpoints

@@ -215,15 +215,16 @@ const (
 	KeyRateLimitPrefix = "rate_limit:"
 
 	// Scheduler keys
-	KeySchedulerQueue  = "scheduler:queue"
-	KeySchedulerLock   = "scheduler:lock:"
+	KeySchedulerQueue = "scheduler:queue"
+	KeySchedulerLock  = "scheduler:lock:"
 
 	// Stats keys
 	KeyStats           = "cache:stats"
 	KeyStatsVersion    = "cache:stats:version"
+	KeyProtectionStats = "stats:protection"
 
 	// Sync version for mobile apps
-	KeySyncVersion     = "sync:version"
+	KeySyncVersion = "sync:version"
 )
 
 // CacheIndicator caches an indicator by its hash

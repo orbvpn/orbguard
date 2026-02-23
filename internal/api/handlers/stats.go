@@ -75,20 +75,20 @@ func (h *StatsHandler) computeStats() models.Stats {
 			"macos":   0,
 			"linux":   0,
 		},
-		TotalSources:        0,
-		ActiveSources:       0,
-		TotalCampaigns:      0,
-		ActiveCampaigns:     0,
-		TotalReports:        0,
-		PendingReports:      0,
-		PegasusIndicators:   0,
-		MobileIndicators:    0,
-		CriticalIndicators:  0,
-		LastUpdate:          time.Now(),
-		TodayNewIOCs:        0,
-		WeeklyNewIOCs:       0,
-		MonthlyNewIOCs:      0,
-		DataVersion:         version,
+		TotalSources:       0,
+		ActiveSources:      0,
+		TotalCampaigns:     0,
+		ActiveCampaigns:    0,
+		TotalReports:       0,
+		PendingReports:     0,
+		PegasusIndicators:  0,
+		MobileIndicators:   0,
+		CriticalIndicators: 0,
+		LastUpdate:         time.Now(),
+		TodayNewIOCs:       0,
+		WeeklyNewIOCs:      0,
+		MonthlyNewIOCs:     0,
+		DataVersion:        version,
 	}
 
 	// Fetch real stats from database
@@ -130,4 +130,102 @@ func (h *StatsHandler) computeStats() models.Stats {
 	}
 
 	return stats
+}
+
+// GetProtection handles GET /api/v1/stats/protection
+func featureState(enabled bool) string {
+	if enabled {
+		return "protected"
+	}
+	return "disabled"
+}
+
+func calculateGrade(score float64) string {
+	switch {
+	case score >= 90:
+		return "A"
+	case score >= 75:
+		return "B"
+	case score >= 60:
+		return "C"
+	case score >= 40:
+		return "D"
+	default:
+		return "F"
+	}
+}
+
+func (h *StatsHandler) GetProtection(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var status models.ProtectionStatus
+
+	// Try cache
+	err := h.cache.GetJSON(ctx, cache.KeyProtectionStats, &status)
+	if err != nil {
+		status = h.computeProtectionStatus(ctx)
+
+		// Cache lebih pendek (1 menit)
+		_ = h.cache.SetJSON(ctx, cache.KeyProtectionStats, status, 1*time.Minute)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	json.NewEncoder(w).Encode(status)
+}
+
+func (h *StatsHandler) computeProtectionStatus(ctx context.Context) models.ProtectionStatus {
+	score := 100.0
+
+	var criticalCount int64
+	var highCount int64
+
+	if h.repos != nil {
+		if dbStats, err := h.repos.Indicators.GetStats(ctx); err == nil {
+
+			criticalCount = dbStats.CriticalCount
+
+			// Get high from BySeverity map
+			if v, ok := dbStats.BySeverity["high"]; ok {
+				highCount = v
+			}
+		}
+	}
+
+	// Score logic
+	if criticalCount > 0 {
+		score -= 25
+	}
+	if highCount > 0 {
+		score -= 10
+	}
+
+	// Feature flags (temporary hardcoded)
+	smsEnabled := true
+	webEnabled := true
+	appEnabled := true
+	networkEnabled := true
+	vpnEnabled := false
+
+	if !vpnEnabled {
+		score -= 10
+	}
+
+	if score < 0 {
+		score = 0
+	}
+
+	return models.ProtectionStatus{
+		IsActive: score >= 60,
+		Score:    score,
+		Grade:    calculateGrade(score),
+		Features: models.FeatureSet{
+			SMS:     models.FeatureStatus{Enabled: smsEnabled, Status: featureState(smsEnabled)},
+			Web:     models.FeatureStatus{Enabled: webEnabled, Status: featureState(webEnabled)},
+			App:     models.FeatureStatus{Enabled: appEnabled, Status: featureState(appEnabled)},
+			Network: models.FeatureStatus{Enabled: networkEnabled, Status: featureState(networkEnabled)},
+			VPN:     models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
+		},
+		LastScan: time.Now(),
+	}
 }

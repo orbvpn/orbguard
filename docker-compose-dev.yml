@@ -1,0 +1,53 @@
+services:
+  orbguard-lab:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: orbguard-lab-dev
+
+    volumes:
+      # Mount source code ke container
+      - .:/app
+      # Cache go modules biar tidak download ulang terus
+      - go-mod-cache:/go/pkg/mod
+
+    environment:
+      - ORBGUARD_APP_ENVIRONMENT=development
+      - ORBGUARD_APP_NAME=orbguard-lab
+      - ORBGUARD_APP_VERSION=dev
+
+      # Database
+      - ORBGUARD_DATABASE_HOST=postgres
+      - ORBGUARD_DATABASE_PORT=5432
+      - ORBGUARD_DATABASE_USER=orbguard
+      - ORBGUARD_DATABASE_PASSWORD=orbguard_secret
+      - ORBGUARD_DATABASE_DBNAME=orbguard_lab
+      - ORBGUARD_DATABASE_SCHEMA=orbguard_lab
+
+      # Cache
+      - ORBGUARD_REDIS_HOST=redis
+      - ORBGUARD_REDIS_PORT=6379
+
+      # Disable optional heavy services in dev kalau mau
+      - ORBGUARD_NEO4J_ENABLED=false
+      - ORBGUARD_NATS_ENABLED=false
+
+      - ORBGUARD_JWT_SECRET=dev-secret
+
+    ports:
+      - "8090:8090"
+      - "9002:9002"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    networks:
+      - orbguard-network
+
+    restart: unless-stopped
+
+volumes:
+  go-mod-cache:
