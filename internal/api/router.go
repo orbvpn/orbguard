@@ -67,6 +67,9 @@ func (r *Router) Setup() http.Handler {
 		// Public stats
 		pub.Get("/api/v1/stats", r.handlers.Stats.Get)
 		pub.Get("/api/v1/stats/protection", r.handlers.Stats.GetProtection)
+
+		// auth device
+		pub.Post("/api/v1/auth/device", r.handlers.Auth.Device)
 	})
 
 	// API v1 routes (authenticated)

@@ -16,6 +16,7 @@ import (
 type AggregatorRepositoryAdapter struct {
 	indicators *IndicatorRepository
 	sources    *SourceRepository
+	Devices    *DeviceRepository
 	pool       *pgxpool.Pool
 	queries    *db.Queries
 }
@@ -25,10 +26,12 @@ func NewAggregatorRepositoryAdapter(
 	pool *pgxpool.Pool,
 	indicators *IndicatorRepository,
 	sources *SourceRepository,
+	devices *DeviceRepository,
 ) *AggregatorRepositoryAdapter {
 	return &AggregatorRepositoryAdapter{
 		indicators: indicators,
 		sources:    sources,
+		Devices:    devices,
 		pool:       pool,
 		queries:    db.New(pool),
 	}
@@ -205,6 +208,7 @@ type Repositories struct {
 	UpdateHistory *UpdateHistoryRepository
 	// Adapter for aggregator
 	AggregatorAdapter *AggregatorRepositoryAdapter
+	Devices           *DeviceRepository
 }
 
 // NewRepositories creates all repository instances from a database pool
@@ -214,7 +218,8 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 	campaigns := NewCampaignRepository(pool)
 	actors := NewThreatActorRepository(pool)
 	updateHistory := NewUpdateHistoryRepository(pool)
-	adapter := NewAggregatorRepositoryAdapter(pool, indicators, sources)
+	devices := NewDeviceRepository(pool)
+	adapter := NewAggregatorRepositoryAdapter(pool, indicators, sources, devices)
 
 	return &Repositories{
 		Indicators:        indicators,
@@ -223,5 +228,6 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		Actors:            actors,
 		UpdateHistory:     updateHistory,
 		AggregatorAdapter: adapter,
+		Devices:           devices,
 	}
 }

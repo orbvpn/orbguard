@@ -38,6 +38,7 @@ type Handlers struct {
 	QRSecurity      *QRSecurityHandler
 	Enterprise      *EnterpriseHandler
 	OrbNet          *OrbNetHandler
+	Auth            *DeviceAuthHandler
 	// Forensics       *ForensicsHandler
 	// Footprint       *FootprintHandler
 	// DesktopSecurity *DesktopSecurityHandler
@@ -116,6 +117,7 @@ func NewHandlers(deps Dependencies) *Handlers {
 		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger),
 		Enterprise:      NewEnterpriseHandler(deps.EnterpriseService, deps.Logger),
 		OrbNet:          NewOrbNetHandler(deps.OrbNetService, deps.Logger),
+		Auth:            NewDeviceAuthHandler(deps.Repos, deps.Logger),
 		// Forensics:       NewForensicsHandler(deps.ForensicsService, deps.Logger),
 		// Footprint:       NewFootprintHandler(deps.FootprintScanner, deps.Logger),
 		// DesktopSecurity: NewDesktopSecurityHandler(DesktopSecurityDeps{
