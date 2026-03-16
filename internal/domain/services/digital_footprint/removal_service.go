@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +23,9 @@ type RemovalService struct {
 	brokerDB   *brokers.BrokerDatabase
 	httpClient *http.Client
 	logger     *logger.Logger
+
+	// In-memory store for removal requests (until DB repo is available)
+	requests sync.Map // map[uuid.UUID]*models.RemovalRequest
 
 	// Templates for opt-out requests
 	templates map[string]*template.Template
@@ -69,6 +73,9 @@ func (s *RemovalService) CreateRequest(ctx context.Context, userID, brokerID uui
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
+
+	// Store in memory
+	s.requests.Store(request.ID, request)
 
 	s.logger.Info().
 		Str("request_id", request.ID.String()).
@@ -146,8 +153,11 @@ func (s *RemovalService) ProcessRequest(ctx context.Context, request *models.Rem
 
 // GetStatus returns the status of a removal request
 func (s *RemovalService) GetStatus(ctx context.Context, requestID uuid.UUID) (*models.RemovalRequest, error) {
-	// In a real implementation, this would fetch from database
-	return nil, fmt.Errorf("not implemented - would fetch from database")
+	val, ok := s.requests.Load(requestID)
+	if !ok {
+		return nil, fmt.Errorf("removal request not found: %s", requestID)
+	}
+	return val.(*models.RemovalRequest), nil
 }
 
 // getRemovalMethod determines the best removal method for a broker

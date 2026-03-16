@@ -2,6 +2,8 @@ package threatintel
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -331,12 +333,84 @@ func (s *Server) ReportNetworkThreat(ctx context.Context, req *NetworkThreatRepo
 		Str("server_id", req.ServerId).
 		Msg("received network threat report")
 
-	// TODO: Store report in database
+	// Store as indicator in database
+	if s.repos != nil {
+		iocType := protoTypeToModel(req.IndicatorType)
+		if iocType == "" {
+			iocType = models.IndicatorTypeDomain
+		}
+
+		// Build metadata JSON from report fields
+		meta := map[string]string{
+			"source":           "vpn_network_report",
+			"server_id":        req.ServerId,
+			"client_ip":        req.ClientIp,
+			"destination_ip":   req.DestinationIp,
+			"destination_port": fmt.Sprintf("%d", req.DestinationPort),
+			"protocol":         req.Protocol,
+		}
+		for k, v := range req.Metadata {
+			meta[k] = v
+		}
+		metaJSON, _ := json.Marshal(meta)
+
+		now := time.Now()
+		indicator := &models.Indicator{
+			ID:          uuid.New(),
+			Value:       strings.ToLower(req.IndicatorValue),
+			Type:        iocType,
+			Severity:    models.SeverityMedium,
+			Confidence:  50.0,
+			Description: req.Description,
+			Tags:        []string{"network-report", "vpn-traffic"},
+			FirstSeen:   now,
+			LastSeen:    now,
+			ReportCount: 1,
+			SourceCount: 1,
+			Metadata:    metaJSON,
+		}
+
+		created, err := s.repos.Indicators.Upsert(ctx, indicator)
+		if err != nil {
+			s.logger.Error().Err(err).Str("value", req.IndicatorValue).Msg("failed to store network threat report")
+			return &ReportResponse{
+				Success:  false,
+				Message:  "Failed to store report",
+				ReportId: indicator.ID.String(),
+			}, nil
+		}
+
+		// Publish event for real-time updates
+		if s.eventBus != nil {
+			_ = s.eventBus.Publish(ctx, &streaming.ThreatEvent{
+				ID:             created.ID.String(),
+				Type:           streaming.EventTypeNewThreat,
+				Timestamp:      time.Now(),
+				IndicatorID:    created.ID.String(),
+				IndicatorValue: created.Value,
+				IndicatorType:  created.Type,
+				Severity:       created.Severity,
+				Confidence:     created.Confidence,
+				Description:    created.Description,
+				Tags:           created.Tags,
+			})
+		}
+
+		return &ReportResponse{
+			Success:  true,
+			Message:  "Report stored successfully",
+			ReportId: created.ID.String(),
+		}, nil
+	}
+
+	// No database available — accept but warn
+	reportID := uuid.New().String()
+	s.logger.Warn().Str("report_id", reportID).Msg("report accepted but database unavailable")
 
 	return &ReportResponse{
 		Success:  true,
-		Message:  "Report received",
-		ReportId: "pending",
+		Message:  "Report received (database unavailable)",
+		ReportId: reportID,
 	}, nil
 }
 

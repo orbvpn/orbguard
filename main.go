@@ -439,16 +439,57 @@ func handleReportThreat(w http.ResponseWriter, r *http.Request) {
 
 	report.ReportedAt = time.Now()
 
-	// In production: Store in database for review
-	// For now: Log it
 	log.Printf("[Report] New threat report: %s (%s) - %s", report.Indicator, report.Type, report.Description)
 
-	// TODO: Queue for manual validation
-	// TODO: Auto-add high-confidence reports
+	// Store the reported indicator in the in-memory threat intel map
+	threatIntel.mu.Lock()
+	ioc := &IndicatorOfCompromise{
+		Value:       report.Indicator,
+		Type:        report.Type,
+		Severity:    "medium",
+		Description: report.Description,
+		Tags:        report.Tags,
+		FirstSeen:   report.ReportedAt,
+		LastSeen:    report.ReportedAt,
+		ReportCount: 1,
+		Sources:     []string{"user-report"},
+		Metadata:    report.Metadata,
+	}
+
+	// Route to correct map by type and auto-add
+	var targetMap map[string]*IndicatorOfCompromise
+	switch report.Type {
+	case "domain":
+		targetMap = threatIntel.Domains
+	case "ip":
+		targetMap = threatIntel.IPs
+	case "hash":
+		targetMap = threatIntel.FileHashes
+	case "process":
+		targetMap = threatIntel.ProcessNames
+	case "certificate":
+		targetMap = threatIntel.Certificates
+	case "package":
+		targetMap = threatIntel.PackageNames
+	default:
+		targetMap = threatIntel.Domains
+	}
+
+	if existing, ok := targetMap[report.Indicator]; ok {
+		// Update existing: increment report count, refresh last seen
+		existing.ReportCount++
+		existing.LastSeen = report.ReportedAt
+		if report.Description != "" {
+			existing.Description = report.Description
+		}
+	} else {
+		targetMap[report.Indicator] = ioc
+	}
+	threatIntel.mu.Unlock()
 
 	respondWithJSON(w, http.StatusOK, APIResponse{
 		Success: true,
-		Message: "Threat report received and queued for review",
+		Message: "Threat report received and stored",
 	})
 }
 
