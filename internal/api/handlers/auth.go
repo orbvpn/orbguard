@@ -8,23 +8,35 @@ import (
 	"time"
 
 	"orbguard-lab/internal/infrastructure/cache"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	cache  *cache.RedisCache
-	logger *logger.Logger
-	secret string
+	cache   *cache.RedisCache
+	devices *repository.DeviceRepository
+	logger  *logger.Logger
+	secret  string
 }
 
 // NewAuthHandler creates a new AuthHandler
-func NewAuthHandler(c *cache.RedisCache, secret string, log *logger.Logger) *AuthHandler {
+func NewAuthHandler(c *cache.RedisCache, devices *repository.DeviceRepository, secret string, log *logger.Logger) *AuthHandler {
 	return &AuthHandler{
-		cache:  c,
-		logger: log.WithComponent("auth-handler"),
-		secret: secret,
+		cache:   c,
+		devices: devices,
+		logger:  log.WithComponent("auth-handler"),
+		secret:  secret,
 	}
+}
+
+// newAuthHandler creates AuthHandler from Dependencies, handling nil Repos safely
+func newAuthHandler(deps Dependencies) *AuthHandler {
+	var devices *repository.DeviceRepository
+	if deps.Repos != nil {
+		devices = deps.Repos.Devices
+	}
+	return NewAuthHandler(deps.Cache, devices, deps.JWTSecret, deps.Logger)
 }
 
 func authGenerateToken(length int) string {
@@ -133,12 +145,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // RegisterDevice handles POST /api/v1/auth/device
 func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DeviceID   string `json:"device_id"`
-		DeviceName string `json:"device_name"`
-		Platform   string `json:"platform"`
-		OSVersion  string `json:"os_version"`
-		AppVersion string `json:"app_version"`
-		PushToken  string `json:"push_token,omitempty"`
+		DeviceID     string `json:"device_id"`
+		DeviceName   string `json:"device_name"`
+		Platform     string `json:"platform"`
+		OSVersion    string `json:"os_version"`
+		AppVersion   string `json:"app_version"`
+		Model        string `json:"model,omitempty"`
+		Manufacturer string `json:"manufacturer,omitempty"`
+		PushToken    string `json:"push_token,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -153,15 +167,42 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	apiKey := authGenerateToken(32)
 	expiresAt := time.Now().Add(365 * 24 * time.Hour)
 
+	// Persist to PostgreSQL if repository available
+	if h.devices != nil {
+		// Check if device already exists
+		existing, _ := h.devices.FindByHardwareID(r.Context(), req.DeviceID)
+		if existing != nil {
+			// Update last seen
+			_ = h.devices.UpdateLastSeen(r.Context(), existing.ID, r.RemoteAddr)
+			h.logger.Info().Str("device_id", req.DeviceID).Msg("existing device re-registered")
+		} else {
+			// Create new device
+			_, err := h.devices.Create(r.Context(), repository.CreateDeviceParams{
+				HardwareID:   req.DeviceID,
+				Platform:     req.Platform,
+				Model:        req.Model,
+				Manufacturer: req.Manufacturer,
+				OSVersion:    req.OSVersion,
+				IPAddress:    r.RemoteAddr,
+			})
+			if err != nil {
+				h.logger.Warn().Err(err).Str("device_id", req.DeviceID).Msg("failed to persist device to DB, continuing with cache only")
+			}
+		}
+	}
+
+	// Store in Redis cache for fast auth lookups
 	_ = h.cache.SetJSON(r.Context(), "auth:device:"+req.DeviceID, map[string]interface{}{
-		"device_id":   req.DeviceID,
-		"device_name": req.DeviceName,
-		"platform":    req.Platform,
-		"os_version":  req.OSVersion,
-		"app_version": req.AppVersion,
-		"push_token":  req.PushToken,
-		"api_key":     apiKey,
-		"registered":  time.Now().UTC().Format(time.RFC3339),
+		"device_id":    req.DeviceID,
+		"device_name":  req.DeviceName,
+		"platform":     req.Platform,
+		"os_version":   req.OSVersion,
+		"app_version":  req.AppVersion,
+		"model":        req.Model,
+		"manufacturer": req.Manufacturer,
+		"push_token":   req.PushToken,
+		"api_key":      apiKey,
+		"registered":   time.Now().UTC().Format(time.RFC3339),
 	}, 365*24*time.Hour)
 
 	_ = h.cache.SetJSON(r.Context(), "auth:apikey:"+apiKey, map[string]interface{}{

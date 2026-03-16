@@ -119,7 +119,7 @@ func NewHandlers(deps Dependencies) *Handlers {
 		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger),
 		Enterprise:      NewEnterpriseHandler(deps.EnterpriseService, deps.Logger),
 		OrbNet:          NewOrbNetHandler(deps.OrbNetService, deps.Logger),
-		Auth:            NewAuthHandler(deps.Cache, deps.JWTSecret, deps.Logger),
+		Auth:            newAuthHandler(deps),
 		Alerts:          NewAlertsHandler(deps.Repos, deps.Cache, deps.Logger),
 		Forensics:       NewForensicsHandler(deps.ForensicsService, deps.Logger),
 		ScamDetection:   NewScamDetectionHandler(deps.Logger, deps.ScamDetector),

@@ -17,14 +17,22 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
+// DeviceRepository defines the interface for device persistence
+type DeviceRepository interface {
+	FindByHardwareID(ctx context.Context, hardwareID string) (interface{}, error)
+	UpdateLastSeen(ctx context.Context, deviceID string, ip string) error
+}
+
 // DeviceSecurityService handles device security operations
 type DeviceSecurityService struct {
 	cache  *cache.RedisCache
 	logger *logger.Logger
 	mu     sync.RWMutex
 
-	// In-memory stores (in production, these would be database-backed)
+	// Device store (in-memory with cache fallback)
 	devices      map[string]*models.SecureDeviceInfo
+
+	// Ephemeral stores (session-based, not persisted to DB)
 	commands     map[string][]*models.RemoteCommand
 	simInfo      map[string][]*models.SIMInfo
 	simEvents    map[string][]*models.SIMChangeEvent
@@ -71,8 +79,14 @@ func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *mode
 	s.devices[device.DeviceID] = device
 	s.devicesTracked.Add(1)
 
+	// Persist device to Redis cache for recovery after restart
+	cacheKey := "device:security:" + device.DeviceID
+	if err := s.cache.SetJSON(ctx, cacheKey, device, 0); err != nil {
+		s.logger.Warn().Err(err).Str("device_id", device.DeviceID).Msg("failed to cache device")
+	}
+
 	// Initialize default settings
-	s.settings[device.DeviceID] = &models.AntiTheftSettings{
+	settings := &models.AntiTheftSettings{
 		DeviceID:             device.DeviceID,
 		EnableRemoteLocate:   true,
 		EnableRemoteLock:     true,
@@ -85,6 +99,11 @@ func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *mode
 		AlertPushEnabled:     true,
 		UpdatedAt:            time.Now(),
 	}
+	s.settings[device.DeviceID] = settings
+
+	// Persist settings to cache
+	settingsKey := "device:settings:" + device.DeviceID
+	_ = s.cache.SetJSON(ctx, settingsKey, settings, 0)
 
 	s.logger.Info().
 		Str("device_id", device.DeviceID).
@@ -133,14 +152,34 @@ func (s *DeviceSecurityService) UpdateDevice(ctx context.Context, deviceID strin
 // GetDevice returns device information
 func (s *DeviceSecurityService) GetDevice(ctx context.Context, deviceID string) (*models.SecureDeviceInfo, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	device, exists := s.devices[deviceID]
-	if !exists {
-		return nil, fmt.Errorf("device not found: %s", deviceID)
+	s.mu.RUnlock()
+
+	if exists {
+		return device, nil
 	}
 
-	return device, nil
+	// Try to recover from cache
+	cacheKey := "device:security:" + deviceID
+	var cached models.SecureDeviceInfo
+	if err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil {
+		s.mu.Lock()
+		s.devices[deviceID] = &cached
+		s.mu.Unlock()
+
+		// Also recover settings from cache
+		settingsKey := "device:settings:" + deviceID
+		var settings models.AntiTheftSettings
+		if err := s.cache.GetJSON(ctx, settingsKey, &settings); err == nil {
+			s.mu.Lock()
+			s.settings[deviceID] = &settings
+			s.mu.Unlock()
+		}
+
+		return &cached, nil
+	}
+
+	return nil, fmt.Errorf("device not found: %s", deviceID)
 }
 
 // UpdateLocation updates device location
@@ -541,6 +580,10 @@ func (s *DeviceSecurityService) UpdateSettings(ctx context.Context, deviceID str
 	settings.AlertPhone = update.AlertPhone
 	settings.AlertPushEnabled = update.AlertPushEnabled
 	settings.UpdatedAt = time.Now()
+
+	// Persist to cache
+	settingsKey := "device:settings:" + deviceID
+	_ = s.cache.SetJSON(ctx, settingsKey, settings, 0)
 
 	return nil
 }
