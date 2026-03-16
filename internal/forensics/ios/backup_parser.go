@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"orbguard-lab/internal/forensics/models"
 	"orbguard-lab/pkg/logger"
@@ -214,7 +214,7 @@ func (p *BackupParser) Parse(backupPath string) (*models.ForensicResult, error) 
 
 // parseManifestDB parses the Manifest.db SQLite database
 func (p *BackupParser) parseManifestDB(dbPath string) ([]models.BackupFileInfo, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Manifest.db: %w", err)
 	}

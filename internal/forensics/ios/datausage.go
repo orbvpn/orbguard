@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"orbguard-lab/internal/forensics/models"
 	"orbguard-lab/pkg/logger"
@@ -74,7 +74,7 @@ var legitimateHighUsageProcesses = map[string]bool{
 func (p *DataUsageParser) Parse(dbPath string) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeDataUsage)
 
-	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DataUsage.sqlite: %w", err)
 	}
