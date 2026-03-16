@@ -33,6 +33,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   final List<PersistenceItem> _persistenceItems = [];
   final List<SignedApp> _signedApps = [];
   final List<FirewallRule> _firewallRules = [];
+  List<Map<String, dynamic>> _networkConnections = [];
+  Map<String, dynamic>? _browserScanResult;
 
   bool get _isDesktopPlatform =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
@@ -66,6 +68,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       final persistenceData = await _apiClient.getPersistenceItems();
       final signedAppsData = await _apiClient.getSignedApps();
       final firewallData = await _apiClient.getDesktopFirewallRules();
+      final networkData = await _apiClient.getNetworkConnections().catchError((_) => <Map<String, dynamic>>[]);
+      final browserData = await _apiClient.scanBrowserExtensions().catchError((_) => <String, dynamic>{});
 
       setState(() {
         _persistenceItems.clear();
@@ -76,6 +80,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
         _firewallRules.clear();
         _firewallRules.addAll(firewallData.map((json) => FirewallRule.fromJson(json)));
+
+        _networkConnections = networkData;
+        _browserScanResult = browserData.isNotEmpty ? browserData : null;
 
         _isLoading = false;
       });
@@ -127,6 +134,16 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           label: 'Firewall',
           iconPath: 'link_round',
           content: _buildFirewallTab(),
+        ),
+        GlassTab(
+          label: 'Network',
+          iconPath: 'wi_fi_router',
+          content: _buildNetworkTab(),
+        ),
+        GlassTab(
+          label: 'Browser',
+          iconPath: 'globe',
+          content: _buildBrowserTab(),
         ),
         GlassTab(
           label: 'Quarantine',
@@ -715,6 +732,225 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildNetworkTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Summary card
+        GlassCard(
+          child: Row(
+            children: [
+              const GlassDuotoneIconBox(icon: 'wi_fi_router', color: GlassTheme.primaryAccent, size: 48, iconSize: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_networkConnections.length} Active Connections',
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Monitoring network activity',
+                      style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                onPressed: () async {
+                  final data = await _apiClient.getNetworkConnections().catchError((_) => <Map<String, dynamic>>[]);
+                  setState(() => _networkConnections = data);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Connection list
+        if (_networkConnections.isEmpty)
+          GlassCard(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('No active connections detected', style: TextStyle(color: Colors.white.withAlpha(128))),
+              ),
+            ),
+          )
+        else
+          ..._networkConnections.map((conn) {
+            final process = conn['process_name'] as String? ?? conn['process'] as String? ?? 'Unknown';
+            final remoteIp = conn['remote_ip'] as String? ?? conn['destination'] as String? ?? '';
+            final remotePort = conn['remote_port']?.toString() ?? conn['port']?.toString() ?? '';
+            final protocol = conn['protocol'] as String? ?? 'tcp';
+            final state = conn['state'] as String? ?? '';
+            final isSuspicious = conn['is_suspicious'] as bool? ?? false;
+
+            return GlassCard(
+              tintColor: isSuspicious ? GlassTheme.errorColor : null,
+              child: Row(
+                children: [
+                  GlassDuotoneIconBox(
+                    icon: isSuspicious ? 'danger_triangle' : 'link_round',
+                    color: isSuspicious ? GlassTheme.errorColor : GlassTheme.successColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(process, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                        Text(
+                          '$remoteIp${remotePort.isNotEmpty ? ':$remotePort' : ''} ($protocol)',
+                          style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (state.isNotEmpty)
+                    GlassBadge(
+                      text: state,
+                      color: state == 'ESTABLISHED' ? GlassTheme.successColor : Colors.grey,
+                    ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildBrowserTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+    }
+
+    final extensions = (_browserScanResult?['extensions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final totalExt = _browserScanResult?['total'] as int? ?? extensions.length;
+    final highRisk = _browserScanResult?['high_risk'] as int? ?? 0;
+    final byBrowser = (_browserScanResult?['by_browser'] as Map?)?.cast<String, dynamic>() ?? {};
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Summary card
+        GlassCard(
+          tintColor: highRisk > 0 ? GlassTheme.warningColor : null,
+          child: Row(
+            children: [
+              GlassDuotoneIconBox(
+                icon: 'globe',
+                color: highRisk > 0 ? GlassTheme.warningColor : GlassTheme.successColor,
+                size: 48,
+                iconSize: 24,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$totalExt Extensions Found',
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      highRisk > 0 ? '$highRisk high-risk extension${highRisk > 1 ? 's' : ''} detected' : 'No high-risk extensions',
+                      style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                onPressed: () async {
+                  final data = await _apiClient.scanBrowserExtensions().catchError((_) => <String, dynamic>{});
+                  setState(() => _browserScanResult = data.isNotEmpty ? data : null);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Browser breakdown
+        if (byBrowser.isNotEmpty) ...[
+          const Text('By Browser', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: byBrowser.entries.map((e) {
+              return GlassBadge(text: '${e.key}: ${e.value}', color: GlassTheme.primaryAccent);
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Extension list
+        if (extensions.isEmpty)
+          GlassCard(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const DuotoneIcon('globe', size: 48, color: Colors.white24),
+                    const SizedBox(height: 12),
+                    Text('No extensions data', style: TextStyle(color: Colors.white.withAlpha(128))),
+                    const SizedBox(height: 4),
+                    Text('Tap refresh to scan browser extensions', style: TextStyle(color: Colors.white.withAlpha(89), fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          ...extensions.map((ext) {
+            final name = ext['name'] as String? ?? 'Unknown';
+            final browser = ext['browser'] as String? ?? '';
+            final risk = ext['risk_level'] as String? ?? 'low';
+            final version = ext['version'] as String? ?? '';
+            final isHighRisk = risk == 'high' || risk == 'critical';
+
+            return GlassCard(
+              tintColor: isHighRisk ? GlassTheme.errorColor : null,
+              child: Row(
+                children: [
+                  GlassDuotoneIconBox(
+                    icon: isHighRisk ? 'danger_triangle' : 'verified_check',
+                    color: isHighRisk ? GlassTheme.errorColor : GlassTheme.successColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                        Text(
+                          '$browser${version.isNotEmpty ? ' v$version' : ''}',
+                          style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GlassBadge(
+                    text: risk,
+                    color: isHighRisk ? GlassTheme.errorColor : risk == 'medium' ? GlassTheme.warningColor : GlassTheme.successColor,
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
     );
   }
 

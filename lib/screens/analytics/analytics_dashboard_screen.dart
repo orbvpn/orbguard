@@ -11,6 +11,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../models/api/threat_indicator.dart';
+import '../../services/api/orbguard_api_client.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -22,6 +23,13 @@ class AnalyticsDashboardScreen extends StatefulWidget {
 class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   String _selectedTimeRange = '7d';
   final _numberFormat = NumberFormat('#,###');
+  final _apiClient = OrbGuardApiClient.instance;
+
+  // Analytics data from dedicated API
+  Map<String, dynamic>? _threatAnalytics;
+  Map<String, dynamic>? _alertMetrics;
+  Map<String, dynamic>? _geoData;
+  bool _isLoadingAnalytics = false;
 
   @override
   void initState() {
@@ -31,7 +39,34 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       if (!provider.hasData) {
         provider.refresh();
       }
+      _loadAnalytics();
     });
+  }
+
+  Future<void> _loadAnalytics() async {
+    setState(() => _isLoadingAnalytics = true);
+    try {
+      final results = await Future.wait([
+        _apiClient.getThreatAnalytics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
+        _apiClient.getAlertMetrics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
+        _apiClient.getGeoDistribution(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
+      ]);
+      if (mounted) {
+        setState(() {
+          _threatAnalytics = results[0];
+          _alertMetrics = results[1];
+          _geoData = results[2];
+          _isLoadingAnalytics = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAnalytics = false);
+    }
+  }
+
+  void _onTimeRangeChanged(String value) {
+    setState(() => _selectedTimeRange = value);
+    _loadAnalytics();
   }
 
   @override
@@ -72,7 +107,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                 PopupMenuButton<String>(
                   icon: const DuotoneIcon('calendar', size: 22, color: Colors.white),
                   color: GlassTheme.gradientTop,
-                  onSelected: (value) => setState(() => _selectedTimeRange = value),
+                  onSelected: _onTimeRangeChanged,
                   itemBuilder: (context) => [
                     _buildTimeRangeItem('24h', 'Last 24 Hours'),
                     _buildTimeRangeItem('7d', 'Last 7 Days'),
@@ -112,30 +147,73 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   Widget _buildOverviewTab(DashboardProvider provider) {
     final stats = provider.stats;
 
-    // Get metric values from real data
-    final totalIndicators = stats?.totalIndicators ?? 0;
-    final threatsBlocked = provider.threatsBlockedToday;
-    final urlsChecked = stats?.getCountByType(IndicatorType.url) ?? 0;
-    final smsAnalyzed = stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
+    // Use analytics API data if available, fallback to dashboard provider
+    final summary = _threatAnalytics?['summary'] as Map<String, dynamic>?;
+    final totalIndicators = summary?['total_indicators'] as int? ?? stats?.totalIndicators ?? 0;
+    final threatsBlocked = summary?['threats_blocked'] as int? ?? provider.threatsBlockedToday;
+    final urlsChecked = summary?['urls_checked'] as int? ?? stats?.getCountByType(IndicatorType.url) ?? 0;
+    final smsAnalyzed = summary?['sms_analyzed'] as int? ?? stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
 
-    // Calculate threat distribution from stats
-    final total = stats?.totalIndicators ?? 1;
-    final phishingCount = stats?.getCountByType(IndicatorType.url) ?? 0;
-    final malwareCount = (stats?.getCountByType(IndicatorType.sha256) ?? 0) +
-        (stats?.getCountByType(IndicatorType.sha1) ?? 0) +
-        (stats?.getCountByType(IndicatorType.md5) ?? 0);
-    final domainCount = stats?.getCountByType(IndicatorType.domain) ?? 0;
-    final ipCount = (stats?.getCountByType(IndicatorType.ipv4) ?? 0) +
-        (stats?.getCountByType(IndicatorType.ipv6) ?? 0);
-    final otherCount = total - phishingCount - malwareCount - domainCount - ipCount;
+    // Calculate threat distribution from analytics API or stats
+    final typeDistribution = (_threatAnalytics?['type_distribution'] as List?)
+        ?.cast<Map<String, dynamic>>();
+    final total = totalIndicators > 0 ? totalIndicators : 1;
+
+    double phishingRatio = 0, malwareRatio = 0, domainRatio = 0, ipRatio = 0, otherRatio = 0;
+    if (typeDistribution != null && typeDistribution.isNotEmpty) {
+      for (final item in typeDistribution) {
+        final name = (item['name'] as String? ?? '').toLowerCase();
+        final count = (item['count'] as int? ?? 0).toDouble();
+        final ratio = count / total;
+        if (name.contains('url') || name.contains('phish')) {
+          phishingRatio += ratio;
+        } else if (name.contains('hash') || name.contains('sha') || name.contains('md5')) {
+          malwareRatio += ratio;
+        } else if (name.contains('domain')) {
+          domainRatio += ratio;
+        } else if (name.contains('ip')) {
+          ipRatio += ratio;
+        } else {
+          otherRatio += ratio;
+        }
+      }
+    } else {
+      final phishingCount = stats?.getCountByType(IndicatorType.url) ?? 0;
+      final malwareCount = (stats?.getCountByType(IndicatorType.sha256) ?? 0) +
+          (stats?.getCountByType(IndicatorType.sha1) ?? 0) +
+          (stats?.getCountByType(IndicatorType.md5) ?? 0);
+      final domainCount = stats?.getCountByType(IndicatorType.domain) ?? 0;
+      final ipCount = (stats?.getCountByType(IndicatorType.ipv4) ?? 0) +
+          (stats?.getCountByType(IndicatorType.ipv6) ?? 0);
+      phishingRatio = phishingCount / total;
+      malwareRatio = malwareCount / total;
+      domainRatio = domainCount / total;
+      ipRatio = ipCount / total;
+      otherRatio = (total - phishingCount - malwareCount - domainCount - ipCount) / total;
+    }
+
+    // Alert metrics from analytics API
+    final alertTotal = _alertMetrics?['total_alerts'] as int?;
+    final alertUnread = _alertMetrics?['unread_alerts'] as int?;
+
+    // Geo top countries from analytics API
+    final geoCountries = (_geoData?['countries'] as List?)?.cast<Map<String, dynamic>>().take(3).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Time range indicator
-          GlassBadge(text: _getTimeRangeLabel(), color: GlassTheme.primaryAccent),
+          // Time range indicator + loading
+          Row(
+            children: [
+              GlassBadge(text: _getTimeRangeLabel(), color: GlassTheme.primaryAccent),
+              if (_isLoadingAnalytics) ...[
+                const SizedBox(width: 8),
+                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: GlassTheme.primaryAccent)),
+              ],
+            ],
+          ),
           const SizedBox(height: 16),
 
           // Key metrics
@@ -154,6 +232,18 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               _buildMetricCard('Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', const Color(0xFF2196F3)),
             ],
           ),
+
+          // Alert metrics from analytics API
+          if (alertTotal != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildMetricCard('Total Alerts', _numberFormat.format(alertTotal), 'bell', GlassTheme.warningColor),
+                const SizedBox(width: 12),
+                _buildMetricCard('Unread', _numberFormat.format(alertUnread ?? 0), 'notification_unread', const Color(0xFFFF5722)),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
 
           // Threat distribution chart
@@ -165,14 +255,34 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           GlassCard(
             child: Column(
               children: [
-                _buildDistributionBar('URLs/Phishing', total > 0 ? phishingCount / total : 0, GlassTheme.errorColor),
-                _buildDistributionBar('Malware Hashes', total > 0 ? malwareCount / total : 0, const Color(0xFFFF5722)),
-                _buildDistributionBar('Domains', total > 0 ? domainCount / total : 0, GlassTheme.warningColor),
-                _buildDistributionBar('IP Addresses', total > 0 ? ipCount / total : 0, const Color(0xFF9C27B0)),
-                _buildDistributionBar('Other', total > 0 ? otherCount / total : 0, Colors.grey),
+                _buildDistributionBar('URLs/Phishing', phishingRatio, GlassTheme.errorColor),
+                _buildDistributionBar('Malware Hashes', malwareRatio, const Color(0xFFFF5722)),
+                _buildDistributionBar('Domains', domainRatio, GlassTheme.warningColor),
+                _buildDistributionBar('IP Addresses', ipRatio, const Color(0xFF9C27B0)),
+                _buildDistributionBar('Other', otherRatio, Colors.grey),
               ],
             ),
           ),
+
+          // Geo distribution from analytics API
+          if (geoCountries != null && geoCountries.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Top Threat Origins',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Column(
+                children: geoCountries.map((c) {
+                  final country = c['country'] as String? ?? 'Unknown';
+                  final count = c['count'] as int? ?? 0;
+                  final geoTotal = (_geoData?['total'] as int?) ?? 1;
+                  return _buildDistributionBar(country, count / geoTotal, GlassTheme.primaryAccent);
+                }).toList(),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
 
           // Activity timeline from real alerts
@@ -194,7 +304,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               ),
             )
           else ...[
-            // Show real alerts from provider
             ...provider.recentAlerts.take(4).map((alert) => _buildActivityCard(
                   icon: _getAlertIcon(alert.type),
                   title: alert.title,
@@ -202,7 +311,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   time: _formatTime(alert.timestamp),
                   color: _getSeverityColorFromLevel(alert.severity),
                 )),
-            // Show realtime events if available
             ...provider.realtimeEvents.take(4 - provider.recentAlerts.length).map((event) => _buildActivityCard(
                   icon: _getAlertIcon(event.type),
                   title: event.type.toUpperCase(),

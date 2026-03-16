@@ -531,6 +531,102 @@ class ApiEndpoints {
   /// GET /api/v1/desktop/firewall
   static const String desktopFirewall = '$_v1/desktop/firewall';
 
+  /// Scan persistence items
+  /// POST /api/v1/desktop/persistence/scan
+  static const String desktopPersistenceScan = '$_v1/desktop/persistence/scan';
+
+  /// Quick scan persistence
+  /// POST /api/v1/desktop/persistence/quick-scan
+  static const String desktopPersistenceQuickScan = '$_v1/desktop/persistence/quick-scan';
+
+  /// Verify code signing
+  /// POST /api/v1/desktop/codesign/verify
+  static const String desktopCodesignVerify = '$_v1/desktop/codesign/verify';
+
+  /// Get network connections
+  /// GET /api/v1/desktop/network/connections
+  static const String desktopNetworkConnections = '$_v1/desktop/network/connections';
+
+  /// Get listening ports
+  /// GET /api/v1/desktop/network/listening
+  static const String desktopNetworkListening = '$_v1/desktop/network/listening';
+
+  /// Get outbound connections
+  /// GET /api/v1/desktop/network/outbound
+  static const String desktopNetworkOutbound = '$_v1/desktop/network/outbound';
+
+  /// Get firewall rules (network monitor)
+  /// GET /api/v1/desktop/network/rules
+  static const String desktopNetworkRules = '$_v1/desktop/network/rules';
+
+  /// Add firewall rule
+  /// POST /api/v1/desktop/network/rules
+  static const String desktopNetworkRulesAdd = '$_v1/desktop/network/rules';
+
+  /// Delete firewall rule
+  /// DELETE /api/v1/desktop/network/rules/{id}
+  static String desktopNetworkRuleDelete(String id) => '$_v1/desktop/network/rules/$id';
+
+  /// Block IP address
+  /// POST /api/v1/desktop/network/block-ip
+  static const String desktopBlockIp = '$_v1/desktop/network/block-ip';
+
+  /// Scan browser extensions
+  /// POST /api/v1/desktop/browser/extensions/scan
+  static const String desktopBrowserScan = '$_v1/desktop/browser/extensions/scan';
+
+  /// VirusTotal hash lookup
+  /// GET /api/v1/desktop/virustotal/hash/{hash}
+  static String desktopVtHash(String hash) => '$_v1/desktop/virustotal/hash/$hash';
+
+  /// VirusTotal IP lookup
+  /// GET /api/v1/desktop/virustotal/ip/{ip}
+  static String desktopVtIp(String ip) => '$_v1/desktop/virustotal/ip/$ip';
+
+  /// Full desktop security scan
+  /// POST /api/v1/desktop/scan/full
+  static const String desktopFullScan = '$_v1/desktop/scan/full';
+
+  // ============================================
+  // ANALYTICS & REPORTING
+  // ============================================
+
+  /// Get threat analytics
+  /// GET /api/v1/analytics/threats
+  static const String analyticsThreat = '$_v1/analytics/threats';
+
+  /// Get alert metrics
+  /// GET /api/v1/analytics/alerts
+  static const String analyticsAlerts = '$_v1/analytics/alerts';
+
+  /// Get detection metrics
+  /// GET /api/v1/analytics/detections
+  static const String analyticsDetections = '$_v1/analytics/detections';
+
+  /// Get source health
+  /// GET /api/v1/analytics/sources
+  static const String analyticsSources = '$_v1/analytics/sources';
+
+  /// Get geo distribution
+  /// GET /api/v1/analytics/geo
+  static const String analyticsGeo = '$_v1/analytics/geo';
+
+  /// Get analytics dashboard
+  /// GET /api/v1/analytics/dashboard
+  static const String analyticsDashboard = '$_v1/analytics/dashboard';
+
+  /// List reports
+  /// GET /api/v1/analytics/reports
+  static const String analyticsReports = '$_v1/analytics/reports';
+
+  /// Create report
+  /// POST /api/v1/analytics/reports
+  static const String analyticsReportCreate = '$_v1/analytics/reports';
+
+  /// Get report by ID
+  /// GET /api/v1/analytics/reports/{id}
+  static String analyticsReport(String id) => '$_v1/analytics/reports/$id';
+
   // ============================================
   // VPN SERVERS
   // ============================================
