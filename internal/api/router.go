@@ -610,60 +610,97 @@ func (r *Router) Setup() http.Handler {
 			fr.Post("/quick-check", r.handlers.Forensics.QuickCheck)
 		})
 
-		// // Digital Footprint endpoints (Data broker removal, privacy)
-		// api.Route("/footprint", func(footprint chi.Router) {
-		// 	// Scan digital footprint
-		// 	footprint.Post("/scan", r.handlers.Footprint.Scan)
-		// 	footprint.Post("/quick-scan", r.handlers.Footprint.QuickScan)
+		// Digital Footprint endpoints (Data broker removal, privacy)
+		api.Route("/footprint", func(footprint chi.Router) {
+			footprint.Post("/scan", r.handlers.Footprint.Scan)
+			footprint.Post("/quick-scan", r.handlers.Footprint.QuickScan)
+			footprint.Get("/brokers", r.handlers.Footprint.GetBrokers)
+			footprint.Get("/brokers/categories", r.handlers.Footprint.GetCategories)
+			footprint.Get("/brokers/{id}", r.handlers.Footprint.GetBroker)
+			footprint.Post("/removal", r.handlers.Footprint.RequestRemoval)
+			footprint.Post("/removal/batch", r.handlers.Footprint.RequestBatchRemoval)
+			footprint.Get("/removal/{id}", r.handlers.Footprint.GetRemovalStatus)
+			footprint.Get("/stats", r.handlers.Footprint.GetStats)
+		})
 
-		// 	// Data brokers
-		// 	footprint.Get("/brokers", r.handlers.Footprint.GetBrokers)
-		// 	footprint.Get("/brokers/categories", r.handlers.Footprint.GetCategories)
-		// 	footprint.Get("/brokers/{id}", r.handlers.Footprint.GetBroker)
+		// Desktop Security endpoints (KnockKnock/LuLu-style)
+		api.Route("/desktop", func(desktop chi.Router) {
+			desktop.Post("/persistence/scan", r.handlers.DesktopSecurity.ScanPersistence)
+			desktop.Post("/persistence/quick-scan", r.handlers.DesktopSecurity.QuickScanPersistence)
+			desktop.Post("/persistence/scan-path", r.handlers.DesktopSecurity.ScanPath)
+			desktop.Post("/codesign/verify", r.handlers.DesktopSecurity.VerifyCodeSigning)
+			desktop.Post("/codesign/verify-batch", r.handlers.DesktopSecurity.VerifyCodeSigningBatch)
+			desktop.Get("/network/connections", r.handlers.DesktopSecurity.GetNetworkConnections)
+			desktop.Get("/network/listening", r.handlers.DesktopSecurity.GetListeningPorts)
+			desktop.Get("/network/outbound", r.handlers.DesktopSecurity.GetOutboundConnections)
+			desktop.Get("/network/rules", r.handlers.DesktopSecurity.GetFirewallRules)
+			desktop.Post("/network/rules", r.handlers.DesktopSecurity.AddFirewallRule)
+			desktop.Delete("/network/rules/{id}", r.handlers.DesktopSecurity.DeleteFirewallRule)
+			desktop.Post("/network/block-ip", r.handlers.DesktopSecurity.BlockIP)
+			desktop.Post("/browser/extensions/scan", r.handlers.DesktopSecurity.ScanBrowserExtensions)
+			desktop.Get("/virustotal/hash/{hash}", r.handlers.DesktopSecurity.LookupHash)
+			desktop.Post("/virustotal/file", r.handlers.DesktopSecurity.LookupFile)
+			desktop.Post("/virustotal/batch", r.handlers.DesktopSecurity.LookupHashBatch)
+			desktop.Get("/virustotal/ip/{ip}", r.handlers.DesktopSecurity.LookupIP)
+			desktop.Post("/scan/full", r.handlers.DesktopSecurity.FullSecurityScan)
+		})
 
-		// 	// Data removal requests
-		// 	footprint.Post("/removal", r.handlers.Footprint.RequestRemoval)
-		// 	footprint.Post("/removal/batch", r.handlers.Footprint.RequestBatchRemoval)
-		// 	footprint.Get("/removal/{id}", r.handlers.Footprint.GetRemovalStatus)
+		// Webhooks endpoints
+		api.Route("/webhooks", func(wh chi.Router) {
+			wh.Get("/", r.handlers.Webhooks.List)
+			wh.Post("/", r.handlers.Webhooks.Create)
+			wh.Get("/stats", r.handlers.Webhooks.GetStats)
+			wh.Get("/{id}", r.handlers.Webhooks.Get)
+			wh.Put("/{id}", r.handlers.Webhooks.Update)
+			wh.Delete("/{id}", r.handlers.Webhooks.Delete)
+			wh.Post("/{id}/enable", r.handlers.Webhooks.Enable)
+			wh.Post("/{id}/disable", r.handlers.Webhooks.Disable)
+			wh.Post("/{id}/test", r.handlers.Webhooks.Test)
+			wh.Post("/{id}/rotate-secret", r.handlers.Webhooks.RotateSecret)
+		})
 
-		// 	// Stats
-		// 	footprint.Get("/stats", r.handlers.Footprint.GetStats)
-		// })
+		// Playbooks endpoints
+		api.Route("/playbooks", func(pb chi.Router) {
+			pb.Get("/", r.handlers.Playbooks.List)
+			pb.Post("/", r.handlers.Playbooks.Create)
+			pb.Get("/executions", r.handlers.Playbooks.GetExecutions)
+			pb.Get("/stats", r.handlers.Playbooks.GetStats)
+			pb.Get("/templates", r.handlers.Playbooks.GetTemplates)
+			pb.Post("/from-template", r.handlers.Playbooks.CreateFromTemplate)
+			pb.Get("/{id}", r.handlers.Playbooks.Get)
+			pb.Put("/{id}", r.handlers.Playbooks.Update)
+			pb.Delete("/{id}", r.handlers.Playbooks.Delete)
+			pb.Post("/{id}/enable", r.handlers.Playbooks.Enable)
+			pb.Post("/{id}/disable", r.handlers.Playbooks.Disable)
+			pb.Post("/{id}/execute", r.handlers.Playbooks.Execute)
+		})
 
-		// // Desktop Security endpoints (KnockKnock/LuLu-style)
-		// api.Route("/desktop", func(desktop chi.Router) {
-		// 	// Persistence scanning
-		// 	desktop.Post("/persistence/scan", r.handlers.DesktopSecurity.ScanPersistence)
-		// 	desktop.Post("/persistence/quick-scan", r.handlers.DesktopSecurity.QuickScanPersistence)
-		// 	desktop.Post("/persistence/scan-path", r.handlers.DesktopSecurity.ScanPath)
+		// Analytics endpoints
+		api.Route("/analytics", func(an chi.Router) {
+			an.Get("/threats", r.handlers.Analytics.GetThreatAnalytics)
+			an.Get("/alerts", r.handlers.Analytics.GetAlertMetrics)
+			an.Get("/detections", r.handlers.Analytics.GetDetectionMetrics)
+			an.Get("/sources", r.handlers.Analytics.GetSourceHealth)
+			an.Get("/geo", r.handlers.Analytics.GetGeoDistribution)
+			an.Get("/dashboard", r.handlers.Analytics.GetDashboard)
+			an.Get("/reports", r.handlers.Analytics.ListReports)
+			an.Post("/reports", r.handlers.Analytics.CreateReport)
+			an.Get("/reports/{id}", r.handlers.Analytics.GetReport)
+		})
 
-		// 	// Code signing verification
-		// 	desktop.Post("/codesign/verify", r.handlers.DesktopSecurity.VerifyCodeSigning)
-		// 	desktop.Post("/codesign/verify-batch", r.handlers.DesktopSecurity.VerifyCodeSigningBatch)
-
-		// 	// Network monitoring (LuLu-style)
-		// 	desktop.Get("/network/connections", r.handlers.DesktopSecurity.GetNetworkConnections)
-		// 	desktop.Get("/network/listening", r.handlers.DesktopSecurity.GetListeningPorts)
-		// 	desktop.Get("/network/outbound", r.handlers.DesktopSecurity.GetOutboundConnections)
-
-		// 	// Firewall rules
-		// 	desktop.Get("/network/rules", r.handlers.DesktopSecurity.GetFirewallRules)
-		// 	desktop.Post("/network/rules", r.handlers.DesktopSecurity.AddFirewallRule)
-		// 	desktop.Delete("/network/rules/{id}", r.handlers.DesktopSecurity.DeleteFirewallRule)
-		// 	desktop.Post("/network/block-ip", r.handlers.DesktopSecurity.BlockIP)
-
-		// 	// Browser extension scanning
-		// 	desktop.Post("/browser/extensions/scan", r.handlers.DesktopSecurity.ScanBrowserExtensions)
-
-		// 	// VirusTotal integration
-		// 	desktop.Get("/virustotal/hash/{hash}", r.handlers.DesktopSecurity.LookupHash)
-		// 	desktop.Post("/virustotal/file", r.handlers.DesktopSecurity.LookupFile)
-		// 	desktop.Post("/virustotal/batch", r.handlers.DesktopSecurity.LookupHashBatch)
-		// 	desktop.Get("/virustotal/ip/{ip}", r.handlers.DesktopSecurity.LookupIP)
-
-		// 	// Full security scan
-		// 	desktop.Post("/scan/full", r.handlers.DesktopSecurity.FullSecurityScan)
-		// })
+		// Integrations endpoints (Slack, Teams, PagerDuty)
+		api.Route("/integrations", func(ig chi.Router) {
+			ig.Get("/", r.handlers.Integrations.List)
+			ig.Post("/", r.handlers.Integrations.Create)
+			ig.Get("/{id}", r.handlers.Integrations.Get)
+			ig.Patch("/{id}", r.handlers.Integrations.Update)
+			ig.Delete("/{id}", r.handlers.Integrations.Delete)
+			ig.Post("/{id}/enable", r.handlers.Integrations.Enable)
+			ig.Post("/{id}/disable", r.handlers.Integrations.Disable)
+			ig.Post("/{id}/test", r.handlers.Integrations.Test)
+			ig.Get("/{id}/stats", r.handlers.Integrations.GetStats)
+			ig.Get("/{id}/deliveries", r.handlers.Integrations.GetDeliveries)
+		})
 
 		// Scam Detection endpoints (AI-powered)
 		r.handlers.ScamDetection.RegisterRoutes(api)

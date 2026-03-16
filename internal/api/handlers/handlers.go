@@ -42,12 +42,12 @@ type Handlers struct {
 	Alerts          *AlertsHandler
 	Forensics       *ForensicsHandler
 	ScamDetection   *ScamDetectionHandler
-	// Footprint       *FootprintHandler
-	// DesktopSecurity *DesktopSecurityHandler
-	// Webhooks        *WebhookHandler
-	// Playbooks       *PlaybookHandler
-	// Analytics       *AnalyticsHandler
-	// Integrations    *IntegrationsHandler
+	Footprint       *FootprintHandler
+	DesktopSecurity *DesktopSecurityHandler
+	Webhooks        *WebhookHandler
+	Playbooks       *PlaybookHandler
+	Analytics       *AnalyticsHandler
+	Integrations    *IntegrationsHandler
 }
 
 // Dependencies holds dependencies for handlers
@@ -123,18 +123,18 @@ func NewHandlers(deps Dependencies) *Handlers {
 		Alerts:          NewAlertsHandler(deps.Repos, deps.Cache, deps.Logger),
 		Forensics:       NewForensicsHandler(deps.ForensicsService, deps.Logger),
 		ScamDetection:   NewScamDetectionHandler(deps.Logger, deps.ScamDetector),
-		// Footprint:       NewFootprintHandler(deps.FootprintScanner, deps.Logger),
-		// DesktopSecurity: NewDesktopSecurityHandler(DesktopSecurityDeps{
-		// 	PersistenceScanner: deps.PersistenceScanner,
-		// 	CodeVerifier:       deps.CodeVerifier,
-		// 	NetworkMonitor:     deps.NetworkMonitor,
-		// 	BrowserScanner:     deps.BrowserScanner,
-		// 	VTClient:           deps.VTClient,
-		// 	Logger:             deps.Logger,
-		// }),
-		// Webhooks:      NewWebhookHandler(deps.Logger, deps.WebhookService),
-		// Playbooks:     NewPlaybookHandler(deps.Logger, deps.PlaybookService),
-		// Analytics:     NewAnalyticsHandler(deps.Logger, deps.AnalyticsService),
-		// Integrations:  NewIntegrationsHandler(deps.IntegrationService),
+		Footprint:       NewFootprintHandler(deps.FootprintScanner, deps.Logger),
+		DesktopSecurity: NewDesktopSecurityHandler(DesktopSecurityDeps{
+			PersistenceScanner: deps.PersistenceScanner,
+			CodeVerifier:       deps.CodeVerifier,
+			NetworkMonitor:     deps.NetworkMonitor,
+			BrowserScanner:     deps.BrowserScanner,
+			VTClient:           deps.VTClient,
+			Logger:             deps.Logger,
+		}),
+		Webhooks:     NewWebhookHandler(deps.Logger, deps.WebhookService),
+		Playbooks:    NewPlaybookHandler(deps.Logger, deps.PlaybookService),
+		Analytics:    NewAnalyticsHandler(deps.Logger, deps.AnalyticsService),
+		Integrations: NewIntegrationsHandler(deps.IntegrationService, deps.Logger),
 	}
 }
