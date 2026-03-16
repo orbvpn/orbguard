@@ -246,6 +246,7 @@ func main() {
 		Cache:             redisCache,
 		Logger:            log,
 		Repos:             repos,
+		JWTSecret:         cfg.JWT.Secret,
 		EventBus:          eventBus,
 		WSHub:             wsHub,
 		URLService:        urlService,

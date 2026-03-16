@@ -1,0 +1,19 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "mkdir -p tmp && go build -buildvcs=false -o tmp/main ./cmd/api"
+  bin = "tmp/main"
+  full_bin = "tmp/main"
+  include_ext = ["go", "yaml"]
+  include_dir = ["cmd", "internal", "pkg"]
+  exclude_dir = ["tmp", "vendor"]
+  delay = 500
+  stop_on_error = true
+
+[watch]
+  poll = true
+  poll_interval = 1000
+
+[log]
+  time = true

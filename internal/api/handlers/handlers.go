@@ -38,14 +38,16 @@ type Handlers struct {
 	QRSecurity      *QRSecurityHandler
 	Enterprise      *EnterpriseHandler
 	OrbNet          *OrbNetHandler
+	Auth            *AuthHandler
+	Alerts          *AlertsHandler
 	Forensics       *ForensicsHandler
-	Footprint       *FootprintHandler
-	DesktopSecurity *DesktopSecurityHandler
-	Webhooks        *WebhookHandler
-	Playbooks       *PlaybookHandler
-	Analytics       *AnalyticsHandler
-	Integrations    *IntegrationsHandler
 	ScamDetection   *ScamDetectionHandler
+	// Footprint       *FootprintHandler
+	// DesktopSecurity *DesktopSecurityHandler
+	// Webhooks        *WebhookHandler
+	// Playbooks       *PlaybookHandler
+	// Analytics       *AnalyticsHandler
+	// Integrations    *IntegrationsHandler
 }
 
 // Dependencies holds dependencies for handlers
@@ -58,6 +60,7 @@ type Dependencies struct {
 	Cache                 *cache.RedisCache
 	Logger                *logger.Logger
 	Repos                 *repository.Repositories
+	JWTSecret             string
 	EventBus              *streaming.EventBus
 	WSHub                 *streaming.WebSocketHub
 	URLService            *services.URLReputationService
@@ -116,20 +119,22 @@ func NewHandlers(deps Dependencies) *Handlers {
 		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger),
 		Enterprise:      NewEnterpriseHandler(deps.EnterpriseService, deps.Logger),
 		OrbNet:          NewOrbNetHandler(deps.OrbNetService, deps.Logger),
+		Auth:            NewAuthHandler(deps.Cache, deps.JWTSecret, deps.Logger),
+		Alerts:          NewAlertsHandler(deps.Repos, deps.Cache, deps.Logger),
 		Forensics:       NewForensicsHandler(deps.ForensicsService, deps.Logger),
-		Footprint:       NewFootprintHandler(deps.FootprintScanner, deps.Logger),
-		DesktopSecurity: NewDesktopSecurityHandler(DesktopSecurityDeps{
-			PersistenceScanner: deps.PersistenceScanner,
-			CodeVerifier:       deps.CodeVerifier,
-			NetworkMonitor:     deps.NetworkMonitor,
-			BrowserScanner:     deps.BrowserScanner,
-			VTClient:           deps.VTClient,
-			Logger:             deps.Logger,
-		}),
-		Webhooks:      NewWebhookHandler(deps.Logger, deps.WebhookService),
-		Playbooks:     NewPlaybookHandler(deps.Logger, deps.PlaybookService),
-		Analytics:     NewAnalyticsHandler(deps.Logger, deps.AnalyticsService),
-		Integrations:  NewIntegrationsHandler(deps.IntegrationService),
-		ScamDetection: NewScamDetectionHandler(deps.Logger, deps.ScamDetector),
+		ScamDetection:   NewScamDetectionHandler(deps.Logger, deps.ScamDetector),
+		// Footprint:       NewFootprintHandler(deps.FootprintScanner, deps.Logger),
+		// DesktopSecurity: NewDesktopSecurityHandler(DesktopSecurityDeps{
+		// 	PersistenceScanner: deps.PersistenceScanner,
+		// 	CodeVerifier:       deps.CodeVerifier,
+		// 	NetworkMonitor:     deps.NetworkMonitor,
+		// 	BrowserScanner:     deps.BrowserScanner,
+		// 	VTClient:           deps.VTClient,
+		// 	Logger:             deps.Logger,
+		// }),
+		// Webhooks:      NewWebhookHandler(deps.Logger, deps.WebhookService),
+		// Playbooks:     NewPlaybookHandler(deps.Logger, deps.PlaybookService),
+		// Analytics:     NewAnalyticsHandler(deps.Logger, deps.AnalyticsService),
+		// Integrations:  NewIntegrationsHandler(deps.IntegrationService),
 	}
 }

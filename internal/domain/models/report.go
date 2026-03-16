@@ -19,8 +19,8 @@ const (
 
 // CommunityReport represents a user-submitted threat report
 type CommunityReport struct {
-	ID          uuid.UUID    `json:"id" db:"id"`
-	Status      ReportStatus `json:"status" db:"status"`
+	ID     uuid.UUID    `json:"id" db:"id"`
+	Status ReportStatus `json:"status" db:"status"`
 
 	// Indicator data
 	IndicatorValue string        `json:"indicator_value" db:"indicator_value"`
@@ -34,19 +34,19 @@ type CommunityReport struct {
 	ReporterCountry string `json:"reporter_country,omitempty" db:"reporter_country"`
 
 	// Device info (for mobile reports)
-	DeviceType     string `json:"device_type,omitempty" db:"device_type"`       // android/ios
-	DeviceModel    string `json:"device_model,omitempty" db:"device_model"`
-	OSVersion      string `json:"os_version,omitempty" db:"os_version"`
-	AppVersion     string `json:"app_version,omitempty" db:"app_version"`
+	DeviceType  string `json:"device_type,omitempty" db:"device_type"` // android/ios
+	DeviceModel string `json:"device_model,omitempty" db:"device_model"`
+	OSVersion   string `json:"os_version,omitempty" db:"os_version"`
+	AppVersion  string `json:"app_version,omitempty" db:"app_version"`
 
 	// Evidence
-	EvidenceData   map[string]any `json:"evidence_data,omitempty" db:"evidence_data"`
-	ScreenshotURL  *string        `json:"screenshot_url,omitempty" db:"screenshot_url"`
+	EvidenceData  map[string]any `json:"evidence_data,omitempty" db:"evidence_data"`
+	ScreenshotURL *string        `json:"screenshot_url,omitempty" db:"screenshot_url"`
 
 	// Review
-	ReviewedBy   *uuid.UUID `json:"reviewed_by,omitempty" db:"reviewed_by"`
-	ReviewedAt   *time.Time `json:"reviewed_at,omitempty" db:"reviewed_at"`
-	ReviewNotes  *string    `json:"review_notes,omitempty" db:"review_notes"`
+	ReviewedBy  *uuid.UUID `json:"reviewed_by,omitempty" db:"reviewed_by"`
+	ReviewedAt  *time.Time `json:"reviewed_at,omitempty" db:"reviewed_at"`
+	ReviewNotes *string    `json:"review_notes,omitempty" db:"review_notes"`
 
 	// If approved, link to created indicator
 	IndicatorID *uuid.UUID `json:"indicator_id,omitempty" db:"indicator_id"`
@@ -59,22 +59,22 @@ type CommunityReport struct {
 
 // CreateReportRequest represents the request to create a community report
 type CreateReportRequest struct {
-	IndicatorValue string            `json:"indicator_value" validate:"required"`
-	IndicatorType  IndicatorType     `json:"indicator_type" validate:"required"`
-	Severity       Severity          `json:"severity"`
-	Description    string            `json:"description" validate:"required,min=10,max=1000"`
-	Tags           []string          `json:"tags,omitempty"`
-	DeviceInfo     DeviceInfo        `json:"device_info,omitempty"`
-	EvidenceData   map[string]any    `json:"evidence_data,omitempty"`
+	IndicatorValue string         `json:"indicator_value" validate:"required"`
+	IndicatorType  IndicatorType  `json:"indicator_type" validate:"required"`
+	Severity       Severity       `json:"severity"`
+	Description    string         `json:"description" validate:"required,min=10,max=1000"`
+	Tags           []string       `json:"tags,omitempty"`
+	DeviceInfo     DeviceInfo     `json:"device_info,omitempty"`
+	EvidenceData   map[string]any `json:"evidence_data,omitempty"`
 }
 
 // DeviceInfo represents device information submitted with a report
 type DeviceInfo struct {
-	Type      string `json:"type"`       // android/ios
-	Model     string `json:"model"`
-	OSVersion string `json:"os_version"`
+	Type       string `json:"type"` // android/ios
+	Model      string `json:"model"`
+	OSVersion  string `json:"os_version"`
 	AppVersion string `json:"app_version"`
-	Country   string `json:"country,omitempty"`
+	Country    string `json:"country,omitempty"`
 }
 
 // UpdateHistory represents an update/aggregation history entry
@@ -84,17 +84,17 @@ type UpdateHistory struct {
 	SourceSlug string    `json:"source_slug" db:"source_slug"`
 
 	// Timing
-	StartedAt  time.Time     `json:"started_at" db:"started_at"`
-	CompletedAt time.Time    `json:"completed_at" db:"completed_at"`
-	Duration   time.Duration `json:"duration" db:"duration"`
+	StartedAt   time.Time     `json:"started_at" db:"started_at"`
+	CompletedAt time.Time     `json:"completed_at" db:"completed_at"`
+	Duration    time.Duration `json:"duration" db:"duration"`
 
 	// Results
-	Success           bool   `json:"success" db:"success"`
+	Success           bool    `json:"success" db:"success"`
 	Error             *string `json:"error,omitempty" db:"error"`
-	TotalFetched      int    `json:"total_fetched" db:"total_fetched"`
-	NewIndicators     int    `json:"new_indicators" db:"new_indicators"`
-	UpdatedIndicators int    `json:"updated_indicators" db:"updated_indicators"`
-	SkippedIndicators int    `json:"skipped_indicators" db:"skipped_indicators"`
+	TotalFetched      int     `json:"total_fetched" db:"total_fetched"`
+	NewIndicators     int     `json:"new_indicators" db:"new_indicators"`
+	UpdatedIndicators int     `json:"updated_indicators" db:"updated_indicators"`
+	SkippedIndicators int     `json:"skipped_indicators" db:"skipped_indicators"`
 
 	// Metadata
 	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"`
@@ -105,14 +105,14 @@ type UpdateHistory struct {
 // Stats represents aggregated statistics
 type Stats struct {
 	// Indicator counts
-	TotalIndicators    int            `json:"total_indicators"`
-	IndicatorsByType   map[string]int `json:"indicators_by_type"`
+	TotalIndicators      int            `json:"total_indicators"`
+	IndicatorsByType     map[string]int `json:"indicators_by_type"`
 	IndicatorsBySeverity map[string]int `json:"indicators_by_severity"`
 	IndicatorsByPlatform map[string]int `json:"indicators_by_platform"`
 
 	// Source counts
-	TotalSources   int `json:"total_sources"`
-	ActiveSources  int `json:"active_sources"`
+	TotalSources  int `json:"total_sources"`
+	ActiveSources int `json:"active_sources"`
 
 	// Campaign counts
 	TotalCampaigns  int `json:"total_campaigns"`
@@ -123,9 +123,9 @@ type Stats struct {
 	PendingReports int `json:"pending_reports"`
 
 	// Special categories
-	PegasusIndicators   int `json:"pegasus_indicators"`
-	MobileIndicators    int `json:"mobile_indicators"`
-	CriticalIndicators  int `json:"critical_indicators"`
+	PegasusIndicators  int `json:"pegasus_indicators"`
+	MobileIndicators   int `json:"mobile_indicators"`
+	CriticalIndicators int `json:"critical_indicators"`
 
 	// Temporal
 	LastUpdate     time.Time `json:"last_update"`
@@ -137,12 +137,34 @@ type Stats struct {
 	DataVersion int64 `json:"data_version"`
 }
 
+// stats protection
+type ProtectionStatus struct {
+	IsActive bool       `json:"is_active"`
+	Score    float64    `json:"score"`
+	Grade    string     `json:"grade"`
+	Features FeatureSet `json:"features"`
+	LastScan time.Time  `json:"last_scan"`
+}
+
+type FeatureSet struct {
+	SMS     FeatureStatus `json:"sms"`
+	Web     FeatureStatus `json:"web"`
+	App     FeatureStatus `json:"app"`
+	Network FeatureStatus `json:"network"`
+	VPN     FeatureStatus `json:"vpn"`
+}
+
+type FeatureStatus struct {
+	Enabled bool   `json:"enabled"`
+	Status  string `json:"status"`
+}
+
 // MobileSyncResponse represents the optimized sync response for mobile apps
 type MobileSyncResponse struct {
-	Version     int64       `json:"version"`
-	LastUpdated time.Time   `json:"last_updated"`
-	HasMore     bool        `json:"has_more"`
-	NextCursor  string      `json:"next_cursor,omitempty"`
+	Version     int64     `json:"version"`
+	LastUpdated time.Time `json:"last_updated"`
+	HasMore     bool      `json:"has_more"`
+	NextCursor  string    `json:"next_cursor,omitempty"`
 
 	// Delta updates (since last sync)
 	NewIndicators     []MobileIndicator `json:"new_indicators,omitempty"`
