@@ -157,8 +157,9 @@ class ApiEndpoints {
   static const String appsAnalyzeBatch = '$_v1/apps/analyze/batch';
 
   /// Get app privacy report
-  /// GET /api/v1/apps/privacy-report/{package_name}
-  static String appsPrivacyReport(String packageName) => '$_v1/apps/privacy-report/$packageName';
+  /// POST /api/v1/apps/privacy-report
+  /// Body: { "package_name": "..." }
+  static const String appsPrivacyReport = '$_v1/apps/privacy-report';
 
   /// Get known trackers list
   /// GET /api/v1/apps/trackers
@@ -584,56 +585,56 @@ class ApiEndpoints {
   // ============================================
 
   /// Device base endpoint
-  /// GET/POST /api/v1/devices
-  static const String devices = '$_v1/devices';
+  /// GET/POST /api/v1/device
+  static const String devices = '$_v1/device';
 
   /// Register device
-  /// POST /api/v1/devices/register
-  static const String devicesRegister = '$_v1/devices/register';
+  /// POST /api/v1/device/register
+  static const String devicesRegister = '$_v1/device/register';
 
   /// Get device security status
-  /// GET /api/v1/devices/{id}/security
-  static String deviceSecurity(String id) => '$_v1/devices/$id/security';
+  /// GET /api/v1/device/{id}/security-status
+  static String deviceSecurity(String id) => '$_v1/device/$id/security-status';
 
   /// Get anti-theft settings
-  /// GET /api/v1/devices/{id}/anti-theft
-  static String deviceAntiTheft(String id) => '$_v1/devices/$id/anti-theft';
+  /// GET /api/v1/device/{id}/settings
+  static String deviceAntiTheft(String id) => '$_v1/device/$id/settings';
 
   /// Locate device
-  /// POST /api/v1/devices/{id}/locate
-  static String deviceLocate(String id) => '$_v1/devices/$id/locate';
+  /// POST /api/v1/device/{id}/locate
+  static String deviceLocate(String id) => '$_v1/device/$id/locate';
 
   /// Send device command
-  /// POST /api/v1/devices/{id}/command
-  static String deviceCommand(String id) => '$_v1/devices/$id/command';
+  /// POST /api/v1/device/{id}/command
+  static String deviceCommand(String id) => '$_v1/device/$id/command';
 
   /// Mark device as lost
-  /// POST /api/v1/devices/{id}/lost
-  static String deviceLost(String id) => '$_v1/devices/$id/lost';
+  /// POST /api/v1/device/{id}/mark-lost
+  static String deviceLost(String id) => '$_v1/device/$id/mark-lost';
 
   /// Mark device as stolen
-  /// POST /api/v1/devices/{id}/stolen
-  static String deviceStolen(String id) => '$_v1/devices/$id/stolen';
+  /// POST /api/v1/device/{id}/mark-stolen
+  static String deviceStolen(String id) => '$_v1/device/$id/mark-stolen';
 
   /// Mark device as recovered
-  /// POST /api/v1/devices/{id}/recovered
-  static String deviceRecovered(String id) => '$_v1/devices/$id/recovered';
+  /// POST /api/v1/device/{id}/mark-recovered
+  static String deviceRecovered(String id) => '$_v1/device/$id/mark-recovered';
 
   /// Get device location history
-  /// GET /api/v1/devices/{id}/location-history
-  static String deviceLocationHistory(String id) => '$_v1/devices/$id/location-history';
+  /// GET /api/v1/device/{id}/location/history
+  static String deviceLocationHistory(String id) => '$_v1/device/$id/location/history';
 
   /// Get SIM history
-  /// GET /api/v1/devices/{id}/sim-history
-  static String deviceSimHistory(String id) => '$_v1/devices/$id/sim-history';
+  /// GET /api/v1/device/{id}/sim/history
+  static String deviceSimHistory(String id) => '$_v1/device/$id/sim/history';
 
   /// Add trusted SIM
-  /// POST /api/v1/devices/{id}/trusted-sim
-  static String deviceTrustedSim(String id) => '$_v1/devices/$id/trusted-sim';
+  /// POST /api/v1/device/{id}/sim/trusted
+  static String deviceTrustedSim(String id) => '$_v1/device/$id/sim/trusted';
 
   /// Audit OS vulnerabilities
-  /// POST /api/v1/devices/{id}/audit-os
-  static String deviceAuditOs(String id) => '$_v1/devices/$id/audit-os';
+  /// POST /api/v1/device/vulnerabilities/audit
+  static String deviceAuditOs(String id) => '$_v1/device/vulnerabilities/audit';
 
   // ============================================
   // FORENSICS
