@@ -324,8 +324,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     return Column(
       children: [
         // Camera view
-        Expanded(
-          flex: 3,
+        SizedBox(
+          height: 300,
           child: Stack(
             children: [
               if (_isCameraActive && _scannerController != null)
@@ -389,8 +389,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         ),
         // Manual input section
         Expanded(
-          flex: 2,
-          child: Container(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,11 +402,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Expanded(
-                  child: QrManualInput(
-                    onAnalyze: _onManualInput,
-                    isAnalyzing: provider.isScanning,
-                  ),
+                QrManualInput(
+                  onAnalyze: _onManualInput,
+                  isAnalyzing: provider.isScanning,
                 ),
               ],
             ),

@@ -230,7 +230,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     return GlassCard(
       isDark: isDark,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(0),
         child: Column(
           children: [
             Row(
@@ -1037,9 +1037,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          mainAxisSpacing: 12,
+          // mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
+          childAspectRatio: 1.2,
           children: [
             _buildFeatureCard(
               icon: 'bug',
@@ -1077,6 +1077,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             ),
           ],
         ),
+        const SizedBox(height: 30),
       ],
     );
   }
@@ -1097,9 +1098,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
       child: GlassCard(
         isDark: isDark,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 width: 44,

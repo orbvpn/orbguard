@@ -60,7 +60,7 @@ class ThreatIntelligenceAPI {
   }
 
   /// Fetch community-reported indicators
-  Future<ThreatIntelligenceData> _fetchCommunityIoCs() async {
+  Future<ThreatIntelligenceData> _fetchCommunityIoCs() async {    
     try {
       final response = await _dio.get('$baseUrl/community');
       return ThreatIntelligenceData.fromJson(response.data);

@@ -157,8 +157,9 @@ class ApiEndpoints {
   static const String appsAnalyzeBatch = '$_v1/apps/analyze/batch';
 
   /// Get app privacy report
-  /// GET /api/v1/apps/privacy-report/{package_name}
-  static String appsPrivacyReport(String packageName) => '$_v1/apps/privacy-report/$packageName';
+  /// POST /api/v1/apps/privacy-report
+  /// Body: { "package_name": "..." }
+  static const String appsPrivacyReport = '$_v1/apps/privacy-report';
 
   /// Get known trackers list
   /// GET /api/v1/apps/trackers
@@ -530,6 +531,102 @@ class ApiEndpoints {
   /// GET /api/v1/desktop/firewall
   static const String desktopFirewall = '$_v1/desktop/firewall';
 
+  /// Scan persistence items
+  /// POST /api/v1/desktop/persistence/scan
+  static const String desktopPersistenceScan = '$_v1/desktop/persistence/scan';
+
+  /// Quick scan persistence
+  /// POST /api/v1/desktop/persistence/quick-scan
+  static const String desktopPersistenceQuickScan = '$_v1/desktop/persistence/quick-scan';
+
+  /// Verify code signing
+  /// POST /api/v1/desktop/codesign/verify
+  static const String desktopCodesignVerify = '$_v1/desktop/codesign/verify';
+
+  /// Get network connections
+  /// GET /api/v1/desktop/network/connections
+  static const String desktopNetworkConnections = '$_v1/desktop/network/connections';
+
+  /// Get listening ports
+  /// GET /api/v1/desktop/network/listening
+  static const String desktopNetworkListening = '$_v1/desktop/network/listening';
+
+  /// Get outbound connections
+  /// GET /api/v1/desktop/network/outbound
+  static const String desktopNetworkOutbound = '$_v1/desktop/network/outbound';
+
+  /// Get firewall rules (network monitor)
+  /// GET /api/v1/desktop/network/rules
+  static const String desktopNetworkRules = '$_v1/desktop/network/rules';
+
+  /// Add firewall rule
+  /// POST /api/v1/desktop/network/rules
+  static const String desktopNetworkRulesAdd = '$_v1/desktop/network/rules';
+
+  /// Delete firewall rule
+  /// DELETE /api/v1/desktop/network/rules/{id}
+  static String desktopNetworkRuleDelete(String id) => '$_v1/desktop/network/rules/$id';
+
+  /// Block IP address
+  /// POST /api/v1/desktop/network/block-ip
+  static const String desktopBlockIp = '$_v1/desktop/network/block-ip';
+
+  /// Scan browser extensions
+  /// POST /api/v1/desktop/browser/extensions/scan
+  static const String desktopBrowserScan = '$_v1/desktop/browser/extensions/scan';
+
+  /// VirusTotal hash lookup
+  /// GET /api/v1/desktop/virustotal/hash/{hash}
+  static String desktopVtHash(String hash) => '$_v1/desktop/virustotal/hash/$hash';
+
+  /// VirusTotal IP lookup
+  /// GET /api/v1/desktop/virustotal/ip/{ip}
+  static String desktopVtIp(String ip) => '$_v1/desktop/virustotal/ip/$ip';
+
+  /// Full desktop security scan
+  /// POST /api/v1/desktop/scan/full
+  static const String desktopFullScan = '$_v1/desktop/scan/full';
+
+  // ============================================
+  // ANALYTICS & REPORTING
+  // ============================================
+
+  /// Get threat analytics
+  /// GET /api/v1/analytics/threats
+  static const String analyticsThreat = '$_v1/analytics/threats';
+
+  /// Get alert metrics
+  /// GET /api/v1/analytics/alerts
+  static const String analyticsAlerts = '$_v1/analytics/alerts';
+
+  /// Get detection metrics
+  /// GET /api/v1/analytics/detections
+  static const String analyticsDetections = '$_v1/analytics/detections';
+
+  /// Get source health
+  /// GET /api/v1/analytics/sources
+  static const String analyticsSources = '$_v1/analytics/sources';
+
+  /// Get geo distribution
+  /// GET /api/v1/analytics/geo
+  static const String analyticsGeo = '$_v1/analytics/geo';
+
+  /// Get analytics dashboard
+  /// GET /api/v1/analytics/dashboard
+  static const String analyticsDashboard = '$_v1/analytics/dashboard';
+
+  /// List reports
+  /// GET /api/v1/analytics/reports
+  static const String analyticsReports = '$_v1/analytics/reports';
+
+  /// Create report
+  /// POST /api/v1/analytics/reports
+  static const String analyticsReportCreate = '$_v1/analytics/reports';
+
+  /// Get report by ID
+  /// GET /api/v1/analytics/reports/{id}
+  static String analyticsReport(String id) => '$_v1/analytics/reports/$id';
+
   // ============================================
   // VPN SERVERS
   // ============================================
@@ -584,56 +681,56 @@ class ApiEndpoints {
   // ============================================
 
   /// Device base endpoint
-  /// GET/POST /api/v1/devices
-  static const String devices = '$_v1/devices';
+  /// GET/POST /api/v1/device
+  static const String devices = '$_v1/device';
 
   /// Register device
-  /// POST /api/v1/devices/register
-  static const String devicesRegister = '$_v1/devices/register';
+  /// POST /api/v1/device/register
+  static const String devicesRegister = '$_v1/device/register';
 
   /// Get device security status
-  /// GET /api/v1/devices/{id}/security
-  static String deviceSecurity(String id) => '$_v1/devices/$id/security';
+  /// GET /api/v1/device/{id}/security-status
+  static String deviceSecurity(String id) => '$_v1/device/$id/security-status';
 
   /// Get anti-theft settings
-  /// GET /api/v1/devices/{id}/anti-theft
-  static String deviceAntiTheft(String id) => '$_v1/devices/$id/anti-theft';
+  /// GET /api/v1/device/{id}/settings
+  static String deviceAntiTheft(String id) => '$_v1/device/$id/settings';
 
   /// Locate device
-  /// POST /api/v1/devices/{id}/locate
-  static String deviceLocate(String id) => '$_v1/devices/$id/locate';
+  /// POST /api/v1/device/{id}/locate
+  static String deviceLocate(String id) => '$_v1/device/$id/locate';
 
   /// Send device command
-  /// POST /api/v1/devices/{id}/command
-  static String deviceCommand(String id) => '$_v1/devices/$id/command';
+  /// POST /api/v1/device/{id}/command
+  static String deviceCommand(String id) => '$_v1/device/$id/command';
 
   /// Mark device as lost
-  /// POST /api/v1/devices/{id}/lost
-  static String deviceLost(String id) => '$_v1/devices/$id/lost';
+  /// POST /api/v1/device/{id}/mark-lost
+  static String deviceLost(String id) => '$_v1/device/$id/mark-lost';
 
   /// Mark device as stolen
-  /// POST /api/v1/devices/{id}/stolen
-  static String deviceStolen(String id) => '$_v1/devices/$id/stolen';
+  /// POST /api/v1/device/{id}/mark-stolen
+  static String deviceStolen(String id) => '$_v1/device/$id/mark-stolen';
 
   /// Mark device as recovered
-  /// POST /api/v1/devices/{id}/recovered
-  static String deviceRecovered(String id) => '$_v1/devices/$id/recovered';
+  /// POST /api/v1/device/{id}/mark-recovered
+  static String deviceRecovered(String id) => '$_v1/device/$id/mark-recovered';
 
   /// Get device location history
-  /// GET /api/v1/devices/{id}/location-history
-  static String deviceLocationHistory(String id) => '$_v1/devices/$id/location-history';
+  /// GET /api/v1/device/{id}/location/history
+  static String deviceLocationHistory(String id) => '$_v1/device/$id/location/history';
 
   /// Get SIM history
-  /// GET /api/v1/devices/{id}/sim-history
-  static String deviceSimHistory(String id) => '$_v1/devices/$id/sim-history';
+  /// GET /api/v1/device/{id}/sim/history
+  static String deviceSimHistory(String id) => '$_v1/device/$id/sim/history';
 
   /// Add trusted SIM
-  /// POST /api/v1/devices/{id}/trusted-sim
-  static String deviceTrustedSim(String id) => '$_v1/devices/$id/trusted-sim';
+  /// POST /api/v1/device/{id}/sim/trusted
+  static String deviceTrustedSim(String id) => '$_v1/device/$id/sim/trusted';
 
   /// Audit OS vulnerabilities
-  /// POST /api/v1/devices/{id}/audit-os
-  static String deviceAuditOs(String id) => '$_v1/devices/$id/audit-os';
+  /// POST /api/v1/device/vulnerabilities/audit
+  static String deviceAuditOs(String id) => '$_v1/device/vulnerabilities/audit';
 
   // ============================================
   // FORENSICS

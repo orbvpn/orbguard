@@ -162,7 +162,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
 
     return GlassCard(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(0),
         child: Column(
           children: [
             Row(

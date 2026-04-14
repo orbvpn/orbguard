@@ -1927,6 +1927,265 @@ class OrbGuardApiClient {
       throw ApiError.fromDioException(e);
     }
   }
+
+  // ============================================
+  // ANALYTICS & REPORTING
+  // ============================================
+
+  /// Get threat analytics
+  Future<Map<String, dynamic>> getThreatAnalytics({String period = '7d'}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.analyticsThreat,
+        queryParameters: {'period': period},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get alert metrics
+  Future<Map<String, dynamic>> getAlertMetrics({String period = '7d'}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.analyticsAlerts,
+        queryParameters: {'period': period},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get detection metrics
+  Future<Map<String, dynamic>> getDetectionMetrics({String period = '7d'}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.analyticsDetections,
+        queryParameters: {'period': period},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get source health report
+  Future<Map<String, dynamic>> getSourceHealth() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.analyticsSources);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get geo distribution
+  Future<Map<String, dynamic>> getGeoDistribution({String period = '7d'}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.analyticsGeo,
+        queryParameters: {'period': period},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get analytics dashboard config
+  Future<Map<String, dynamic>> getAnalyticsDashboard() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.analyticsDashboard);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// List analytics reports
+  Future<List<Map<String, dynamic>>> getAnalyticsReports({int limit = 20}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.analyticsReports,
+        queryParameters: {'limit': limit},
+      );
+      return (response.data as List<dynamic>?)
+          ?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Create analytics report
+  Future<Map<String, dynamic>> createAnalyticsReport({
+    required String reportType,
+    String format = 'json',
+    String period = '7d',
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.analyticsReportCreate,
+        data: {
+          'report_type': reportType,
+          'format': format,
+          'period': period,
+        },
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get analytics report by ID
+  Future<Map<String, dynamic>> getAnalyticsReport(String id) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.analyticsReport(id));
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
+  // DESKTOP SECURITY (Extended)
+  // ============================================
+
+  /// Quick scan persistence
+  Future<Map<String, dynamic>> quickScanPersistence() async {
+    try {
+      final response = await _dio.post(ApiEndpoints.desktopPersistenceQuickScan);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Verify code signing
+  Future<Map<String, dynamic>> verifyCodeSigning(String path) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.desktopCodesignVerify,
+        data: {'path': path},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get network connections
+  Future<List<Map<String, dynamic>>> getNetworkConnections() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopNetworkConnections);
+      return (response.data as List<dynamic>?)
+          ?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get listening ports
+  Future<List<Map<String, dynamic>>> getListeningPorts() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopNetworkListening);
+      return (response.data as List<dynamic>?)
+          ?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get outbound connections
+  Future<List<Map<String, dynamic>>> getOutboundConnections() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopNetworkOutbound);
+      return (response.data as List<dynamic>?)
+          ?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Get network firewall rules
+  Future<List<Map<String, dynamic>>> getNetworkFirewallRules() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopNetworkRules);
+      return (response.data as List<dynamic>?)
+          ?.cast<Map<String, dynamic>>() ?? [];
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Add firewall rule
+  Future<void> addFirewallRule(Map<String, dynamic> rule) async {
+    try {
+      await _dio.post(ApiEndpoints.desktopNetworkRulesAdd, data: rule);
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Delete firewall rule
+  Future<void> deleteFirewallRule(String id) async {
+    try {
+      await _dio.delete(ApiEndpoints.desktopNetworkRuleDelete(id));
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Block IP address
+  Future<void> blockIpAddress(String ip, {String reason = ''}) async {
+    try {
+      await _dio.post(ApiEndpoints.desktopBlockIp, data: {'ip': ip, 'reason': reason});
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Scan browser extensions
+  Future<Map<String, dynamic>> scanBrowserExtensions() async {
+    try {
+      final response = await _dio.post(ApiEndpoints.desktopBrowserScan);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// VirusTotal hash lookup
+  Future<Map<String, dynamic>> vtLookupHash(String hash) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopVtHash(hash));
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// VirusTotal IP lookup
+  Future<Map<String, dynamic>> vtLookupIp(String ip) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.desktopVtIp(ip));
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Full desktop security scan
+  Future<Map<String, dynamic>> fullDesktopScan() async {
+    try {
+      final response = await _dio.post(ApiEndpoints.desktopFullScan);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
 }
 
 /// Generic paginated response

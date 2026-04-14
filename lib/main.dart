@@ -79,7 +79,7 @@ void main() async {
   // Initialize OrbGuard API Client first
   await OrbGuardApiClient.instance.init(
     baseUrl: ApiConfig.baseUrl,
-    enableLogging: false,
+    enableLogging: true,
   );
 
   // Initialize threat intelligence
