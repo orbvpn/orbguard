@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -464,8 +465,81 @@ func (s *NetworkSecurityService) generateWiFiRecommendations(result *models.WiFi
 	}
 }
 
-// CheckDNS performs a DNS security check
-func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCheckRequest) (*models.DNSCheckResult, error) {
+// ClientCanaryResolution is one canary domain that the CLIENT resolved through
+// its own local resolver and submitted for verification. Hijack detection must
+// run against the client's resolver: the server resolving canaries only proves
+// something about the server's resolver, which says nothing about the device.
+type ClientCanaryResolution struct {
+	// Canary is the well-known hostname the client resolved (e.g. "one.one.one.one").
+	Canary string `json:"canary"`
+	// ResolvedIPs are the answers the client's local resolver returned.
+	ResolvedIPs []string `json:"resolved_ips"`
+	// ResolverHint is the client's best-effort report of which resolver it
+	// used (e.g. the configured DNS server IP). Informational only.
+	ResolverHint string `json:"resolver_hint,omitempty"`
+}
+
+// DNSCheckOutcome wraps the DNS check result with explicit per-check status
+// strings so callers can distinguish "checked and clean" from "not checked".
+type DNSCheckOutcome struct {
+	Result *models.DNSCheckResult
+	// HijackCheckStatus describes whether the hijack check actually ran:
+	// "performed: ...", "not_performed: ..." or "not_requested".
+	HijackCheckStatus string
+	// LeakCheckStatus describes the leak check state. Leak detection requires
+	// a controlled canary domain (randomized subdomain whose authoritative
+	// queries we can observe); none is deployed, so when requested this is
+	// always dnsLeakCheckUnavailable rather than a fabricated result.
+	LeakCheckStatus string
+}
+
+const (
+	dnsCheckNotRequested = "not_requested"
+	// dnsLeakCheckUnavailable is returned whenever a leak check is requested:
+	// honest leak detection needs a randomized-subdomain canary under a domain
+	// whose authoritative resolver logs the backend controls. No such domain
+	// exists in this deployment, so the check is reported unavailable instead
+	// of being faked from provider capabilities.
+	dnsLeakCheckUnavailable = "unavailable: leak detection requires a controlled canary domain, which is not deployed"
+)
+
+// dnsCanaryAnswerSets maps verifiable canary hostnames to their published,
+// long-term-stable answer sets. Both canaries are operated by the resolver
+// vendors themselves and have not changed their A/AAAA records in years:
+//   - one.one.one.one  -> Cloudflare public DNS service addresses
+//   - dns.google       -> Google Public DNS service addresses
+//
+// Any answer outside these sets means the client's resolver is rewriting
+// responses (hijack/captive portal/filtering middlebox).
+var dnsCanaryAnswerSets = map[string]map[string]bool{
+	"one.one.one.one": {
+		"1.1.1.1":              true,
+		"1.0.0.1":              true,
+		"2606:4700:4700::1111": true,
+		"2606:4700:4700::1001": true,
+	},
+	"dns.google": {
+		"8.8.8.8":              true,
+		"8.8.4.4":              true,
+		"2001:4860:4860::8888": true,
+		"2001:4860:4860::8844": true,
+	},
+}
+
+// dnsCanaryExpected renders the known-good answer set for hijack details.
+func dnsCanaryExpected(known map[string]bool) string {
+	ips := make([]string, 0, len(known))
+	for ip := range known {
+		ips = append(ips, ip)
+	}
+	sort.Strings(ips)
+	return strings.Join(ips, ", ")
+}
+
+// CheckDNS performs a DNS security check. Hijack detection is driven entirely
+// by client-submitted canary resolutions (resolved on the device through its
+// local resolver) compared against known-good answer sets and threat intel.
+func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCheckRequest, clientResolutions []ClientCanaryResolution) (*DNSCheckOutcome, error) {
 	result := &models.DNSCheckResult{
 		ID:              uuid.New(),
 		CurrentDNS:      req.CurrentDNS,
@@ -473,37 +547,59 @@ func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCh
 		Recommendations: make([]models.NetworkRecommendation, 0),
 		CheckedAt:       time.Now(),
 	}
+	outcome := &DNSCheckOutcome{
+		Result:            result,
+		HijackCheckStatus: dnsCheckNotRequested,
+		LeakCheckStatus:   dnsCheckNotRequested,
+	}
 
-	// Check if DNS is from a known provider
-	if provider, ok := models.KnownDNSProviders[req.CurrentDNS]; ok {
-		result.Provider = provider
-		result.IsSecure = provider.IsTrusted
-		result.IsEncrypted = provider.SupportsDoH || provider.SupportsDoT
-		if provider.SupportsDoH {
-			result.EncryptionType = "doh"
-		} else if provider.SupportsDoT {
-			result.EncryptionType = "dot"
-		}
-	} else {
-		// Unknown DNS - could be ISP or potentially malicious
+	// Classify the resolver the client reports it is using.
+	switch {
+	case req.CurrentDNS == "":
+		// The client could not determine its configured resolver. Provider
+		// trust cannot be assessed; say so instead of guessing.
 		result.IsSecure = false
 		result.SecurityIssues = append(result.SecurityIssues, models.DNSSecurityIssue{
-			Type:        "unknown_dns",
-			Severity:    models.NetworkRiskLevelMedium,
-			Title:       "Unknown DNS Server",
-			Description: fmt.Sprintf("DNS server %s is not a recognized trusted provider", req.CurrentDNS),
-			Mitigation:  "Consider switching to a trusted DNS provider like Cloudflare (1.1.1.1) or Quad9 (9.9.9.9)",
+			Type:        "resolver_unknown",
+			Severity:    models.NetworkRiskLevelLow,
+			Title:       "DNS Resolver Address Unknown",
+			Description: "The device did not report its configured DNS server, so the resolver's provider and trust level cannot be assessed",
+			Mitigation:  "Configure an explicit trusted DNS provider like Cloudflare (1.1.1.1) or Quad9 (9.9.9.9)",
 		})
+	default:
+		if provider, ok := models.KnownDNSProviders[req.CurrentDNS]; ok {
+			result.Provider = provider
+			result.IsSecure = provider.IsTrusted
+			result.IsEncrypted = provider.SupportsDoH || provider.SupportsDoT
+			if provider.SupportsDoH {
+				result.EncryptionType = "doh"
+			} else if provider.SupportsDoT {
+				result.EncryptionType = "dot"
+			}
+		} else {
+			// Unknown DNS - could be ISP or potentially malicious
+			result.IsSecure = false
+			result.SecurityIssues = append(result.SecurityIssues, models.DNSSecurityIssue{
+				Type:        "unknown_dns",
+				Severity:    models.NetworkRiskLevelMedium,
+				Title:       "Unknown DNS Server",
+				Description: fmt.Sprintf("DNS server %s is not a recognized trusted provider", req.CurrentDNS),
+				Mitigation:  "Consider switching to a trusted DNS provider like Cloudflare (1.1.1.1) or Quad9 (9.9.9.9)",
+			})
+		}
 	}
 
-	// Check for DNS hijacking if requested
+	// Verify the client's canary resolutions for hijacking if requested.
 	if req.CheckHijack {
-		s.checkDNSHijacking(ctx, result)
+		outcome.HijackCheckStatus = s.verifyClientCanaryResolutions(ctx, result, clientResolutions)
 	}
 
-	// Check for DNS leaks if requested
+	// Leak detection cannot be performed honestly without a controlled canary
+	// domain; report it unavailable instead of inferring a "leak" from
+	// provider capabilities (which proves nothing about actual query paths).
 	if req.CheckLeaks {
-		s.checkDNSLeaks(ctx, result)
+		outcome.LeakCheckStatus = dnsLeakCheckUnavailable
+		s.logger.Info().Msg("DNS leak check requested but unavailable: no controlled canary domain deployed")
 	}
 
 	// Generate recommendations
@@ -513,85 +609,124 @@ func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCh
 		Str("dns", req.CurrentDNS).
 		Bool("is_secure", result.IsSecure).
 		Bool("is_hijacked", result.IsHijacked).
+		Str("hijack_check", outcome.HijackCheckStatus).
+		Int("client_resolutions", len(clientResolutions)).
 		Msg("DNS check completed")
 
-	return result, nil
+	return outcome, nil
 }
 
-func (s *NetworkSecurityService) checkDNSHijacking(ctx context.Context, result *models.DNSCheckResult) {
-	// Test domains that should resolve to known IPs
-	testCases := []struct {
-		domain     string
-		expectedIP string // simplified - in reality would check against known good IPs
-	}{
-		{"www.google.com", ""},
-		{"www.cloudflare.com", ""},
+// verifyClientCanaryResolutions compares the canary answers the CLIENT's local
+// resolver returned against the published answer sets, escalating deviations
+// with threat intelligence on the resolved IPs. Returns the check status.
+func (s *NetworkSecurityService) verifyClientCanaryResolutions(ctx context.Context, result *models.DNSCheckResult, resolutions []ClientCanaryResolution) string {
+	if len(resolutions) == 0 {
+		return "not_performed: client submitted no canary resolutions"
 	}
 
-	for _, tc := range testCases {
-		ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", tc.domain)
-		if err != nil {
+	verified := 0
+	for _, res := range resolutions {
+		canary := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(res.Canary), "."))
+		known, ok := dnsCanaryAnswerSets[canary]
+		if !ok {
+			s.logger.Warn().Str("canary", res.Canary).Msg("client submitted canary with no known answer set; skipping")
+			continue
+		}
+		if len(res.ResolvedIPs) == 0 {
+			// The client's resolver returned nothing for a domain that always
+			// resolves. That is a resolution failure, not proof of hijacking.
+			s.logger.Info().Str("canary", canary).Str("resolver_hint", res.ResolverHint).
+				Msg("client reported empty answer set for canary (local resolution failure)")
 			continue
 		}
 
-		// Check if resolved IP looks suspicious
-		for _, ip := range ips {
+		verified++
+		for _, raw := range res.ResolvedIPs {
+			ip := net.ParseIP(strings.TrimSpace(raw))
+			if ip == nil {
+				s.logger.Warn().Str("canary", canary).Str("value", raw).Msg("client submitted unparseable canary answer; skipping")
+				continue
+			}
+			if known[ip.String()] {
+				continue
+			}
+
+			// Deviation from the published answer set: the client's resolver
+			// is rewriting answers for this canary.
+			confidence := 0.8
+			description := fmt.Sprintf("Device resolver returned %s for %s, outside the provider's published answer set", ip.String(), canary)
 			if s.isSuspiciousIP(ip) {
-				result.IsHijacked = true
+				confidence = 0.95
+				description = fmt.Sprintf("Device resolver returned private/loopback address %s for public canary %s (captive portal or local DNS interception)", ip.String(), canary)
+			} else if ind := s.lookupIPIndicator(ctx, ip); ind != nil {
+				confidence = 0.95
+				description = fmt.Sprintf("Device resolver returned %s for %s, which matches a known threat indicator (severity %s)", ip.String(), canary, ind.Severity)
+			}
+			if res.ResolverHint != "" {
+				description += fmt.Sprintf(" [client resolver: %s]", res.ResolverHint)
+			}
+
+			result.IsHijacked = true
+			if result.HijackDetails == nil || confidence > result.HijackDetails.Confidence {
 				result.HijackDetails = &models.DNSHijackDetails{
-					ExpectedIP:  tc.expectedIP,
+					ExpectedIP:  dnsCanaryExpected(known),
 					ResolvedIP:  ip.String(),
-					TestDomain:  tc.domain,
-					Confidence:  0.8,
-					Description: fmt.Sprintf("DNS resolution for %s returned suspicious IP %s", tc.domain, ip.String()),
+					TestDomain:  canary,
+					Confidence:  confidence,
+					Description: description,
 					DetectedAt:  time.Now(),
 				}
-				result.SecurityIssues = append(result.SecurityIssues, models.DNSSecurityIssue{
-					Type:        "dns_hijacking",
-					Severity:    models.NetworkRiskLevelCritical,
-					Title:       "DNS Hijacking Detected",
-					Description: "Your DNS queries are being redirected to potentially malicious servers",
-					Mitigation:  "Switch to encrypted DNS (DoH) immediately. Consider using VPN.",
-				})
-				return
 			}
 		}
 	}
+
+	if result.IsHijacked {
+		result.SecurityIssues = append(result.SecurityIssues, models.DNSSecurityIssue{
+			Type:        "dns_hijacking",
+			Severity:    models.NetworkRiskLevelCritical,
+			Title:       "DNS Hijacking Detected",
+			Description: "The device's DNS resolver is rewriting answers for well-known domains",
+			Mitigation:  "Switch to encrypted DNS (DoH) immediately. Consider using VPN.",
+		})
+	}
+
+	if verified == 0 {
+		return "not_performed: no verifiable canary resolutions submitted"
+	}
+	return fmt.Sprintf("performed: %d canary domain(s) verified against known answer sets", verified)
 }
 
 func (s *NetworkSecurityService) isSuspiciousIP(ip net.IP) bool {
-	// Check for private IPs (shouldn't resolve for public domains)
-	if ip.IsPrivate() || ip.IsLoopback() {
-		return true
-	}
-
-	// Check for known malicious IP ranges (simplified)
-	// In production, this would check against threat intelligence
-	return false
+	// Private/loopback/unspecified addresses must never be the answer for a
+	// public canary domain; they indicate local interception.
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast()
 }
 
-func (s *NetworkSecurityService) checkDNSLeaks(ctx context.Context, result *models.DNSCheckResult) {
-	// In production, this would:
-	// 1. Make requests to a DNS leak test service
-	// 2. Check which DNS servers actually handled the request
-	// 3. Report if queries went to unexpected servers
-
-	// For now, we'll just check if using encrypted DNS
-	if !result.IsEncrypted {
-		result.LeakDetected = true
-		result.LeakDetails = &models.DNSLeakDetails{
-			LeakedToISP: true,
-			Description: "DNS queries are not encrypted and may be visible to your ISP",
-			DetectedAt:  time.Now(),
-		}
-		result.SecurityIssues = append(result.SecurityIssues, models.DNSSecurityIssue{
-			Type:        "dns_leak",
-			Severity:    models.NetworkRiskLevelMedium,
-			Title:       "Potential DNS Leak",
-			Description: "Your DNS queries are not encrypted and could be monitored",
-			Mitigation:  "Enable DNS-over-HTTPS (DoH) or DNS-over-TLS (DoT)",
-		})
+// lookupIPIndicator checks the threat-intelligence indicator store for a
+// resolved IP. Returns nil when no indicator exists or lookup fails (failures
+// are logged, never silently treated as "clean with certainty").
+func (s *NetworkSecurityService) lookupIPIndicator(ctx context.Context, ip net.IP) *models.Indicator {
+	if s.repos == nil || s.repos.Indicators == nil {
+		s.logger.Warn().Msg("indicator repository unavailable; skipping threat-intel check on resolved IP")
+		return nil
 	}
+
+	types := []models.IndicatorType{models.IndicatorTypeIP, models.IndicatorTypeIPv4}
+	if ip.To4() == nil {
+		types = []models.IndicatorType{models.IndicatorTypeIP, models.IndicatorTypeIPv6}
+	}
+	for _, iocType := range types {
+		ind, err := s.repos.Indicators.GetByValue(ctx, ip.String(), iocType)
+		if err != nil {
+			s.logger.Warn().Err(err).Str("ip", ip.String()).Str("type", string(iocType)).
+				Msg("threat-intel lookup on resolved IP failed")
+			continue
+		}
+		if ind != nil {
+			return ind
+		}
+	}
+	return nil
 }
 
 func (s *NetworkSecurityService) generateDNSRecommendations(result *models.DNSCheckResult) {

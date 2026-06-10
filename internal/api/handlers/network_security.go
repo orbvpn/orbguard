@@ -127,25 +127,43 @@ func (h *NetworkSecurityHandler) GetWiFiSecurityInfo(w http.ResponseWriter, r *h
 	})
 }
 
+// dnsCheckRequestBody is the wire body of POST /api/v1/network/dns/check:
+// the legacy DNSCheckRequest fields plus the client-resolved canary results
+// that drive hijack detection (resolution happens on the DEVICE, through its
+// local resolver — the server only verifies the submitted answers).
+type dnsCheckRequestBody struct {
+	models.DNSCheckRequest
+	ClientResolutions []services.ClientCanaryResolution `json:"client_resolutions,omitempty"`
+}
+
+// dnsCheckResponse extends the DNS check result with explicit statuses so a
+// client can tell "checked and clean" apart from "check did not run".
+type dnsCheckResponse struct {
+	*models.DNSCheckResult
+	HijackCheckStatus string `json:"hijack_check_status"`
+	LeakCheckStatus   string `json:"leak_check_status"`
+}
+
 // CheckDNS handles POST /api/v1/network/dns/check
 func (h *NetworkSecurityHandler) CheckDNS(w http.ResponseWriter, r *http.Request) {
-	var req models.DNSCheckRequest
+	var req dnsCheckRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if req.CurrentDNS == "" {
-		h.respondError(w, http.StatusBadRequest, "current_dns is required")
+	if req.CurrentDNS == "" && len(req.ClientResolutions) == 0 {
+		h.respondError(w, http.StatusBadRequest, "current_dns or client_resolutions is required")
 		return
 	}
 
-	result, err := h.service.CheckDNS(r.Context(), &req)
+	outcome, err := h.service.CheckDNS(r.Context(), &req.DNSCheckRequest, req.ClientResolutions)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to check DNS")
 		h.respondError(w, http.StatusInternalServerError, "failed to check DNS")
 		return
 	}
+	result := outcome.Result
 
 	dnsRiskLevel := string(models.NetworkRiskLevelSafe)
 	dnsRiskScore := 0.0
@@ -166,7 +184,11 @@ func (h *NetworkSecurityHandler) CheckDNS(w http.ResponseWriter, r *http.Request
 		Findings:        result,
 	})
 
-	h.respondJSON(w, http.StatusOK, result)
+	h.respondJSON(w, http.StatusOK, dnsCheckResponse{
+		DNSCheckResult:    result,
+		HijackCheckStatus: outcome.HijackCheckStatus,
+		LeakCheckStatus:   outcome.LeakCheckStatus,
+	})
 }
 
 // GetDNSProviders handles GET /api/v1/network/dns/providers
@@ -462,7 +484,7 @@ func (h *NetworkSecurityHandler) GetStats(w http.ResponseWriter, r *http.Request
 func (h *NetworkSecurityHandler) FullNetworkAudit(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		WiFi     *models.WiFiAuditRequest     `json:"wifi,omitempty"`
-		DNS      *models.DNSCheckRequest      `json:"dns,omitempty"`
+		DNS      *dnsCheckRequestBody         `json:"dns,omitempty"`
 		ARP      *models.ARPSpoofCheckRequest `json:"arp,omitempty"`
 		SSL      []models.SSLCheckRequest     `json:"ssl,omitempty"`
 		DeviceID string                       `json:"device_id,omitempty"`
@@ -486,13 +508,15 @@ func (h *NetworkSecurityHandler) FullNetworkAudit(w http.ResponseWriter, r *http
 		}
 	}
 
-	// Run DNS check
+	// Run DNS check (hijack detection driven by client-resolved canaries)
 	if req.DNS != nil {
-		dnsResult, err := h.service.CheckDNS(r.Context(), req.DNS)
+		dnsOutcome, err := h.service.CheckDNS(r.Context(), &req.DNS.DNSCheckRequest, req.DNS.ClientResolutions)
 		if err != nil {
 			h.logger.Warn().Err(err).Msg("DNS check failed")
 		} else {
-			result["dns"] = dnsResult
+			result["dns"] = dnsOutcome.Result
+			result["dns_hijack_check_status"] = dnsOutcome.HijackCheckStatus
+			result["dns_leak_check_status"] = dnsOutcome.LeakCheckStatus
 		}
 	}
 
