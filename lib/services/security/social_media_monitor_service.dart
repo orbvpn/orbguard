@@ -526,21 +526,9 @@ class SocialMediaMonitorService {
   Future<List<ImpersonationAlert>> _checkImpersonation(SocialAccount account) async {
     final alerts = <ImpersonationAlert>[];
 
-    // In production, this would search for similar accounts
-    // using name matching, profile photo similarity, etc.
-
-    // Simulated check - look for common impersonation patterns
-    final impersonatorPatterns = [
-      '${account.username}_official',
-      '${account.username}_real',
-      '${account.username}__',
-      '${account.username}.official',
-      'real_${account.username}',
-      '${account.username}1',
-      '${account.username}2',
-    ];
-
-    // Simulate finding an impersonator
+    // Impersonation detection requires a live similar-account search API.
+    // Without one this check honestly returns no alerts rather than
+    // fabricating matches from username patterns.
     if (_apiKey != null) {
       try {
         final response = await http.get(
@@ -550,27 +538,29 @@ class SocialMediaMonitorService {
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body) as Map<String, dynamic>;
-          // Process API response
+          final rawAlerts = data['alerts'];
+          if (rawAlerts is List) {
+            for (final raw in rawAlerts.whereType<Map<String, dynamic>>()) {
+              alerts.add(ImpersonationAlert(
+                id: raw['id'] as String? ??
+                    'imp_${DateTime.now().millisecondsSinceEpoch}',
+                platform: account.platform,
+                impersonatorUsername:
+                    raw['impersonator_username'] as String? ?? '',
+                targetUsername: account.username,
+                similarityScore:
+                    (raw['similarity_score'] as num?)?.toDouble() ?? 0.0,
+                indicators: (raw['indicators'] as List?)
+                        ?.whereType<String>()
+                        .toList() ??
+                    const [],
+              ));
+            }
+          }
         }
       } catch (e) {
         debugPrint('Impersonation check failed: $e');
       }
-    }
-
-    // Local simulation for demo
-    if (account.username.length > 5) {
-      alerts.add(ImpersonationAlert(
-        id: 'imp_${DateTime.now().millisecondsSinceEpoch}',
-        platform: account.platform,
-        impersonatorUsername: '${account.username}_official',
-        targetUsername: account.username,
-        similarityScore: 0.85,
-        indicators: [
-          'Similar username pattern',
-          'Recently created account',
-          'Copying profile information',
-        ],
-      ));
     }
 
     return alerts;

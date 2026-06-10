@@ -743,6 +743,30 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 ],
               ),
             ),
+          ] else if (settings.thiefSelfieEnabled) ...[
+            // Honest empty state: the feature is armed but nothing has been
+            // captured — never a placeholder photo.
+            const SizedBox(height: 24),
+            const Text(
+              'Captured Photos',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Row(
+                children: [
+                  DuotoneIcon('camera', size: 24, color: Colors.white54),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'No selfies captured. A photo is taken after '
+                      'repeated failed unlock attempts and will appear here.',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),

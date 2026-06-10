@@ -2,7 +2,6 @@
 // Location: lib/detection/
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 
@@ -15,7 +14,6 @@ class BehavioralAnomalyDetector {
 
   // Baseline metrics for normal behavior
   final Map<String, dynamic> _baseline = {};
-  final List<Map<String, dynamic>> _anomalies = [];
 
   /// Establish baseline of normal device behavior
   Future<void> learnBaseline({int durationMinutes = 60}) async {

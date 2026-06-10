@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
-import 'screens/elevated_access_setup_screen.dart';
 import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
@@ -122,7 +120,7 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AppSecurityProvider()),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
         ChangeNotifierProvider(create: (_) => DarkWebProvider()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
         ChangeNotifierProvider(create: (_) => MitreProvider()),
         ChangeNotifierProvider(create: (_) => IdentityProtectionProvider()),
         ChangeNotifierProvider(create: (_) => ExecutiveProtectionProvider()),
@@ -186,15 +184,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Bottom navigation state
   int _currentNavIndex = 0;
 
-  bool _isScanning = false;
   bool _hasRootAccess = false;
-  String _deviceInfo = '';
-  String _accessLevel = 'Standard';
   String _accessMethod = 'Standard';
   final List<ThreatDetection> _threats = [];
-  ScanProgress _scanProgress = ScanProgress();
   double _detectionCapability = 0.0;
-  bool _permissionsChecked = false;
 
   @override
   void initState() {
@@ -224,31 +217,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeApp() async {
-    await _checkDeviceInfo();
     await _checkSystemAccess();
     await _checkAllPermissions();
     await _calculateDetectionCapability();
-  }
-
-  Future<void> _checkDeviceInfo() async {
-    final deviceInfo = DeviceInfoPlugin();
-    String info = '';
-
-    if (Platform.isAndroid) {
-      final androidInfo = await deviceInfo.androidInfo;
-      info = 'Android ${androidInfo.version.release}\n'
-          'Model: ${androidInfo.model}\n'
-          'Security Patch: ${androidInfo.version.securityPatch ?? "Unknown"}';
-    } else if (Platform.isIOS) {
-      final iosInfo = await deviceInfo.iosInfo;
-      info = 'iOS ${iosInfo.systemVersion}\n'
-          'Model: ${iosInfo.model}\n'
-          'Device: ${iosInfo.name}';
-    }
-
-    setState(() {
-      _deviceInfo = info;
-    });
   }
 
   Future<void> _checkSystemAccess() async {
@@ -256,16 +227,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final result = await platform.invokeMethod('checkRootAccess');
       setState(() {
         _hasRootAccess = result['hasRoot'] ?? false;
-        _accessLevel = result['accessLevel'] ?? 'Standard';
         _accessMethod = result['method'] ?? 'Standard';
       });
 
       if (_accessMethod != 'Standard') {
-        print('[OrbGuard] Access method detected: $_accessMethod');
+        debugPrint('[OrbGuard] Access method detected: $_accessMethod');
       }
     } catch (e) {
       setState(() {
-        _accessLevel = 'Standard';
         _accessMethod = 'Standard';
       });
     }
@@ -273,9 +242,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _checkAllPermissions() async {
     await specialPermissions.checkPermissions();
-    setState(() {
-      _permissionsChecked = true;
-    });
   }
 
   Future<void> _calculateDetectionCapability() async {
@@ -342,22 +308,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     if (scanResult != null && scanResult.threats.isNotEmpty) {
-      print('[OrbGuard] Received ${scanResult.threats.length} threats from scan');
+      debugPrint('[OrbGuard] Received ${scanResult.threats.length} threats from scan');
       setState(() {
         _threats.clear();
         for (var t in scanResult.threats) {
           final converted = ThreatDetection.fromJson(t);
-          print('[OrbGuard] Converted: ${converted.name} (${converted.severity})');
+          debugPrint('[OrbGuard] Converted: ${converted.name} (${converted.severity})');
           _threats.add(converted);
         }
         _lastScanItemsScanned = scanResult.itemsScanned;
         _lastScanDuration = scanResult.scanDuration;
       });
-      print('[OrbGuard] Showing results with ${_threats.length} threats');
+      debugPrint('[OrbGuard] Showing results with ${_threats.length} threats');
       _showScanResults();
     } else if (scanResult != null) {
       // Scan completed with no threats
-      print('[OrbGuard] Scan completed with no threats');
+      debugPrint('[OrbGuard] Scan completed with no threats');
       setState(() {
         _lastScanItemsScanned = scanResult.itemsScanned;
         _lastScanDuration = scanResult.scanDuration;
@@ -430,163 +396,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _runScanPhase(
-    String phase,
-    Future<void> Function() scanFunc,
-  ) async {
-    setState(() {
-      _scanProgress.currentPhase = phase;
-    });
-    await scanFunc();
-  }
-
-  Future<void> _scanNetwork() async {
-    try {
-      final result = await platform.invokeMethod('scanNetwork');
-      final threats = _parseThreatData(result['threats']);
-      setState(() {
-        _threats.addAll(threats);
-        _scanProgress.networkComplete = true;
-      });
-    } catch (e) {
-      print('Network scan error: $e');
-      setState(() {
-        _scanProgress.networkComplete = true;
-      });
-    }
-  }
-
-  Future<void> _scanProcesses() async {
-    try {
-      final result = await platform.invokeMethod('scanProcesses');
-      final threats = _parseThreatData(result['threats']);
-      setState(() {
-        _threats.addAll(threats);
-        _scanProgress.processComplete = true;
-      });
-    } catch (e) {
-      print('Process scan error: $e');
-      setState(() {
-        _scanProgress.processComplete = true;
-      });
-    }
-  }
-
-  Future<void> _scanFileSystem() async {
-    try {
-      final result = await platform.invokeMethod('scanFileSystem');
-      final threats = _parseThreatData(result['threats']);
-      setState(() {
-        _threats.addAll(threats);
-        _scanProgress.fileSystemComplete = true;
-      });
-    } catch (e) {
-      print('File system scan error: $e');
-      setState(() {
-        _scanProgress.fileSystemComplete = true;
-      });
-    }
-  }
-
-  Future<void> _scanDatabases() async {
-    try {
-      final result = await platform.invokeMethod('scanDatabases');
-      final threats = _parseThreatData(result['threats']);
-      setState(() {
-        _threats.addAll(threats);
-        _scanProgress.databaseComplete = true;
-      });
-    } catch (e) {
-      print('Database scan error: $e');
-      setState(() {
-        _scanProgress.databaseComplete = true;
-      });
-    }
-  }
-
-  Future<void> _scanMemory() async {
-    try {
-      final result = await platform.invokeMethod('scanMemory');
-      final threats = _parseThreatData(result['threats']);
-      setState(() {
-        _threats.addAll(threats);
-        _scanProgress.memoryComplete = true;
-      });
-    } catch (e) {
-      print('Memory scan error: $e');
-      setState(() {
-        _scanProgress.memoryComplete = true;
-      });
-    }
-  }
-
-  void _addThreats(List<Map<String, dynamic>> threats) {
-    setState(() {
-      _threats.addAll(threats.map((t) => ThreatDetection.fromJson(t)));
-    });
-  }
-
-  Future<void> _matchCloudIntelligence() async {
-    for (final threat in _threats) {
-      bool isKnown = false;
-
-      switch (threat.type) {
-        case 'network':
-          isKnown = threatIntel.isDomainMalicious(threat.path);
-          break;
-        case 'process':
-          isKnown = threatIntel.isProcessMalicious(threat.path);
-          break;
-        case 'package':
-          isKnown = threatIntel.isPackageMalicious(threat.path);
-          break;
-      }
-
-      if (isKnown) {
-        threat.severity = 'CRITICAL';
-        final details = threatIntel.getIndicatorDetails(
-          threat.path,
-          _mapToIndicatorType(threat.type),
-        );
-
-        if (details != null) {
-          threat.metadata.addAll({
-            'verifiedByCloudIntel': true,
-            'sources': details.sources,
-            'reportCount': details.reportCount,
-            'tags': details.tags,
-          });
-        }
-      }
-    }
-
-    setState(() {
-      _scanProgress.iocComplete = true;
-    });
-  }
-
-  IndicatorType _mapToIndicatorType(String type) {
-    switch (type) {
-      case 'network':
-        return IndicatorType.domain;
-      case 'process':
-        return IndicatorType.processName;
-      case 'package':
-        return IndicatorType.packageName;
-      default:
-        return IndicatorType.domain;
-    }
-  }
-
-  List<ThreatDetection> _parseThreatData(dynamic data) {
-    if (data == null) return [];
-    List<ThreatDetection> threats = [];
-    for (var item in data) {
-      threats.add(ThreatDetection.fromJson(item));
-    }
-    return threats;
-  }
-
   void _showScanResults() {
     Navigator.push(
       context,
@@ -640,68 +449,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await _calculateDetectionCapability();
       setState(() {});
     }
-  }
-
-  Future<void> _removeThreat(ThreatDetection threat) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Threat'),
-        content: Text(
-          'Are you sure you want to remove:\n\n'
-          '${threat.name}\n\n'
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _executeRemoval(threat);
-            },
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _executeRemoval(ThreatDetection threat) async {
-    try {
-      final result = await platform.invokeMethod('removeThreat', {
-        'id': threat.id,
-        'type': threat.type,
-        'path': threat.path,
-        'requiresRoot': threat.requiresRoot,
-      });
-
-      if (result['success']) {
-        setState(() {
-          _threats.remove(threat);
-        });
-        _showSuccess('Threat removed successfully');
-      } else {
-        _showError('Failed to remove threat');
-      }
-    } catch (e) {
-      _showError('Removal failed: $e');
-    }
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
   }
 
   @override
@@ -1009,385 +756,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCapabilityBanner() {
-    Color bannerColor = _detectionCapability >= 50 ? Colors.orange : Colors.red;
-
-    return Card(
-      color: bannerColor.withAlpha(51),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            DuotoneIcon(AppIcons.dangerTriangle, color: bannerColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Detection capability at ${_detectionCapability.round()}%. Grant permissions for full protection.',
-                style: TextStyle(color: bannerColor),
-              ),
-            ),
-            TextButton(
-              onPressed: _navigateToPermissionSetup,
-              child: const Text('Setup'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusCard() {
-    final criticalThreats =
-        _threats.where((t) => t.severity == 'CRITICAL').length;
-    final highThreats = _threats.where((t) => t.severity == 'HIGH').length;
-
-    Color statusColor = Colors.green;
-    String statusText = 'Protected';
-    String statusIcon = AppIcons.shield;
-
-    if (criticalThreats > 0) {
-      statusColor = Colors.red;
-      statusText = 'Critical Threats Detected';
-      statusIcon = AppIcons.dangerCircle;
-    } else if (highThreats > 0) {
-      statusColor = Colors.orange;
-      statusText = 'Threats Detected';
-      statusIcon = AppIcons.dangerTriangle;
-    }
-
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          GlassCircleButton(
-            size: 80,
-            tintColor: statusColor,
-            child: DuotoneIcon(statusIcon, size: 40, color: statusColor),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            statusText,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: statusColor,
-            ),
-          ),
-          if (_threats.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildThreatCount('Critical', criticalThreats, GlassTheme.errorColor),
-                _buildThreatCount('High', highThreats, GlassTheme.warningColor),
-                _buildThreatCount(
-                  'Medium',
-                  _threats.where((t) => t.severity == 'MEDIUM').length,
-                  Colors.yellow,
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThreatCount(String label, int count, Color color) {
-    return Column(
-      children: [
-        Text(
-          count.toString(),
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-
-  Widget _buildDeviceInfoCard() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              GlassSvgIconBox(
-                icon: AppIcons.smartphone,
-                color: GlassTheme.primaryAccent,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Device Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(_deviceInfo, style: TextStyle(fontSize: 14, color: Colors.grey[400])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetectionCapabilityCard() {
-    Color capabilityColor = _detectionCapability >= 80
-        ? GlassTheme.successColor
-        : _detectionCapability >= 50
-            ? GlassTheme.warningColor
-            : GlassTheme.errorColor;
-
-    return GlassCard(
-      onTap: _navigateToPermissionSetup,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  GlassSvgIconBox(
-                    icon: _detectionCapability >= 80
-                        ? AppIcons.shieldCheck
-                        : _detectionCapability >= 50
-                            ? AppIcons.shield
-                            : AppIcons.dangerTriangle,
-                    color: capabilityColor,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Detection Capability',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              Text(
-                '${_detectionCapability.round()}%',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: capabilityColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: _detectionCapability / 100,
-              backgroundColor: Colors.white.withAlpha(20),
-              color: capabilityColor,
-              minHeight: 8,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Status breakdown
-          _buildCapabilityBreakdown(),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _detectionCapability >= 80
-                    ? 'Full protection active'
-                    : 'Tap to configure permissions',
-                style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-              ),
-              DuotoneIcon(AppIcons.chevronRight, color: Colors.grey[600]!, size: 20),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCapabilityBreakdown() {
-    return FutureBuilder<List<_CapabilityItem>>(
-      future: _getCapabilityItems(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-
-        final items = snapshot.data!;
-
-        return Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: items.map((item) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: item.enabled
-                    ? Colors.green.withAlpha(30)
-                    : Colors.grey.withAlpha(30),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: item.enabled
-                      ? Colors.green.withAlpha(100)
-                      : Colors.grey.withAlpha(50),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DuotoneIcon(
-                    item.enabled ? AppIcons.checkCircle : AppIcons.minusCircle,
-                    size: 14,
-                    color: item.enabled ? Colors.green : Colors.grey[600]!,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: item.enabled ? Colors.green[300] : Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Future<List<_CapabilityItem>> _getCapabilityItems() async {
-    bool hasStorage = false;
-    try {
-      final storageResult = await platform.invokeMethod('checkStoragePermission');
-      hasStorage = storageResult['hasPermission'] == true;
-    } catch (e) {
-      hasStorage = await Permission.storage.isGranted;
-    }
-
-    final hasEnhanced = _hasRootAccess || _accessMethod == 'Shell' || _accessMethod == 'AppProcess';
-    final enhancedLabel = _hasRootAccess ? 'Root' : (_accessMethod == 'Shell' ? 'Shell' : 'Enhanced');
-
-    return [
-      _CapabilityItem('Storage', hasStorage),
-      _CapabilityItem('SMS', await Permission.sms.isGranted),
-      _CapabilityItem('Phone', await Permission.phone.isGranted),
-      _CapabilityItem('Location', await Permission.location.isGranted),
-      _CapabilityItem('Usage', specialPermissions.hasUsageStats),
-      _CapabilityItem('Accessibility', specialPermissions.hasAccessibility),
-      _CapabilityItem(enhancedLabel, hasEnhanced),
-    ];
-  }
-
-  Widget _buildScanButton() {
-    return ElevatedButton.icon(
-      onPressed: _isScanning ? null : () => _startScan(),
-      icon: DuotoneIcon(
-        _isScanning ? AppIcons.stopwatch : AppIcons.search,
-        size: 32,
-        color: Colors.black,
-      ),
-      label: Text(
-        _isScanning ? 'Scanning...' : 'Start Security Scan',
-        style: const TextStyle(fontSize: 20),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.all(20),
-        backgroundColor: AppColors.accent,
-        foregroundColor: Colors.black,
-      ),
-    );
-  }
-
-  Widget _buildScanProgress() {
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Scanning: ${_scanProgress.currentPhase}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildProgressItem(
-                'Network Analysis', _scanProgress.networkComplete),
-            _buildProgressItem(
-                'Process Inspection', _scanProgress.processComplete),
-            _buildProgressItem(
-                'File System Check', _scanProgress.fileSystemComplete),
-            _buildProgressItem(
-                'Database Analysis', _scanProgress.databaseComplete),
-            _buildProgressItem('Memory Analysis', _scanProgress.memoryComplete),
-            _buildProgressItem(
-                'Advanced Detection', _scanProgress.advancedComplete),
-            _buildProgressItem('Cloud Intelligence', _scanProgress.iocComplete),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressItem(String label, bool complete) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          DuotoneIcon(
-            complete ? AppIcons.checkCircle : AppIcons.stopwatch,
-            color: complete ? Colors.green : Colors.grey,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThreatsSummary() {
-    return Card(
-      color: const Color(0xFF1D1E33),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Detected Threats',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...(_threats.take(3).map((threat) => ListTile(
-                  leading: DuotoneIcon(
-                    AppIcons.dangerCircle,
-                    color: threat.severity == 'CRITICAL'
-                        ? Colors.red
-                        : threat.severity == 'HIGH'
-                            ? Colors.orange
-                            : Colors.yellow,
-                  ),
-                  title: Text(threat.name),
-                  subtitle: Text(threat.description),
-                  trailing: IconButton(
-                    icon: const DuotoneIcon(AppIcons.trash, color: Colors.grey),
-                    onPressed: () => _removeThreat(threat),
-                  ),
-                ))),
-            if (_threats.length > 3)
-              TextButton(
-                onPressed: _showScanResults,
-                child: Text('View All ${_threats.length} Threats'),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1913,20 +1281,3 @@ class ThreatDetection {
   }
 }
 
-class ScanProgress {
-  String currentPhase = '';
-  bool networkComplete = false;
-  bool processComplete = false;
-  bool fileSystemComplete = false;
-  bool databaseComplete = false;
-  bool memoryComplete = false;
-  bool advancedComplete = false;
-  bool iocComplete = false;
-}
-
-class _CapabilityItem {
-  final String name;
-  final bool enabled;
-
-  _CapabilityItem(this.name, this.enabled);
-}

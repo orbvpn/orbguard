@@ -1,6 +1,9 @@
 /// Scam Detection Screen
 /// AI-powered scam detection and analysis interface
 
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -22,6 +25,15 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   final _urlController = TextEditingController();
   final _phoneController = TextEditingController();
   ScamContentType _selectedType = ScamContentType.text;
+
+  /// Image/voice file selected for analysis (bytes loaded in memory).
+  PlatformFile? _pickedMediaFile;
+  bool _isPickingFile = false;
+
+  /// Set after an image/voice analysis attempt fails server-side: the
+  /// backend's vision/speech analyzers are config-gated and the analyze
+  /// endpoint fails when they are disabled.
+  String? _mediaCapabilityNotice;
 
   @override
   void initState() {
@@ -117,7 +129,13 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                     label: Text(type.displayName),
                     selected: isSelected,
                     onSelected: (selected) {
-                      if (selected) setState(() => _selectedType = type);
+                      if (selected) {
+                        setState(() {
+                          _selectedType = type;
+                          _pickedMediaFile = null;
+                          _mediaCapabilityNotice = null;
+                        });
+                      }
                     },
                     backgroundColor: GlassTheme.glassColorDark,
                     selectedColor: GlassTheme.primaryAccent.withOpacity(0.3),
@@ -139,7 +157,12 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: provider.isAnalyzing ? null : () => _analyze(provider),
+              onPressed: provider.isAnalyzing ||
+                      ((_selectedType == ScamContentType.image ||
+                              _selectedType == ScamContentType.voice) &&
+                          _pickedMediaFile == null)
+                  ? null
+                  : () => _analyze(provider),
               icon: provider.isAnalyzing
                   ? const SizedBox(
                       width: 20,
@@ -156,11 +179,40 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             ),
           ),
 
+          // Analysis errors — surfaced, never swallowed.
+          if (provider.error != null) ...[
+            const SizedBox(height: 16),
+            _buildErrorCard(provider),
+          ],
+
           // Last result
           if (provider.lastResult != null) ...[
             const SizedBox(height: 24),
             _buildResultCard(provider.lastResult!),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(ScamDetectionProvider provider) {
+    return GlassCard(
+      tintColor: GlassTheme.errorColor,
+      child: Row(
+        children: [
+          const DuotoneIcon('danger_circle',
+              size: 22, color: GlassTheme.errorColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              provider.error!,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: Colors.white54),
+            onPressed: provider.clearError,
+          ),
         ],
       ),
     );
@@ -236,23 +288,132 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             ),
           ),
         );
-      default:
-        return GlassContainer(
+      case ScamContentType.image:
+      case ScamContentType.voice:
+        return _buildMediaPickerField();
+    }
+  }
+
+  /// Picker UI for image/voice analysis. The selected file is uploaded as
+  /// base64 in the `content` field (the backend ScamAnalysisRequest documents
+  /// `content` as "text content or base64 for images").
+  Widget _buildMediaPickerField() {
+    final isImage = _selectedType == ScamContentType.image;
+    final file = _pickedMediaFile;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GlassContainer(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              const DuotoneIcon('info_circle', color: Colors.white54, size: 24),
+              DuotoneIcon(
+                isImage ? 'gallery' : 'microphone',
+                color: Colors.white54,
+                size: 24,
+              ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'This content type analysis is coming soon',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6)),
-                ),
+                child: file == null
+                    ? Text(
+                        isImage
+                            ? 'Select a screenshot or image to analyze'
+                            : 'Select a voice message or audio file to analyze',
+                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                      )
+                    : Text(
+                        '${file.name} (${_formatBytes(file.size)})',
+                        style: const TextStyle(color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+              ),
+              TextButton(
+                onPressed: _isPickingFile ? null : _pickMediaFile,
+                child: Text(file == null ? 'Choose' : 'Change'),
               ),
             ],
           ),
-        );
+        ),
+        if (_mediaCapabilityNotice != null) ...[
+          const SizedBox(height: 12),
+          GlassContainer(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const DuotoneIcon('info_circle',
+                    color: GlassTheme.warningColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _mediaCapabilityNotice!,
+                    style: const TextStyle(
+                        color: GlassTheme.warningColor, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickMediaFile() async {
+    setState(() => _isPickingFile = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: _selectedType == ScamContentType.image
+            ? FileType.image
+            : FileType.audio,
+        withData: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _pickedMediaFile = result.files.first;
+          _mediaCapabilityNotice = null;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingFile = false);
     }
+  }
+
+  Future<void> _analyzeMedia(ScamDetectionProvider provider) async {
+    final bytes = _pickedMediaFile?.bytes;
+    if (bytes == null || bytes.isEmpty) return;
+
+    final result = await provider.analyzeContent(
+      type: _selectedType,
+      content: base64Encode(bytes),
+    );
+
+    if (!mounted) return;
+    if (result == null && provider.error != null) {
+      // The backend vision/speech analyzers are config-gated; when disabled
+      // the analyze endpoint fails server-side ("scam analysis failed").
+      // Surface that honestly instead of pretending the upload was bad.
+      final err = provider.error!;
+      if (err.contains('scam analysis failed') ||
+          err.contains('503') ||
+          err.contains('Service Unavailable')) {
+        setState(() {
+          _mediaCapabilityNotice = _selectedType == ScamContentType.image
+              ? 'Image analysis requires server AI configuration: the '
+                  'vision analyzer is not enabled on this backend.'
+              : 'Voice analysis requires server AI configuration: the '
+                  'speech analyzer is not enabled on this backend.';
+        });
+      }
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '$bytes B';
   }
 
   void _analyze(ScamDetectionProvider provider) {
@@ -272,7 +433,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           provider.checkPhone(_phoneController.text);
         }
         break;
-      default:
+      case ScamContentType.image:
+      case ScamContentType.voice:
+        _analyzeMedia(provider);
         break;
     }
   }
@@ -312,9 +475,31 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                   ],
                 ),
               ),
-              GlassBadge(text: result.riskLevel, color: riskColor),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  GlassBadge(text: result.riskLevel, color: riskColor),
+                  if (result.offline) ...[
+                    const SizedBox(height: 4),
+                    const GlassBadge(
+                      text: 'Offline analysis',
+                      color: GlassTheme.warningColor,
+                      fontSize: 10,
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
+          if (result.offline) ...[
+            const SizedBox(height: 12),
+            Text(
+              'The backend was unreachable — this verdict comes from the '
+              'limited on-device heuristic, not the server AI.',
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.6), fontSize: 12),
+            ),
+          ],
           if (result.scamType != null) ...[
             const SizedBox(height: 16),
             GlassContainer(
@@ -436,6 +621,14 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               GlassBadge(text: result.riskLevel, color: riskColor, fontSize: 10),
+              if (result.offline) ...[
+                const SizedBox(height: 4),
+                const GlassBadge(
+                  text: 'Offline analysis',
+                  color: GlassTheme.warningColor,
+                  fontSize: 9,
+                ),
+              ],
               const SizedBox(height: 4),
               Text(
                 _formatTime(result.analyzedAt),
@@ -454,6 +647,31 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     }
 
     if (provider.patterns.isEmpty) {
+      if (provider.error != null) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const DuotoneIcon('danger_circle',
+                    size: 48, color: GlassTheme.errorColor),
+                const SizedBox(height: 12),
+                Text(
+                  provider.error!,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => provider.loadPatterns(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return _buildEmptyState(
         icon: 'link_round',
         title: 'No Patterns',
@@ -496,19 +714,6 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _formatCount(pattern.detectionCount),
-                    style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'detections',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
-                  ),
-                ],
               ),
             ],
           ),
@@ -708,9 +913,4 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     return '${diff.inDays}d ago';
   }
 
-  String _formatCount(int count) {
-    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
-    return count.toString();
-  }
 }

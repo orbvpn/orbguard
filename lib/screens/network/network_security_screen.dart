@@ -606,6 +606,73 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          // DNS hijack check: real client-side canary resolution verified by
+          // the backend against known-good answer sets.
+          const Text(
+            'DNS Security Check',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Resolves well-known canary domains through this device\'s DNS '
+            'resolver and verifies the answers against known-good records.',
+            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  provider.isCheckingDns ? null : () => provider.runDnsCheck(),
+              icon: provider.isCheckingDns
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const DuotoneIcon('shield_check', size: 20),
+              label: Text(provider.isCheckingDns
+                  ? 'Checking DNS...'
+                  : 'Run DNS Hijack Check'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D9FF),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          if (provider.dnsCheckError != null) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Row(
+                children: [
+                  const DuotoneIcon('danger_circle', size: 20, color: Colors.red),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      provider.dnsCheckError!,
+                      style: TextStyle(color: Colors.red[300], fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (provider.dnsCheckResult != null) ...[
+            const SizedBox(height: 12),
+            _buildDnsCheckResultCard(provider.dnsCheckResult!),
+          ],
+          const SizedBox(height: 24),
           const Text(
             'How to Enable Private DNS',
             style: TextStyle(
@@ -659,6 +726,173 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           ..._privateDnsProviders.map(
             (p) => _buildDnsProviderCard(p.name, p.host, p.description),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Renders the verified DNS check result, distinguishing three states
+  /// honestly: hijack check performed, hijack check not run, and the leak
+  /// check (explicitly unavailable — no controlled canary domain deployed).
+  Widget _buildDnsCheckResultCard(DnsCheckResult result) {
+    final hijackColor = !result.hijackCheckPerformed
+        ? Colors.grey
+        : result.isHijacked
+            ? Colors.red
+            : Colors.green;
+
+    String statusDetail(String status) {
+      final idx = status.indexOf(':');
+      return idx >= 0 ? status.substring(idx + 1).trim() : status;
+    }
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hijack verdict
+          Row(
+            children: [
+              DuotoneIcon(
+                !result.hijackCheckPerformed
+                    ? 'info_circle'
+                    : result.isHijacked
+                        ? 'danger_triangle'
+                        : 'shield_check',
+                size: 24,
+                color: hijackColor,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      !result.hijackCheckPerformed
+                          ? 'Hijack check not performed'
+                          : result.isHijacked
+                              ? 'DNS hijacking detected'
+                              : 'No DNS hijacking detected',
+                      style: TextStyle(
+                        color: hijackColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      !result.hijackCheckPerformed
+                          ? statusDetail(result.hijackCheckStatus)
+                          : result.hijackDescription ??
+                              statusDetail(result.hijackCheckStatus),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (result.hijackCheckPerformed && result.hijackConfidence != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Confidence: ${(result.hijackConfidence! * 100).toInt()}%',
+                style: TextStyle(color: Colors.grey[500], fontSize: 11),
+              ),
+            ),
+          if (result.providerName != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Resolver provider: ${result.providerName}',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+            ),
+          if (result.issues.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...result.issues.map((issue) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const DuotoneIcon('danger_triangle',
+                          size: 14, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          issue,
+                          style: TextStyle(
+                              color: Colors.orange[300], fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+          // Leak check — explicitly unavailable, never fabricated.
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const DuotoneIcon('info_circle', size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    result.leakCheckUnavailable
+                        ? 'DNS leak check unavailable: '
+                            '${statusDetail(result.leakCheckStatus)}'
+                        : 'Leak check: ${result.leakCheckStatus}',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // What this device actually measured.
+          if (result.canaryResolutions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Measured on this device',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...result.canaryResolutions.map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    r.lookupError != null
+                        ? '${r.canary} → lookup failed (${r.lookupError})'
+                        : '${r.canary} → ${r.resolvedIps.join(', ')}',
+                    style: TextStyle(
+                      color: r.lookupError != null
+                          ? Colors.orange[300]
+                          : Colors.grey[500],
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                )),
+          ],
+          if (result.resolverHint != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Resolver: ${result.resolverHint}',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
         ],
       ),
     );

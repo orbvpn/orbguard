@@ -18,12 +18,25 @@ class RogueAPScreen extends StatefulWidget {
 }
 
 class _RogueAPScreenState extends State<RogueAPScreen> {
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RogueAPProvider>().initialize();
     });
+  }
+
+  /// Case-insensitive SSID/BSSID filter applied to the AP lists.
+  List<DetectedAP> _filterAPs(List<DetectedAP> aps) {
+    if (_searchQuery.isEmpty) return aps;
+    final query = _searchQuery.toLowerCase();
+    return aps
+        .where((ap) =>
+            ap.ssid.toLowerCase().contains(query) ||
+            ap.bssid.toLowerCase().contains(query))
+        .toList();
   }
 
   @override
@@ -34,6 +47,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           title: 'Rogue AP Detection',
           hasSearch: true,
           searchHint: 'Search networks...',
+          onSearchChanged: (query) => setState(() => _searchQuery = query),
           headerContent: Column(
             children: [
               // Actions row
@@ -311,8 +325,17 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
       );
     }
 
+    final filtered = _filterAPs(provider.detectedAPs);
+    if (filtered.isEmpty) {
+      return _buildEmptyState(
+        icon: 'radar',
+        title: 'No Matching Networks',
+        subtitle: 'No access points match "$_searchQuery"',
+      );
+    }
+
     // Sort by signal strength
-    final sortedAPs = List<DetectedAP>.from(provider.detectedAPs)
+    final sortedAPs = List<DetectedAP>.from(filtered)
       ..sort((a, b) => b.signalStrength.compareTo(a.signalStrength));
 
     return ListView.builder(
@@ -325,17 +348,19 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildThreatsTab(RogueAPProvider provider) {
-    final threats = provider.detectedAPs
+    final threats = _filterAPs(provider.detectedAPs
         .where((ap) =>
             ap.threatLevel == APThreatLevel.dangerous ||
             ap.threatLevel == APThreatLevel.suspicious)
-        .toList();
+        .toList());
 
     if (threats.isEmpty) {
       return _buildEmptyState(
         icon: 'shield_check',
-        title: 'No Threats Detected',
-        subtitle: 'Your WiFi environment appears safe',
+        title: _searchQuery.isEmpty ? 'No Threats Detected' : 'No Matching Threats',
+        subtitle: _searchQuery.isEmpty
+            ? 'Your WiFi environment appears safe'
+            : 'No threats match "$_searchQuery"',
         color: GlassTheme.successColor,
       );
     }
@@ -358,11 +383,28 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
       );
     }
 
+    final query = _searchQuery.toLowerCase();
+    final trusted = _searchQuery.isEmpty
+        ? provider.trustedAPs
+        : provider.trustedAPs
+            .where((ap) =>
+                ap.ssid.toLowerCase().contains(query) ||
+                ap.bssid.toLowerCase().contains(query))
+            .toList();
+
+    if (trusted.isEmpty) {
+      return _buildEmptyState(
+        icon: 'verified_check',
+        title: 'No Matching Networks',
+        subtitle: 'No trusted networks match "$_searchQuery"',
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: provider.trustedAPs.length,
+      itemCount: trusted.length,
       itemBuilder: (context, index) {
-        return _buildTrustedCard(provider.trustedAPs[index], provider);
+        return _buildTrustedCard(trusted[index], provider);
       },
     );
   }
@@ -631,36 +673,21 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   ),
                 )),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const DuotoneIcon('forbidden', size: 18),
-                    label: const Text('Block'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: GlassTheme.errorColor,
-                      side: const BorderSide(
-                        color: GlassTheme.errorColor,
-                      ),
-                    ),
+            // No platform exposes an API to block another access point, so
+            // the only real action is whitelisting a known-good network.
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => provider.addTrustedAP(ap),
+                icon: const DuotoneIcon('shield_check', size: 18),
+                label: const Text('Trust'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: GlassTheme.primaryAccent,
+                  side: const BorderSide(
+                    color: GlassTheme.primaryAccent,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => provider.addTrustedAP(ap),
-                    icon: const DuotoneIcon('shield_check', size: 18),
-                    label: const Text('Trust'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: GlassTheme.primaryAccent,
-                      side: const BorderSide(
-                        color: GlassTheme.primaryAccent,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
@@ -1029,8 +1056,10 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             ),
             const SizedBox(height: 24),
             _buildSettingSwitch(
-              'Auto Protection',
-              'Automatically enable VPN when threats detected',
+              'Threat Action Reminders',
+              // No VPN engine is bundled, so this cannot switch a VPN on —
+              // label it with the provider's honest limitation statement.
+              provider.autoProtectLimitation,
               provider.autoProtect,
               (value) => provider.updateSettings(autoProtect: value),
             ),

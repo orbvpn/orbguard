@@ -116,7 +116,10 @@ class Vulnerability {
   final String affectedVersions;
   final String? fixedVersion;
   final String? exploitAvailable;
-  final DateTime publishedDate;
+
+  /// Advisory publication date — null when the source (e.g. the backend's
+  /// OSV check summary) does not carry one.
+  final DateTime? publishedDate;
   final List<String> references;
 
   Vulnerability({
@@ -127,7 +130,7 @@ class Vulnerability {
     required this.affectedVersions,
     this.fixedVersion,
     this.exploitAvailable,
-    required this.publishedDate,
+    this.publishedDate,
     this.references = const [],
   });
 
@@ -140,7 +143,9 @@ class Vulnerability {
       affectedVersions: json['affected_versions'] as String,
       fixedVersion: json['fixed_version'] as String?,
       exploitAvailable: json['exploit_available'] as String?,
-      publishedDate: DateTime.parse(json['published_date'] as String),
+      publishedDate: json['published_date'] != null
+          ? DateTime.tryParse(json['published_date'] as String)
+          : null,
       references: (json['references'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
@@ -197,9 +202,6 @@ class SupplyChainMonitorService {
   // Known SDK signatures database
   final Map<String, _SDKSignature> _sdkDatabase = {};
 
-  // Known vulnerability database
-  final Map<String, List<Vulnerability>> _vulnDatabase = {};
-
   // Known tracker signatures
   final Set<String> _trackerSignatures = {};
 
@@ -216,7 +218,6 @@ class SupplyChainMonitorService {
   /// Initialize the service
   Future<void> initialize() async {
     await _loadSDKDatabase();
-    await _loadVulnerabilityDatabase();
     await _loadTrackerSignatures();
   }
 
@@ -404,40 +405,6 @@ class SupplyChainMonitorService {
     });
   }
 
-  /// Load vulnerability database from API
-  Future<void> _loadVulnerabilityDatabase() async {
-    try {
-      final api = OrbGuardApiClient.instance;
-      final vulnerabilities = await api.getSupplyChainVulnerabilities();
-
-      for (final vuln in vulnerabilities) {
-        final libraryName = vuln['library_name'] as String?;
-        if (libraryName == null) continue;
-
-        final vulnerability = Vulnerability(
-          cveId: vuln['cve_id'] as String? ?? '',
-          description: vuln['description'] as String? ?? '',
-          cvssScore: (vuln['cvss_score'] as num?)?.toDouble() ?? 0.0,
-          severity: vuln['severity'] as String? ?? 'UNKNOWN',
-          affectedVersions: vuln['affected_versions'] as String? ?? '',
-          fixedVersion: vuln['fixed_version'] as String?,
-          exploitAvailable: vuln['exploit_available'] as String?,
-          publishedDate: vuln['published_date'] != null
-              ? DateTime.tryParse(vuln['published_date'] as String) ?? DateTime.now()
-              : DateTime.now(),
-        );
-
-        if (_vulnDatabase.containsKey(libraryName)) {
-          _vulnDatabase[libraryName]!.add(vulnerability);
-        } else {
-          _vulnDatabase[libraryName] = [vulnerability];
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to load vulnerability database from API: $e');
-    }
-  }
-
   /// Load tracker signatures from API
   Future<void> _loadTrackerSignatures() async {
     try {
@@ -473,7 +440,6 @@ class SupplyChainMonitorService {
       );
 
       final libraries = <ThirdPartyLibrary>[];
-      final vulnerabilities = <Vulnerability>[];
       int trackerCount = 0;
       double totalRiskScore = 0.0;
 
@@ -486,15 +452,17 @@ class SupplyChainMonitorService {
 
         // Add risk score
         totalRiskScore += _getRiskScore(lib.riskLevel);
+      }
 
-        // Check for vulnerabilities
-        final libVulns = _checkVulnerabilities(libPackage.toString(), lib.version);
-        vulnerabilities.addAll(libVulns);
+      // Check libraries against the backend OSV-backed vulnerability service
+      // (server-side version-range matching). Libraries without a known
+      // version are not checked: claiming a CVE match without knowing the
+      // installed version would be a false positive.
+      final vulnerabilities = await _checkVulnerabilities(libraries);
 
-        // Alert on critical vulnerabilities
-        for (final vuln in libVulns.where((v) => v.cvssScore >= 9.0)) {
-          _vulnerabilityAlertController.add(vuln);
-        }
+      // Alert on critical vulnerabilities
+      for (final vuln in vulnerabilities.where((v) => v.cvssScore >= 9.0)) {
+        _vulnerabilityAlertController.add(vuln);
       }
 
       // Calculate overall risk
@@ -623,18 +591,52 @@ class SupplyChainMonitorService {
     return packageName;
   }
 
-  /// Check for known vulnerabilities
-  List<Vulnerability> _checkVulnerabilities(String packageName, String? version) {
-    final vulns = <Vulnerability>[];
+  /// Check detected libraries for known vulnerabilities via the backend
+  /// POST /supply-chain/check endpoint (real OSV version-range matching).
+  ///
+  /// Only libraries with a known package name AND version are submitted —
+  /// the backend requires a version to evaluate affected ranges, and we do
+  /// not fabricate matches for unknown versions.
+  Future<List<Vulnerability>> _checkVulnerabilities(
+    List<ThirdPartyLibrary> libraries,
+  ) async {
+    final versioned = libraries
+        .where((l) =>
+            l.packageName != null &&
+            l.packageName!.isNotEmpty &&
+            l.version != null &&
+            l.version!.isNotEmpty)
+        .toList();
+    if (versioned.isEmpty) return [];
 
-    for (final entry in _vulnDatabase.entries) {
-      if (packageName.startsWith(entry.key)) {
-        // In production, would check version ranges properly
-        vulns.addAll(entry.value);
+    try {
+      final results = await OrbGuardApiClient.instance.checkSupplyChainPackages([
+        for (final lib in versioned)
+          {'name': lib.packageName, 'version': lib.version},
+      ]);
+
+      final vulns = <Vulnerability>[];
+      for (final result in results) {
+        if (result['vulnerable'] != true) continue;
+        final pkg = result['package'] as String? ?? '';
+        final version = result['version'] as String? ?? '';
+        for (final v in (result['vulns'] as List<dynamic>? ?? const [])) {
+          if (v is! Map) continue;
+          vulns.add(Vulnerability(
+            cveId: v['cve_id'] as String? ?? 'UNKNOWN',
+            description: v['summary'] as String? ?? '',
+            cvssScore: (v['cvss_score'] as num?)?.toDouble() ?? 0.0,
+            severity: v['severity'] as String? ?? 'UNKNOWN',
+            affectedVersions: '$pkg $version (installed version matched)',
+            publishedDate: null,
+          ));
+        }
       }
+      return vulns;
+    } catch (e) {
+      debugPrint('Supply-chain vulnerability check failed: $e');
+      return [];
     }
-
-    return vulns;
   }
 
   /// Get numeric risk score
@@ -771,37 +773,6 @@ class SupplyChainMonitorService {
       debugPrint('Failed to scan apps: $e');
       return [];
     }
-  }
-
-  /// Check if an app update is safe
-  Future<Map<String, dynamic>> analyzeAppUpdate(
-    String packageName,
-    String newVersion,
-  ) async {
-    // Scan current version
-    final currentScan = await scanApp(packageName);
-
-    // In production, would compare with new version's dependencies
-    // from app store metadata or APK analysis
-
-    return {
-      'package': packageName,
-      'current_version': currentScan.appVersion,
-      'new_version': newVersion,
-      'current_risk': currentScan.overallRisk.name,
-      'current_vulnerabilities': currentScan.vulnerabilities.length,
-      'current_trackers': currentScan.trackerCount,
-      'recommendation': 'Update analysis requires app store integration',
-    };
-  }
-
-  /// Get supply chain statistics
-  Map<String, dynamic> getStatistics() {
-    return {
-      'known_sdks': _sdkDatabase.length,
-      'vulnerability_entries': _vulnDatabase.length,
-      'tracker_signatures': _trackerSignatures.length,
-    };
   }
 
   /// Dispose resources

@@ -467,8 +467,9 @@ class IOSForensicService {
   Future<List<ForensicFinding>> _analyzeNetworkConnections() async {
     final findings = <ForensicFinding>[];
 
-    // Check for connections to known C2 infrastructure
-    // This would use the rogue_ap_detection_service and dns_protection_service
+    // iOS sandboxing prevents enumerating active connections without a
+    // jailbreak; C2-infrastructure checks run server-side via the backend
+    // threat-intelligence APIs instead.
 
     return findings;
   }

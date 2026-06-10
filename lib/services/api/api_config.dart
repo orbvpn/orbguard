@@ -717,10 +717,9 @@ class ApiEndpoints {
   // SUPPLY CHAIN SECURITY
   // ============================================
 
-  /// Get known vulnerabilities
-  /// GET /api/v1/supply-chain/vulnerabilities
-  /// Response: { "vulnerabilities": [...], ... }
-  static const String supplyChainVulnerabilities = '$_v1/supply-chain/vulnerabilities';
+  // NOTE: supplyChainVulnerabilities (GET /supply-chain/vulnerabilities) was
+  // removed with its only client consumer; version-aware vulnerability
+  // matching uses supplyChainCheck below.
 
   /// Check package vulnerabilities
   /// POST /api/v1/supply-chain/check
@@ -907,6 +906,13 @@ class ApiEndpoints {
   /// Check clipboard
   /// POST /api/v1/privacy/clipboard/check
   static const String privacyClipboardCheck = '$_v1/privacy/clipboard/check';
+
+  /// Check whether a domain is a tracker that should be blocked
+  /// POST /api/v1/privacy/trackers/should-block
+  /// Body: { "domain": "...", "settings"?: {...} }
+  /// Response: { "domain", "should_block", "tracker" }
+  static const String privacyTrackersShouldBlock =
+      '$_v1/privacy/trackers/should-block';
 
   // ============================================
   // SCAM DETECTION

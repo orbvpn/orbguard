@@ -88,8 +88,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Privacy Score
-          if (provider.lastAudit != null) _buildPrivacyScoreCard(provider.lastAudit!),
+          // Privacy Score — or the honest reason no audit result exists.
+          if (provider.lastAudit != null)
+            _buildPrivacyScoreCard(provider.lastAudit!)
+          else
+            _buildAuditUnavailableCard(provider),
           const SizedBox(height: 24),
 
           // Quick Settings
@@ -148,6 +151,32 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                 _buildStatCard('Trackers Found', provider.lastAudit!.totalTrackers.toString(), GlassTheme.errorColor),
               ],
             ),
+          ],
+
+          // Issues found by the audit
+          if (provider.lastAudit != null && provider.lastAudit!.issues.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Issues Found',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ...provider.lastAudit!.issues.map((issue) => GlassCard(
+                  child: Row(
+                    children: [
+                      const GlassSvgIconBox(
+                          icon: AppIcons.dangerTriangle,
+                          color: GlassTheme.errorColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          issue,
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
           ],
 
           // Recommendations
@@ -214,9 +243,17 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Privacy Score',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    const Text(
+                      'Privacy Score',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    if (audit.grade != null) ...[
+                      const SizedBox(width: 8),
+                      GlassBadge(text: 'Grade ${audit.grade}', color: color),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -227,8 +264,53 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                           : 'Your privacy needs attention',
                   style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
                 ),
+                if (audit.riskLevel != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Risk level: ${audit.riskLevel}',
+                    style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Honest empty state shown instead of a fabricated score when no audit
+  /// result exists — including the provider's specific unavailability reason.
+  Widget _buildAuditUnavailableCard(PrivacyProvider provider) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const GlassSvgIconBox(icon: AppIcons.shield, color: Colors.white54),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Privacy Audit Not Available',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              if (provider.isAuditing)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: GlassTheme.primaryAccent),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            provider.auditUnavailableReason ??
+                'No audit has been run yet. Tap the shield icon above to run '
+                    'a privacy audit.',
+            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
           ),
         ],
       ),

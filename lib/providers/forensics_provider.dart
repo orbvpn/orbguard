@@ -9,6 +9,8 @@ import 'dart:io' show Platform;
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
 import '../services/api/orbguard_api_client.dart';
 
 /// Forensic analysis type
@@ -175,6 +177,10 @@ class IOCStats {
 /// Forensics Provider
 class ForensicsProvider extends ChangeNotifier {
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+
+  /// Native system-metrics channel (Android: SystemMetricsHandler.kt).
+  static const MethodChannel _systemChannel =
+      MethodChannel('com.orb.guard/system');
 
   // State
   final List<ForensicAnalysisResult> _analysisHistory = [];
@@ -353,6 +359,43 @@ class ForensicsProvider extends ChangeNotifier {
         'log_data': logcatContent,
       }),
     );
+  }
+
+  /// Capture device logs via the native system channel and run the logcat
+  /// analyzer on them — no manual log export needed.
+  ///
+  /// Native: com.orb.guard/system captureLogs {lines: 500} returning
+  /// {logs, line_count, pid, scope, note}. The capture is scoped to
+  /// OrbGuard's own process (full-device logs require the privileged
+  /// READ_LOGS permission, which is system/ADB only).
+  Future<ForensicAnalysisResult?> captureAndAnalyzeLogcat({
+    int lines = 500,
+  }) async {
+    if (!Platform.isAndroid) {
+      _error = 'Logcat capture is only available on Android';
+      notifyListeners();
+      return null;
+    }
+
+    try {
+      final captured = await _systemChannel
+          .invokeMapMethod<String, dynamic>('captureLogs', {'lines': lines});
+      final logs = captured?['logs'] as String?;
+      if (logs == null || logs.trim().isEmpty) {
+        _error = 'Log capture returned no log lines';
+        notifyListeners();
+        return null;
+      }
+      return analyzeLogcat(logs);
+    } on PlatformException catch (e) {
+      _error = 'Log capture failed: ${e.message ?? e.code}';
+      notifyListeners();
+      return null;
+    } on MissingPluginException {
+      _error = 'Log capture is not supported on this platform build';
+      notifyListeners();
+      return null;
+    }
   }
 
   /// Run full forensic analysis.

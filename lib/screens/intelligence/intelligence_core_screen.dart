@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -10,6 +11,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../models/api/threat_indicator.dart' as api;
+import '../sources/intelligence_sources_screen.dart';
 
 class IntelligenceCoreScreen extends StatefulWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -95,9 +97,16 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
       embedded: widget.embedded,
       actions: [
         IconButton(
-          icon: const DuotoneIcon('file', size: 22, color: Colors.white),
-          tooltip: 'Import Indicators',
-          onPressed: () => _showImportDialog(context),
+          icon: const DuotoneIcon('database', size: 22, color: Colors.white),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const IntelligenceSourcesScreen(),
+              ),
+            );
+          },
+          tooltip: 'Intelligence Sources',
         ),
         IconButton(
           icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
@@ -685,34 +694,27 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const DuotoneIcon('copy', size: 20),
-                      label: const Text('Copy'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                        ClipboardData(text: indicator.value));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Indicator copied to clipboard')),
+                      );
+                    }
+                  },
+                  icon: const DuotoneIcon('copy', size: 20),
+                  label: const Text('Copy Indicator'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: GlassTheme.primaryAccent,
+                    side: const BorderSide(color: GlassTheme.primaryAccent),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const DuotoneIcon('forbidden', size: 20),
-                      label: const Text('Block'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: GlassTheme.errorColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -752,6 +754,9 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             onPressed: () {
               if (controller.text.isNotEmpty) {
                 Navigator.pop(context);
+                // Feed the dialog's value into the shared check input so the
+                // check actually runs against what the user typed here.
+                _checkInputController.text = controller.text.trim();
                 _checkIndicators();
               }
             },
@@ -760,45 +765,6 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Check'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showImportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Import Indicators', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const DuotoneIcon('file', size: 24, color: GlassTheme.primaryAccent),
-              title: const Text('CSV File', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Import from CSV', style: TextStyle(color: Colors.white.withAlpha(128))),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const DuotoneIcon('code', size: 24, color: GlassTheme.primaryAccent),
-              title: const Text('STIX/TAXII', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Import from TAXII server', style: TextStyle(color: Colors.white.withAlpha(128))),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const DuotoneIcon('programming', size: 24, color: GlassTheme.primaryAccent),
-              title: const Text('API', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Import via API', style: TextStyle(color: Colors.white.withAlpha(128))),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
           ),
         ],
       ),

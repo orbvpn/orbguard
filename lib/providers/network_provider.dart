@@ -111,55 +111,6 @@ class NetworkThreat {
   bool get isCritical => severity == 'critical' || severity == 'high';
 }
 
-/// VPN connection status
-class VpnStatus {
-  final bool isConnected;
-  final String? serverLocation;
-  final String? serverIp;
-  final String? protocol;
-  final DateTime? connectedAt;
-  final int? bytesIn;
-  final int? bytesOut;
-
-  VpnStatus({
-    this.isConnected = false,
-    this.serverLocation,
-    this.serverIp,
-    this.protocol,
-    this.connectedAt,
-    this.bytesIn,
-    this.bytesOut,
-  });
-
-  Duration? get connectionDuration {
-    if (connectedAt == null || !isConnected) return null;
-    return DateTime.now().difference(connectedAt!);
-  }
-}
-
-/// DNS protection status
-class DnsProtectionStatus {
-  final bool isEnabled;
-  final String provider;
-  final String primaryDns;
-  final String? secondaryDns;
-  final bool isMalwareBlocking;
-  final bool isAdBlocking;
-  final bool isTrackingBlocking;
-  final int blockedQueries;
-
-  DnsProtectionStatus({
-    this.isEnabled = false,
-    this.provider = 'Default',
-    this.primaryDns = '',
-    this.secondaryDns,
-    this.isMalwareBlocking = false,
-    this.isAdBlocking = false,
-    this.isTrackingBlocking = false,
-    this.blockedQueries = 0,
-  });
-}
-
 /// One canary domain resolved through the DEVICE's local resolver.
 /// Hijack detection must use the local resolver: a server resolving canaries
 /// proves nothing about the resolver this device actually uses.
@@ -227,22 +178,20 @@ class DnsCheckResult {
   bool get leakCheckUnavailable => leakCheckStatus.startsWith('unavailable');
 }
 
-/// Network security stats
+/// Network security stats. Every field is derived from real scan/check
+/// results — the app performs no on-device DNS or site blocking, so no
+/// "blocked" counters exist here.
 class NetworkSecurityStats {
   final int totalScans;
   final int threatsDetected;
   final int openNetworksFound;
   final int rogueApsDetected;
-  final int dnsQueriesBlocked;
-  final int maliciousSitesBlocked;
 
   NetworkSecurityStats({
     this.totalScans = 0,
     this.threatsDetected = 0,
     this.openNetworksFound = 0,
     this.rogueApsDetected = 0,
-    this.dnsQueriesBlocked = 0,
-    this.maliciousSitesBlocked = 0,
   });
 }
 
@@ -256,7 +205,16 @@ class NetworkProvider extends ChangeNotifier {
   // State
   WifiNetwork? _currentNetwork;
   final List<WifiNetwork> _nearbyNetworks = [];
-  final List<NetworkThreat> _threats = [];
+
+  /// Threats reported by the backend (GET /network/threats). Owned by
+  /// [loadNetworkThreats]; never touched by local scans.
+  final List<NetworkThreat> _remoteThreats = [];
+
+  /// Threats derived on-device (local scan heuristics, WiFi audit of the
+  /// current network, DNS hijack check). Owned by the scan/check methods;
+  /// never touched by [loadNetworkThreats].
+  final List<NetworkThreat> _localThreats = [];
+
   NetworkSecurityStats _stats = NetworkSecurityStats();
 
   bool _isLoading = false;
@@ -271,7 +229,8 @@ class NetworkProvider extends ChangeNotifier {
   // Getters
   WifiNetwork? get currentNetwork => _currentNetwork;
   List<WifiNetwork> get nearbyNetworks => List.unmodifiable(_nearbyNetworks);
-  List<NetworkThreat> get threats => List.unmodifiable(_threats);
+  List<NetworkThreat> get threats =>
+      List.unmodifiable([..._remoteThreats, ..._localThreats]);
   NetworkSecurityStats get stats => _stats;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
@@ -282,11 +241,11 @@ class NetworkProvider extends ChangeNotifier {
 
   /// Active threats
   List<NetworkThreat> get activeThreats =>
-      _threats.where((t) => t.isActive).toList();
+      threats.where((t) => t.isActive).toList();
 
   /// Critical threats
   List<NetworkThreat> get criticalThreats =>
-      _threats.where((t) => t.isCritical && t.isActive).toList();
+      threats.where((t) => t.isCritical && t.isActive).toList();
 
   /// Open (unsecured) networks nearby
   List<WifiNetwork> get openNetworks =>
@@ -358,13 +317,14 @@ class NetworkProvider extends ChangeNotifier {
         }
       }
 
-      // Also audit the current network via API
+      // Rebuild locally-derived threats from this scan, then append any
+      // findings from the backend WiFi audit of the current network.
+      _checkForThreats();
       if (_currentNetwork != null) {
         await _auditCurrentNetwork();
       }
 
-      _checkForThreats();
-      _updateStats();
+      _updateStats(countScan: true);
     } on PlatformException catch (e) {
       _error = 'Failed to scan networks: ${e.message}';
     } catch (e) {
@@ -394,8 +354,8 @@ class NetworkProvider extends ChangeNotifier {
         for (var i = 0; i < auditResult.threats.length; i++) {
           final threat = auditResult.threats[i];
           final threatId = 'wifi_${_currentNetwork!.bssid}_${threat.type}_$i';
-          if (!_threats.any((t) => t.id == threatId)) {
-            _threats.add(NetworkThreat(
+          if (!_localThreats.any((t) => t.id == threatId)) {
+            _localThreats.add(NetworkThreat(
               id: threatId,
               type: threat.type,
               title: _getThreatTitle(threat.type),
@@ -418,9 +378,9 @@ class NetworkProvider extends ChangeNotifier {
     try {
       final threatsData = await _api.getNetworkThreats();
 
-      _threats.clear();
+      _remoteThreats.clear();
       for (final threatJson in threatsData) {
-        _threats.add(NetworkThreat(
+        _remoteThreats.add(NetworkThreat(
           id: threatJson['id'] as String? ?? '',
           type: threatJson['type'] as String? ?? 'unknown',
           title: threatJson['title'] as String? ?? 'Network Threat',
@@ -602,12 +562,12 @@ class NetworkProvider extends ChangeNotifier {
   /// Keep the threats list in sync with the latest verified DNS check.
   void _syncDnsHijackThreat() {
     const threatId = 'dns_hijacking_local';
-    _threats.removeWhere((t) => t.id == threatId);
+    _localThreats.removeWhere((t) => t.id == threatId);
 
     final result = _dnsCheckResult;
     if (result == null || !result.isHijacked) return;
 
-    _threats.add(NetworkThreat(
+    _localThreats.add(NetworkThreat(
       id: threatId,
       type: 'dns_hijacking',
       title: _getThreatTitle('dns_hijacking'),
@@ -621,17 +581,21 @@ class NetworkProvider extends ChangeNotifier {
 
   /// Dismiss threat
   void dismissThreat(String id) {
-    final index = _threats.indexWhere((t) => t.id == id);
-    if (index >= 0) {
-      _threats.removeAt(index);
+    final removedLocal = _localThreats.any((t) => t.id == id);
+    final removedRemote = _remoteThreats.any((t) => t.id == id);
+    if (removedLocal) _localThreats.removeWhere((t) => t.id == id);
+    if (removedRemote) _remoteThreats.removeWhere((t) => t.id == id);
+    if (removedLocal || removedRemote) {
       _updateStats();
       notifyListeners();
     }
   }
 
-  /// Check for network threats
+  /// Rebuild locally-derived scan threats. Only touches [_localThreats];
+  /// backend-reported threats are preserved. The DNS hijack finding (owned by
+  /// [_syncDnsHijackThreat]) is re-applied after the rebuild.
   void _checkForThreats() {
-    _threats.clear();
+    _localThreats.clear();
 
     // Check for open networks
     for (final network in _nearbyNetworks) {
@@ -641,7 +605,7 @@ class NetworkProvider extends ChangeNotifier {
             n.ssid == network.ssid &&
             n.bssid != network.bssid &&
             n.security.isSecure)) {
-          _threats.add(NetworkThreat(
+          _localThreats.add(NetworkThreat(
             id: 'evil_twin_${network.bssid}',
             type: 'evil_twin',
             title: 'Potential Evil Twin Detected',
@@ -658,7 +622,7 @@ class NetworkProvider extends ChangeNotifier {
 
     // Check current network security
     if (_currentNetwork != null && !_currentNetwork!.security.isSecure) {
-      _threats.add(NetworkThreat(
+      _localThreats.add(NetworkThreat(
         id: 'insecure_network',
         type: 'insecure_wifi',
         title: 'Insecure Network Connection',
@@ -670,17 +634,22 @@ class NetworkProvider extends ChangeNotifier {
             'Enable WPA2 or WPA3 encryption on your network, or use a VPN.',
       ));
     }
+
+    // Re-apply the DNS hijack finding (cleared with the rest of the local
+    // threats above) from the latest verified DNS check result.
+    _syncDnsHijackThreat();
   }
 
-  /// Update stats
-  void _updateStats() {
+  /// Update stats. [countScan] is true only when a real network scan
+  /// completed, so the scan counter reflects actual scans rather than every
+  /// state refresh.
+  void _updateStats({bool countScan = false}) {
+    final all = threats;
     _stats = NetworkSecurityStats(
-      totalScans: _stats.totalScans + 1,
-      threatsDetected: _threats.length,
+      totalScans: _stats.totalScans + (countScan ? 1 : 0),
+      threatsDetected: all.length,
       openNetworksFound: openNetworks.length,
-      rogueApsDetected: _threats.where((t) => t.type == 'evil_twin').length,
-      dnsQueriesBlocked: 0,
-      maliciousSitesBlocked: 0,
+      rogueApsDetected: all.where((t) => t.type == 'evil_twin').length,
     );
   }
 

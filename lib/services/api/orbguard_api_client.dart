@@ -591,35 +591,11 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Analyze backup
-  Future<Map<String, dynamic>> analyzeBackup(Map<String, dynamic> backupData) async {
-    try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/backup', data: backupData);
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Analyze data usage
-  Future<Map<String, dynamic>> analyzeDataUsage(Map<String, dynamic> usageData) async {
-    try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/data-usage', data: usageData);
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Analyze sysdiagnose (iOS)
-  Future<Map<String, dynamic>> analyzeSysdiagnose(Map<String, dynamic> sysdiagnoseData) async {
-    try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/sysdiagnose', data: sysdiagnoseData);
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
+  // NOTE: analyzeBackup / analyzeDataUsage / analyzeSysdiagnose were removed:
+  // those backend paths are service-only (server-side file paths), archive
+  // artifacts go through the dedicated multipart upload endpoints
+  // (uploadSysdiagnose / uploadAndroidBugreport), and the methods had zero
+  // call sites.
 
   /// Analyze logcat (Android)
   Future<Map<String, dynamic>> analyzeLogcat(Map<String, dynamic> logcatData) async {
@@ -875,10 +851,17 @@ class OrbGuardApiClient {
   // NETWORK
   // ============================================
 
-  /// Check if domain should be blocked
+  /// Check if a domain is a tracker that should be blocked.
+  /// POST /api/v1/privacy/trackers/should-block {domain}
+  /// -> { "domain", "should_block", "tracker" }
+  /// (Previously pointed at the DNS-check endpoint, which never returned a
+  /// should_block verdict; this is the purpose-built backend route.)
   Future<bool> shouldBlockDomain(String domain) async {
     try {
-      final response = await _dio.post(ApiEndpoints.networkDnsCheck, data: {'domain': domain});
+      final response = await _dio.post(
+        ApiEndpoints.privacyTrackersShouldBlock,
+        data: {'domain': domain},
+      );
       return response.data['should_block'] as bool? ?? false;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -2390,27 +2373,12 @@ class OrbGuardApiClient {
   // SUPPLY CHAIN SECURITY
   // ============================================
 
-  /// Get known vulnerabilities database
-  /// GET /api/v1/supply-chain/vulnerabilities
-  Future<List<Map<String, dynamic>>> getSupplyChainVulnerabilities() async {
-    try {
-      final response = await _dio.get(
-        ApiEndpoints.supplyChainVulnerabilities,
-        options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
-      );
-      final vulnerabilities = response.data['vulnerabilities'];
-      if (vulnerabilities is! List) {
-        throw ApiError(
-          message: 'Unexpected supply-chain vulnerabilities response: '
-              'missing "vulnerabilities" list',
-          code: 'BAD_RESPONSE',
-        );
-      }
-      return vulnerabilities.cast<Map<String, dynamic>>();
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
+  // NOTE: getSupplyChainVulnerabilities (GET /supply-chain/vulnerabilities)
+  // was removed: its only consumer was the client-side advisory-prefix
+  // matcher in SupplyChainMonitorService, which fabricated matches by
+  // ignoring version ranges. Version-aware matching now goes through
+  // checkSupplyChainPackages (POST /supply-chain/check) below; the backend
+  // route remains for other consumers.
 
   /// Check packages for vulnerabilities
   /// POST /api/v1/supply-chain/check

@@ -751,10 +751,11 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               _buildDetailRow('Affected Versions', vuln.affectedVersions),
               if (vuln.fixedVersion != null)
                 _buildDetailRow('Fixed Version', vuln.fixedVersion!),
-              _buildDetailRow(
-                'Published',
-                '${vuln.publishedDate.year}-${vuln.publishedDate.month.toString().padLeft(2, '0')}-${vuln.publishedDate.day.toString().padLeft(2, '0')}',
-              ),
+              if (vuln.publishedDate != null)
+                _buildDetailRow(
+                  'Published',
+                  '${vuln.publishedDate!.year}-${vuln.publishedDate!.month.toString().padLeft(2, '0')}-${vuln.publishedDate!.day.toString().padLeft(2, '0')}',
+                ),
               if (vuln.exploitAvailable != null) ...[
                 const SizedBox(height: 16),
                 Container(

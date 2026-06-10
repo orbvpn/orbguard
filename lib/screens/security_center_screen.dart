@@ -6,12 +6,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../presentation/theme/colors.dart';
-import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../providers/dashboard_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/api/threat_indicator.dart';
 import 'sms_protection/sms_protection_screen.dart';
 import 'url_protection/url_protection_screen.dart';
@@ -20,6 +21,7 @@ import 'app_security/app_security_screen.dart';
 import 'darkweb/darkweb_screen.dart';
 import 'footprint/digital_footprint_screen.dart';
 import 'intelligence/intelligence_core_screen.dart';
+import 'security/threat_hunting_screen.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
   const SecurityCenterScreen({super.key});
@@ -32,16 +34,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  late AnimationController _scanController;
 
   final DashboardProvider _provider = DashboardProvider();
   bool _isInitialized = false;
-
-  // Protection toggle states
-  bool _smsProtection = true;
-  bool _urlProtection = true;
-  bool _qrProtection = true;
-  bool _networkProtection = true;
 
   @override
   void initState() {
@@ -57,11 +52,11 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Scan animation
-    _scanController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    );
+    // Load the persisted protection settings (shared with the Settings
+    // screen) so the Active Protections switches reflect real state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<SettingsProvider>().init();
+    });
 
     _initProvider();
   }
@@ -81,13 +76,12 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   @override
   void dispose() {
     _pulseController.dispose();
-    _scanController.dispose();
     _provider.removeListener(_onProviderChanged);
     _provider.dispose();
     super.dispose();
   }
 
-  int get _securityScore {
+  int _securityScore(ProtectionSettings prot) {
     if (!_isInitialized) return 0;
     final protection = _provider.summary?.protection;
     if (protection == null) return 85; // Default score
@@ -95,10 +89,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     int score = 100;
 
     // Deduct points for disabled protections
-    if (!_smsProtection) score -= 10;
-    if (!_urlProtection) score -= 10;
-    if (!_qrProtection) score -= 5;
-    if (!_networkProtection) score -= 10;
+    if (!prot.smsProtectionEnabled) score -= 10;
+    if (!prot.urlProtectionEnabled) score -= 10;
+    if (!prot.qrProtectionEnabled) score -= 5;
+    if (!prot.networkProtectionEnabled) score -= 10;
 
     // Deduct for active threats
     final threatCount = _provider.stats?.criticalAndHighCount ?? 0;
@@ -131,7 +125,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final score = _securityScore;
+    final settings = context.watch<SettingsProvider>();
+    final score = _securityScore(settings.protection);
     final scoreColor = _getScoreColor(score);
 
     return Scaffold(
@@ -163,7 +158,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 const SizedBox(height: 20),
 
                 // Active Protections Card
-                _buildActiveProtectionsCard(isDark),
+                _buildActiveProtectionsCard(isDark, settings),
                 const SizedBox(height: 20),
 
                 // Recent Activity
@@ -190,30 +185,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        const Spacer(),
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            // Show notifications
-          },
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: GlassTheme.circularGlassDecoration(isDark: isDark),
-            child: ClipOval(
-              child: BackdropFilter(
-                filter: GlassTheme.blurFilter,
-                child: Center(
-                  child: DuotoneIcon(
-                    'bell',
-                    size: 22,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
       ],
@@ -352,7 +323,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 child: GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    // Navigate to threat details
+                    // The threat count comes from intelligence stats, so the
+                    // Intelligence Core (threat feed) is where to review them.
+                    _navigateTo(const IntelligenceCoreScreen());
                   },
                   child: Container(
                     padding: const EdgeInsets.all(14),
@@ -714,7 +687,12 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   // ACTIVE PROTECTIONS CARD
   // ============================================================================
 
-  Widget _buildActiveProtectionsCard(bool isDark) {
+  /// Switches read from and write to the persisted [ProtectionSettings]
+  /// (SharedPreferences-backed), the same source of truth used by the
+  /// Settings screen's Protection Features section.
+  Widget _buildActiveProtectionsCard(bool isDark, SettingsProvider settings) {
+    final prot = settings.protection;
+
     return GlassCard(
       isDark: isDark,
       child: Padding(
@@ -744,8 +722,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               'SMS Protection',
               'Scans messages for phishing',
               'chat_dots',
-              _smsProtection,
-              (value) => setState(() => _smsProtection = value),
+              prot.smsProtectionEnabled,
+              (value) => settings.updateProtection(
+                  prot.copyWith(smsProtectionEnabled: value)),
               isDark,
             ),
             _buildDivider(isDark),
@@ -753,8 +732,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               'URL Protection',
               'Blocks malicious links',
               'link',
-              _urlProtection,
-              (value) => setState(() => _urlProtection = value),
+              prot.urlProtectionEnabled,
+              (value) => settings.updateProtection(
+                  prot.copyWith(urlProtectionEnabled: value)),
               isDark,
             ),
             _buildDivider(isDark),
@@ -762,8 +742,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               'QR Code Protection',
               'Scans QR codes before opening',
               'qr_code',
-              _qrProtection,
-              (value) => setState(() => _qrProtection = value),
+              prot.qrProtectionEnabled,
+              (value) => settings.updateProtection(
+                  prot.copyWith(qrProtectionEnabled: value)),
               isDark,
             ),
             _buildDivider(isDark),
@@ -771,8 +752,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               'Network Protection',
               'Monitors network security',
               'wi_fi_router',
-              _networkProtection,
-              (value) => setState(() => _networkProtection = value),
+              prot.networkProtectionEnabled,
+              (value) => settings.updateProtection(
+                  prot.copyWith(networkProtectionEnabled: value)),
               isDark,
             ),
           ],
@@ -879,20 +861,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                     ),
                   ),
                 ),
-                if (alerts.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      // Navigate to full history
-                    },
-                    child: Text(
-                      'View All',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1047,9 +1015,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               description: 'Detect Pegasus & stalkerware',
               color: Colors.red,
               isDark: isDark,
-              onTap: () {
-                // Navigate to spyware check
-              },
+              // Spyware/stalkerware detection runs as threat hunts.
+              onTap: () => _navigateTo(const ThreatHuntingScreen()),
             ),
             _buildFeatureCard(
               icon: 'incognito',

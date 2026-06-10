@@ -1,8 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../presentation/widgets/duotone_icon.dart';
 
-class JailbreakInstructionsScreen extends StatelessWidget {
+class JailbreakInstructionsScreen extends StatefulWidget {
   const JailbreakInstructionsScreen({super.key});
+
+  @override
+  State<JailbreakInstructionsScreen> createState() =>
+      _JailbreakInstructionsScreenState();
+}
+
+class _JailbreakInstructionsScreenState
+    extends State<JailbreakInstructionsScreen> {
+  /// Same native channel used elsewhere for root/jailbreak detection —
+  /// AppDelegate handles "checkRootAccess" on iOS and returns
+  /// {hasRoot: isJailbroken, accessLevel, method}.
+  static const _systemChannel = MethodChannel('com.orb.guard/system');
+
+  bool _isTesting = false;
+
+  Future<void> _testJailbreakStatus() async {
+    setState(() => _isTesting = true);
+    String title;
+    String message;
+    try {
+      final result = await _systemChannel.invokeMethod('checkRootAccess');
+      final map = result is Map ? result : const {};
+      final isJailbroken = map['hasRoot'] == true;
+      title = isJailbroken ? 'Jailbreak Detected' : 'No Jailbreak Detected';
+      message = isJailbroken
+          ? 'This device is jailbroken. Deep scans can access the full '
+              'filesystem for spyware detection.'
+          : 'No jailbreak was detected on this device. Scans will run with '
+              'standard (sandboxed) access.';
+    } on PlatformException catch (e) {
+      title = 'Jailbreak Check Failed';
+      message = 'The native jailbreak check could not run: '
+          '${e.message ?? e.code}';
+    } on MissingPluginException {
+      title = 'Jailbreak Check Unavailable';
+      message =
+          'The native jailbreak check is not available on this platform.';
+    } finally {
+      if (mounted) setState(() => _isTesting = false);
+    }
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1D1E33),
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +168,20 @@ class JailbreakInstructionsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
-                    label: const Text('Test Jailbreak Status'),
+                    onPressed: _isTesting ? null : _testJailbreakStatus,
+                    icon: _isTesting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const DuotoneIcon(AppIcons.checkCircle,
+                            color: Colors.black),
+                    label: Text(
+                        _isTesting ? 'Testing...' : 'Test Jailbreak Status'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00D9FF),
                       foregroundColor: Colors.black,
@@ -174,7 +241,7 @@ class JailbreakInstructionsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(

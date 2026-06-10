@@ -15,7 +15,9 @@ import '../widgets/dashboard/connection_indicator.dart';
 import '../services/realtime/websocket_service.dart';
 import '../services/realtime/connection_manager.dart';
 import '../services/security/device_scan_service.dart';
+import 'analytics/analytics_dashboard_screen.dart';
 import 'scanning_screen.dart';
+import 'settings/settings_screen.dart';
 
 /// Main dashboard screen
 class DashboardScreen extends StatefulWidget {
@@ -127,9 +129,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: DuotoneIcon('wi_fi_router', size: 22, color: iconColor),
         ),
         GestureDetector(
-          onTap: () {
-            // Navigate to settings
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          ),
           child: DuotoneIcon('settings', size: 22, color: iconColor),
         ),
       ],
@@ -162,23 +165,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                       stats: _dashboardProvider.stats,
                       threatOverview: _dashboardProvider.summary?.threats,
                       isLoading: _dashboardProvider.isLoading,
-                      onTap: () {
-                        // Navigate to threat details
-                      },
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AnalyticsDashboardScreen(),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Recent Alerts
+                    // Recent Alerts (no dedicated "all alerts" screen exists,
+                    // so no view-all affordance is shown).
                     RecentAlertsWidget(
                       alerts: _dashboardProvider.recentAlerts,
                       isLoading: _dashboardProvider.isLoading,
-                      onViewAll: () {
-                        // Navigate to all alerts
-                      },
-                      onAlertTap: (alertId) {
-                        _dashboardProvider.markAlertAsRead(alertId);
-                        // Navigate to alert details
-                      },
+                      onAlertTap: (alertId) =>
+                          _dashboardProvider.markAlertAsRead(alertId),
                     ),
                     const SizedBox(height: 16),
 

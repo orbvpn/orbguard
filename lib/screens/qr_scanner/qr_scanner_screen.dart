@@ -53,14 +53,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     });
   }
 
-  void _stopCamera() {
-    _scannerController?.dispose();
-    _scannerController = null;
-    setState(() {
-      _isCameraActive = false;
-    });
-  }
-
   void _toggleFlash() {
     _scannerController?.toggleTorch();
     setState(() {
@@ -214,17 +206,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              // Report false positive
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Report submitted'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              _scannerController?.start();
-                            },
+                            onPressed: () => _reportFalsePositive(context, content),
                             icon: const DuotoneIcon('flag', size: 18),
                             label: const Text('Report False Positive'),
                             style: ElevatedButton.styleFrom(
@@ -247,6 +229,32 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       // Resume scanning when bottom sheet is dismissed
       _scannerController?.start();
     });
+  }
+
+  /// Submit a real false-positive report via POST /qr/report-false-positive
+  /// and surface the actual outcome — no fake "submitted" confirmation.
+  Future<void> _reportFalsePositive(
+      BuildContext sheetContext, String content) async {
+    final provider = context.read<QrProvider>();
+    Navigator.pop(sheetContext);
+
+    final success = await provider.reportFalsePositive(
+      content,
+      reason: 'User marked the scan verdict as a false positive',
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'False positive reported'
+              : provider.error ?? 'Failed to submit report',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    _scannerController?.start();
   }
 
   void _onManualInput(String content) async {

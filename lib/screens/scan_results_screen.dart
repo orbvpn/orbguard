@@ -303,7 +303,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       ),
       child: Row(
         children: [
-          _buildSummaryItem('folder_open', 'Items Scanned', _formatNumber(widget.itemsScanned)),
+          _buildSummaryItem('folder_open', 'Scan Stages Completed', _formatNumber(widget.itemsScanned)),
           Container(
             width: 1,
             height: 40,
@@ -771,7 +771,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            _buildDetailItem('Items Scanned', _formatNumber(widget.itemsScanned)),
+            _buildDetailItem('Scan Stages Completed', _formatNumber(widget.itemsScanned)),
             _buildDetailItem('Duration', _formatDuration(widget.scanDuration)),
             _buildDetailItem('Threats Found', widget.threats.length.toString()),
             _buildDetailItem('Scan Type', 'Full System Scan'),

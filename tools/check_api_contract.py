@@ -54,17 +54,20 @@ HTTP_VERBS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 # ---------------------------------------------------------------------------
 WAVE4_PENDING = {
     # =======================================================================
-    # Genuinely future work (post-Wave-4): retire the client methods or add
-    # the routes in a later wave.
+    # Wave-6 reconciliation status:
+    #   - LAB landed live routes for GET mitre/navigator/export,
+    #     GET enterprise/policies and GET enterprise/compliance/controls,
+    #     so those entries were pruned (the gate now enforces them).
+    #   - LAB declared the remaining 11 enterprise calls below as
+    #     intentionally unregistered ("client must retire"); the consuming
+    #     UI (enterprise screens/providers/policy_management_service) is
+    #     still in place, so the entries stay allowlisted until the
+    #     enterprise UI retirement lands. Retire the client methods and
+    #     these entries together.
     # =======================================================================
-    # --- MITRE navigator export: route exists but is POST-only; the unused
-    #     ApiEndpoints.mitreNavigatorExport doc-verb says GET ---
-    "GET /api/v1/mitre/navigator/export",
-    # --- enterprise routes flagged 404 in api_config.dart NOTEs ---
+    # --- enterprise routes LAB declared client-must-retire ---
     "GET /api/v1/enterprise/events",
     "GET /api/v1/enterprise/devices",
-    "GET /api/v1/enterprise/compliance/controls",
-    "GET /api/v1/enterprise/policies",
     "POST /api/v1/enterprise/policies/{param}/assign-groups",
     "POST /api/v1/enterprise/policies/{param}/assign-devices",
     "POST /api/v1/enterprise/policies/{param}/unassign",
