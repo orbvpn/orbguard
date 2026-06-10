@@ -1,6 +1,13 @@
 /// Forensics Provider
 /// State management for forensic analysis (Pegasus/spyware detection)
+///
+/// Request/response shapes mirror the live backend handlers in
+/// orbguard.lab/internal/api/handlers/forensics.go and the
+/// ForensicResult / QuickCheckResult models.
 
+import 'dart:io' show Platform;
+
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import '../services/api/orbguard_api_client.dart';
 
@@ -32,6 +39,9 @@ enum FindingSeverity {
 }
 
 /// Forensic finding model
+///
+/// Built from a backend `Anomaly` (anomalies[]) or `DetectedThreat`
+/// (detected_threats[]) entry of a ForensicResult response.
 class ForensicFinding {
   final String id;
   final String title;
@@ -54,6 +64,30 @@ class ForensicFinding {
   }) : detectedAt = detectedAt ?? DateTime.now();
 }
 
+/// Detected threat (backend `detected_threats[]` entry).
+/// e.g. Pegasus, Predator, stalkerware infections identified server-side.
+class DetectedThreat {
+  final String type; // pegasus, predator, stalkerware, ...
+  final String name;
+  final double confidence; // 0.0 - 1.0
+  final FindingSeverity severity;
+  final String description;
+  final String attribution;
+  final List<String> mitreTechniques;
+  final List<String> remediation;
+
+  DetectedThreat({
+    required this.type,
+    required this.name,
+    required this.confidence,
+    required this.severity,
+    required this.description,
+    this.attribution = '',
+    this.mitreTechniques = const [],
+    this.remediation = const [],
+  });
+}
+
 /// Forensic analysis result
 class ForensicAnalysisResult {
   final String id;
@@ -62,6 +96,11 @@ class ForensicAnalysisResult {
   final DateTime? completedAt;
   final bool isComplete;
   final List<ForensicFinding> findings;
+  final List<DetectedThreat> detectedThreats;
+
+  /// Backend-computed infection likelihood (0.0 - 1.0).
+  final double infectionLikelihood;
+  final List<String> recommendations;
   final int totalIndicatorsChecked;
   final int matchedIndicators;
   final String? error;
@@ -73,14 +112,24 @@ class ForensicAnalysisResult {
     this.completedAt,
     this.isComplete = false,
     this.findings = const [],
+    this.detectedThreats = const [],
+    this.infectionLikelihood = 0.0,
+    this.recommendations = const [],
     this.totalIndicatorsChecked = 0,
     this.matchedIndicators = 0,
     this.error,
   });
 
-  bool get hasThreat => findings.any((f) =>
-      f.severity == FindingSeverity.critical ||
-      f.severity == FindingSeverity.high);
+  /// A threat is present when the backend explicitly detected one
+  /// (detected_threats), reported high infection likelihood, or any
+  /// critical/high severity finding exists. A backend-detected Pegasus
+  /// infection must never render as "No Threats Found".
+  bool get hasThreat =>
+      detectedThreats.isNotEmpty ||
+      infectionLikelihood >= 0.5 ||
+      findings.any((f) =>
+          f.severity == FindingSeverity.critical ||
+          f.severity == FindingSeverity.high);
 
   int get criticalCount =>
       findings.where((f) => f.severity == FindingSeverity.critical).length;
@@ -89,9 +138,19 @@ class ForensicAnalysisResult {
       findings.where((f) => f.severity == FindingSeverity.high).length;
 }
 
-/// IOC Statistics
+/// IOC Statistics — mirrors GET /api/v1/forensics/iocs/stats which returns
+/// {domains, ips, hashes, path_patterns, process_patterns, total}.
 class IOCStats {
   final int totalIOCs;
+  final int domains;
+  final int ips;
+  final int hashes;
+  final int pathPatterns;
+  final int processPatterns;
+
+  // The backend does not break IOCs down by campaign (Pegasus/Predator/...).
+  // These remain for UI compatibility and are always 0 until the backend
+  // exposes a per-campaign breakdown.
   final int pegasusIOCs;
   final int predatorIOCs;
   final int stalkerwareIOCs;
@@ -100,6 +159,11 @@ class IOCStats {
 
   IOCStats({
     this.totalIOCs = 0,
+    this.domains = 0,
+    this.ips = 0,
+    this.hashes = 0,
+    this.pathPatterns = 0,
+    this.processPatterns = 0,
     this.pegasusIOCs = 0,
     this.predatorIOCs = 0,
     this.stalkerwareIOCs = 0,
@@ -116,7 +180,9 @@ class ForensicsProvider extends ChangeNotifier {
   final List<ForensicAnalysisResult> _analysisHistory = [];
   ForensicAnalysisResult? _currentAnalysis;
   IOCStats _iocStats = IOCStats();
+  bool _iocStatsLoaded = false;
   Map<String, dynamic>? _capabilities;
+  String? _cachedDeviceId;
 
   bool _isAnalyzing = false;
   bool _isLoadingStats = false;
@@ -129,6 +195,9 @@ class ForensicsProvider extends ChangeNotifier {
       List.unmodifiable(_analysisHistory);
   ForensicAnalysisResult? get currentAnalysis => _currentAnalysis;
   IOCStats get iocStats => _iocStats;
+
+  /// True once IOC stats have been successfully fetched from the backend.
+  bool get iocStatsLoaded => _iocStatsLoaded;
   Map<String, dynamic>? get capabilities => _capabilities;
   bool get isAnalyzing => _isAnalyzing;
   bool get isLoadingStats => _isLoadingStats;
@@ -167,87 +236,141 @@ class ForensicsProvider extends ChangeNotifier {
     }
   }
 
-  /// Load IOC statistics
+  /// Load IOC statistics.
+  ///
+  /// Parses the live backend shape from GET /forensics/iocs/stats:
+  /// {domains, ips, hashes, path_patterns, process_patterns, total}.
+  /// On failure the error is surfaced — no fabricated statistics.
   Future<void> loadIOCStats() async {
     _isLoadingStats = true;
     notifyListeners();
 
     try {
       final stats = await _api.getIOCStats();
+      if (stats['total'] == null) {
+        throw const FormatException(
+            'Unexpected IOC stats response: missing "total"');
+      }
       _iocStats = IOCStats(
-        totalIOCs: stats['total'] ?? 0,
-        pegasusIOCs: stats['pegasus'] ?? 0,
-        predatorIOCs: stats['predator'] ?? 0,
-        stalkerwareIOCs: stats['stalkerware'] ?? 0,
-        otherIOCs: stats['other'] ?? 0,
+        totalIOCs: (stats['total'] as num).toInt(),
+        domains: (stats['domains'] as num?)?.toInt() ?? 0,
+        ips: (stats['ips'] as num?)?.toInt() ?? 0,
+        hashes: (stats['hashes'] as num?)?.toInt() ?? 0,
+        pathPatterns: (stats['path_patterns'] as num?)?.toInt() ?? 0,
+        processPatterns: (stats['process_patterns'] as num?)?.toInt() ?? 0,
         lastUpdated: DateTime.now(),
       );
+      _iocStatsLoaded = true;
+      _error = null;
     } catch (e) {
-      // Use default stats
-      _iocStats = IOCStats(
-        totalIOCs: 2500,
-        pegasusIOCs: 850,
-        predatorIOCs: 320,
-        stalkerwareIOCs: 1100,
-        otherIOCs: 230,
-      );
+      _iocStatsLoaded = false;
+      _error = 'Failed to load IOC statistics: $e';
     }
 
     _isLoadingStats = false;
     notifyListeners();
   }
 
-  /// Analyze iOS shutdown log
+  /// Analyze iOS shutdown log.
+  /// Backend: POST /forensics/analyze/shutdown-log {device_id, log_data}
   Future<ForensicAnalysisResult?> analyzeShutdownLog(String logContent) async {
     return _runAnalysis(
       ForensicAnalysisType.shutdownLog,
-      () => _api.analyzeShutdownLog({'content': logContent}),
+      () async => _api.analyzeShutdownLog({
+        'device_id': await _deviceId(),
+        'log_data': logContent,
+      }),
     );
   }
 
-  /// Analyze iOS backup
+  /// Analyze iOS backup.
+  /// Backend: POST /forensics/analyze/backup {device_id, backup_path}
   Future<ForensicAnalysisResult?> analyzeBackup(String backupPath) async {
     return _runAnalysis(
       ForensicAnalysisType.backup,
-      () => _api.analyzeBackup({'path': backupPath}),
+      () async => _api.analyzeBackup({
+        'device_id': await _deviceId(),
+        'backup_path': backupPath,
+      }),
     );
   }
 
-  /// Analyze data usage patterns
+  /// Analyze data usage patterns.
+  /// Backend: POST /forensics/analyze/data-usage {device_id, db_path}
   Future<ForensicAnalysisResult?> analyzeDataUsage(
       Map<String, dynamic> usageData) async {
     return _runAnalysis(
       ForensicAnalysisType.dataUsage,
-      () => _api.analyzeDataUsage(usageData),
+      () async => _api.analyzeDataUsage({
+        'device_id': await _deviceId(),
+        'db_path': (usageData['db_path'] ?? usageData['path'] ?? '') as String,
+      }),
     );
   }
 
-  /// Analyze iOS sysdiagnose
+  /// Analyze iOS sysdiagnose.
+  /// Backend: POST /forensics/analyze/sysdiagnose {device_id, archive_path}
   Future<ForensicAnalysisResult?> analyzeSysdiagnose(String diagPath) async {
     return _runAnalysis(
       ForensicAnalysisType.sysdiagnose,
-      () => _api.analyzeSysdiagnose({'path': diagPath}),
+      () async => _api.analyzeSysdiagnose({
+        'device_id': await _deviceId(),
+        'archive_path': diagPath,
+      }),
     );
   }
 
-  /// Analyze Android logcat
+  /// Analyze Android logcat.
+  /// Backend: POST /forensics/analyze/logcat {device_id, log_data}
   Future<ForensicAnalysisResult?> analyzeLogcat(String logcatContent) async {
     return _runAnalysis(
       ForensicAnalysisType.logcat,
-      () => _api.analyzeLogcat({'content': logcatContent}),
+      () async => _api.analyzeLogcat({
+        'device_id': await _deviceId(),
+        'log_data': logcatContent,
+      }),
     );
   }
 
-  /// Run full forensic analysis
-  Future<ForensicAnalysisResult?> runFullAnalysis() async {
+  /// Run full forensic analysis.
+  /// Backend: POST /forensics/full-analysis
+  /// {device_id, platform, include_timeline, ...optional artifacts}
+  Future<ForensicAnalysisResult?> runFullAnalysis({
+    String? shutdownLog,
+    String? logcatData,
+    String? backupPath,
+    String? dataUsagePath,
+    String? sysdiagnosePath,
+  }) async {
     return _runAnalysis(
       ForensicAnalysisType.fullScan,
-      () => _api.runFullForensicAnalysis({}),
+      () async => _api.runFullForensicAnalysis({
+        'device_id': await _deviceId(),
+        'platform': _platformName(),
+        'include_timeline': true,
+        if (shutdownLog != null && shutdownLog.isNotEmpty)
+          'shutdown_log': shutdownLog,
+        if (logcatData != null && logcatData.isNotEmpty)
+          'logcat_data': logcatData,
+        if (backupPath != null && backupPath.isNotEmpty)
+          'backup_path': backupPath,
+        if (dataUsagePath != null && dataUsagePath.isNotEmpty)
+          'data_usage_path': dataUsagePath,
+        if (sysdiagnosePath != null && sysdiagnosePath.isNotEmpty)
+          'sysdiagnose_path': sysdiagnosePath,
+      }),
     );
   }
 
-  /// Quick check for known IOCs
-  Future<ForensicAnalysisResult?> quickCheck(List<String> indicators) async {
+  /// Quick check for known IOCs in raw log data.
+  ///
+  /// Backend: POST /forensics/quick-check {platform, log_data} returning
+  /// {platform, checked_at, is_suspicious, indicators_found,
+  ///  recommend_full_scan, indicators: [{type, value, confidence, description}]}.
+  Future<ForensicAnalysisResult?> quickCheck({
+    String? platform,
+    required String logData,
+  }) async {
     _isAnalyzing = true;
     _progress = 0.0;
     _currentPhase = 'Checking indicators...';
@@ -261,23 +384,46 @@ class ForensicsProvider extends ChangeNotifier {
     );
 
     try {
-      final indicatorMaps = indicators.map((i) => {'value': i}).toList();
-      final response = await _api.quickForensicCheck(indicatorMaps);
-      final findings = <ForensicFinding>[];
+      final response = await _api.quickForensicCheck([
+        {
+          'platform': platform ?? _platformName(),
+          'log_data': logData,
+        }
+      ]);
 
-      if (response['matches'] != null) {
-        for (final match in response['matches']) {
+      if (response['indicators_found'] == null &&
+          response['is_suspicious'] == null) {
+        throw const FormatException(
+            'Unexpected quick-check response: missing "indicators_found"');
+      }
+
+      final findings = <ForensicFinding>[];
+      final indicators = response['indicators'];
+      if (indicators is List) {
+        for (final raw in indicators) {
+          if (raw is! Map) continue;
+          final indicator = Map<String, dynamic>.from(raw);
+          final confidence =
+              (indicator['confidence'] as num?)?.toDouble() ?? 0.0;
           findings.add(ForensicFinding(
-            id: match['id'] ?? '',
-            title: match['title'] ?? 'Unknown IOC Match',
-            description: match['description'] ?? '',
-            severity: _parseSeverity(match['severity']),
-            category: match['category'] ?? 'unknown',
-            indicators: List<String>.from(match['indicators'] ?? []),
+            id: '${indicator['type'] ?? 'indicator'}-${indicator['value'] ?? findings.length}',
+            title: (indicator['description'] as String?) ??
+                'Suspicious indicator',
+            description:
+                'Matched ${indicator['type'] ?? 'indicator'}: ${indicator['value'] ?? ''}',
+            severity: confidence >= 0.8
+                ? FindingSeverity.high
+                : FindingSeverity.medium,
+            category: (indicator['type'] as String?) ?? 'indicator',
+            indicators: [
+              if (indicator['value'] is String) indicator['value'] as String,
+            ],
+            metadata: {'confidence': confidence},
           ));
         }
       }
 
+      final isSuspicious = response['is_suspicious'] == true;
       final completedResult = ForensicAnalysisResult(
         id: result.id,
         type: result.type,
@@ -285,7 +431,13 @@ class ForensicsProvider extends ChangeNotifier {
         completedAt: DateTime.now(),
         isComplete: true,
         findings: findings,
-        totalIndicatorsChecked: indicators.length,
+        infectionLikelihood: isSuspicious ? 0.5 : 0.0,
+        recommendations: [
+          if (response['recommend_full_scan'] == true)
+            'Suspicious indicators found — run a full forensic analysis.',
+        ],
+        totalIndicatorsChecked:
+            (response['indicators_found'] as num?)?.toInt() ?? findings.length,
         matchedIndicators: findings.length,
       );
 
@@ -303,14 +455,17 @@ class ForensicsProvider extends ChangeNotifier {
     }
   }
 
-  /// Run analysis with progress tracking
+  /// Run analysis and parse the backend ForensicResult response:
+  /// {id, device_id, platform, scan_type, started_at, completed_at,
+  ///  total_anomalies, critical_count, high_count, medium_count, low_count,
+  ///  anomalies[], infection_likelihood, detected_threats[], recommendations[]}
   Future<ForensicAnalysisResult?> _runAnalysis(
     ForensicAnalysisType type,
     Future<Map<String, dynamic>> Function() apiCall,
   ) async {
     _isAnalyzing = true;
     _progress = 0.0;
-    _currentPhase = 'Initializing ${type.displayName}...';
+    _currentPhase = 'Running ${type.displayName}...';
     _error = null;
     notifyListeners();
 
@@ -324,46 +479,120 @@ class ForensicsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate progress phases
-      final phases = [
-        'Extracting artifacts...',
-        'Checking IOC database...',
-        'Analyzing patterns...',
-        'Generating report...',
-      ];
+      final response = await apiCall();
 
-      for (var i = 0; i < phases.length; i++) {
-        _currentPhase = phases[i];
-        _progress = (i + 1) / (phases.length + 1);
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 500));
+      if (response['anomalies'] == null &&
+          response['total_anomalies'] == null) {
+        throw const FormatException(
+            'Unexpected forensic analysis response: missing "anomalies"');
       }
 
-      final response = await apiCall();
       final findings = <ForensicFinding>[];
 
-      if (response['findings'] != null) {
-        for (final finding in response['findings']) {
+      // Anomalies detected by the backend analyzers.
+      final anomalies = response['anomalies'];
+      if (anomalies is List) {
+        for (final raw in anomalies) {
+          if (raw is! Map) continue;
+          final anomaly = Map<String, dynamic>.from(raw);
+          final indicators = <String>[];
+          final iocMatch = anomaly['ioc_match'];
+          if (iocMatch is Map && iocMatch['value'] is String) {
+            indicators.add(iocMatch['value'] as String);
+          }
+          final mitre = anomaly['mitre_techniques'];
+          if (mitre is List) {
+            indicators.addAll(mitre.whereType<String>());
+          }
           findings.add(ForensicFinding(
-            id: finding['id'] ?? '',
-            title: finding['title'] ?? 'Unknown Finding',
-            description: finding['description'] ?? '',
-            severity: _parseSeverity(finding['severity']),
-            category: finding['category'] ?? 'unknown',
-            indicators: List<String>.from(finding['indicators'] ?? []),
-            metadata: Map<String, dynamic>.from(finding['metadata'] ?? {}),
+            id: (anomaly['id'] as String?) ?? '',
+            title: (anomaly['title'] as String?) ?? 'Unknown Finding',
+            description: (anomaly['description'] as String?) ?? '',
+            severity: _parseSeverity(anomaly['severity'] as String?),
+            category: (anomaly['type'] as String?) ?? 'unknown',
+            indicators: indicators,
+            metadata: {
+              if (anomaly['confidence'] != null)
+                'confidence': anomaly['confidence'],
+              if (anomaly['path'] != null) 'path': anomaly['path'],
+              if (anomaly['process_name'] != null)
+                'process_name': anomaly['process_name'],
+              if (anomaly['evidence'] is Map)
+                ...Map<String, dynamic>.from(anomaly['evidence'] as Map),
+            },
+            detectedAt: DateTime.tryParse(
+                (anomaly['timestamp'] as String?) ?? ''),
           ));
         }
       }
 
+      // Threats explicitly identified by the backend (Pegasus, Predator...).
+      final detectedThreats = <DetectedThreat>[];
+      final threats = response['detected_threats'];
+      if (threats is List) {
+        for (final raw in threats) {
+          if (raw is! Map) continue;
+          final threat = Map<String, dynamic>.from(raw);
+          final severity = _parseSeverity(threat['severity'] as String?);
+          final mitre = (threat['mitre_techniques'] is List)
+              ? List<String>.from(
+                  (threat['mitre_techniques'] as List).whereType<String>())
+              : const <String>[];
+          final remediation = (threat['remediation'] is List)
+              ? List<String>.from(
+                  (threat['remediation'] as List).whereType<String>())
+              : const <String>[];
+          detectedThreats.add(DetectedThreat(
+            type: (threat['type'] as String?) ?? 'unknown',
+            name: (threat['name'] as String?) ?? 'Unknown Threat',
+            confidence: (threat['confidence'] as num?)?.toDouble() ?? 0.0,
+            severity: severity,
+            description: (threat['description'] as String?) ?? '',
+            attribution: (threat['attribution'] as String?) ?? '',
+            mitreTechniques: mitre,
+            remediation: remediation,
+          ));
+          // Surface the threat as a finding too, so detected infections are
+          // always visible in finding-based UI.
+          findings.add(ForensicFinding(
+            id: 'threat-${threat['type'] ?? detectedThreats.length}',
+            title: (threat['name'] as String?) ?? 'Detected Threat',
+            description: (threat['description'] as String?) ?? '',
+            severity: severity,
+            category: (threat['type'] as String?) ?? 'threat',
+            indicators: mitre,
+            metadata: {
+              'confidence': threat['confidence'],
+              if (threat['attribution'] != null)
+                'attribution': threat['attribution'],
+              if (remediation.isNotEmpty) 'remediation': remediation,
+            },
+          ));
+        }
+      }
+
+      final recommendations = (response['recommendations'] is List)
+          ? List<String>.from(
+              (response['recommendations'] as List).whereType<String>())
+          : const <String>[];
+
       final completedResult = ForensicAnalysisResult(
-        id: result.id,
+        id: (response['id'] as String?) ?? result.id,
         type: type,
-        startedAt: result.startedAt,
-        completedAt: DateTime.now(),
+        startedAt:
+            DateTime.tryParse((response['started_at'] as String?) ?? '') ??
+                result.startedAt,
+        completedAt:
+            DateTime.tryParse((response['completed_at'] as String?) ?? '') ??
+                DateTime.now(),
         isComplete: true,
         findings: findings,
-        totalIndicatorsChecked: response['total_checked'] ?? 0,
+        detectedThreats: detectedThreats,
+        infectionLikelihood:
+            (response['infection_likelihood'] as num?)?.toDouble() ?? 0.0,
+        recommendations: recommendations,
+        totalIndicatorsChecked:
+            (response['total_anomalies'] as num?)?.toInt() ?? findings.length,
         matchedIndicators: findings.length,
       );
 
@@ -390,6 +619,33 @@ class ForensicsProvider extends ChangeNotifier {
       notifyListeners();
       return errorResult;
     }
+  }
+
+  /// Stable device identifier matching what device registration sends.
+  Future<String> _deviceId() async {
+    final cached = _cachedDeviceId;
+    if (cached != null && cached.isNotEmpty) return cached;
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+        _cachedDeviceId = info.id;
+      } else if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+        _cachedDeviceId = info.identifierForVendor ?? '';
+      } else {
+        _cachedDeviceId = '';
+      }
+    } catch (_) {
+      _cachedDeviceId = '';
+    }
+    return _cachedDeviceId ?? '';
+  }
+
+  String _platformName() {
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isAndroid) return 'android';
+    return Platform.operatingSystem;
   }
 
   FindingSeverity _parseSeverity(String? severity) {

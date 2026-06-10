@@ -1,5 +1,16 @@
 /// ML Analysis Screen
 /// Machine learning anomaly detection and analysis interface
+///
+/// Wire format note: GET /ml/models returns the MLService stats object
+/// (`models_loaded`, `models: [MLModelInfo]`, ...). Each MLModelInfo carries
+/// `name`, `version`, `type`, `status` ("ready"/"not_trained"), `trained_at`,
+/// `training_size`, optional `accuracy` (omitted when untrained) and
+/// `feature_names`. There is currently no server endpoint for enabling or
+/// disabling individual models, no stored anomaly history endpoint
+/// (/ml/anomalies is an alias of the stats endpoint) and no insights endpoint
+/// (/ml/insights is the same alias), so those sections render explicit
+/// "unavailable" states instead of fabricated data.
+library;
 
 import 'package:flutter/material.dart';
 
@@ -20,11 +31,18 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
   final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey<GlassTabPageState>();
   final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
-  bool _isAnalyzing = false;
   String? _error;
   final List<MLModel> _models = [];
   final List<AnomalyDetection> _anomalies = [];
   final List<MLInsight> _insights = [];
+
+  // The server does not yet expose stored anomaly history or insight feeds:
+  // /ml/anomalies and /ml/insights are currently aliases of the ML stats
+  // endpoint and never carry `anomalies`/`insights` arrays. These flags become
+  // true only when the server actually returns entries, so the tabs can show
+  // an honest "unavailable" state instead of pretending the system is clean.
+  bool _anomalyHistoryAvailable = false;
+  bool _insightsAvailable = false;
 
   @override
   void initState() {
@@ -38,36 +56,54 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
       _error = null;
     });
 
+    final errors = <String>[];
+
+    List<MLModel> models = [];
     try {
-      // Load ML models, anomalies, and insights from API
-      final results = await Future.wait([
-        _apiClient.getMLModels(),
-        _apiClient.getAnomalies(),
-        _apiClient.getMLInsights(),
-      ]);
-
-      final modelsData = results[0];
-      final anomaliesData = results[1];
-      final insightsData = results[2];
-
-      setState(() {
-        _models.clear();
-        _models.addAll(modelsData.map((json) => MLModel.fromJson(json)));
-
-        _anomalies.clear();
-        _anomalies.addAll(anomaliesData.map((json) => AnomalyDetection.fromJson(json)));
-
-        _insights.clear();
-        _insights.addAll(insightsData.map((json) => MLInsight.fromJson(json)));
-
-        _isLoading = false;
-      });
+      final modelsData = await _apiClient.getMLModels();
+      models = modelsData.map((json) => MLModel.fromJson(json)).toList();
     } catch (e) {
-      setState(() {
-        _error = 'Failed to load ML data: $e';
-        _isLoading = false;
-      });
+      errors.add('models: $e');
     }
+
+    List<AnomalyDetection> anomalies = [];
+    bool anomaliesAvailable = false;
+    try {
+      final anomaliesData = await _apiClient.getAnomalies();
+      anomalies = anomaliesData
+          .map((json) => AnomalyDetection.fromJson(json))
+          .toList();
+      anomaliesAvailable = anomalies.isNotEmpty;
+    } catch (e) {
+      errors.add('anomalies: $e');
+    }
+
+    List<MLInsight> insights = [];
+    bool insightsAvailable = false;
+    try {
+      final insightsData = await _apiClient.getMLInsights();
+      insights = insightsData.map((json) => MLInsight.fromJson(json)).toList();
+      insightsAvailable = insights.isNotEmpty;
+    } catch (e) {
+      errors.add('insights: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _models
+        ..clear()
+        ..addAll(models);
+      _anomalies
+        ..clear()
+        ..addAll(anomalies);
+      _insights
+        ..clear()
+        ..addAll(insights);
+      _anomalyHistoryAvailable = anomaliesAvailable;
+      _insightsAvailable = insightsAvailable;
+      _error = errors.isEmpty ? null : 'Failed to load ML data — ${errors.join('; ')}';
+      _isLoading = false;
+    });
   }
 
   @override
@@ -85,10 +121,18 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
       hasSearch: true,
       searchHint: 'Search anomalies...',
       actions: [
-        IconButton(
-          icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
-          onPressed: _isAnalyzing ? null : _runAnalysis,
-          tooltip: 'Run Analysis',
+        // Batch anomaly analysis (POST /ml/anomalies/detect) is not exposed
+        // through the app's API layer yet; the only analysis call available to
+        // the client analyzes a single raw value and cannot run a batch scan.
+        // The control stays visible but disabled rather than firing a request
+        // that the server is guaranteed to reject.
+        Tooltip(
+          message: 'Batch ML analysis is not available from the server yet',
+          child: IconButton(
+            icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white.withAlpha(96)),
+            onPressed: null,
+            tooltip: 'Run Analysis (unavailable)',
+          ),
         ),
         IconButton(
           icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
@@ -120,19 +164,51 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_error != null) ...[
+          _buildErrorCard(_error!),
+          const SizedBox(height: 16),
+        ],
+
         // Stats
         Row(
           children: [
             _buildStatCard('Models', _models.length.toString(), GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Active', _models.where((m) => m.isEnabled).length.toString(), GlassTheme.successColor),
+            _buildStatCard('Trained', _models.where((m) => m.isReady).length.toString(), GlassTheme.successColor),
           ],
         ),
         const SizedBox(height: 24),
 
         const GlassSectionHeader(title: 'Detection Models'),
-        ..._models.map((model) => _buildModelCard(model)),
+        if (_models.isEmpty && _error == null)
+          _buildEmptyState(
+            icon: AppIcons.mlAnalysis,
+            title: 'No Models Reported',
+            subtitle: 'The server did not return any ML models',
+          )
+        else
+          ..._models.map((model) => _buildModelCard(model)),
       ],
+    );
+  }
+
+  Widget _buildErrorCard(String message) {
+    return GlassCard(
+      tintColor: GlassTheme.errorColor,
+      child: Row(
+        children: [
+          const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(message, style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 12)),
+          ),
+          IconButton(
+            icon: const DuotoneIcon('refresh', color: Colors.white, size: 20),
+            onPressed: _loadData,
+            tooltip: 'Retry',
+          ),
+        ],
+      ),
     );
   }
 
@@ -152,11 +228,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
   }
 
   Widget _buildModelCard(MLModel model) {
-    final accuracyColor = model.accuracy >= 0.9
-        ? GlassTheme.successColor
-        : model.accuracy >= 0.7
-            ? GlassTheme.warningColor
-            : GlassTheme.errorColor;
+    final accuracy = model.accuracy;
+    final accuracyColor = accuracy == null
+        ? Colors.white54
+        : accuracy >= 0.9
+            ? GlassTheme.successColor
+            : accuracy >= 0.7
+                ? GlassTheme.warningColor
+                : GlassTheme.errorColor;
 
     return GlassCard(
       child: Column(
@@ -166,7 +245,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             children: [
               GlassSvgIconBox(
                 icon: _getModelIcon(model.type),
-                color: model.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
+                color: model.isReady ? GlassTheme.primaryAccent : Colors.grey,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -174,29 +253,53 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(model.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(model.type, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(
+                      model.version.isEmpty ? model.type : '${model.type} • v${model.version}',
+                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    ),
                   ],
                 ),
               ),
-              Switch(
-                value: model.isEnabled,
-                onChanged: (v) => setState(() => model.isEnabled = v),
-                activeColor: GlassTheme.successColor,
+              GlassBadge(
+                text: model.isReady ? 'READY' : 'NOT TRAINED',
+                color: model.isReady ? GlassTheme.successColor : GlassTheme.warningColor,
+                fontSize: 10,
+              ),
+              const SizedBox(width: 8),
+              // The server has no endpoint to enable/disable individual
+              // models, so this control is intentionally disabled instead of
+              // pretending to toggle anything.
+              Tooltip(
+                message: 'Model enable/disable is not supported by the server yet',
+                child: Switch(
+                  value: model.isReady,
+                  onChanged: null,
+                  activeThumbColor: GlassTheme.successColor,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildModelMetric('Accuracy', '${(model.accuracy * 100).toInt()}%', accuracyColor),
+              _buildModelMetric(
+                'Accuracy',
+                accuracy != null ? '${(accuracy * 100).toInt()}%' : 'n/a',
+                accuracyColor,
+              ),
               const SizedBox(width: 16),
-              _buildModelMetric('Precision', '${(model.precision * 100).toInt()}%', Colors.white54),
+              _buildModelMetric('Training Size', model.trainingSize.toString(), Colors.white54),
               const SizedBox(width: 16),
-              _buildModelMetric('Recall', '${(model.recall * 100).toInt()}%', Colors.white54),
+              _buildModelMetric('Features', model.featureNames.length.toString(), Colors.white54),
             ],
           ),
           const SizedBox(height: 8),
-          Text(model.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+          Text(
+            model.trainedAt != null
+                ? 'Last trained ${_formatTime(model.trainedAt!)}'
+                : 'Never trained',
+            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+          ),
         ],
       ),
     );
@@ -213,36 +316,17 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
   }
 
   Widget _buildAnomaliesTab() {
-    if (_anomalies.isEmpty) {
+    if (!_anomalyHistoryAvailable) {
       return _buildEmptyState(
         icon: AppIcons.mlAnalysis,
-        title: 'No Anomalies',
-        subtitle: 'Run analysis to detect anomalies',
+        title: 'Anomaly History Unavailable',
+        subtitle: 'The server does not provide stored anomaly detections yet',
       );
     }
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (_isAnalyzing)
-          GlassCard(
-            tintColor: GlassTheme.primaryAccent,
-            child: Row(
-              children: [
-                const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: GlassTheme.primaryAccent)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Analyzing patterns...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                      Text('Running ML models', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
         ..._anomalies.map((anomaly) => _buildAnomalyCard(anomaly)),
       ],
     );
@@ -278,9 +362,17 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildAnomalyStat(AppIcons.graphUp, 'Score: ${(anomaly.anomalyScore * 100).toInt()}%'),
+              _buildAnomalyStat(
+                AppIcons.graphUp,
+                anomaly.anomalyScore != null
+                    ? 'Score: ${(anomaly.anomalyScore! * 100).toInt()}%'
+                    : 'Score: n/a',
+              ),
               const SizedBox(width: 16),
-              _buildAnomalyStat(AppIcons.clock, _formatTime(anomaly.detectedAt)),
+              _buildAnomalyStat(
+                AppIcons.clock,
+                anomaly.detectedAt != null ? _formatTime(anomaly.detectedAt!) : 'Time unknown',
+              ),
             ],
           ),
         ],
@@ -308,13 +400,13 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           const Text('AI Insights', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
-          if (_insights.isEmpty)
+          if (!_insightsAvailable)
             GlassCard(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
-                    'No insights available yet',
+                    'AI insights are not available from the server yet',
                     style: TextStyle(color: Colors.white.withAlpha(153)),
                   ),
                 ),
@@ -379,7 +471,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildPerformanceBar(String label, double value) {
+  Widget _buildPerformanceBar(String label, double? value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -389,14 +481,20 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(label, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
-              Text('${(value * 100).toInt()}%', style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold)),
+              Text(
+                value != null ? '${(value * 100).toInt()}%' : 'n/a',
+                style: TextStyle(
+                  color: value != null ? GlassTheme.primaryAccent : Colors.white54,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
-              value: value,
+              value: value ?? 0,
               backgroundColor: Colors.white12,
               valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
               minHeight: 6,
@@ -420,44 +518,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(
+            subtitle,
+            style: TextStyle(color: Colors.white.withAlpha(153)),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
-  }
-
-  Future<void> _runAnalysis() async {
-    setState(() => _isAnalyzing = true);
-    _tabPageKey.currentState?.animateToTab(1);
-
-    try {
-      // Run ML analysis via API
-      final result = await _apiClient.runMLAnalysis();
-
-      setState(() {
-        _isAnalyzing = false;
-        // Add any new anomalies detected
-        if (result['anomalies'] != null) {
-          final newAnomalies = (result['anomalies'] as List)
-              .map((json) => AnomalyDetection.fromJson(json as Map<String, dynamic>))
-              .toList();
-          for (final anomaly in newAnomalies) {
-            if (!_anomalies.any((a) => a.id == anomaly.id)) {
-              _anomalies.insert(0, anomaly);
-            }
-          }
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isAnalyzing = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Analysis failed: $e'), backgroundColor: GlassTheme.errorColor),
-        );
-      }
-    }
   }
 
   void _showAnomalyDetails(BuildContext context, AnomalyDetection anomaly) {
@@ -507,8 +575,16 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 child: Column(
                   children: [
                     _buildDetailRow('Model', anomaly.model),
-                    _buildDetailRow('Anomaly Score', '${(anomaly.anomalyScore * 100).toInt()}%'),
-                    _buildDetailRow('Detected', _formatTime(anomaly.detectedAt)),
+                    _buildDetailRow(
+                      'Anomaly Score',
+                      anomaly.anomalyScore != null
+                          ? '${(anomaly.anomalyScore! * 100).toInt()}%'
+                          : 'n/a',
+                    ),
+                    _buildDetailRow(
+                      'Detected',
+                      anomaly.detectedAt != null ? _formatTime(anomaly.detectedAt!) : 'n/a',
+                    ),
                   ],
                 ),
               ),
@@ -534,14 +610,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
 
   String _getModelIcon(String type) {
     switch (type.toLowerCase()) {
-      case 'classifier':
+      case 'classification':
         return AppIcons.filter;
-      case 'anomaly detection':
+      case 'anomaly_detection':
         return AppIcons.dangerTriangle;
+      case 'clustering':
+        return AppIcons.mlAnalysis;
       case 'nlp':
         return AppIcons.fileText;
-      case 'behavior analysis':
-        return AppIcons.mlAnalysis;
       default:
         return AppIcons.cpu;
     }
@@ -569,46 +645,70 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
 
 }
 
+/// Mirrors the live MLModelInfo JSON emitted by the backend
+/// (orbguard-lab internal/domain/models/ml.go): name, version, type,
+/// trained_at, training_size, accuracy (omitempty), feature_names, status.
 class MLModel {
   final String name;
   final String type;
-  final String description;
-  final double accuracy;
-  final double precision;
-  final double recall;
-  bool isEnabled;
+  final String version;
+  final String status; // "ready" or "not_trained"
+  final double? accuracy; // omitted by the server when not meaningful
+  final int trainingSize;
+  final DateTime? trainedAt;
+  final List<String> featureNames;
 
   MLModel({
     required this.name,
     required this.type,
-    required this.description,
-    required this.accuracy,
-    required this.precision,
-    required this.recall,
-    this.isEnabled = true,
+    required this.version,
+    required this.status,
+    required this.trainingSize,
+    required this.featureNames,
+    this.accuracy,
+    this.trainedAt,
   });
 
+  bool get isReady => status == 'ready';
+
   factory MLModel.fromJson(Map<String, dynamic> json) {
+    // Go encodes an untrained model's zero time as "0001-01-01T00:00:00Z";
+    // treat that as "never trained" rather than a real timestamp.
+    DateTime? trainedAt;
+    final rawTrainedAt = json['trained_at'] as String?;
+    if (rawTrainedAt != null) {
+      final parsed = DateTime.tryParse(rawTrainedAt);
+      if (parsed != null && parsed.year > 1970) {
+        trainedAt = parsed;
+      }
+    }
+
     return MLModel(
       name: json['name'] as String? ?? 'Unknown Model',
-      type: json['type'] as String? ?? 'Unknown',
-      description: json['description'] as String? ?? '',
-      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
-      precision: (json['precision'] as num?)?.toDouble() ?? 0.0,
-      recall: (json['recall'] as num?)?.toDouble() ?? 0.0,
-      isEnabled: json['is_enabled'] as bool? ?? true,
+      type: json['type'] as String? ?? 'unknown',
+      version: json['version'] as String? ?? '',
+      status: json['status'] as String? ?? 'unknown',
+      accuracy: (json['accuracy'] as num?)?.toDouble(),
+      trainingSize: (json['training_size'] as num?)?.toInt() ?? 0,
+      trainedAt: trainedAt,
+      featureNames:
+          (json['feature_names'] as List?)?.whereType<String>().toList() ?? const [],
     );
   }
 }
 
+/// Stored anomaly detections are not served by the backend yet
+/// (/ml/anomalies aliases the stats endpoint); this model parses entries
+/// defensively if/when the server starts returning them. Absent fields stay
+/// null and are rendered as "n/a" — never substituted with fake values.
 class AnomalyDetection {
   final String id;
   final String title;
   final String description;
   final String model;
   final String severity;
-  final double anomalyScore;
-  final DateTime detectedAt;
+  final double? anomalyScore;
+  final DateTime? detectedAt;
 
   AnomalyDetection({
     required this.id,
@@ -616,21 +716,26 @@ class AnomalyDetection {
     required this.description,
     required this.model,
     required this.severity,
-    required this.anomalyScore,
-    required this.detectedAt,
+    this.anomalyScore,
+    this.detectedAt,
   });
 
   factory AnomalyDetection.fromJson(Map<String, dynamic> json) {
+    // Accept both a server-side AnomalyScore shape (score/method/computed_at,
+    // see orbguard-lab models/ml.go) and a flattened history entry shape.
+    final score = (json['anomaly_score'] as num?)?.toDouble() ??
+        (json['score'] as num?)?.toDouble();
+    final timestampRaw =
+        (json['detected_at'] as String?) ?? (json['computed_at'] as String?);
+
     return AnomalyDetection(
-      id: json['id'] as String? ?? '',
+      id: json['id'] as String? ?? json['indicator_id'] as String? ?? '',
       title: json['title'] as String? ?? 'Anomaly Detected',
       description: json['description'] as String? ?? '',
-      model: json['model'] as String? ?? 'Unknown',
-      severity: json['severity'] as String? ?? 'medium',
-      anomalyScore: (json['anomaly_score'] as num?)?.toDouble() ?? 0.0,
-      detectedAt: json['detected_at'] != null
-          ? DateTime.parse(json['detected_at'] as String)
-          : DateTime.now(),
+      model: json['model'] as String? ?? json['method'] as String? ?? 'unknown',
+      severity: json['severity'] as String? ?? 'unknown',
+      anomalyScore: score,
+      detectedAt: timestampRaw != null ? DateTime.tryParse(timestampRaw) : null,
     );
   }
 }

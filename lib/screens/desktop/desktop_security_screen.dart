@@ -63,35 +63,68 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       _error = null;
     });
 
+    // Each section loads independently so one failing endpoint does not hide
+    // data from the others; failures are surfaced instead of silently
+    // replaced with empty placeholders.
+    final errors = <String>[];
+
+    List<PersistenceItem> persistenceItems = [];
     try {
-      // Load desktop security data from API
       final persistenceData = await _apiClient.getPersistenceItems();
-      final signedAppsData = await _apiClient.getSignedApps();
-      final firewallData = await _apiClient.getDesktopFirewallRules();
-      final networkData = await _apiClient.getNetworkConnections().catchError((_) => <Map<String, dynamic>>[]);
-      final browserData = await _apiClient.scanBrowserExtensions().catchError((_) => <String, dynamic>{});
-
-      setState(() {
-        _persistenceItems.clear();
-        _persistenceItems.addAll(persistenceData.map((json) => PersistenceItem.fromJson(json)));
-
-        _signedApps.clear();
-        _signedApps.addAll(signedAppsData.map((json) => SignedApp.fromJson(json)));
-
-        _firewallRules.clear();
-        _firewallRules.addAll(firewallData.map((json) => FirewallRule.fromJson(json)));
-
-        _networkConnections = networkData;
-        _browserScanResult = browserData.isNotEmpty ? browserData : null;
-
-        _isLoading = false;
-      });
+      persistenceItems =
+          persistenceData.map((json) => PersistenceItem.fromJson(json)).toList();
     } catch (e) {
-      setState(() {
-        _error = 'Failed to load desktop security data: $e';
-        _isLoading = false;
-      });
+      errors.add('persistence: $e');
     }
+
+    List<SignedApp> signedApps = [];
+    try {
+      final signedAppsData = await _apiClient.getSignedApps();
+      signedApps = signedAppsData.map((json) => SignedApp.fromJson(json)).toList();
+    } catch (e) {
+      errors.add('signed apps: $e');
+    }
+
+    List<FirewallRule> firewallRules = [];
+    try {
+      final firewallData = await _apiClient.getDesktopFirewallRules();
+      firewallRules = firewallData.map((json) => FirewallRule.fromJson(json)).toList();
+    } catch (e) {
+      errors.add('firewall: $e');
+    }
+
+    List<Map<String, dynamic>> networkData = [];
+    try {
+      networkData = await _apiClient.getNetworkConnections();
+    } catch (e) {
+      errors.add('network: $e');
+    }
+
+    Map<String, dynamic> browserData = {};
+    try {
+      browserData = await _apiClient.scanBrowserExtensions();
+    } catch (e) {
+      errors.add('browser: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _persistenceItems
+        ..clear()
+        ..addAll(persistenceItems);
+      _signedApps
+        ..clear()
+        ..addAll(signedApps);
+      _firewallRules
+        ..clear()
+        ..addAll(firewallRules);
+      _networkConnections = networkData;
+      _browserScanResult = browserData.isNotEmpty ? browserData : null;
+      _error = errors.isEmpty
+          ? null
+          : 'Failed to load desktop security data — ${errors.join('; ')}';
+      _isLoading = false;
+    });
   }
 
   @override
@@ -718,7 +751,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${rule.port != null ? "Port ${rule.port}" : "All ports"} • ${rule.address ?? "Any address"}',
+                  '${rule.destPort != null ? "Port ${rule.destPort}" : "All ports"} • ${rule.destAddress ?? "Any address"}',
                   style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
                 ),
               ],
@@ -788,12 +821,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           )
         else
           ..._networkConnections.map((conn) {
-            final process = conn['process_name'] as String? ?? conn['process'] as String? ?? 'Unknown';
-            final remoteIp = conn['remote_ip'] as String? ?? conn['destination'] as String? ?? '';
-            final remotePort = conn['remote_port']?.toString() ?? conn['port']?.toString() ?? '';
+            // Live NetworkConnection JSON (orbguard-lab
+            // models/desktop_security.go): process_name, remote_address,
+            // remote_port, protocol, state, is_known_bad, is_cnc,
+            // threat_tags, ...
+            final process = conn['process_name'] as String? ?? 'Unknown';
+            final remoteIp = conn['remote_address'] as String? ?? '';
+            final remotePortNum = (conn['remote_port'] as num?)?.toInt() ?? 0;
+            final remotePort = remotePortNum > 0 ? remotePortNum.toString() : '';
             final protocol = conn['protocol'] as String? ?? 'tcp';
             final state = conn['state'] as String? ?? '';
-            final isSuspicious = conn['is_suspicious'] as bool? ?? false;
+            final isSuspicious = (conn['is_known_bad'] as bool? ?? false) ||
+                (conn['is_cnc'] as bool? ?? false);
 
             return GlassCard(
               tintColor: isSuspicious ? GlassTheme.errorColor : null,
@@ -1438,10 +1477,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               name: item.name,
               type: item.typeDisplayName,
               path: item.path,
-              isRunning: item.isEnabled,
-              autoStart: item.isEnabled,
-              isSuspicious: item.risk.level >= DesktopItemRisk.high.level,
-              reason: item.indicators.isNotEmpty ? item.indicators.first : null,
+              enabled: item.isEnabled,
+              runAtLoad: item.isEnabled,
+              riskLevel: item.risk == DesktopItemRisk.safe ? 'clean' : item.risk.name,
+              riskReasons: item.indicators,
+              isKnownBad: item.risk == DesktopItemRisk.critical,
             )),
           );
         });
@@ -1539,8 +1579,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 child: Column(
                   children: [
                     _buildDetailRow('Type', item.type),
-                    _buildDetailRow('Status', item.isRunning ? 'Running' : 'Stopped'),
-                    _buildDetailRow('Auto Start', item.autoStart ? 'Yes' : 'No'),
+                    _buildDetailRow('Status', item.enabled ? 'Enabled' : 'Disabled'),
+                    _buildDetailRow('Run at Load', item.runAtLoad ? 'Yes' : 'No'),
+                    _buildDetailRow('Risk Level', item.riskLevel.toUpperCase()),
+                    if (item.codeSigning != null)
+                      _buildDetailRow('Code Signing', item.codeSigning!),
                   ],
                 ),
               ),
@@ -1554,15 +1597,23 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   style: TextStyle(color: Colors.white.withAlpha(204), fontFamily: 'monospace', fontSize: 12),
                 ),
               ),
-              if (item.isSuspicious) ...[
+              if (item.riskReasons.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                const Text('Reason', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const Text('Risk Reasons', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 GlassContainer(
                   padding: const EdgeInsets.all(12),
-                  child: Text(
-                    item.reason ?? 'Unknown executable in startup location',
-                    style: TextStyle(color: GlassTheme.errorColor.withAlpha(230)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: item.riskReasons
+                        .map((r) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                '• $r',
+                                style: TextStyle(color: GlassTheme.errorColor.withAlpha(230)),
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ),
               ],
@@ -1943,26 +1994,39 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
 }
 
+/// Mirrors the live PersistenceItem JSON emitted by the backend
+/// (orbguard-lab internal/domain/models/desktop_security.go): id, type, name,
+/// path, enabled, run_at_load, risk_level (critical/high/medium/low/info/
+/// clean), risk_reasons, is_known_bad, code_signing, ...
 class PersistenceItem {
   final String id;
   final String name;
   final String type;
   final String path;
-  final bool isRunning;
-  final bool autoStart;
-  final bool isSuspicious;
-  final String? reason;
+  final bool enabled;
+  final bool runAtLoad;
+  final String riskLevel;
+  final List<String> riskReasons;
+  final bool isKnownBad;
+  final String? codeSigning;
 
   PersistenceItem({
     required this.id,
     required this.name,
     required this.type,
     required this.path,
-    required this.isRunning,
-    required this.autoStart,
-    required this.isSuspicious,
-    this.reason,
+    required this.enabled,
+    required this.runAtLoad,
+    required this.riskLevel,
+    required this.riskReasons,
+    required this.isKnownBad,
+    this.codeSigning,
   });
+
+  bool get isSuspicious =>
+      isKnownBad || riskLevel == 'critical' || riskLevel == 'high';
+
+  String? get reason => riskReasons.isNotEmpty ? riskReasons.join('; ') : null;
 
   factory PersistenceItem.fromJson(Map<String, dynamic> json) {
     return PersistenceItem(
@@ -1970,10 +2034,13 @@ class PersistenceItem {
       name: json['name'] as String? ?? 'Unknown',
       type: json['type'] as String? ?? 'Unknown',
       path: json['path'] as String? ?? '',
-      isRunning: json['is_running'] as bool? ?? false,
-      autoStart: json['auto_start'] as bool? ?? false,
-      isSuspicious: json['is_suspicious'] as bool? ?? false,
-      reason: json['reason'] as String?,
+      enabled: json['enabled'] as bool? ?? false,
+      runAtLoad: json['run_at_load'] as bool? ?? false,
+      riskLevel: json['risk_level'] as String? ?? 'info',
+      riskReasons:
+          (json['risk_reasons'] as List?)?.whereType<String>().toList() ?? const [],
+      isKnownBad: json['is_known_bad'] as bool? ?? false,
+      codeSigning: json['code_signing'] as String?,
     );
   }
 }
@@ -2007,14 +2074,18 @@ class SignedApp {
   }
 }
 
+/// Mirrors the live FirewallRule JSON emitted by the backend
+/// (orbguard-lab internal/domain/models/desktop_security.go): id, name,
+/// action, direction, protocol, dest_address, dest_port (string: port, range
+/// or any), enabled, ...
 class FirewallRule {
   final String id;
   final String name;
   final String action;
   final String direction;
   final String protocol;
-  final int? port;
-  final String? address;
+  final String? destPort;
+  final String? destAddress;
   bool isEnabled;
 
   FirewallRule({
@@ -2023,21 +2094,23 @@ class FirewallRule {
     required this.action,
     required this.direction,
     required this.protocol,
-    this.port,
-    this.address,
+    this.destPort,
+    this.destAddress,
     this.isEnabled = true,
   });
 
   factory FirewallRule.fromJson(Map<String, dynamic> json) {
+    final destPort = json['dest_port'] as String?;
+    final destAddress = json['dest_address'] as String?;
     return FirewallRule(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'Unknown Rule',
-      action: json['action'] as String? ?? 'Block',
-      direction: json['direction'] as String? ?? 'Incoming',
-      protocol: json['protocol'] as String? ?? 'TCP',
-      port: json['port'] as int?,
-      address: json['address'] as String?,
-      isEnabled: json['is_enabled'] as bool? ?? true,
+      action: json['action'] as String? ?? 'block',
+      direction: json['direction'] as String? ?? 'inbound',
+      protocol: json['protocol'] as String? ?? 'any',
+      destPort: (destPort != null && destPort.isNotEmpty) ? destPort : null,
+      destAddress: (destAddress != null && destAddress.isNotEmpty) ? destAddress : null,
+      isEnabled: json['enabled'] as bool? ?? true,
     );
   }
 }

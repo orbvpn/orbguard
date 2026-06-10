@@ -137,6 +137,7 @@ class ApiEndpoints {
 
   /// Get breach alerts
   /// GET /api/v1/darkweb/alerts
+  /// Response: { "unread": [...], "read": [...], "unread_count": N, "total_count": N }
   static const String darkwebAlerts = '$_v1/darkweb/alerts';
 
   /// Get breach details
@@ -187,6 +188,8 @@ class ApiEndpoints {
 
   /// Remove trusted access point
   /// DELETE /api/v1/network/rogue-ap/trusted/{id}
+  /// NOTE: not implemented by the backend yet (404) — proper rogue-ap routes
+  /// are planned for a later wave; constant kept for that work.
   static String rogueApTrustedRemove(String id) => '$_v1/network/rogue-ap/trusted/$id';
 
   /// Check DNS configuration
@@ -361,10 +364,14 @@ class ApiEndpoints {
 
   /// Get enterprise security events
   /// GET /api/v1/enterprise/events
+  /// NOTE: not implemented by the backend (404). SIEM events are POSTed via
+  /// /enterprise/siem/events; there is no enterprise event feed yet.
   static const String enterpriseEvents = '$_v1/enterprise/events';
 
   /// Get enterprise device health
   /// GET /api/v1/enterprise/devices
+  /// NOTE: not implemented by the backend (404). MDM devices are listed via
+  /// /enterprise/mdm/integrations/{id}/devices.
   static const String enterpriseDevices = '$_v1/enterprise/devices';
 
   /// Get compliance frameworks
@@ -377,15 +384,23 @@ class ApiEndpoints {
 
   /// Get compliance controls
   /// GET /api/v1/enterprise/compliance/controls
+  /// NOTE: not implemented by the backend (404); findings live at
+  /// /enterprise/compliance/findings.
   static const String complianceControls = '$_v1/enterprise/compliance/controls';
 
   /// Generate compliance report
   /// POST /api/v1/enterprise/compliance/reports/generate
-  static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports/generate';
+  /// NOTE: live route is POST /enterprise/compliance/reports (no /generate).
+  static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports';
 
   /// Get enterprise policies
   /// GET /api/v1/enterprise/policies
+  /// NOTE: live route is /enterprise/zerotrust/policies; this path 404s.
   static const String enterprisePolicies = '$_v1/enterprise/policies';
+
+  // NOTE: the policy-assignment / BYOD / ownership routes below are NOT
+  // implemented by the backend (404). Constants kept for the wave that adds
+  // the missing endpoints.
 
   /// Assign policy to groups
   /// POST /api/v1/enterprise/policies/{id}/assign-groups
@@ -484,18 +499,24 @@ class ApiEndpoints {
   // ============================================
 
   /// Get ML models
-  /// GET /api/v1/ml/models
+  /// GET /api/v1/ml/models (returns MLServiceStats: {models_loaded, models: [...], ...})
   static const String mlModels = '$_v1/ml/models';
 
-  /// Get anomaly detections
+  /// Get anomaly detections (backend alias of GET /ml/stats — stats shape, no list)
   /// GET /api/v1/ml/anomalies
   static const String mlAnomalies = '$_v1/ml/anomalies';
 
-  /// Run ML analysis
+  /// Run anomaly detection over indicators (ID list or filter; {} = recent indicators)
+  /// POST /api/v1/ml/anomalies/detect
+  /// Response: { "result": { "scores": [...], "anomaly_count": N, ... }, "processed": N }
+  static const String mlAnomaliesDetect = '$_v1/ml/anomalies/detect';
+
+  /// Run ML analysis on a raw value
   /// POST /api/v1/ml/analyze
+  /// Body: { "value": "...", "type": "domain" } — "value" is REQUIRED (400 otherwise)
   static const String mlAnalyze = '$_v1/ml/analyze';
 
-  /// Get ML insights
+  /// Get ML insights (backend alias of GET /ml/stats — stats shape, no insights list)
   /// GET /api/v1/ml/insights
   static const String mlInsights = '$_v1/ml/insights';
 
@@ -521,15 +542,18 @@ class ApiEndpoints {
 
   /// Get persistence items
   /// GET /api/v1/desktop/persistence
+  /// NOTE: not implemented by the backend (404); use POST /desktop/persistence/scan.
   static const String desktopPersistence = '$_v1/desktop/persistence';
 
   /// Get signed apps
   /// GET /api/v1/desktop/apps
+  /// NOTE: not implemented by the backend (404); use POST /desktop/codesign/verify-batch.
   static const String desktopApps = '$_v1/desktop/apps';
 
   /// Get firewall rules
   /// GET /api/v1/desktop/firewall
-  static const String desktopFirewall = '$_v1/desktop/firewall';
+  /// NOTE: not implemented by the backend (404); live route is /desktop/network/rules.
+  static const String desktopFirewall = '$_v1/desktop/network/rules';
 
   /// Scan persistence items
   /// POST /api/v1/desktop/persistence/scan
@@ -649,10 +673,14 @@ class ApiEndpoints {
 
   /// Get graph nodes
   /// GET /api/v1/graph/nodes
+  /// NOTE: not implemented by the backend yet; graph/correlation routes are
+  /// being added in a later wave — constant kept for that work.
   static const String graphNodes = '$_v1/graph/nodes';
 
   /// Get graph relations
   /// GET /api/v1/graph/relations
+  /// NOTE: not implemented by the backend yet; graph/correlation routes are
+  /// being added in a later wave — constant kept for that work.
   static const String graphRelations = '$_v1/graph/relations';
 
   /// Search graph
@@ -702,7 +730,22 @@ class ApiEndpoints {
 
   /// Send device command
   /// POST /api/v1/device/{id}/command
+  /// Body: models.RemoteCommand — { "type": "...", "payload": "(json string)" }
   static String deviceCommand(String id) => '$_v1/device/$id/command';
+
+  /// Lock device
+  /// POST /api/v1/device/{id}/lock
+  /// Body (optional): { "pin", "message", "phone" }
+  static String deviceLock(String id) => '$_v1/device/$id/lock';
+
+  /// Wipe device
+  /// POST /api/v1/device/{id}/wipe
+  /// Body: { "confirmation_id" (REQUIRED), "factory_reset", "wipe_sd_card", "wipe_esim" }
+  static String deviceWipe(String id) => '$_v1/device/$id/wipe';
+
+  /// Ring device
+  /// POST /api/v1/device/{id}/ring
+  static String deviceRing(String id) => '$_v1/device/$id/ring';
 
   /// Mark device as lost
   /// POST /api/v1/device/{id}/mark-lost
@@ -728,9 +771,11 @@ class ApiEndpoints {
   /// POST /api/v1/device/{id}/sim/trusted
   static String deviceTrustedSim(String id) => '$_v1/device/$id/sim/trusted';
 
-  /// Audit OS vulnerabilities
+  /// Audit OS vulnerabilities (no device segment — global audit route)
   /// POST /api/v1/device/vulnerabilities/audit
-  static String deviceAuditOs(String id) => '$_v1/device/vulnerabilities/audit';
+  /// Body: { "device_id", "platform", "os_version", "security_patch", "api_level" }
+  /// "platform" and "os_version" are REQUIRED (400 otherwise)
+  static const String deviceVulnerabilitiesAudit = '$_v1/device/vulnerabilities/audit';
 
   // ============================================
   // FORENSICS
@@ -775,6 +820,32 @@ class ApiEndpoints {
   /// Quick forensic check
   /// POST /api/v1/forensics/quick-check
   static const String forensicsQuickCheck = '$_v1/forensics/quick-check';
+
+  // ============================================
+  // DIGITAL FOOTPRINT
+  // ============================================
+
+  /// Get data brokers list (response is a bare JSON array of brokers)
+  /// GET /api/v1/footprint/brokers
+  static const String footprintBrokers = '$_v1/footprint/brokers';
+
+  /// Scan digital footprint
+  /// POST /api/v1/footprint/scan
+  /// Body: { "email": "...", ... } — "email" is REQUIRED
+  static const String footprintScan = '$_v1/footprint/scan';
+
+  /// Quick footprint scan
+  /// POST /api/v1/footprint/quick-scan
+  static const String footprintQuickScan = '$_v1/footprint/quick-scan';
+
+  /// Request data removal from a broker
+  /// POST /api/v1/footprint/removal
+  /// Body: { "broker_id": "(uuid)", "email": "...", "user_id": "..." }
+  static const String footprintRemoval = '$_v1/footprint/removal';
+
+  /// Get removal request status
+  /// GET /api/v1/footprint/removal/{id}
+  static String footprintRemovalStatus(String id) => '$_v1/footprint/removal/$id';
 
   // ============================================
   // PRIVACY

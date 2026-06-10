@@ -18,6 +18,10 @@ class InstalledApp {
   final DateTime? updateTime;
   final int? apkSize;
 
+  /// SDK/library package prefixes detected inside the app, when available.
+  /// Forwarded to the backend analyzer for tracker detection.
+  final List<String>? detectedLibraries;
+
   InstalledApp({
     required this.packageName,
     required this.appName,
@@ -28,6 +32,7 @@ class InstalledApp {
     required this.installTime,
     this.updateTime,
     this.apkSize,
+    this.detectedLibraries,
   });
 
   bool get isSideloaded =>
@@ -63,11 +68,17 @@ class AnalyzedApp {
     );
   }
 
-  double get riskScore => result?.riskScore ?? 0.0;
+  /// Risk score normalized to 0.0-1.0 (the backend emits 0-100).
+  double get riskScore => ((result?.riskScore ?? 0.0) / 100.0).clamp(0.0, 1.0);
   String get riskLevel => result?.riskLevel ?? 'unknown';
   String get privacyGrade => result?.privacyGrade ?? 'U';
-  bool get isHighRisk => riskScore > 0.7 || (result?.isKnownMalware ?? false);
-  bool get isMediumRisk => riskScore > 0.4 && !isHighRisk;
+  bool get isHighRisk =>
+      riskScore >= 0.7 ||
+      riskLevel == 'critical' ||
+      riskLevel == 'high' ||
+      (result?.isKnownMalware ?? false);
+  bool get isMediumRisk =>
+      !isHighRisk && (riskScore >= 0.4 || riskLevel == 'medium');
 }
 
 /// App security stats
@@ -211,6 +222,8 @@ class AppSecurityProvider extends ChangeNotifier {
               ? DateTime.parse(appJson['update_time'] as String)
               : null,
           apkSize: appJson['apk_size'] as int?,
+          detectedLibraries: (appJson['detected_libraries'] as List<dynamic>?)
+              ?.cast<String>(),
         );
 
         // Check if there's an analysis result
@@ -266,9 +279,16 @@ class AppSecurityProvider extends ChangeNotifier {
       final request = AppAnalysisRequest(
         packageName: app.app.packageName,
         appName: app.app.appName,
-        version: app.app.version,
-        permissions: app.app.permissions,
+        versionName: app.app.version,
+        permissions: app.app.permissions
+            .map((p) => AppPermissionInfo(
+                  name: p,
+                  isGranted: true,
+                  isDangerous: AppPermissionInfo.isDangerousPermission(p),
+                ))
+            .toList(),
         installSource: app.app.installSource,
+        detectedLibraries: app.app.detectedLibraries,
       );
 
       final result = await _api.analyzeApp(request);
@@ -288,10 +308,8 @@ class AppSecurityProvider extends ChangeNotifier {
 
   /// Select app for detail view
   void selectApp(String packageName) {
-    _selectedApp = _apps.firstWhere(
-      (a) => a.app.packageName == packageName,
-      orElse: () => _apps.first,
-    );
+    final index = _apps.indexWhere((a) => a.app.packageName == packageName);
+    _selectedApp = index >= 0 ? _apps[index] : null;
     notifyListeners();
   }
 

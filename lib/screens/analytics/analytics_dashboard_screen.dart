@@ -1,5 +1,6 @@
 /// Analytics Dashboard Screen
 /// Threat analytics, statistics, and reporting interface
+library;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -25,10 +26,19 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   final _numberFormat = NumberFormat('#,###');
   final _apiClient = OrbGuardApiClient.instance;
 
-  // Analytics data from dedicated API
+  // Analytics data from dedicated API.
+  // Shapes mirror the live backend (orbguard-lab handlers/analytics.go +
+  // models/analytics.go): threat analytics carries `summary` and
+  // `by_type: [{category, count, percentage}]`; alert metrics carries
+  // `total_alerts`/`open_alerts` and optional `mtta_minutes`; geo carries
+  // `countries: [{country_code, country_name, count, percentage}]`;
+  // detection metrics carries optional `detection_rate` and
+  // `false_positive_rate` (absent when the server has no tracking data).
   Map<String, dynamic>? _threatAnalytics;
   Map<String, dynamic>? _alertMetrics;
   Map<String, dynamic>? _geoData;
+  Map<String, dynamic>? _detectionMetrics;
+  String? _analyticsError;
   bool _isLoadingAnalytics = false;
 
   @override
@@ -44,24 +54,51 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() => _isLoadingAnalytics = true);
+    setState(() {
+      _isLoadingAnalytics = true;
+      _analyticsError = null;
+    });
+
+    final errors = <String>[];
+
+    Map<String, dynamic>? threats;
     try {
-      final results = await Future.wait([
-        _apiClient.getThreatAnalytics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-        _apiClient.getAlertMetrics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-        _apiClient.getGeoDistribution(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-      ]);
-      if (mounted) {
-        setState(() {
-          _threatAnalytics = results[0];
-          _alertMetrics = results[1];
-          _geoData = results[2];
-          _isLoadingAnalytics = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingAnalytics = false);
+      threats = await _apiClient.getThreatAnalytics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('threats: $e');
     }
+
+    Map<String, dynamic>? alerts;
+    try {
+      alerts = await _apiClient.getAlertMetrics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('alerts: $e');
+    }
+
+    Map<String, dynamic>? geo;
+    try {
+      geo = await _apiClient.getGeoDistribution(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('geo: $e');
+    }
+
+    Map<String, dynamic>? detections;
+    try {
+      detections = await _apiClient.getDetectionMetrics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('detections: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _threatAnalytics = threats;
+      _alertMetrics = alerts;
+      _geoData = geo;
+      _detectionMetrics = detections;
+      _analyticsError =
+          errors.isEmpty ? null : 'Failed to load analytics — ${errors.join('; ')}';
+      _isLoadingAnalytics = false;
+    });
   }
 
   void _onTimeRangeChanged(String value) {
@@ -116,6 +153,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   ],
                 ),
                 IconButton(
+                  icon: const DuotoneIcon('document_add', size: 22, color: Colors.white),
+                  onPressed: _showReportDialog,
+                  tooltip: 'Generate Report',
+                ),
+                IconButton(
                   icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
                   onPressed: provider.isLoading ? null : () => provider.refresh(),
                   tooltip: 'Refresh',
@@ -147,23 +189,32 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   Widget _buildOverviewTab(DashboardProvider provider) {
     final stats = provider.stats;
 
-    // Use analytics API data if available, fallback to dashboard provider
+    // Use analytics API data if available, fallback to dashboard provider.
+    // Live summary keys (models/analytics.go AnalyticsSummary):
+    // total_indicators, blocked_domains, blocked_ips, ... The backend does
+    // not emit threats_blocked/urls_checked/sms_analyzed.
     final summary = _threatAnalytics?['summary'] as Map<String, dynamic>?;
-    final totalIndicators = summary?['total_indicators'] as int? ?? stats?.totalIndicators ?? 0;
-    final threatsBlocked = summary?['threats_blocked'] as int? ?? provider.threatsBlockedToday;
-    final urlsChecked = summary?['urls_checked'] as int? ?? stats?.getCountByType(IndicatorType.url) ?? 0;
-    final smsAnalyzed = summary?['sms_analyzed'] as int? ?? stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
+    final totalIndicators =
+        (summary?['total_indicators'] as num?)?.toInt() ?? stats?.totalIndicators ?? 0;
+    final threatsBlocked = summary != null
+        ? ((summary['blocked_domains'] as num?)?.toInt() ?? 0) +
+            ((summary['blocked_ips'] as num?)?.toInt() ?? 0)
+        : provider.threatsBlockedToday;
+    final urlsChecked = stats?.getCountByType(IndicatorType.url) ?? 0;
+    final smsAnalyzed = stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
 
-    // Calculate threat distribution from analytics API or stats
-    final typeDistribution = (_threatAnalytics?['type_distribution'] as List?)
-        ?.cast<Map<String, dynamic>>();
+    // Threat distribution: the live backend emits
+    // by_type: [{category, count, percentage}] (CategoryCount uses the key
+    // 'category', not 'name').
+    final typeDistribution =
+        (_threatAnalytics?['by_type'] as List?)?.cast<Map<String, dynamic>>();
     final total = totalIndicators > 0 ? totalIndicators : 1;
 
     double phishingRatio = 0, malwareRatio = 0, domainRatio = 0, ipRatio = 0, otherRatio = 0;
     if (typeDistribution != null && typeDistribution.isNotEmpty) {
       for (final item in typeDistribution) {
-        final name = (item['name'] as String? ?? '').toLowerCase();
-        final count = (item['count'] as int? ?? 0).toDouble();
+        final name = (item['category'] as String? ?? '').toLowerCase();
+        final count = ((item['count'] as num?)?.toInt() ?? 0).toDouble();
         final ratio = count / total;
         if (name.contains('url') || name.contains('phish')) {
           phishingRatio += ratio;
@@ -192,12 +243,29 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       otherRatio = (total - phishingCount - malwareCount - domainCount - ipCount) / total;
     }
 
-    // Alert metrics from analytics API
-    final alertTotal = _alertMetrics?['total_alerts'] as int?;
-    final alertUnread = _alertMetrics?['unread_alerts'] as int?;
+    // Alert metrics from analytics API (live keys: total_alerts, open_alerts,
+    // acknowledged_alerts, resolved_alerts, optional mtta_minutes).
+    final alertTotal = (_alertMetrics?['total_alerts'] as num?)?.toInt();
+    final alertOpen = (_alertMetrics?['open_alerts'] as num?)?.toInt();
 
-    // Geo top countries from analytics API
-    final geoCountries = (_geoData?['countries'] as List?)?.cast<Map<String, dynamic>>().take(3).toList();
+    // Geo top countries from analytics API. Live entries carry country_name /
+    // country_code / count / percentage; there is no top-level total, so it
+    // is computed client-side from the per-country counts.
+    final geoCountries =
+        (_geoData?['countries'] as List?)?.cast<Map<String, dynamic>>();
+    final geoTotal = geoCountries?.fold<int>(
+            0, (sum, c) => sum + ((c['count'] as num?)?.toInt() ?? 0)) ??
+        0;
+    final topGeoCountries = geoCountries?.take(3).toList();
+
+    // Detection quality (live keys: detection_rate / false_positive_rate are
+    // ABSENT when the server has no tracked review data; mtta_minutes is
+    // absent when no alert was acknowledged). These render as 'n/a' rather
+    // than fabricated numbers.
+    final detectionRate = (_detectionMetrics?['detection_rate'] as num?)?.toDouble();
+    final falsePositiveRate =
+        (_detectionMetrics?['false_positive_rate'] as num?)?.toDouble();
+    final mttaMinutes = (_alertMetrics?['mtta_minutes'] as num?)?.toDouble();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -214,6 +282,29 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               ],
             ],
           ),
+          if (_analyticsError != null) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              tintColor: GlassTheme.errorColor,
+              child: Row(
+                children: [
+                  const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _analyticsError!,
+                      style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 12),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const DuotoneIcon('refresh', color: Colors.white, size: 20),
+                    onPressed: _loadAnalytics,
+                    tooltip: 'Retry',
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Key metrics
@@ -240,10 +331,44 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               children: [
                 _buildMetricCard('Total Alerts', _numberFormat.format(alertTotal), 'bell', GlassTheme.warningColor),
                 const SizedBox(width: 12),
-                _buildMetricCard('Unread', _numberFormat.format(alertUnread ?? 0), 'notification_unread', const Color(0xFFFF5722)),
+                _buildMetricCard('Open', _numberFormat.format(alertOpen ?? 0), 'notification_unread', const Color(0xFFFF5722)),
               ],
             ),
           ],
+          const SizedBox(height: 24),
+
+          // Detection quality — values may legitimately be absent from the
+          // server (untracked); show 'n/a' instead of fake numbers.
+          const Text(
+            'Detection Quality',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            child: Row(
+              children: [
+                _buildQualityMetric(
+                  'Detection Rate',
+                  detectionRate != null
+                      ? '${(detectionRate * 100).toStringAsFixed(1)}%'
+                      : 'n/a',
+                  detectionRate != null ? GlassTheme.successColor : Colors.white54,
+                ),
+                _buildQualityMetric(
+                  'False Positives',
+                  falsePositiveRate != null
+                      ? '${(falsePositiveRate * 100).toStringAsFixed(1)}%'
+                      : 'n/a',
+                  falsePositiveRate != null ? GlassTheme.warningColor : Colors.white54,
+                ),
+                _buildQualityMetric(
+                  'MTTA',
+                  mttaMinutes != null ? '${mttaMinutes.toStringAsFixed(0)}m' : 'n/a',
+                  mttaMinutes != null ? GlassTheme.primaryAccent : Colors.white54,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
 
           // Threat distribution chart
@@ -264,8 +389,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             ),
           ),
 
-          // Geo distribution from analytics API
-          if (geoCountries != null && geoCountries.isNotEmpty) ...[
+          // Geo distribution from analytics API (live entry keys:
+          // country_name, country_code, count; total computed client-side).
+          if (topGeoCountries != null && topGeoCountries.isNotEmpty) ...[
             const SizedBox(height: 24),
             const Text(
               'Top Threat Origins',
@@ -274,11 +400,16 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             const SizedBox(height: 12),
             GlassCard(
               child: Column(
-                children: geoCountries.map((c) {
-                  final country = c['country'] as String? ?? 'Unknown';
-                  final count = c['count'] as int? ?? 0;
-                  final geoTotal = (_geoData?['total'] as int?) ?? 1;
-                  return _buildDistributionBar(country, count / geoTotal, GlassTheme.primaryAccent);
+                children: topGeoCountries.map((c) {
+                  final country = c['country_name'] as String? ??
+                      c['country_code'] as String? ??
+                      'Unknown';
+                  final count = (c['count'] as num?)?.toInt() ?? 0;
+                  return _buildDistributionBar(
+                    country,
+                    geoTotal > 0 ? count / geoTotal : 0,
+                    GlassTheme.primaryAccent,
+                  );
                 }).toList(),
               ),
             ),
@@ -343,20 +474,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     }
   }
 
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
-      case 'high':
-        return GlassTheme.errorColor;
-      case 'medium':
-        return GlassTheme.warningColor;
-      case 'low':
-        return GlassTheme.primaryAccent;
-      default:
-        return GlassTheme.successColor;
-    }
-  }
-
   Color _getSeverityColorFromLevel(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
@@ -403,6 +520,22 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQualityMetric(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -833,6 +966,109 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         ),
       ),
     );
+  }
+
+  // Report types/formats offered here are exactly the ones the live backend
+  // accepts (orbguard-lab analytics_service.go supportedReportTypes /
+  // supportedReportFormats); anything else is rejected with HTTP 400.
+  static const List<MapEntry<String, String>> _reportTypes = [
+    MapEntry('threat_landscape', 'Threat Landscape'),
+    MapEntry('campaign_analysis', 'Campaign Analysis'),
+    MapEntry('source_health', 'Source Health'),
+  ];
+  static const List<String> _reportFormats = ['json', 'csv', 'html'];
+
+  Future<void> _showReportDialog() async {
+    String selectedType = _reportTypes.first.key;
+    String selectedFormat = _reportFormats.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: GlassTheme.gradientTop,
+          title: const Text('Generate Report', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Type', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+              const SizedBox(height: 4),
+              DropdownButton<String>(
+                value: selectedType,
+                isExpanded: true,
+                dropdownColor: GlassTheme.gradientTop,
+                style: const TextStyle(color: Colors.white),
+                items: _reportTypes
+                    .map((t) => DropdownMenuItem(value: t.key, child: Text(t.value)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedType = v);
+                },
+              ),
+              const SizedBox(height: 12),
+              Text('Format', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+              const SizedBox(height: 4),
+              DropdownButton<String>(
+                value: selectedFormat,
+                isExpanded: true,
+                dropdownColor: GlassTheme.gradientTop,
+                style: const TextStyle(color: Colors.white),
+                items: _reportFormats
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f.toUpperCase())))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedFormat = v);
+                },
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Period: ${_getTimeRangeLabel()}',
+                style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Generate'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final report = await _apiClient.createAnalyticsReport(
+        reportType: selectedType,
+        format: selectedFormat,
+        period: _selectedTimeRange,
+      );
+      if (!mounted) return;
+      final id = report['id'] as String? ?? '';
+      final status = report['status'] as String? ?? 'unknown';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report $status${id.isNotEmpty ? ' — $id' : ''}'),
+          backgroundColor: GlassTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report generation failed: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
   }
 
   String _getTimeRangeLabel() {

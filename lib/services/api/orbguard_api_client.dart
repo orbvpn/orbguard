@@ -2,10 +2,12 @@
 /// Main client for communicating with the threat intelligence backend
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'api_config.dart';
 import 'api_interceptors.dart';
@@ -71,31 +73,115 @@ class OrbGuardApiClient {
     _initialized = true;
   }
 
+  /// Collect device metadata in the exact shape the backend's
+  /// POST /api/v1/auth/device handler decodes:
+  /// {device_id, device_name, platform, os_version, app_version, model, manufacturer}
+  Future<Map<String, dynamic>> _collectDeviceData() async {
+    final deviceInfo = DeviceInfoPlugin();
+
+    String appVersion = '';
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      appVersion = packageInfo.version;
+    } catch (_) {
+      // App version is optional metadata; registration proceeds without it.
+    }
+
+    if (Platform.isAndroid) {
+      final info = await deviceInfo.androidInfo;
+      return {
+        'device_id': info.id,
+        'device_name': '${info.manufacturer} ${info.model}',
+        'platform': 'android',
+        'os_version': info.version.release,
+        'app_version': appVersion,
+        'model': info.model,
+        'manufacturer': info.manufacturer,
+      };
+    } else if (Platform.isIOS) {
+      final info = await deviceInfo.iosInfo;
+      return {
+        'device_id': info.identifierForVendor ?? '',
+        'device_name': info.name,
+        'platform': 'ios',
+        'os_version': info.systemVersion,
+        'app_version': appVersion,
+        'model': info.model,
+        'manufacturer': 'Apple',
+      };
+    } else if (Platform.isMacOS) {
+      final info = await deviceInfo.macOsInfo;
+      return {
+        'device_id': info.systemGUID ?? '',
+        'device_name': info.computerName,
+        'platform': 'macos',
+        'os_version': info.osRelease,
+        'app_version': appVersion,
+        'model': info.model,
+        'manufacturer': 'Apple',
+      };
+    } else if (Platform.isWindows) {
+      final info = await deviceInfo.windowsInfo;
+      return {
+        'device_id': info.deviceId,
+        'device_name': info.computerName,
+        'platform': 'windows',
+        'os_version': info.displayVersion,
+        'app_version': appVersion,
+        'model': info.productName,
+        'manufacturer': '',
+      };
+    } else if (Platform.isLinux) {
+      final info = await deviceInfo.linuxInfo;
+      return {
+        'device_id': info.machineId ?? '',
+        'device_name': info.prettyName,
+        'platform': 'linux',
+        'os_version': info.versionId ?? '',
+        'app_version': appVersion,
+        'model': info.name,
+        'manufacturer': '',
+      };
+    }
+
+    return {
+      'device_id': '',
+      'device_name': Platform.localHostname,
+      'platform': Platform.operatingSystem,
+      'os_version': Platform.operatingSystemVersion,
+      'app_version': appVersion,
+      'model': '',
+      'manufacturer': '',
+    };
+  }
+
+  /// Persist the credentials returned by POST /api/v1/auth/device:
+  /// {device_id, api_key, expires_at, token, refresh_token, expires_in, token_type}
+  /// The long-lived api_key is used as the bearer credential; the refresh
+  /// token enables session rotation via POST /api/v1/auth/refresh.
+  Future<void> _storeRegistrationCredentials(Map<String, dynamic> data) async {
+    final deviceId = data['device_id'] as String?;
+    final apiKey = data['api_key'] as String?;
+    final refreshToken = data['refresh_token'] as String?;
+
+    if (deviceId != null && deviceId.isNotEmpty) {
+      await _authInterceptor.setDeviceId(deviceId);
+    }
+    if (apiKey != null && apiKey.isNotEmpty) {
+      await _authInterceptor.saveTokens(
+        accessToken: apiKey,
+        refreshToken: refreshToken,
+      );
+    }
+  }
+
   /// Register device with backend
   Future<void> _registerDevice() async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      Map<String, dynamic> deviceData = {};
-
-      if (Platform.isAndroid) {
-        final info = await deviceInfo.androidInfo;
-        deviceData = {
-          'platform': 'android',
-          'model': info.model,
-          'manufacturer': info.manufacturer,
-          'version': info.version.release,
-          'sdk_int': info.version.sdkInt,
-          'device_id': info.id,
-        };
-      } else if (Platform.isIOS) {
-        final info = await deviceInfo.iosInfo;
-        deviceData = {
-          'platform': 'ios',
-          'model': info.model,
-          'name': info.name,
-          'version': info.systemVersion,
-          'device_id': info.identifierForVendor,
-        };
+      final deviceData = await _collectDeviceData();
+      if ((deviceData['device_id'] as String).isEmpty) {
+        // Backend rejects registrations without a device_id; nothing to send.
+        return;
       }
 
       final response = await _dio.post(
@@ -104,19 +190,13 @@ class OrbGuardApiClient {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data as Map<String, dynamic>;
-        final deviceId = data['device_id'] as String?;
-        final token = data['token'] as String?;
-
-        if (deviceId != null) {
-          await _authInterceptor.setDeviceId(deviceId);
-        }
-        if (token != null) {
-          await _authInterceptor.saveTokens(accessToken: token);
-        }
+        await _storeRegistrationCredentials(
+          response.data as Map<String, dynamic>,
+        );
       }
     } catch (e) {
-      // Device registration is optional, continue without it
+      // Device registration is optional at startup; authenticated calls will
+      // surface 401s if it never succeeds.
     }
   }
 
@@ -166,20 +246,43 @@ class OrbGuardApiClient {
   // DEVICE SECURITY
   // ============================================
 
-  /// Register device with backend
+  /// The registered device ID, required by all /device/{device_id}/... routes.
+  /// Throws instead of building a broken path when registration never happened.
+  String get _requiredDeviceId {
+    final id = _authInterceptor.deviceId;
+    if (id == null || id.isEmpty) {
+      throw ApiError(
+        message: 'Device is not registered with the backend; '
+            'device-scoped endpoints are unavailable.',
+        code: 'NO_DEVICE_ID',
+      );
+    }
+    return id;
+  }
+
+  /// Register device with backend (POST /api/v1/auth/device).
+  /// Missing required fields are filled from the local device metadata; the
+  /// returned api_key/refresh_token are persisted for subsequent calls.
   Future<Map<String, dynamic>> registerDevice(Map<String, dynamic> deviceData) async {
     try {
-      final response = await _dio.post(ApiEndpoints.authDevice, data: deviceData);
-      return response.data as Map<String, dynamic>? ?? {};
+      final payload = await _collectDeviceData();
+      payload.addAll(deviceData);
+
+      final response = await _dio.post(ApiEndpoints.authDevice, data: payload);
+      final data = response.data as Map<String, dynamic>? ?? {};
+      await _storeRegistrationCredentials(data);
+      return data;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get device security status
+  /// GET /api/v1/device/{device_id}/security-status
   Future<Map<String, dynamic>> getDeviceSecurityStatus() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.devices}/security/status');
+      final response =
+          await _dio.get(ApiEndpoints.deviceSecurity(_requiredDeviceId));
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -187,9 +290,11 @@ class OrbGuardApiClient {
   }
 
   /// Get anti-theft settings
+  /// GET /api/v1/device/{device_id}/settings
   Future<Map<String, dynamic>> getAntiTheftSettings() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.devices}/anti-theft/settings');
+      final response =
+          await _dio.get(ApiEndpoints.deviceAntiTheft(_requiredDeviceId));
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -197,39 +302,139 @@ class OrbGuardApiClient {
   }
 
   /// Update anti-theft settings
+  /// PUT /api/v1/device/{device_id}/settings
+  ///
+  /// The backend decodes models.AntiTheftSettings (enable_remote_locate,
+  /// enable_remote_lock, enable_remote_wipe, enable_thief_selfie,
+  /// enable_sim_alert, selfie_after_attempts, ...). Legacy client keys are
+  /// translated to those field names; backend-shaped keys pass through.
   Future<bool> updateAntiTheftSettings(Map<String, dynamic> settings) async {
+    const legacyKeyMap = {
+      'locate_enabled': 'enable_remote_locate',
+      'lock_enabled': 'enable_remote_lock',
+      'wipe_enabled': 'enable_remote_wipe',
+      'thief_selfie_enabled': 'enable_thief_selfie',
+      'sim_monitoring_enabled': 'enable_sim_alert',
+      'max_unlock_attempts': 'selfie_after_attempts',
+    };
+
+    final deviceId = _requiredDeviceId;
+    final payload = <String, dynamic>{'device_id': deviceId};
+    settings.forEach((key, value) {
+      payload[legacyKeyMap[key] ?? key] = value;
+    });
+
     try {
-      await _dio.put('${ApiEndpoints.devices}/anti-theft/settings', data: settings);
+      await _dio.put(ApiEndpoints.deviceAntiTheft(deviceId), data: payload);
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
-  /// Locate device
+  /// Locate device (issues a remote locate command)
+  /// POST /api/v1/device/{device_id}/locate
+  /// Response: { "status": "locate_requested", "command_id": "..." }
   Future<Map<String, dynamic>> locateDevice() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.devices}/locate');
+      final response =
+          await _dio.post(ApiEndpoints.deviceLocate(_requiredDeviceId));
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
-  /// Send device command (lock, wipe, alarm, etc.)
+  /// Send device command (lock, wipe, ring, etc.)
+  /// POST /api/v1/device/{device_id}/command
+  /// Body: models.RemoteCommand — { "type": "...", "payload": "<json string>" }
   Future<bool> sendDeviceCommand(String command, {Map<String, dynamic>? data}) async {
     try {
-      await _dio.post('${ApiEndpoints.devices}/command/$command', data: data);
+      await _dio.post(
+        ApiEndpoints.deviceCommand(_requiredDeviceId),
+        data: {
+          'type': command,
+          if (data != null && data.isNotEmpty) 'payload': jsonEncode(data),
+        },
+      );
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
+  /// Lock device (issues a remote lock command)
+  /// POST /api/v1/device/{device_id}/lock
+  /// Body: models.LockCommandPayload — { "pin", "message", "phone" } (all optional)
+  Future<Map<String, dynamic>> lockDevice({
+    String? pin,
+    String? message,
+    String? phone,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.deviceLock(_requiredDeviceId),
+        data: {
+          if (pin != null && pin.isNotEmpty) 'pin': pin,
+          if (message != null && message.isNotEmpty) 'message': message,
+          if (phone != null && phone.isNotEmpty) 'phone': phone,
+        },
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Wipe device (issues a remote wipe command)
+  /// POST /api/v1/device/{device_id}/wipe
+  /// Body: models.WipeCommandPayload — "confirmation_id" is REQUIRED by the
+  /// backend as a safety check (400 without it).
+  Future<Map<String, dynamic>> wipeDevice({
+    required String confirmationId,
+    bool factoryReset = true,
+    bool wipeSdCard = false,
+    bool wipeEsim = false,
+  }) async {
+    if (confirmationId.isEmpty) {
+      throw ApiError(
+        message: 'confirmation_id is required for the wipe command',
+        code: 'INVALID_ARGUMENT',
+      );
+    }
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.deviceWipe(_requiredDeviceId),
+        data: {
+          'confirmation_id': confirmationId,
+          'factory_reset': factoryReset,
+          'wipe_sd_card': wipeSdCard,
+          'wipe_esim': wipeEsim,
+        },
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Ring device (issues a remote ring command)
+  /// POST /api/v1/device/{device_id}/ring
+  Future<Map<String, dynamic>> ringDevice() async {
+    try {
+      final response =
+          await _dio.post(ApiEndpoints.deviceRing(_requiredDeviceId));
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
   /// Mark device as lost
+  /// POST /api/v1/device/{device_id}/mark-lost (no request body)
   Future<bool> markDeviceLost({String? message}) async {
     try {
-      await _dio.post('${ApiEndpoints.devices}/status/lost', data: {'message': message});
+      await _dio.post(ApiEndpoints.deviceLost(_requiredDeviceId));
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -237,9 +442,10 @@ class OrbGuardApiClient {
   }
 
   /// Mark device as stolen
+  /// POST /api/v1/device/{device_id}/mark-stolen (no request body)
   Future<bool> markDeviceStolen({String? reportNumber}) async {
     try {
-      await _dio.post('${ApiEndpoints.devices}/status/stolen', data: {'report_number': reportNumber});
+      await _dio.post(ApiEndpoints.deviceStolen(_requiredDeviceId));
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -247,9 +453,10 @@ class OrbGuardApiClient {
   }
 
   /// Mark device as recovered
+  /// POST /api/v1/device/{device_id}/mark-recovered
   Future<bool> markDeviceRecovered() async {
     try {
-      await _dio.post('${ApiEndpoints.devices}/status/recovered');
+      await _dio.post(ApiEndpoints.deviceRecovered(_requiredDeviceId));
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -257,29 +464,53 @@ class OrbGuardApiClient {
   }
 
   /// Get location history
+  /// GET /api/v1/device/{device_id}/location/history
+  /// Response: { "device_id", "locations": [...], "count" }
   Future<List<Map<String, dynamic>>> getLocationHistory({int days = 7}) async {
     try {
-      final response = await _dio.get('${ApiEndpoints.devices}/location/history', queryParameters: {'days': days});
-      return (response.data['locations'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      final response = await _dio
+          .get(ApiEndpoints.deviceLocationHistory(_requiredDeviceId));
+      final locations = response.data['locations'];
+      if (locations is! List) {
+        throw ApiError(
+          message: 'Unexpected location history response: missing "locations" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return locations.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get SIM history
+  /// GET /api/v1/device/{device_id}/sim/history
+  /// Response: { "device_id", "events": [...], "count" }
   Future<List<Map<String, dynamic>>> getSIMHistory() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.devices}/sim/history');
-      return (response.data['sim_history'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      final response =
+          await _dio.get(ApiEndpoints.deviceSimHistory(_requiredDeviceId));
+      final events = response.data['events'];
+      if (events is! List) {
+        throw ApiError(
+          message: 'Unexpected SIM history response: missing "events" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return events.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Add trusted SIM
-  Future<bool> addTrustedSIM(String simId, String name) async {
+  /// POST /api/v1/device/{device_id}/sim/trusted — Body: { "iccid": "..." }
+  Future<bool> addTrustedSIM(String iccid, String name) async {
     try {
-      await _dio.post('${ApiEndpoints.devices}/sim/trusted', data: {'sim_id': simId, 'name': name});
+      await _dio.post(
+        ApiEndpoints.deviceTrustedSim(_requiredDeviceId),
+        data: {'iccid': iccid},
+      );
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -287,9 +518,37 @@ class OrbGuardApiClient {
   }
 
   /// Audit OS vulnerabilities
+  /// POST /api/v1/device/vulnerabilities/audit
+  /// Body: { device_id, platform, os_version, security_patch, api_level }
+  /// (platform and os_version are required by the backend)
   Future<Map<String, dynamic>> auditOSVulnerabilities() async {
     try {
-      final response = await _dio.post('${ApiEndpoints.devices}/security/audit-os');
+      final deviceInfo = DeviceInfoPlugin();
+      final payload = <String, dynamic>{
+        'device_id': _authInterceptor.deviceId ?? '',
+      };
+
+      if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+        payload['platform'] = 'android';
+        payload['os_version'] = info.version.release;
+        payload['security_patch'] = info.version.securityPatch ?? '';
+        payload['api_level'] = info.version.sdkInt;
+      } else if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+        payload['platform'] = 'ios';
+        payload['os_version'] = info.systemVersion;
+      } else {
+        throw ApiError(
+          message: 'OS vulnerability audit is only supported on Android and iOS',
+          code: 'UNSUPPORTED_PLATFORM',
+        );
+      }
+
+      final response = await _dio.post(
+        ApiEndpoints.deviceVulnerabilitiesAudit,
+        data: payload,
+      );
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -311,9 +570,10 @@ class OrbGuardApiClient {
   }
 
   /// Get IOC stats
+  /// GET /api/v1/forensics/iocs/stats
   Future<Map<String, dynamic>> getIOCStats() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.forensics}/ioc/stats');
+      final response = await _dio.get(ApiEndpoints.forensicsIocStats);
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -321,9 +581,10 @@ class OrbGuardApiClient {
   }
 
   /// Analyze shutdown log
+  /// POST /api/v1/forensics/analyze/shutdown-log
   Future<Map<String, dynamic>> analyzeShutdownLog(Map<String, dynamic> logData) async {
     try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/shutdown', data: logData);
+      final response = await _dio.post(ApiEndpoints.forensicsAnalyzeShutdownLog, data: logData);
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -371,9 +632,10 @@ class OrbGuardApiClient {
   }
 
   /// Run full forensic analysis
+  /// POST /api/v1/forensics/full-analysis
   Future<Map<String, dynamic>> runFullForensicAnalysis(Map<String, dynamic> data) async {
     try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/analyze/full', data: data);
+      final response = await _dio.post(ApiEndpoints.forensicsFullAnalysis, data: data);
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -381,9 +643,13 @@ class OrbGuardApiClient {
   }
 
   /// Quick forensic check
+  /// POST /api/v1/forensics/quick-check
+  /// NOTE: the backend decodes { "platform": "...", "log_data": "..." }; the
+  /// indicator-list payload kept here for call-site compatibility is ignored
+  /// by the server and needs a coordinated provider-side fix.
   Future<Map<String, dynamic>> quickForensicCheck(List<Map<String, dynamic>> indicators) async {
     try {
-      final response = await _dio.post('${ApiEndpoints.forensics}/check', data: {'indicators': indicators});
+      final response = await _dio.post(ApiEndpoints.forensicsQuickCheck, data: {'indicators': indicators});
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -405,9 +671,29 @@ class OrbGuardApiClient {
   }
 
   /// Record privacy event
+  /// POST /api/v1/privacy/events — backend decodes models.PrivacyEvent and
+  /// requires "device_id" (400 without it); the legacy "type" key is mapped
+  /// to the model's "event_type".
   Future<bool> recordPrivacyEvent(Map<String, dynamic> event) async {
+    final payload = Map<String, dynamic>.from(event);
+
+    // Legacy callers send 'type'; the Go model field is 'event_type'.
+    if (payload.containsKey('type') && !payload.containsKey('event_type')) {
+      payload['event_type'] = payload.remove('type');
+    }
+
+    final deviceId = payload['device_id'] as String? ?? _authInterceptor.deviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      throw ApiError(
+        message: 'device_id is required to record a privacy event '
+            '(device not registered)',
+        code: 'NO_DEVICE_ID',
+      );
+    }
+    payload['device_id'] = deviceId;
+
     try {
-      await _dio.post('${ApiEndpoints.privacy}/events', data: event);
+      await _dio.post(ApiEndpoints.privacyEvents, data: payload);
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -415,9 +701,13 @@ class OrbGuardApiClient {
   }
 
   /// Check clipboard content
+  /// POST /api/v1/privacy/clipboard/check — Body: { "content", "source_app" }
   Future<Map<String, dynamic>> checkClipboard(String content) async {
     try {
-      final response = await _dio.post('${ApiEndpoints.privacy}/check/clipboard', data: {'content': content});
+      final response = await _dio.post(
+        ApiEndpoints.privacyClipboardCheck,
+        data: {'content': content},
+      );
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -439,10 +729,19 @@ class OrbGuardApiClient {
   }
 
   /// Get scam patterns
+  /// GET /api/v1/scam/patterns
+  /// Response: { "version", "last_updated", "scam_types": [...], "risk_indicators": [...] }
   Future<List<Map<String, dynamic>>> getScamPatterns() async {
     try {
-      final response = await _dio.get('${ApiEndpoints.scam}/patterns');
-      return (response.data['patterns'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      final response = await _dio.get(ApiEndpoints.scamPatterns);
+      final scamTypes = response.data['scam_types'];
+      if (scamTypes is! List) {
+        throw ApiError(
+          message: 'Unexpected scam patterns response: missing "scam_types" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return scamTypes.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -459,9 +758,12 @@ class OrbGuardApiClient {
   }
 
   /// Get phone reputation
+  /// GET /api/v1/scam/phone/{number}
   Future<Map<String, dynamic>> getPhoneReputation(String phoneNumber) async {
     try {
-      final response = await _dio.get('${ApiEndpoints.scam}/phone/reputation', queryParameters: {'number': phoneNumber});
+      final response = await _dio.get(
+        ApiEndpoints.scamPhoneReputation(Uri.encodeComponent(phoneNumber)),
+      );
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -469,9 +771,14 @@ class OrbGuardApiClient {
   }
 
   /// Report phone number
+  /// POST /api/v1/scam/phone/report
+  /// Body: { "phone_number" (required), "scam_type", "description" }
   Future<bool> reportPhoneNumber(String phoneNumber, String reason) async {
     try {
-      await _dio.post('${ApiEndpoints.scam}/phone/report', data: {'number': phoneNumber, 'reason': reason});
+      await _dio.post(
+        ApiEndpoints.scamPhoneReport,
+        data: {'phone_number': phoneNumber, 'description': reason},
+      );
       return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -712,12 +1019,25 @@ class OrbGuardApiClient {
   }
 
   /// Get breach alerts for monitored assets
+  /// GET /api/v1/darkweb/alerts
+  /// Response: { "unread": [...], "read": [...], "unread_count", "total_count" }
+  /// Unread alerts are returned first.
   Future<List<BreachAlert>> getBreachAlerts() async {
     try {
       final response = await _dio.get(ApiEndpoints.darkwebAlerts);
 
-      final alerts = response.data['alerts'] as List<dynamic>;
-      return alerts
+      final data = response.data;
+      final unread = data is Map<String, dynamic> ? data['unread'] : null;
+      final read = data is Map<String, dynamic> ? data['read'] : null;
+      if (unread is! List || read is! List) {
+        throw ApiError(
+          message: 'Unexpected dark web alerts response: '
+              'missing "unread"/"read" lists',
+          code: 'BAD_RESPONSE',
+        );
+      }
+
+      return [...unread, ...read]
           .map((a) => BreachAlert.fromJson(a as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -1117,20 +1437,29 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get data brokers list
+  /// GET /api/v1/footprint/brokers — response is a bare JSON array
   Future<List<dynamic>> getDataBrokers() async {
     try {
-      final response = await _dio.get('/api/footprint/brokers');
-      return response.data['brokers'] as List<dynamic>? ?? [];
+      final response = await _dio.get(ApiEndpoints.footprintBrokers);
+      final data = response.data;
+      if (data is! List) {
+        throw ApiError(
+          message: 'Unexpected brokers response: expected a JSON array',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return data;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Scan digital footprint
+  /// POST /api/v1/footprint/scan — Body must include "email"
   Future<Map<String, dynamic>> scanDigitalFootprint(Map<String, dynamic> params) async {
     try {
       final response = await _dio.post(
-        '/api/footprint/scan',
+        ApiEndpoints.footprintScan,
         data: params,
       );
       return response.data as Map<String, dynamic>;
@@ -1140,11 +1469,15 @@ class OrbGuardApiClient {
   }
 
   /// Request data removal from broker
-  Future<Map<String, dynamic>> requestDataRemoval(String brokerId) async {
+  /// POST /api/v1/footprint/removal — Body: { "broker_id", "email"? }
+  Future<Map<String, dynamic>> requestDataRemoval(String brokerId, {String? email}) async {
     try {
       final response = await _dio.post(
-        '/api/footprint/removal',
-        data: {'broker_id': brokerId},
+        ApiEndpoints.footprintRemoval,
+        data: {
+          'broker_id': brokerId,
+          if (email != null && email.isNotEmpty) 'email': email,
+        },
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -1153,9 +1486,11 @@ class OrbGuardApiClient {
   }
 
   /// Get removal request status
+  /// GET /api/v1/footprint/removal/{id}
   Future<Map<String, dynamic>> getRemovalStatus(String requestId) async {
     try {
-      final response = await _dio.get('/api/footprint/removal/$requestId');
+      final response =
+          await _dio.get(ApiEndpoints.footprintRemovalStatus(requestId));
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -1446,14 +1781,21 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get intelligence sources
+  /// GET /api/v1/intel/sources — Response: { "data": [...], "total": N }
   Future<List<Map<String, dynamic>>> getIntelSources() async {
     try {
       final response = await _dio.get(
         ApiEndpoints.intelSources,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['sources'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final sources = response.data['data'];
+      if (sources is! List) {
+        throw ApiError(
+          message: 'Unexpected sources response: missing "data" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return sources.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1489,36 +1831,69 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get ML models
+  /// GET /api/v1/ml/models — Response: MLServiceStats with "models": [...]
   Future<List<Map<String, dynamic>>> getMLModels() async {
     try {
       final response = await _dio.get(
         ApiEndpoints.mlModels,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['models'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final models = response.data['models'];
+      if (models is! List) {
+        throw ApiError(
+          message: 'Unexpected ML models response: missing "models" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return models.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get anomaly detections
+  /// POST /api/v1/ml/anomalies/detect with {} runs filter-based detection over
+  /// recent indicators. Response: { "result": { "scores": [...], ... }, "processed": N }
+  /// Returns the per-indicator anomaly scores.
   Future<List<Map<String, dynamic>>> getAnomalies() async {
     try {
-      final response = await _dio.get(ApiEndpoints.mlAnomalies);
-      return (response.data['anomalies'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final response = await _dio.post(
+        ApiEndpoints.mlAnomaliesDetect,
+        data: <String, dynamic>{},
+      );
+      final result = response.data['result'];
+      final scores = result is Map<String, dynamic> ? result['scores'] : null;
+      if (scores is! List) {
+        throw ApiError(
+          message: 'Unexpected anomaly detection response: '
+              'missing "result.scores" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return scores.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get ML insights
+  /// GET /api/v1/ml/insights is a backend alias of the ML stats endpoint and
+  /// returns MLServiceStats — it has no "insights" collection. Until the
+  /// backend grows a real insights feed, this surfaces the contract gap
+  /// instead of fabricating an empty result.
   Future<List<Map<String, dynamic>>> getMLInsights() async {
     try {
       final response = await _dio.get(ApiEndpoints.mlInsights);
-      return (response.data['insights'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final insights = response.data['insights'];
+      if (insights is! List) {
+        throw ApiError(
+          statusCode: response.statusCode,
+          message: 'ML insights are not provided by this backend: '
+              '/ml/insights returns ML service stats, not insight items',
+          code: 'NOT_AVAILABLE',
+        );
+      }
+      return insights.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1587,11 +1962,18 @@ class OrbGuardApiClient {
   }
 
   /// Get firewall rules
+  /// GET /api/v1/desktop/network/rules — response is a bare JSON array
   Future<List<Map<String, dynamic>>> getDesktopFirewallRules() async {
     try {
       final response = await _dio.get(ApiEndpoints.desktopFirewall);
-      return (response.data['rules'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final data = response.data;
+      if (data is! List) {
+        throw ApiError(
+          message: 'Unexpected firewall rules response: expected a JSON array',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return data.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1616,11 +1998,19 @@ class OrbGuardApiClient {
   }
 
   /// Get blocked domains for VPN
+  /// GET /api/v1/vpn/blocked (alias of /orbnet/rules)
+  /// Response: { "rules": [...], "count": N }
   Future<List<Map<String, dynamic>>> getVpnBlockedDomains() async {
     try {
       final response = await _dio.get(ApiEndpoints.vpnBlocked);
-      return (response.data['domains'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final rules = response.data['rules'];
+      if (rules is! List) {
+        throw ApiError(
+          message: 'Unexpected VPN block rules response: missing "rules" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return rules.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1755,10 +2145,25 @@ class OrbGuardApiClient {
   // ML ANALYSIS
   // ============================================
 
-  /// Run ML analysis
-  Future<Map<String, dynamic>> runMLAnalysis() async {
+  /// Run ML analysis on a raw indicator value
+  /// POST /api/v1/ml/analyze — Body: { "value": "...", "type": "domain"|... }
+  /// The backend requires "value" (400 otherwise), so it is validated here.
+  Future<Map<String, dynamic>> runMLAnalysis({String? value, String? type}) async {
+    if (value == null || value.isEmpty) {
+      throw ApiError(
+        message: 'ML analysis requires a "value" to analyze '
+            '(e.g. a domain, URL, IP, or hash)',
+        code: 'INVALID_ARGUMENT',
+      );
+    }
     try {
-      final response = await _dio.post('${ApiConfig.apiVersion}/ml/analyze');
+      final response = await _dio.post(
+        ApiEndpoints.mlAnalyze,
+        data: {
+          'value': value,
+          if (type != null && type.isNotEmpty) 'type': type,
+        },
+      );
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -2210,8 +2615,15 @@ class PaginatedResponse<T> {
     Map<String, dynamic> json,
     T Function(dynamic) fromJson,
   ) {
-    final itemsList = json['items'] as List<dynamic>? ?? [];
-    final total = json['total'] as int? ?? 0;
+    // The backend list envelope is { "data": [...], "total": N, "limit": N,
+    // "has_more": bool } (intelligence, campaigns, actors, sources).
+    final itemsList = json['data'];
+    if (itemsList is! List) {
+      throw const FormatException(
+        'Unexpected list response: missing "data" array',
+      );
+    }
+    final total = json['total'] as int? ?? itemsList.length;
     final limit = json['limit'] as int? ?? 100;
 
     return PaginatedResponse(
@@ -2219,7 +2631,7 @@ class PaginatedResponse<T> {
       page: json['page'] as int? ?? 1,
       limit: limit,
       total: total,
-      totalPages: (total / limit).ceil(),
+      totalPages: limit > 0 ? (total / limit).ceil() : 1,
       hasMore: json['has_more'] as bool? ?? false,
     );
   }

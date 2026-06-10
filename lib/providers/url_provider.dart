@@ -133,10 +133,9 @@ class UrlProvider extends ChangeNotifier {
         domain: domain,
         isSafe: true,
         shouldBlock: false,
-        severity: SeverityLevel.info,
-        riskScore: 0.0,
-        categories: [UrlCategory.safe],
-        threats: [],
+        category: UrlCategory.safe,
+        threatLevel: SeverityLevel.info,
+        confidence: 1.0,
         recommendation: 'This domain is on your whitelist.',
         checkedAt: DateTime.now(),
       );
@@ -149,9 +148,10 @@ class UrlProvider extends ChangeNotifier {
         domain: domain,
         isSafe: false,
         shouldBlock: true,
-        severity: SeverityLevel.high,
-        riskScore: 1.0,
-        categories: [],
+        category: UrlCategory.unknown,
+        threatLevel: SeverityLevel.high,
+        confidence: 1.0,
+        blockReason: 'This domain is on your blacklist.',
         threats: [
           UrlThreat(
             type: 'blacklisted',
@@ -375,10 +375,26 @@ class UrlProvider extends ChangeNotifier {
         safe++;
       } else {
         threats++;
-        for (final cat in entry.result!.categories) {
-          if (cat == UrlCategory.phishing) phishing++;
-          if (cat == UrlCategory.malware) malware++;
-          if (cat == UrlCategory.scam) scams++;
+        switch (entry.result!.category) {
+          case UrlCategory.phishing:
+          case UrlCategory.typosquatting:
+            phishing++;
+            break;
+          case UrlCategory.malware:
+          case UrlCategory.ransomware:
+          case UrlCategory.cryptojacking:
+          case UrlCategory.cryptomining:
+          case UrlCategory.commandAndControl:
+          case UrlCategory.botnet:
+          case UrlCategory.exploit:
+          case UrlCategory.driveByDownload:
+            malware++;
+            break;
+          case UrlCategory.scam:
+            scams++;
+            break;
+          default:
+            break;
         }
       }
     }
