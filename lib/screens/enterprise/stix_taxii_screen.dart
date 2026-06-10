@@ -157,11 +157,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-              tooltip: 'Add Server',
-              onPressed: () => _showAddServerDialog(context),
-            ),
-            IconButton(
               icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
@@ -214,7 +209,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         // Servers
         const GlassSectionHeader(title: 'TAXII Servers'),
         if (_servers.isEmpty)
-          _buildEmptyState('No Servers', 'Add a TAXII server to start sharing threat intelligence')
+          _buildEmptyState('No Servers', 'No TAXII servers are available from the backend')
         else
           ..._servers.map((server) => _buildServerCard(server)),
       ],
@@ -320,7 +315,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
 
         // Collections
         if (_collections.isEmpty)
-          _buildEmptyState('No Collections', 'Connect to a TAXII server to view collections')
+          _buildEmptyState('No Collections', 'The TAXII server exposes no collections')
         else
           ..._collections.map((collection) => _buildCollectionCard(collection)),
       ],
@@ -344,7 +339,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
 
   Widget _buildCollectionCard(TaxiiCollection collection) {
     return GlassCard(
-      onTap: () => _showCollectionDetails(context, collection),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -418,7 +412,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 width: 100,
                 margin: const EdgeInsets.only(right: 12),
                 child: GlassCard(
-                  onTap: () {},
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -502,129 +495,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
     );
   }
 
-  void _showAddServerDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final urlController = TextEditingController();
-    final usernameController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-          ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Add TAXII Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('Connect to a TAXII 2.1 server to share threat intelligence', style: TextStyle(color: Colors.white.withAlpha(153))),
-              const SizedBox(height: 24),
-              TextField(
-                controller: titleController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Server Name'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: urlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Discovery URL', hint: 'https://taxii.server.com/taxii2/'),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: usernameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('Username (Optional)'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: passwordController,
-                      style: const TextStyle(color: Colors.white),
-                      obscureText: true,
-                      decoration: _inputDecoration('Password'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (titleController.text.isNotEmpty && urlController.text.isNotEmpty) {
-                          setState(() {
-                            _servers.add(TaxiiServer(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              title: titleController.text,
-                              description: 'Custom TAXII server',
-                              discoveryUrl: urlController.text,
-                              version: '2.1',
-                              isConnected: true,
-                              collectionCount: 0,
-                              lastSync: DateTime.now(),
-                            ));
-                          });
-                          Navigator.pop(context);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: GlassTheme.primaryAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('Connect'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-      hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-      enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-    );
-  }
-
   void _showServerDetails(BuildContext context, TaxiiServer server) {
     showModalBottomSheet(
       context: context,
@@ -676,48 +546,11 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const DuotoneIcon('refresh', size: 18),
-                      label: const Text('Sync Now'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() => _servers.remove(server));
-                        Navigator.pop(context);
-                      },
-                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
-                      label: const Text('Remove'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.errorColor,
-                        side: const BorderSide(color: GlassTheme.errorColor),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  void _showCollectionDetails(BuildContext context, TaxiiCollection collection) {
-    // Show collection details
   }
 
   void _showObjectDetails(BuildContext context, StixObject obj) {

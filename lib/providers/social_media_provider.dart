@@ -48,6 +48,9 @@ class SocialMediaProvider extends ChangeNotifier {
           (a.threatLevel == 'Critical' || a.threatLevel == 'High'))
       .length;
 
+  /// Average of real backend privacy-audit scores. 0 means "no audit data"
+  /// (no backend signal), never a measured score — see
+  /// [privacyAnalysisAvailable] to distinguish the two.
   int get averagePrivacyScore {
     if (_accounts.isEmpty) return 0;
     final scores = _accounts.where((a) => a.privacyScore != null);
@@ -56,6 +59,17 @@ class SocialMediaProvider extends ChangeNotifier {
             scores.length)
         .round();
   }
+
+  /// True when at least one account has a real privacy-audit result.
+  /// When false, the privacy section has nothing measured to show.
+  bool get privacyAnalysisAvailable =>
+      _accounts.any((a) => a.privacyScore != null);
+
+  /// True only when the last scan actually performed a backend data-exposure
+  /// analysis. When false, an empty [exposures] list means "not analyzable"
+  /// (no backend signal), NOT "no exposures found".
+  bool get exposureAnalysisPerformed =>
+      _lastScanResult?.exposureAnalysisPerformed ?? false;
 
   /// Initialize the provider
   Future<void> initialize() async {

@@ -112,11 +112,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-              tooltip: 'Add Connection',
-              onPressed: () => _showAddConnectionDialog(context),
-            ),
-            IconButton(
               icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
@@ -151,7 +146,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         // Active Connections
         const GlassSectionHeader(title: 'Active Connections'),
         if (_connections.isEmpty)
-          _buildEmptyState('No Connections', 'Add a SIEM connection to get started')
+          _buildEmptyState('No Connections',
+              'No SIEM integrations are configured on the server')
         else
           ..._connections.map((conn) => _buildConnectionCard(conn)),
       ],
@@ -194,7 +190,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
             width: 90,
             margin: const EdgeInsets.only(right: 12),
             child: GlassCard(
-              onTap: () => _showAddConnectionDialog(context, siemType: siem['name'] as String),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -291,31 +286,10 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Add forwarder button
-        GlassCard(
-          onTap: () => _showAddForwarderDialog(context),
-          child: Row(
-            children: [
-              GlassSvgIconBox(icon: 'add_circle', color: GlassTheme.primaryAccent),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Add Event Forwarder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('Configure event forwarding rules', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const DuotoneIcon('alt_arrow_right', size: 24, color: Colors.white38),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
         const GlassSectionHeader(title: 'Active Forwarders'),
         if (_forwarders.isEmpty)
-          _buildEmptyState('No Forwarders', 'Create forwarders to send events to SIEM')
+          _buildEmptyState('No Forwarders',
+              'No event forwarders are configured on the server')
         else
           ..._forwarders.map((forwarder) => _buildForwarderCard(forwarder)),
       ],
@@ -412,7 +386,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     }
 
     return GlassCard(
-      onTap: () => _showAlertDetails(context, alert),
       tintColor: alert.isAcknowledged ? null : severityColor,
       child: Row(
         children: [
@@ -496,157 +469,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     );
   }
 
-  void _showAddConnectionDialog(BuildContext context, {String? siemType}) {
-    final nameController = TextEditingController();
-    final endpointController = TextEditingController();
-    final tokenController = TextEditingController();
-    String selectedType = siemType ?? 'Splunk';
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Add SIEM Connection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedType,
-                  dropdownColor: GlassTheme.gradientTop,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'SIEM Type',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                  items: ['Splunk', 'Elastic', 'ArcSight', 'QRadar', 'Sentinel', 'Chronicle']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
-                  onChanged: (v) => setSheetState(() => selectedType = v!),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Connection Name',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: endpointController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Endpoint URL',
-                    hintText: 'https://your-siem.example.com:8088',
-                    hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: tokenController,
-                  style: const TextStyle(color: Colors.white),
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'API Token / HEC Token',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (nameController.text.isNotEmpty && endpointController.text.isNotEmpty) {
-                            setState(() {
-                              _connections.add(SiemConnection(
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                name: nameController.text,
-                                type: selectedType,
-                                endpoint: endpointController.text,
-                                isConnected: true,
-                                eventsPerMinute: 0,
-                                eventsSent: 0,
-                                errors: 0,
-                                lastSync: DateTime.now(),
-                              ));
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: GlassTheme.primaryAccent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Connect'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAddForwarderDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Add Event Forwarder', style: TextStyle(color: Colors.white)),
-        content: const Text('Configure which events to forward to your SIEM.', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent, foregroundColor: Colors.white),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showConnectionDetails(BuildContext context, SiemConnection connection) {
     showModalBottomSheet(
       context: context,
@@ -698,49 +520,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const DuotoneIcon('refresh', size: 18),
-                      label: const Text('Test Connection'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() => _connections.remove(connection));
-                        Navigator.pop(context);
-                      },
-                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
-                      label: const Text('Remove'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.errorColor,
-                        side: const BorderSide(color: GlassTheme.errorColor),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  void _showAlertDetails(BuildContext context, SiemAlert alert) {
-    // Similar to connection details
-    Navigator.pop(context);
   }
 
   Widget _buildDetailRow(String label, String value) {

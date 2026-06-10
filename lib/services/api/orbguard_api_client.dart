@@ -1601,26 +1601,19 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Get enterprise security events
-  Future<List<Map<String, dynamic>>> getEnterpriseEvents({int limit = 50}) async {
+  /// List conditional access policies (Zero Trust).
+  /// Returns the raw policy objects from {policies: [...], count}.
+  Future<List<Map<String, dynamic>>> getEnterprisePolicies() async {
     try {
-      final response = await _dio.get(
-        ApiEndpoints.enterpriseEvents,
-        queryParameters: {'limit': limit},
-      );
-      return (response.data['events'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Get enterprise device health
-  Future<List<Map<String, dynamic>>> getEnterpriseDevices() async {
-    try {
-      final response = await _dio.get(ApiEndpoints.enterpriseDevices);
-      return (response.data['devices'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final response = await _dio.get(ApiEndpoints.enterprisePolicies);
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return (data['policies'] as List<dynamic>?)
+                ?.whereType<Map<String, dynamic>>()
+                .toList() ??
+            [];
+      }
+      return [];
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1651,142 +1644,50 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Get compliance controls
-  Future<List<Map<String, dynamic>>> getComplianceControls() async {
+  /// Get compliance control catalog (GDPR / SOC 2 / CIS definitions).
+  /// [framework] optionally filters server-side (gdpr|soc2|cis).
+  /// Controls come back with status "unknown" — definitions, not assessments.
+  Future<List<Map<String, dynamic>>> getComplianceControls({String? framework}) async {
     try {
-      final response = await _dio.get(ApiEndpoints.complianceControls);
-      return (response.data['controls'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final response = await _dio.get(
+        ApiEndpoints.complianceControls,
+        queryParameters: {
+          if (framework != null && framework.isNotEmpty) 'framework': framework,
+        },
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return (data['controls'] as List<dynamic>?)
+                ?.whereType<Map<String, dynamic>>()
+                .toList() ??
+            [];
+      }
+      return [];
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
-  /// Generate compliance report
+  /// Generate a compliance report for a single framework (gdpr|soc2|cis).
+  /// Dates are sent as yyyy-MM-dd; the backend defaults missing dates to the
+  /// last month. Returns the generated report object.
   Future<Map<String, dynamic>> generateComplianceReport({
-    required List<String> frameworks,
-    required String format,
+    required String framework,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
+    String fmt(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     try {
       final response = await _dio.post(
         ApiEndpoints.complianceReportGenerate,
         data: {
-          'frameworks': frameworks,
-          'format': format,
+          'framework': framework,
+          if (startDate != null) 'start_date': fmt(startDate),
+          if (endDate != null) 'end_date': fmt(endDate),
         },
       );
       return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Assign policy to groups
-  Future<bool> assignPolicyToGroups(String policyId, List<String> groupIds) async {
-    try {
-      await _dio.post(
-        ApiEndpoints.policyAssignGroups(policyId),
-        data: {'group_ids': groupIds},
-      );
-      return true;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Assign policy to devices
-  Future<bool> assignPolicyToDevices(String policyId, List<String> deviceIds) async {
-    try {
-      await _dio.post(
-        ApiEndpoints.policyAssignDevices(policyId),
-        data: {'device_ids': deviceIds},
-      );
-      return true;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Remove policy assignment
-  Future<bool> removePolicyAssignment(String policyId, {List<String>? groupIds, List<String>? deviceIds}) async {
-    try {
-      await _dio.post(
-        ApiEndpoints.policyUnassign(policyId),
-        data: {
-          if (groupIds != null) 'group_ids': groupIds,
-          if (deviceIds != null) 'device_ids': deviceIds,
-        },
-      );
-      return true;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Evaluate device compliance
-  Future<Map<String, dynamic>> evaluateDeviceCompliance(String deviceId) async {
-    try {
-      final response = await _dio.post(ApiEndpoints.deviceEvaluateCompliance(deviceId));
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Enroll BYOD device
-  Future<Map<String, dynamic>> enrollBYODDevice(Map<String, dynamic> request) async {
-    try {
-      final response = await _dio.post(
-        ApiEndpoints.byodEnroll,
-        data: request,
-      );
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Get BYOD enrollment status
-  Future<Map<String, dynamic>> getBYODEnrollmentStatus(String deviceId) async {
-    try {
-      final response = await _dio.get(ApiEndpoints.byodStatus(deviceId));
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Unenroll BYOD device
-  Future<bool> unenrollBYODDevice(String deviceId, {bool wipeWorkData = true}) async {
-    try {
-      await _dio.post(
-        ApiEndpoints.byodUnenroll(deviceId),
-        data: {'wipe_work_data': wipeWorkData},
-      );
-      return true;
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Detect device ownership
-  Future<String> detectDeviceOwnership(String deviceId) async {
-    try {
-      final response = await _dio.get(ApiEndpoints.deviceOwnership(deviceId));
-      return response.data['ownership_type'] as String? ?? 'unknown';
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Set device ownership
-  Future<bool> setDeviceOwnership(String deviceId, String ownershipType) async {
-    try {
-      await _dio.post(
-        ApiEndpoints.deviceOwnershipSet(deviceId),
-        data: {'ownership_type': ownershipType},
-      );
-      return true;
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }

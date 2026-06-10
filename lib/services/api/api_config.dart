@@ -378,18 +378,6 @@ class ApiEndpoints {
   /// GET /api/v1/enterprise/stats
   static const String enterpriseStats = '$_v1/enterprise/stats';
 
-  /// Get enterprise security events
-  /// GET /api/v1/enterprise/events
-  /// NOTE: not implemented by the backend (404). SIEM events are POSTed via
-  /// /enterprise/siem/events; there is no enterprise event feed yet.
-  static const String enterpriseEvents = '$_v1/enterprise/events';
-
-  /// Get enterprise device health
-  /// GET /api/v1/enterprise/devices
-  /// NOTE: not implemented by the backend (404). MDM devices are listed via
-  /// /enterprise/mdm/integrations/{id}/devices.
-  static const String enterpriseDevices = '$_v1/enterprise/devices';
-
   /// Get compliance frameworks
   /// GET /api/v1/enterprise/compliance/frameworks
   static const String complianceFrameworks = '$_v1/enterprise/compliance/frameworks';
@@ -398,61 +386,23 @@ class ApiEndpoints {
   /// GET /api/v1/enterprise/compliance/reports
   static const String complianceReports = '$_v1/enterprise/compliance/reports';
 
-  /// Get compliance controls
+  /// Get compliance control catalogs (GDPR / SOC 2 / CIS definitions).
   /// GET /api/v1/enterprise/compliance/controls
-  /// NOTE: not implemented by the backend (404); findings live at
-  /// /enterprise/compliance/findings.
+  /// Supports ?framework=gdpr|soc2|cis. Controls are returned with
+  /// status "unknown" — they are catalog definitions, not assessments.
   static const String complianceControls = '$_v1/enterprise/compliance/controls';
 
   /// Generate compliance report
-  /// POST /api/v1/enterprise/compliance/reports/generate
-  /// NOTE: live route is POST /enterprise/compliance/reports (no /generate).
+  /// POST /api/v1/enterprise/compliance/reports
+  /// Body: {framework, start_date, end_date}; framework must be one of
+  /// gdpr|soc2|cis (the catalogs the backend can assess against).
   static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports';
 
-  /// Get enterprise policies
+  /// List conditional access policies (Zero Trust).
   /// GET /api/v1/enterprise/policies
-  /// NOTE: live route is /enterprise/zerotrust/policies; this path 404s.
+  /// Client-path alias for /enterprise/zerotrust/policies; returns
+  /// {policies: [ConditionalAccessPolicy...], count}.
   static const String enterprisePolicies = '$_v1/enterprise/policies';
-
-  // NOTE: the policy-assignment / BYOD / ownership routes below are NOT
-  // implemented by the backend (404). Constants kept for the wave that adds
-  // the missing endpoints.
-
-  /// Assign policy to groups
-  /// POST /api/v1/enterprise/policies/{id}/assign-groups
-  static String policyAssignGroups(String id) => '$_v1/enterprise/policies/$id/assign-groups';
-
-  /// Assign policy to devices
-  /// POST /api/v1/enterprise/policies/{id}/assign-devices
-  static String policyAssignDevices(String id) => '$_v1/enterprise/policies/$id/assign-devices';
-
-  /// Remove policy assignment
-  /// POST /api/v1/enterprise/policies/{id}/unassign
-  static String policyUnassign(String id) => '$_v1/enterprise/policies/$id/unassign';
-
-  /// Evaluate device compliance
-  /// POST /api/v1/enterprise/devices/{id}/evaluate-compliance
-  static String deviceEvaluateCompliance(String id) => '$_v1/enterprise/devices/$id/evaluate-compliance';
-
-  /// BYOD enrollment
-  /// POST /api/v1/enterprise/byod/enroll
-  static const String byodEnroll = '$_v1/enterprise/byod/enroll';
-
-  /// Get BYOD enrollment status
-  /// GET /api/v1/enterprise/byod/{deviceId}/status
-  static String byodStatus(String deviceId) => '$_v1/enterprise/byod/$deviceId/status';
-
-  /// BYOD unenrollment
-  /// POST /api/v1/enterprise/byod/{deviceId}/unenroll
-  static String byodUnenroll(String deviceId) => '$_v1/enterprise/byod/$deviceId/unenroll';
-
-  /// Detect device ownership
-  /// GET /api/v1/enterprise/devices/{id}/ownership
-  static String deviceOwnership(String id) => '$_v1/enterprise/devices/$id/ownership';
-
-  /// Set device ownership
-  /// POST /api/v1/enterprise/devices/{id}/ownership
-  static String deviceOwnershipSet(String id) => '$_v1/enterprise/devices/$id/ownership';
 
   // ============================================
   // SIEM INTEGRATION

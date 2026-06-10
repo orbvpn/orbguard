@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/api/url_reputation.dart';
 import '../services/api/api_config.dart';
@@ -202,6 +203,11 @@ class NetworkProvider extends ChangeNotifier {
   // Platform channel for native WiFi scanning
   static const _wifiChannel = MethodChannel('com.orb.guard/wifi');
 
+  /// Master network-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_network`).
+  static const _kMasterProtectionKey = 'prot_network';
+  SharedPreferences? _prefs;
+
   // State
   WifiNetwork? _currentNetwork;
   final List<WifiNetwork> _nearbyNetworks = [];
@@ -238,6 +244,25 @@ class NetworkProvider extends ChangeNotifier {
   DnsCheckResult? get dnsCheckResult => _dnsCheckResult;
   bool get isCheckingDns => _isCheckingDns;
   String? get dnsCheckError => _dnsCheckError;
+
+  /// True when the user turned network protection off in the app Settings
+  /// (`prot_network`). While set, active scans and DNS checks are skipped.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('NetworkProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
 
   /// Active threats
   List<NetworkThreat> get activeThreats =>
@@ -293,6 +318,11 @@ class NetworkProvider extends ChangeNotifier {
   /// Scan nearby networks using platform channel
   Future<void> scanNetworks() async {
     if (_isScanning) return;
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'Network protection is disabled in Settings.';
+      notifyListeners();
+      return;
+    }
 
     _isScanning = true;
     notifyListeners();
@@ -440,6 +470,11 @@ class NetworkProvider extends ChangeNotifier {
   /// device_id from it), so no device_id needs to be embedded in the body.
   Future<void> runDnsCheck() async {
     if (_isCheckingDns) return;
+    if (!await _isProtectionEnabledByUser()) {
+      _dnsCheckError = 'Network protection is disabled in Settings.';
+      notifyListeners();
+      return;
+    }
 
     _isCheckingDns = true;
     _dnsCheckError = null;

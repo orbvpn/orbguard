@@ -33,6 +33,17 @@ import 'screens/intelligence/intelligence_core_screen.dart';
 import 'screens/security_center_screen.dart';
 import 'screens/desktop/desktop_security_screen.dart';
 import 'screens/device_security/device_security_screen.dart';
+import 'screens/scam/scam_detection_screen.dart';
+import 'screens/forensics/forensics_screen.dart';
+import 'screens/graph/threat_graph_screen.dart';
+import 'screens/correlation/correlation_screen.dart';
+import 'screens/ml/ml_analysis_screen.dart';
+import 'screens/campaigns/campaigns_screen.dart';
+import 'screens/actors/threat_actors_screen.dart';
+import 'screens/privacy/privacy_protection_screen.dart';
+import 'screens/playbooks/playbooks_screen.dart';
+import 'screens/webhooks/webhooks_screen.dart';
+import 'screens/integrations/integrations_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -879,6 +890,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ));
                   },
                 ),
+                _buildDrawerItem(
+                  svgIcon: 'danger_triangle',
+                  title: 'Scam Detection',
+                  subtitle: 'AI text, URL & call scam analysis',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ScamDetectionScreen(),
+                    ));
+                  },
+                ),
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Security'),
                 _buildDrawerItem(
@@ -947,6 +969,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ));
                   },
                 ),
+                _buildDrawerItem(
+                  svgIcon: 'magnifer',
+                  title: 'Forensics',
+                  subtitle: 'Spyware & Pegasus analysis',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ForensicsScreen(),
+                    ));
+                  },
+                ),
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Intelligence'),
                 _buildDrawerItem(
@@ -993,6 +1026,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ));
                   },
                 ),
+                _buildDrawerItem(
+                  svgIcon: 'graph_new',
+                  title: 'Threat Graph',
+                  subtitle: 'Entity relationship explorer',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ThreatGraphScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'routing',
+                  title: 'Correlation',
+                  subtitle: 'Cross-indicator correlation engine',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const CorrelationScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'cpu',
+                  title: 'ML Analysis',
+                  subtitle: 'Anomaly detection & insights',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const MLAnalysisScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'flag',
+                  title: 'Campaigns',
+                  subtitle: 'Tracked threat campaigns',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const CampaignsScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'users_group_rounded',
+                  title: 'Threat Actors',
+                  subtitle: 'APT & actor profiles',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const ThreatActorsScreen(),
+                    ));
+                  },
+                ),
                 const GlassDivider(isDark: true),
                 _buildDrawerSection('Identity & Privacy'),
                 _buildDrawerItem(
@@ -1014,6 +1102,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (context) => const SocialMediaScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'shield_keyhole',
+                  title: 'Privacy Protection',
+                  subtitle: 'Permission & tracker audit',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const PrivacyProtectionScreen(),
                     ));
                   },
                 ),
@@ -1082,6 +1181,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (context) => const StixTaxiiScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'play_circle',
+                  title: 'Playbooks',
+                  subtitle: 'Automated response playbooks',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const PlaybooksScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'socket',
+                  title: 'Webhooks',
+                  subtitle: 'Event notifications & delivery',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const WebhooksScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'plug_circle',
+                  title: 'Integrations',
+                  subtitle: 'Third-party service connections',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const IntegrationsScreen(),
                     ));
                   },
                 ),

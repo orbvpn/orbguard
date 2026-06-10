@@ -133,6 +133,10 @@ class UrlProvider extends ChangeNotifier {
   static const _prefsPendingRemovalsKey = 'url_list_pending_removals';
   static const _maxPersistedEntries = 100;
 
+  /// Master URL-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_url`).
+  static const _kMasterProtectionKey = 'prot_url';
+
   static final String _whitelistPath =
       '${ApiConfig.apiVersion}/url/whitelist';
   static final String _blacklistPath =
@@ -177,6 +181,25 @@ class UrlProvider extends ChangeNotifier {
 
   String? get error => _error;
 
+  /// True when the user turned URL protection off in the app Settings
+  /// (`prot_url`). While set, URL checks are skipped entirely.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('UrlProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
+
   /// Recent threats from history
   List<UrlCheckEntry> get recentThreats => _history
       .where((e) => e.result != null && !e.result!.isSafe)
@@ -195,6 +218,12 @@ class UrlProvider extends ChangeNotifier {
   /// Check a URL
   Future<UrlReputationResult?> checkUrl(String url) async {
     if (url.isEmpty) return null;
+
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'URL protection is disabled in Settings.';
+      notifyListeners();
+      return null;
+    }
 
     // Normalize URL
     final normalizedUrl = _normalizeUrl(url);
@@ -280,6 +309,12 @@ class UrlProvider extends ChangeNotifier {
   /// Check multiple URLs
   Future<List<UrlReputationResult>> checkUrls(List<String> urls) async {
     if (urls.isEmpty) return [];
+
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'URL protection is disabled in Settings.';
+      notifyListeners();
+      return [];
+    }
 
     _isCheckingUrl = true;
     notifyListeners();

@@ -124,9 +124,17 @@ _Low-risk cleanups that restore product honesty and reduce maintenance surface. 
 - [!] Rotate leaked third-party keys: HIBP 153d2cd2..., LeakCheck 0a81d813..., IntelX 312e04bf... (hardcoded in app source, shipped in binaries)
 - [!] Provide/confirm server-side env keys: ANTHROPIC/OPENAI (scam LLM), GOOGLE_SAFE_BROWSING, VIRUSTOTAL, HIBP (server-side)
 ## Wave 7: Closeout (verifier handoffs)
-- [ ] W7.1 Enterprise coordinated retirement: remove 11 dead client calls + consuming UI (enterprise_overview events/devices, policy assign/BYOD/ownership flows in enterprise_policy_provider + policy_management_service); wire the 2 live routes (GET /enterprise/policies, GET /enterprise/compliance/controls); prune allowlist
-- [ ] W7.2 LAB: honest ZeroTrust posture/compliance (simulated scores behind live routes /enterprise/zerotrust/posture|evaluate, compliance reports/devices) + simulated MDM syncs — make honest or remove
-- [ ] W7.3 scan_results_screen.dart fake quarantine (800ms delay + fake success) — wire to real capability or remove button
-- [ ] W7.4 social_media_monitor_service._checkDataExposure unconditional assertions; ios_forensic_service no-op _runQuickScan/_analyzeShutdownLog — rework or remove
-- [ ] W7.5 Wire prot_* ProtectionSettings flags into enforcement services (SMS/URL/QR/network)
-- [ ] W7.6 UI consumers for ForensicsProvider.captureAndAnalyzeLogcat + SupplyChainProvider.criticalAlerts
+- [x] W7.1 Enterprise coordinated retirement: remove 11 dead client calls + consuming UI (enterprise_overview events/devices, policy assign/BYOD/ownership flows in enterprise_policy_provider + policy_management_service); wire the 2 live routes (GET /enterprise/policies, GET /enterprise/compliance/controls); prune allowlist
+- [x] W7.2 LAB: honest ZeroTrust posture/compliance (simulated scores behind live routes /enterprise/zerotrust/posture|evaluate, compliance reports/devices) + simulated MDM syncs — make honest or remove
+- [x] W7.3 scan_results_screen.dart fake quarantine (800ms delay + fake success) — wire to real capability or remove button
+- [x] W7.4 social_media_monitor_service._checkDataExposure unconditional assertions; ios_forensic_service no-op _runQuickScan/_analyzeShutdownLog — rework or remove
+- [x] W7.5 Wire prot_* ProtectionSettings flags into enforcement services (SMS/URL/QR/network)
+- [x] W7.6 UI consumers for ForensicsProvider.captureAndAnalyzeLogcat + SupplyChainProvider.criticalAlerts
+- [x] W7.7 Wire 11 orphaned functional screens into drawer navigation (scam, forensics, threat graph, correlation, ML, campaigns, actors, privacy, playbooks, webhooks, integrations)
+
+## FINAL STATUS (2026-06-11)
+ALL 78 ITEMS COMPLETE. Final gate: go build/vet/test clean; flutter analyze 0 errors; flutter test 66/66; contract gate PASS with EMPTY allowlist (every app call has a live backend route); debug APK builds; adversarial sweep found no critical fabrication on any live path.
+
+Documented non-critical remainders (file:line in audit raw): /siem/alerts alias returns stats (honest empty tab); admin.go report approve/reject TODO persistence (route unused by app); YARA parse/submit stubs (routes unused by app); inert placeholder IOC hashes (cannot match real files); MDM/SIEM configs in-memory; a few dead-but-honest unrouted services.
+
+Needs-user (unchanged): rotate HIBP/LeakCheck/IntelX keys; set server env keys (ANTHROPIC/OPENAI, GOOGLE_SAFE_BROWSING, VIRUSTOTAL, ORBGUARD_ADMIN_TOKEN); run goose migrations 005-018 on production DB before deploy.

@@ -75,6 +75,10 @@ class QrProvider extends ChangeNotifier {
   static const _prefsHistoryKey = 'qr_scan_history';
   static const _maxPersistedEntries = 100;
 
+  /// Master QR-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_qr`).
+  static const _kMasterProtectionKey = 'prot_qr';
+
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
   SharedPreferences? _prefs;
 
@@ -101,6 +105,25 @@ class QrProvider extends ChangeNotifier {
   bool get isReportingFalsePositive => _isReportingFalsePositive;
   String? get error => _error;
 
+  /// True when the user turned QR protection off in the app Settings
+  /// (`prot_qr`). While set, QR analysis is skipped entirely.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('QrProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
+
   /// Recent threats from history
   List<QrScanEntry> get recentThreats => _history
       .where((e) => e.result != null && e.hasThreats)
@@ -122,6 +145,12 @@ class QrProvider extends ChangeNotifier {
     double? longitude,
   }) async {
     if (content.isEmpty) return null;
+
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'QR protection is disabled in Settings.';
+      notifyListeners();
+      return null;
+    }
 
     // Create history entry
     final entryId = DateTime.now().millisecondsSinceEpoch.toString();

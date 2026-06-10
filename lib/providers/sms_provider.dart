@@ -162,6 +162,10 @@ class SmsProvider extends ChangeNotifier {
   static const _kNotifyOnThreatKey = 'sms_notify_on_threat';
   static const _kAutoBlockDangerousKey = 'sms_auto_block_dangerous';
 
+  /// Master SMS-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_sms`).
+  static const _kMasterProtectionKey = 'prot_sms';
+
   /// Cap for the persisted analysis history (most recent kept).
   static const _maxPersistedAnalyses = 500;
 
@@ -230,6 +234,25 @@ class SmsProvider extends ChangeNotifier {
   bool get protectionEnabled => _protectionEnabled;
   bool get notifyOnThreat => _notifyOnThreat;
   bool get autoBlockDangerous => _autoBlockDangerous;
+
+  /// True when the user turned SMS protection off in the app Settings
+  /// (`prot_sms`). While set, analysis flows are skipped entirely.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('SmsProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
 
   /// Get count of unanalyzed messages
   int get unanalyzedCount =>
@@ -400,6 +423,12 @@ class SmsProvider extends ChangeNotifier {
 
   /// Analyze a single message
   Future<SmsAnalysisResult?> analyzeMessage(String messageId) async {
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'SMS protection is disabled in Settings.';
+      notifyListeners();
+      return null;
+    }
+
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index < 0) return null;
 
@@ -439,6 +468,11 @@ class SmsProvider extends ChangeNotifier {
   /// Analyze all unanalyzed messages via the backend batch endpoint.
   Future<void> analyzeAllMessages() async {
     if (_isAnalyzing) return;
+    if (!await _isProtectionEnabledByUser()) {
+      // Explicit user opt-out: skip the analysis work entirely.
+      notifyListeners();
+      return;
+    }
 
     _isAnalyzing = true;
     _error = null;
@@ -516,6 +550,11 @@ class SmsProvider extends ChangeNotifier {
   /// Analyze content without saving
   Future<SmsAnalysisResult?> analyzeContent(String content,
       {String? sender}) async {
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'SMS protection is disabled in Settings.';
+      notifyListeners();
+      return null;
+    }
     try {
       final request = SmsAnalysisRequest(
         content: content,

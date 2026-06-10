@@ -47,37 +47,14 @@ HTTP_VERBS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 # ---------------------------------------------------------------------------
 # WAVE4_PENDING: app calls that are known to have no backend route yet.
-# Wave 4 ("Missing endpoints + routing") either adds the route or retires the
-# client method. Entries are "<VERB> <normalized path>" with path params
-# written as {param}. Remove entries here as Wave 4 lands them so the gate
-# starts enforcing them.
+# Entries are "<VERB> <normalized path>" with path params written as {param}.
+#
+# Wave-7 closeout: the final 11 enterprise entries (events/devices feed,
+# policy assignment, BYOD enrollment, device ownership) were retired from the
+# client together with their consuming UI, so the allowlist is now EMPTY and
+# the gate enforces every app call against the live router.
 # ---------------------------------------------------------------------------
-WAVE4_PENDING = {
-    # =======================================================================
-    # Wave-6 reconciliation status:
-    #   - LAB landed live routes for GET mitre/navigator/export,
-    #     GET enterprise/policies and GET enterprise/compliance/controls,
-    #     so those entries were pruned (the gate now enforces them).
-    #   - LAB declared the remaining 11 enterprise calls below as
-    #     intentionally unregistered ("client must retire"); the consuming
-    #     UI (enterprise screens/providers/policy_management_service) is
-    #     still in place, so the entries stay allowlisted until the
-    #     enterprise UI retirement lands. Retire the client methods and
-    #     these entries together.
-    # =======================================================================
-    # --- enterprise routes LAB declared client-must-retire ---
-    "GET /api/v1/enterprise/events",
-    "GET /api/v1/enterprise/devices",
-    "POST /api/v1/enterprise/policies/{param}/assign-groups",
-    "POST /api/v1/enterprise/policies/{param}/assign-devices",
-    "POST /api/v1/enterprise/policies/{param}/unassign",
-    "POST /api/v1/enterprise/devices/{param}/evaluate-compliance",
-    "POST /api/v1/enterprise/byod/enroll",
-    "GET /api/v1/enterprise/byod/{param}/status",
-    "POST /api/v1/enterprise/byod/{param}/unenroll",
-    "GET /api/v1/enterprise/devices/{param}/ownership",
-    "POST /api/v1/enterprise/devices/{param}/ownership",
-}
+WAVE4_PENDING: set[str] = set()
 
 # Constants in ApiEndpoints that are base paths used only for composing
 # longer paths (never called on their own). 'forensics'/'privacy'/'scam' are

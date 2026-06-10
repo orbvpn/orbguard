@@ -120,6 +120,11 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          // Critical vulnerability alerts raised during monitoring
+          if (provider.criticalAlerts.isNotEmpty) ...[
+            _buildCriticalAlertsBanner(provider),
+            const SizedBox(height: 12),
+          ],
           // Scan progress
           if (provider.isScanning)
             GlassCard(
@@ -159,6 +164,81 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             )
           else
             _buildSummaryCard(provider),
+        ],
+      ),
+    );
+  }
+
+  /// Banner surfacing critical CVE alerts from [SupplyChainProvider]'s
+  /// vulnerability-alert stream. Each row opens the full CVE details.
+  Widget _buildCriticalAlertsBanner(SupplyChainProvider provider) {
+    final alerts = provider.criticalAlerts;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const DuotoneIcon(
+                'danger_circle',
+                color: GlassTheme.errorColor,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${alerts.length} critical vulnerability '
+                  'alert${alerts.length == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    color: GlassTheme.errorColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...alerts.take(3).map(
+                (vuln) => InkWell(
+                  onTap: () => _showVulnerabilityDetails(vuln),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${vuln.cveId} — CVSS '
+                            '${vuln.cvssScore.toStringAsFixed(1)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DuotoneIcon(
+                          'alt_arrow_right',
+                          size: 16,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          if (alerts.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+${alerts.length - 3} more in the CVEs tab',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 12,
+                ),
+              ),
+            ),
         ],
       ),
     );

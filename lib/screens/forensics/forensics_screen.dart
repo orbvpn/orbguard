@@ -160,6 +160,18 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             ),
           ] else if (Platform.isAndroid) ...[
             _buildAnalysisButton(
+              icon: 'clipboard_text',
+              title: 'Capture & Analyze Logs',
+              description:
+                  "Capture OrbGuard's own process logs and analyze them "
+                  '(full-device logs require ADB export)',
+              color: Colors.lightGreen,
+              onTap: provider.isAnalyzing
+                  ? null
+                  : () => provider.captureAndAnalyzeLogcat(),
+            ),
+            const SizedBox(height: 12),
+            _buildAnalysisButton(
               icon: 'file_text',
               title: 'Logcat Analysis',
               description: 'Analyze Android system logs for malware',
