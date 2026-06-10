@@ -477,3 +477,129 @@ func (r *NetworkSecurityRepository) GetDeviceProtectionState(ctx context.Context
 	}
 	return &state, nil
 }
+
+// ---------------------------------------------------------------------------
+// Device posture signals (Zero Trust /enterprise/zerotrust/posture)
+// ---------------------------------------------------------------------------
+
+// DevicePostureSignals aggregates the real per-device security telemetry
+// persisted over the last 30 days. A Has* flag of false means no signal of
+// that kind exists for the device — the matching averages/counts are then
+// meaningless and posture components built on them must be reported as
+// insufficient_data, never scored.
+type DevicePostureSignals struct {
+	// Network audits (orbguard_lab.network_audits, risk_score 0.0-1.0)
+	HasNetworkAudits  bool
+	NetworkAuditCount int64
+	AvgNetworkRisk    float64
+	NetworkAttacks    int64 // audits with rogue AP / evil twin / hijack findings
+
+	// App analyses (orbguard_lab.app_analyses, risk_score 0-100)
+	HasAppAnalyses  bool
+	AppAnalysisCount int64
+	AvgAppRisk      float64
+	HighRiskApps    int64 // risk_level high/critical
+
+	// SMS analyses (orbguard_lab.sms_analyses)
+	HasSMSAnalyses bool
+	SMSCount       int64
+	SMSThreats     int64
+}
+
+// GetDevicePostureSignals reads the 30-day security telemetry for a device.
+func (r *NetworkSecurityRepository) GetDevicePostureSignals(ctx context.Context, deviceID string) (*DevicePostureSignals, error) {
+	query := `
+	SELECT
+	    (SELECT COUNT(*) FROM orbguard_lab.network_audits a
+	     WHERE a.device_id = $1 AND a.audited_at > NOW() - INTERVAL '30 days'),
+	    (SELECT COALESCE(AVG(a.risk_score), 0) FROM orbguard_lab.network_audits a
+	     WHERE a.device_id = $1 AND a.audited_at > NOW() - INTERVAL '30 days'),
+	    (SELECT COUNT(*) FROM orbguard_lab.network_audits a
+	     WHERE a.device_id = $1 AND a.audited_at > NOW() - INTERVAL '30 days'
+	       AND (a.rogue_ap_count > 0 OR a.evil_twin_count > 0 OR a.hijack_detected)),
+	    (SELECT COUNT(*) FROM orbguard_lab.app_analyses p
+	     WHERE p.device_id = $1 AND p.analyzed_at > NOW() - INTERVAL '30 days'),
+	    (SELECT COALESCE(AVG(p.risk_score), 0) FROM orbguard_lab.app_analyses p
+	     WHERE p.device_id = $1 AND p.analyzed_at > NOW() - INTERVAL '30 days'),
+	    (SELECT COUNT(*) FROM orbguard_lab.app_analyses p
+	     WHERE p.device_id = $1 AND p.analyzed_at > NOW() - INTERVAL '30 days'
+	       AND p.risk_level IN ('high', 'critical')),
+	    (SELECT COUNT(*) FROM orbguard_lab.sms_analyses m
+	     WHERE m.device_id = $1 AND m.analyzed_at > NOW() - INTERVAL '30 days'),
+	    (SELECT COUNT(*) FROM orbguard_lab.sms_analyses m
+	     WHERE m.device_id = $1 AND m.analyzed_at > NOW() - INTERVAL '30 days' AND m.is_threat)`
+
+	var s DevicePostureSignals
+	err := r.pool.QueryRow(ctx, query, deviceID).Scan(
+		&s.NetworkAuditCount, &s.AvgNetworkRisk, &s.NetworkAttacks,
+		&s.AppAnalysisCount, &s.AvgAppRisk, &s.HighRiskApps,
+		&s.SMSCount, &s.SMSThreats,
+	)
+	if err != nil {
+		return nil, err
+	}
+	s.HasNetworkAudits = s.NetworkAuditCount > 0
+	s.HasAppAnalyses = s.AppAnalysisCount > 0
+	s.HasSMSAnalyses = s.SMSCount > 0
+	return &s, nil
+}
+
+// ---------------------------------------------------------------------------
+// Fleet protection coverage (compliance report assessment)
+// ---------------------------------------------------------------------------
+
+// FleetProtectionStats counts, across all active devices, how many have each
+// protection capability actually configured or recently active. These are the
+// only fleet-level signals compliance controls may be assessed against.
+type FleetProtectionStats struct {
+	TotalActiveDevices    int64
+	WithDNSFiltering      int64 // device_network_configs.dns present
+	WithVPN               int64 // device_network_configs.vpn present
+	WithAppScanRecent     int64 // app analysis within 30 days
+	WithNetworkAuditRecent int64 // network audit within 30 days
+	WithSMSScanRecent     int64 // SMS analysis within 30 days
+	WithAnyMonitoring     int64 // any of the three recent-analysis signals
+}
+
+// GetFleetProtectionStats aggregates real protection coverage across the
+// active device fleet.
+func (r *NetworkSecurityRepository) GetFleetProtectionStats(ctx context.Context) (*FleetProtectionStats, error) {
+	query := `
+	SELECT
+	    COUNT(*),
+	    COUNT(*) FILTER (WHERE EXISTS (
+	        SELECT 1 FROM orbguard_lab.device_network_configs c
+	        WHERE c.device_id = d.id::text AND c.dns IS NOT NULL)),
+	    COUNT(*) FILTER (WHERE EXISTS (
+	        SELECT 1 FROM orbguard_lab.device_network_configs c
+	        WHERE c.device_id = d.id::text AND c.vpn IS NOT NULL)),
+	    COUNT(*) FILTER (WHERE EXISTS (
+	        SELECT 1 FROM orbguard_lab.app_analyses p
+	        WHERE p.device_id = d.id::text AND p.analyzed_at > NOW() - INTERVAL '30 days')),
+	    COUNT(*) FILTER (WHERE EXISTS (
+	        SELECT 1 FROM orbguard_lab.network_audits a
+	        WHERE a.device_id = d.id::text AND a.audited_at > NOW() - INTERVAL '30 days')),
+	    COUNT(*) FILTER (WHERE EXISTS (
+	        SELECT 1 FROM orbguard_lab.sms_analyses m
+	        WHERE m.device_id = d.id::text AND m.analyzed_at > NOW() - INTERVAL '30 days')),
+	    COUNT(*) FILTER (WHERE
+	        EXISTS (SELECT 1 FROM orbguard_lab.app_analyses p
+	                WHERE p.device_id = d.id::text AND p.analyzed_at > NOW() - INTERVAL '30 days')
+	        OR EXISTS (SELECT 1 FROM orbguard_lab.network_audits a
+	                   WHERE a.device_id = d.id::text AND a.audited_at > NOW() - INTERVAL '30 days')
+	        OR EXISTS (SELECT 1 FROM orbguard_lab.sms_analyses m
+	                   WHERE m.device_id = d.id::text AND m.analyzed_at > NOW() - INTERVAL '30 days'))
+	FROM orbguard_lab.devices d
+	WHERE d.status = 'active' AND NOT d.revoked`
+
+	var s FleetProtectionStats
+	err := r.pool.QueryRow(ctx, query).Scan(
+		&s.TotalActiveDevices, &s.WithDNSFiltering, &s.WithVPN,
+		&s.WithAppScanRecent, &s.WithNetworkAuditRecent, &s.WithSMSScanRecent,
+		&s.WithAnyMonitoring,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}

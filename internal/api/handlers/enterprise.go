@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -41,13 +42,21 @@ func (h *EnterpriseHandler) ListMDMIntegrations(w http.ResponseWriter, r *http.R
 	})
 }
 
-// CreateMDMIntegration handles POST /api/v1/enterprise/mdm/integrations
+// CreateMDMIntegration handles POST /api/v1/enterprise/mdm/integrations.
+// client_secret is accepted write-only: the model marshals it as "-" so it
+// is never echoed back in any response.
 func (h *EnterpriseHandler) CreateMDMIntegration(w http.ResponseWriter, r *http.Request) {
-	var config models.MDMIntegrationConfig
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+	var req struct {
+		models.MDMIntegrationConfig
+		ClientSecret string `json:"client_secret"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+
+	config := req.MDMIntegrationConfig
+	config.ClientSecret = req.ClientSecret
 
 	if err := h.enterprise.MDM.CreateIntegration(r.Context(), &config); err != nil {
 		h.respondError(w, http.StatusInternalServerError, err.Error())
@@ -102,13 +111,13 @@ func (h *EnterpriseHandler) SyncMDMDevices(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := h.enterprise.MDM.SyncDevices(r.Context(), id); err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
 	h.respondJSON(w, http.StatusOK, map[string]string{
 		"status":  "success",
-		"message": "Device sync initiated",
+		"message": "Device sync completed",
 	})
 }
 
@@ -142,7 +151,7 @@ func (h *EnterpriseHandler) SendMDMThreatAlert(w http.ResponseWriter, r *http.Re
 	alert.Status = "pending"
 
 	if err := h.enterprise.MDM.SendThreatAlert(r.Context(), &alert); err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -177,7 +186,7 @@ func (h *EnterpriseHandler) AssessDevicePosture(w http.ResponseWriter, r *http.R
 
 	posture, err := h.enterprise.ZeroTrust.AssessDevicePosture(r.Context(), deviceID)
 	if err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -218,7 +227,7 @@ func (h *EnterpriseHandler) EvaluateAccess(w http.ResponseWriter, r *http.Reques
 
 	decision, err := h.enterprise.ZeroTrust.EvaluateAccess(r.Context(), accessReq)
 	if err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -330,16 +339,26 @@ func (h *EnterpriseHandler) ListSIEMIntegrations(w http.ResponseWriter, r *http.
 	})
 }
 
-// CreateSIEMIntegration handles POST /api/v1/enterprise/siem/integrations
+// CreateSIEMIntegration handles POST /api/v1/enterprise/siem/integrations.
+// token and password are accepted write-only: the model marshals them as
+// "-" so they are never echoed back in any response.
 func (h *EnterpriseHandler) CreateSIEMIntegration(w http.ResponseWriter, r *http.Request) {
-	var config models.SIEMIntegrationConfig
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+	var req struct {
+		models.SIEMIntegrationConfig
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
+	config := req.SIEMIntegrationConfig
+	config.Token = req.Token
+	config.Password = req.Password
+
 	if err := h.enterprise.SIEM.CreateIntegration(&config); err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -381,11 +400,22 @@ func (h *EnterpriseHandler) DeleteSIEMIntegration(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// SendSIEMEvent handles POST /api/v1/enterprise/siem/events
+// SendSIEMEvent handles POST /api/v1/enterprise/siem/events. When no enabled
+// SIEM integration exists the event cannot go anywhere, so the endpoint
+// honestly returns 503 instead of pretending the event was queued.
 func (h *EnterpriseHandler) SendSIEMEvent(w http.ResponseWriter, r *http.Request) {
 	var event models.SIEMEvent
 	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
 		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if !h.enterprise.SIEM.HasEnabledIntegrations() {
+		h.logger.Warn().Msg("siem event rejected: no enabled SIEM integrations configured")
+		h.respondJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error":  "integration not configured",
+			"detail": "no enabled SIEM integration exists; create one via POST /enterprise/siem/integrations before forwarding events",
+		})
 		return
 	}
 
@@ -451,7 +481,11 @@ func (h *EnterpriseHandler) GenerateComplianceReport(w http.ResponseWriter, r *h
 
 	report, err := h.enterprise.Compliance.GenerateReport(r.Context(), framework, startDate, endDate)
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, services.ErrUnsupportedFramework) {
+			h.respondError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -487,7 +521,7 @@ func (h *EnterpriseHandler) GetDeviceComplianceStatus(w http.ResponseWriter, r *
 
 	status, err := h.enterprise.Compliance.GetDeviceComplianceStatus(r.Context(), id)
 	if err != nil {
-		h.respondError(w, http.StatusInternalServerError, err.Error())
+		h.respondServiceError(w, err)
 		return
 	}
 
@@ -685,4 +719,30 @@ func (h *EnterpriseHandler) respondError(w http.ResponseWriter, status int, mess
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// respondServiceError maps enterprise service sentinel errors to honest HTTP
+// statuses: 503 when the integration lacks configuration, 501 when the
+// external integration is genuinely unimplemented (requires partner
+// credentials), 404 for unknown devices, 500 otherwise.
+func (h *EnterpriseHandler) respondServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, services.ErrIntegrationNotConfigured):
+		h.logger.Warn().Err(err).Msg("enterprise integration not configured")
+		h.respondJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error":  "integration not configured",
+			"detail": err.Error(),
+		})
+	case errors.Is(err, services.ErrIntegrationNotImplemented):
+		h.logger.Warn().Err(err).Msg("enterprise integration not implemented")
+		h.respondJSON(w, http.StatusNotImplemented, map[string]string{
+			"error":  "integration not implemented",
+			"detail": err.Error(),
+		})
+	case errors.Is(err, services.ErrDeviceNotFound):
+		h.respondError(w, http.StatusNotFound, err.Error())
+	default:
+		h.logger.Error().Err(err).Msg("enterprise request failed")
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+	}
 }

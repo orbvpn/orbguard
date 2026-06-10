@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // STIX 2.1 Specification Implementation
@@ -417,9 +419,7 @@ func GenerateSTIXID(stixType STIXType) string {
 
 // Helper function to generate UUID v4
 func generateUUIDv4() string {
-	// This will be replaced with actual UUID generation
-	// For now, use a placeholder that will be overwritten
-	return "00000000-0000-0000-0000-000000000000"
+	return uuid.NewString()
 }
 
 // MarshalJSON implements custom JSON marshaling for STIXBundle

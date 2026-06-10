@@ -160,20 +160,36 @@ type MDMThreatAlert struct {
 // Zero Trust / Conditional Access
 // ============================================================================
 
+// Posture component status values. Every component score is explicitly
+// marked either as computed from real persisted signals ("assessed") or as
+// lacking any signal ("insufficient_data"); scores are never fabricated.
+const (
+	PostureComponentAssessed         = "assessed"
+	PostureComponentInsufficientData = "insufficient_data"
+)
+
 // DevicePosture represents the security posture of a device
 type DevicePosture struct {
 	DeviceID        uuid.UUID   `json:"device_id"`
 
-	// Overall scores (0-100)
+	// Overall scores (0-100). OverallScore is the weighted average of the
+	// ASSESSED components only (see ComponentStatus); when no component has
+	// data the score is 0 and the device is untrusted.
 	OverallScore    int         `json:"overall_score"`
 	TrustLevel      TrustLevel  `json:"trust_level"`
 
-	// Component scores
+	// Component scores. A score is only meaningful when the matching
+	// ComponentStatus entry is "assessed".
 	OSSecurityScore     int     `json:"os_security_score"`
 	AppSecurityScore    int     `json:"app_security_score"`
 	NetworkSecurityScore int    `json:"network_security_score"`
 	BehaviorScore       int     `json:"behavior_score"`
 	ComplianceScore     int     `json:"compliance_score"`
+
+	// ComponentStatus marks each component ("os_security", "app_security",
+	// "network_security", "behavior", "compliance") as "assessed" or
+	// "insufficient_data".
+	ComponentStatus map[string]string `json:"component_status"`
 
 	// Risk factors (negative)
 	RiskFactors     []RiskFactor `json:"risk_factors"`
@@ -359,6 +375,7 @@ type SIEMIntegrationConfig struct {
 	Username    string       `json:"username,omitempty"`
 	Password    string       `json:"-"`
 	Index       string       `json:"index,omitempty"` // For Splunk/Elastic
+	WorkspaceID string       `json:"workspace_id,omitempty"` // Azure Sentinel Log Analytics workspace
 
 	// TLS
 	TLSEnabled      bool     `json:"tls_enabled"`
@@ -462,12 +479,15 @@ type ComplianceReport struct {
 	OverallScore    float64             `json:"overall_score"` // 0-100
 	Controls        []ControlAssessment `json:"controls"`
 
-	// Summary
+	// Summary. NotAssessed counts controls with no automated signal: they
+	// are excluded from OverallScore and require manual assessment.
 	TotalControls       int             `json:"total_controls"`
 	PassedControls      int             `json:"passed_controls"`
 	FailedControls      int             `json:"failed_controls"`
 	PartialControls     int             `json:"partial_controls"`
 	NotApplicable       int             `json:"not_applicable"`
+	NotAssessed         int             `json:"not_assessed"`
+	AssessedControls    int             `json:"assessed_controls"`
 
 	// Findings
 	Findings        []ComplianceFinding `json:"findings"`
@@ -486,6 +506,10 @@ const (
 	ComplianceStatusNonCompliant ComplianceStatus = "non_compliant"
 	ComplianceStatusPartial      ComplianceStatus = "partial"
 	ComplianceStatusUnknown      ComplianceStatus = "unknown"
+	// ComplianceStatusNotAssessed marks controls that have no automated
+	// signal mapped to them: they require manual assessment and are never
+	// assigned a fabricated score.
+	ComplianceStatusNotAssessed ComplianceStatus = "not_assessed"
 )
 
 // ControlAssessment represents assessment of a single control
@@ -557,14 +581,17 @@ type DeviceComplianceStatus struct {
 	NextCheckAt     time.Time           `json:"next_check_at"`
 }
 
-// FrameworkComplianceStatus represents compliance for a specific framework
+// FrameworkComplianceStatus represents compliance for a specific framework.
+// Only controls with a real automated signal are assessed; the rest are
+// counted in NotAssessedControls and excluded from Score.
 type FrameworkComplianceStatus struct {
-	Framework       ComplianceFramework `json:"framework"`
-	Status          ComplianceStatus    `json:"status"`
-	Score           float64             `json:"score"`
-	PassedControls  int                 `json:"passed_controls"`
-	FailedControls  int                 `json:"failed_controls"`
-	LastCheckedAt   time.Time           `json:"last_checked_at"`
+	Framework           ComplianceFramework `json:"framework"`
+	Status              ComplianceStatus    `json:"status"`
+	Score               float64             `json:"score"`
+	PassedControls      int                 `json:"passed_controls"`
+	FailedControls      int                 `json:"failed_controls"`
+	NotAssessedControls int                 `json:"not_assessed_controls"`
+	LastCheckedAt       time.Time           `json:"last_checked_at"`
 }
 
 // ComplianceIssue represents a compliance issue on a device
