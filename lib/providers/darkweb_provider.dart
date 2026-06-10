@@ -1,10 +1,13 @@
 /// Dark Web Provider
 /// State management for dark web monitoring and breach alerts
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
 import '../models/api/sms_analysis.dart';
 import '../models/api/threat_indicator.dart';
@@ -92,6 +95,36 @@ class MonitoredAsset {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type.name,
+        'value': value,
+        if (maskedValue != null) 'masked_value': maskedValue,
+        'added_at': addedAt.toIso8601String(),
+        if (lastChecked != null)
+          'last_checked': lastChecked!.toIso8601String(),
+        'breach_count': breachCount,
+        'is_monitoring': isMonitoring,
+      };
+
+  factory MonitoredAsset.fromJson(Map<String, dynamic> json) {
+    return MonitoredAsset(
+      id: json['id'] as String,
+      type: AssetType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => AssetType.email,
+      ),
+      value: json['value'] as String,
+      maskedValue: json['masked_value'] as String?,
+      addedAt: DateTime.parse(json['added_at'] as String),
+      lastChecked: json['last_checked'] != null
+          ? DateTime.parse(json['last_checked'] as String)
+          : null,
+      breachCount: json['breach_count'] as int? ?? 0,
+      isMonitoring: json['is_monitoring'] as bool? ?? true,
+    );
+  }
+
   /// Get masked display value for privacy
   String get displayValue {
     if (maskedValue != null) return maskedValue!;
@@ -142,7 +175,28 @@ class DarkWebStats {
 
 /// Dark Web Provider
 class DarkWebProvider extends ChangeNotifier {
+  static const _prefsAssetsKey = 'darkweb_monitored_assets';
+
+  static final String _monitorPath = '${ApiConfig.apiVersion}/darkweb/monitor';
+  static String _monitorAssetPath(String id) =>
+      '${ApiConfig.apiVersion}/darkweb/monitor/$id';
+
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+  SharedPreferences? _prefs;
+
+  /// Restores the cached assets and pulls the per-user server state as soon
+  /// as the provider is created (the dark web screen reads the provider
+  /// without calling [init] itself).
+  DarkWebProvider() {
+    unawaited(init());
+  }
+
+  /// True once the asset list reflects the backend monitor state.
+  bool _assetsSynced = false;
+  String? _assetSyncError;
+
+  bool get assetsSynced => _assetsSynced;
+  String? get assetSyncError => _assetSyncError;
 
   // State
   final List<MonitoredAsset> _assets = [];
@@ -239,7 +293,12 @@ class DarkWebProvider extends ChangeNotifier {
     }
   }
 
-  /// Add asset to monitoring
+  /// Add asset to monitoring.
+  ///
+  /// Registers the asset with the live backend
+  /// (POST /darkweb/monitor, per-user scoped) and caches it locally.
+  /// Returns false (with [error] set) when the backend rejects the asset, so
+  /// the UI never claims an asset is monitored when it is not.
   Future<bool> addAsset(AssetType type, String value) async {
     if (value.isEmpty) return false;
 
@@ -250,16 +309,41 @@ class DarkWebProvider extends ChangeNotifier {
       return false;
     }
 
+    Map<String, dynamic> created;
+    try {
+      created = await _api.post<Map<String, dynamic>>(
+        _monitorPath,
+        data: {
+          'asset_type': type.name,
+          'value': value,
+        },
+      );
+    } catch (e) {
+      _error = 'Failed to add ${type.displayName.toLowerCase()} '
+          'to dark web monitoring: $e';
+      notifyListeners();
+      return false;
+    }
+
     final asset = MonitoredAsset(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: created['id'] as String? ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       type: type,
       value: value,
-      addedAt: DateTime.now(),
+      maskedValue: created['display_name'] as String?,
+      addedAt: created['created_at'] != null
+          ? DateTime.tryParse(created['created_at'] as String) ??
+              DateTime.now()
+          : DateTime.now(),
+      breachCount: created['breach_count'] as int? ?? 0,
+      lastChecked: created['last_checked'] != null
+          ? DateTime.tryParse(created['last_checked'] as String)
+          : null,
     );
 
     _assets.add(asset);
     _updateStats();
-    _saveAssets();
+    await _saveAssets();
     notifyListeners();
 
     // Check for breaches immediately
@@ -272,6 +356,7 @@ class DarkWebProvider extends ChangeNotifier {
             lastChecked: DateTime.now(),
             breachCount: result.breachCount,
           );
+          await _saveAssets();
           notifyListeners();
         }
       }
@@ -280,15 +365,36 @@ class DarkWebProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Remove asset from monitoring
-  void removeAsset(String id) {
+  /// Remove asset from monitoring (DELETE /darkweb/monitor/{id}).
+  ///
+  /// The asset is only removed locally once the backend confirms (or reports
+  /// it already gone), so the UI never claims monitoring stopped while the
+  /// server still tracks the asset.
+  Future<bool> removeAsset(String id) async {
+    try {
+      await _api.delete<dynamic>(_monitorAssetPath(id));
+    } catch (e) {
+      final message = e.toString();
+      // 404 = the server no longer knows the asset; safe to drop locally.
+      if (!message.contains('404') && !message.contains('not found')) {
+        _error = 'Failed to remove monitored asset: $e';
+        notifyListeners();
+        return false;
+      }
+    }
+
     _assets.removeWhere((a) => a.id == id);
     _updateStats();
-    _saveAssets();
+    await _saveAssets();
     notifyListeners();
+    return true;
   }
 
-  /// Toggle monitoring for asset
+  /// Toggle client-side monitoring for an asset.
+  ///
+  /// Note: the backend has no pause endpoint (only add/remove), so this flag
+  /// controls whether OrbGuard actively re-checks the asset from this device;
+  /// the asset stays registered server-side until it is removed.
   void toggleMonitoring(String id) {
     final index = _assets.indexWhere((a) => a.id == id);
     if (index >= 0) {
@@ -307,19 +413,25 @@ class DarkWebProvider extends ChangeNotifier {
 
     for (final asset in _assets.where((a) => a.isMonitoring)) {
       if (asset.type == AssetType.email) {
-        final result = await _api.checkEmailBreaches(asset.value);
-        final index = _assets.indexWhere((a) => a.id == asset.id);
-        if (index >= 0) {
-          _assets[index] = asset.copyWith(
-            lastChecked: DateTime.now(),
-            breachCount: result.breachCount,
-          );
+        try {
+          final result = await _api.checkEmailBreaches(asset.value);
+          final index = _assets.indexWhere((a) => a.id == asset.id);
+          if (index >= 0) {
+            _assets[index] = asset.copyWith(
+              lastChecked: DateTime.now(),
+              breachCount: result.breachCount,
+            );
+          }
+          _checkResults[asset.value] = result;
+        } catch (e) {
+          _error = 'Failed to re-check ${asset.displayValue}: $e';
+          debugPrint('DarkWebProvider: $_error');
         }
-        _checkResults[asset.value] = result;
       }
     }
 
     _updateStats();
+    await _saveAssets();
     _isLoading = false;
     notifyListeners();
   }
@@ -363,14 +475,115 @@ class DarkWebProvider extends ChangeNotifier {
     return _checkResults[email];
   }
 
-  /// Load assets from storage
+  /// Load assets: local cache first (instant UI), then the authoritative
+  /// per-user list from the live backend (GET /darkweb/monitor).
   Future<void> loadAssets() async {
-    // TODO: Load from persistent storage
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to open preferences: $e');
+    }
+
+    // 1. Local cache
+    final raw = _prefs?.getString(_prefsAssetsKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        final restored = <MonitoredAsset>[];
+        for (final item in decoded) {
+          try {
+            restored.add(
+                MonitoredAsset.fromJson(Map<String, dynamic>.from(item as Map)));
+          } catch (e) {
+            debugPrint('DarkWebProvider: skipping corrupt cached asset: $e');
+          }
+        }
+        _assets
+          ..clear()
+          ..addAll(restored);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('DarkWebProvider: failed to restore asset cache: $e');
+      }
+    }
+
+    // 2. Authoritative server state
+    try {
+      final response = await _api.get<Map<String, dynamic>>(_monitorPath);
+      final serverAssets = response['assets'] as List<dynamic>? ?? const [];
+
+      // Preserve locally-known plaintext values and client-side monitoring
+      // toggles; the server stores values encrypted/hashed.
+      final localById = {for (final a in _assets) a.id: a};
+
+      _assets
+        ..clear()
+        ..addAll(serverAssets.map((raw) {
+          final map = Map<String, dynamic>.from(raw as Map);
+          final id = map['id'] as String? ?? '';
+          final local = localById[id];
+          return MonitoredAsset(
+            id: id,
+            type: _assetTypeFromBackend(map['asset_type'] as String?),
+            value: local?.value ??
+                (map['asset_value'] as String? ??
+                    map['display_name'] as String? ??
+                    ''),
+            maskedValue: map['display_name'] as String?,
+            addedAt: map['created_at'] != null
+                ? DateTime.tryParse(map['created_at'] as String) ??
+                    DateTime.now()
+                : (local?.addedAt ?? DateTime.now()),
+            lastChecked: map['last_checked'] != null
+                ? DateTime.tryParse(map['last_checked'] as String)
+                : local?.lastChecked,
+            breachCount: map['breach_count'] as int? ?? 0,
+            isMonitoring: local?.isMonitoring ?? true,
+          );
+        }));
+
+      _assetsSynced = true;
+      _assetSyncError = null;
+      await _saveAssets();
+    } catch (e) {
+      _assetsSynced = false;
+      _assetSyncError = 'Failed to sync monitored assets with backend: $e';
+      debugPrint('DarkWebProvider: $_assetSyncError');
+    }
+
+    _updateStats();
+    notifyListeners();
   }
 
-  /// Save assets to storage
+  AssetType _assetTypeFromBackend(String? backendType) {
+    switch (backendType) {
+      case 'email':
+        return AssetType.email;
+      case 'phone':
+        return AssetType.phone;
+      case 'password':
+        return AssetType.password;
+      case 'username':
+        return AssetType.username;
+      case 'domain':
+        return AssetType.domain;
+      default:
+        return AssetType.email;
+    }
+  }
+
+  /// Save assets to the local cache.
   Future<void> _saveAssets() async {
-    // TODO: Save to persistent storage
+    final prefs = _prefs;
+    if (prefs == null) return;
+    try {
+      await prefs.setString(
+        _prefsAssetsKey,
+        jsonEncode(_assets.map((a) => a.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to persist asset cache: $e');
+    }
   }
 
   /// Update stats

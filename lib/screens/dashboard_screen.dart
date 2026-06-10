@@ -8,13 +8,13 @@ import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../presentation/widgets/glass_app_bar.dart';
 import '../providers/dashboard_provider.dart';
-import '../providers/realtime_provider.dart';
 import '../widgets/dashboard/protection_status_card.dart';
 import '../widgets/dashboard/threat_stats_card.dart';
 import '../widgets/dashboard/recent_alerts_widget.dart';
 import '../widgets/dashboard/connection_indicator.dart';
 import '../services/realtime/websocket_service.dart';
 import '../services/realtime/connection_manager.dart';
+import '../services/security/device_scan_service.dart';
 import 'scanning_screen.dart';
 
 /// Main dashboard screen
@@ -73,8 +73,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     final result = await Navigator.push<ScanResult>(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
-          onScan: () async => [], // Placeholder - integrate with actual scan
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            ScanningScreen(
+          // Real native scan flow (same engine as the home screen's scan),
+          // with genuine per-stage progress callbacks.
+          onScanWithProgress: (onProgress) =>
+              DeviceScanService.instance.performScan(onProgress: onProgress),
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -320,49 +324,6 @@ class _ConnectionBottomSheet extends StatelessWidget {
           ),
 
           const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-}
-
-/// Quick action button widget
-class _QuickActionButton extends StatelessWidget {
-  final String icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: DuotoneIcon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ],
       ),
     );

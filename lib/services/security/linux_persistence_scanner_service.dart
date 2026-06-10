@@ -18,6 +18,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'desktop_host_collector.dart';
+
 /// Linux persistence item type
 enum LinuxPersistenceType {
   systemdService('Systemd Service', '/etc/systemd/system, ~/.config/systemd/user'),
@@ -1545,5 +1547,63 @@ class LinuxPersistenceScannerService {
   /// Export scan results to JSON
   String exportToJson(LinuxScanResult result) {
     return jsonEncode(result.toJson());
+  }
+
+  // =========================================================================
+  // Host-local collection (W5.11)
+  //
+  // The backend's desktop network/browser scanners run on the SERVER host,
+  // so this device's data must be collected client-side. Output maps mirror
+  // the backend NetworkConnection / BrowserExtension JSON shapes.
+  // =========================================================================
+
+  /// Collect this machine's active network connections via `ss -tunap`
+  /// (falling back to `netstat -tunap`).
+  Future<HostCollection> collectNetworkConnections() =>
+      collectLinuxNetworkConnections();
+
+  /// Collect browser extensions installed in this machine's browser profiles
+  /// (Chrome, Chromium, Brave, Edge, Firefox — including snap/flatpak
+  /// Firefox locations).
+  Future<HostCollection> collectBrowserExtensions() async {
+    final home = Platform.environment['HOME'] ?? '';
+    final chromium = await collectChromiumExtensions({
+      'Chrome': '$home/.config/google-chrome',
+      'Chromium': '$home/.config/chromium',
+      'Brave': '$home/.config/BraveSoftware/Brave-Browser',
+      'Edge': '$home/.config/microsoft-edge',
+    });
+
+    // Firefox can live in the classic dot-dir, the snap container or the
+    // flatpak container depending on how it was installed.
+    final firefoxRoots = [
+      '$home/.mozilla/firefox',
+      '$home/snap/firefox/common/.mozilla/firefox',
+      '$home/.var/app/org.mozilla.firefox/.mozilla/firefox',
+    ];
+    final firefoxResults = <HostCollection>[];
+    for (final rootPath in firefoxRoots) {
+      if (await Directory(rootPath).exists()) {
+        firefoxResults.add(await collectFirefoxExtensions(rootPath));
+      }
+    }
+
+    return HostCollection(
+      items: [
+        ...chromium.items,
+        for (final r in firefoxResults) ...r.items,
+      ],
+      errors: [
+        ...chromium.errors,
+        for (final r in firefoxResults) ...r.errors,
+      ],
+      source: [
+        chromium.source,
+        if (firefoxResults.isEmpty)
+          'Firefox not installed (no profiles directory)'
+        else
+          ...firefoxResults.map((r) => r.source),
+      ].join('; '),
+    );
   }
 }

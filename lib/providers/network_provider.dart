@@ -1,10 +1,14 @@
 /// Network Provider
 /// State management for network security features
 
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/api/url_reputation.dart';
+import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
 
 /// WiFi security level
@@ -156,6 +160,73 @@ class DnsProtectionStatus {
   });
 }
 
+/// One canary domain resolved through the DEVICE's local resolver.
+/// Hijack detection must use the local resolver: a server resolving canaries
+/// proves nothing about the resolver this device actually uses.
+class DnsCanaryResolution {
+  final String canary;
+  final List<String> resolvedIps;
+
+  /// Set when the local lookup itself failed (no network, blocked resolver).
+  /// A failed lookup is reported honestly instead of being sent as a clean
+  /// empty answer set.
+  final String? lookupError;
+
+  DnsCanaryResolution({
+    required this.canary,
+    required this.resolvedIps,
+    this.lookupError,
+  });
+
+  bool get succeeded => lookupError == null && resolvedIps.isNotEmpty;
+}
+
+/// Result of a DNS security check (client-side canary resolution verified by
+/// the backend against known-good answer sets and threat intelligence).
+class DnsCheckResult {
+  final bool isHijacked;
+  final bool isSecure;
+  final bool isEncrypted;
+  final String? providerName;
+
+  /// Backend status of the hijack check ("performed: ..." or
+  /// "not_performed: ..."). Distinguishes "checked and clean" from
+  /// "check never ran".
+  final String hijackCheckStatus;
+
+  /// Backend status of the leak check. Leak detection requires a controlled
+  /// canary domain the backend can verify; none is deployed, so this is
+  /// always an explicit "unavailable: ..." status — never a fabricated result.
+  final String leakCheckStatus;
+
+  final String? hijackDescription;
+  final double? hijackConfidence;
+  final List<String> issues;
+
+  /// What this device actually measured (including failed lookups).
+  final List<DnsCanaryResolution> canaryResolutions;
+  final String? resolverHint;
+  final DateTime checkedAt;
+
+  DnsCheckResult({
+    required this.isHijacked,
+    required this.isSecure,
+    required this.isEncrypted,
+    this.providerName,
+    required this.hijackCheckStatus,
+    required this.leakCheckStatus,
+    this.hijackDescription,
+    this.hijackConfidence,
+    this.issues = const [],
+    this.canaryResolutions = const [],
+    this.resolverHint,
+    required this.checkedAt,
+  });
+
+  bool get hijackCheckPerformed => hijackCheckStatus.startsWith('performed');
+  bool get leakCheckUnavailable => leakCheckStatus.startsWith('unavailable');
+}
+
 /// Network security stats
 class NetworkSecurityStats {
   final int totalScans;
@@ -192,6 +263,11 @@ class NetworkProvider extends ChangeNotifier {
   bool _isScanning = false;
   String? _error;
 
+  // DNS security check state
+  DnsCheckResult? _dnsCheckResult;
+  bool _isCheckingDns = false;
+  String? _dnsCheckError;
+
   // Getters
   WifiNetwork? get currentNetwork => _currentNetwork;
   List<WifiNetwork> get nearbyNetworks => List.unmodifiable(_nearbyNetworks);
@@ -200,6 +276,9 @@ class NetworkProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
   String? get error => _error;
+  DnsCheckResult? get dnsCheckResult => _dnsCheckResult;
+  bool get isCheckingDns => _isCheckingDns;
+  String? get dnsCheckError => _dnsCheckError;
 
   /// Active threats
   List<NetworkThreat> get activeThreats =>
@@ -377,6 +456,168 @@ class NetworkProvider extends ChangeNotifier {
   // The backend never exposed those endpoints; VPN protection is provided by
   // the separate OrbVPN app, and secure DNS is configured at the OS level
   // (Android Private DNS / Apple DNS profiles).
+
+  // ============================================
+  // DNS SECURITY CHECK (client-side resolution)
+  // ============================================
+
+  /// Well-known canary hostnames with long-term-stable, vendor-operated
+  /// answer sets the backend can verify:
+  ///   one.one.one.one -> 1.1.1.1 / 1.0.0.1 (+IPv6), operated by Cloudflare
+  ///   dns.google      -> 8.8.8.8 / 8.8.4.4 (+IPv6), operated by Google
+  /// A randomized-subdomain LEAK canary would additionally require a domain
+  /// whose authoritative resolver logs the backend controls; none is
+  /// deployed, so the backend reports the leak check as explicitly
+  /// unavailable (surfaced via [DnsCheckResult.leakCheckStatus]).
+  static const List<String> _dnsCanaries = ['one.one.one.one', 'dns.google'];
+
+  /// Run a DNS hijack check: resolve canary domains through this device's
+  /// LOCAL resolver and submit the answers to the backend, which compares
+  /// them against known-good answer sets and threat intelligence.
+  ///
+  /// Device identity for the backend audit trail is carried by the
+  /// authenticated device api_key (the server's auth middleware resolves the
+  /// device_id from it), so no device_id needs to be embedded in the body.
+  Future<void> runDnsCheck() async {
+    if (_isCheckingDns) return;
+
+    _isCheckingDns = true;
+    _dnsCheckError = null;
+    notifyListeners();
+
+    try {
+      // 1. Resolve each canary through the device's local resolver.
+      final resolutions = <DnsCanaryResolution>[];
+      for (final canary in _dnsCanaries) {
+        try {
+          final addresses = await InternetAddress.lookup(canary)
+              .timeout(const Duration(seconds: 8));
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps:
+                addresses.map((a) => a.address).toList(growable: false),
+          ));
+        } on SocketException catch (e) {
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps: const [],
+            lookupError: e.message.isNotEmpty ? e.message : 'lookup failed',
+          ));
+        } on TimeoutException {
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps: const [],
+            lookupError: 'lookup timed out',
+          ));
+        }
+      }
+
+      // 2. Best-effort resolver hint from the native side. If the platform
+      // does not expose the configured DNS servers, the hint is omitted —
+      // never guessed.
+      String? resolverHint;
+      try {
+        final servers =
+            await _wifiChannel.invokeMethod<List<dynamic>>('getDnsServers');
+        if (servers != null && servers.isNotEmpty) {
+          resolverHint = servers.map((s) => s.toString()).join(',');
+        }
+      } on PlatformException catch (e) {
+        debugPrint('DNS check: resolver hint unavailable: ${e.message}');
+      } on MissingPluginException {
+        debugPrint('DNS check: resolver hint unavailable (no native handler)');
+      }
+
+      final successful = resolutions.where((r) => r.succeeded).toList();
+      if (successful.isEmpty && resolverHint == null) {
+        // Nothing measurable: local resolution failed for every canary and
+        // the resolver address is unknown. Report the failure explicitly
+        // instead of submitting an empty check.
+        final details = resolutions
+            .map((r) => '${r.canary}: ${r.lookupError ?? 'no answers'}')
+            .join('; ');
+        _dnsCheckError =
+            'DNS check could not run: local canary resolution failed ($details)';
+        return;
+      }
+
+      // 3. Submit the client-side measurements for verification.
+      final response = await _api.post<Map<String, dynamic>>(
+        ApiEndpoints.networkDnsCheck,
+        data: {
+          'current_dns':
+              resolverHint == null ? '' : resolverHint.split(',').first,
+          'check_hijack': true,
+          'check_leaks': true,
+          'client_resolutions': [
+            for (final r in successful)
+              {
+                'canary': r.canary,
+                'resolved_ips': r.resolvedIps,
+                if (resolverHint != null) 'resolver_hint': resolverHint,
+              },
+          ],
+        },
+      );
+
+      // 4. Parse the verified result.
+      final issues = <String>[];
+      for (final issue
+          in (response['security_issues'] as List<dynamic>? ?? const [])) {
+        final map = issue as Map<String, dynamic>;
+        final title = map['title'] as String? ?? '';
+        final description = map['description'] as String? ?? '';
+        issues.add(title.isEmpty ? description : '$title: $description');
+      }
+      final provider = response['provider'] as Map<String, dynamic>?;
+      final hijackDetails =
+          response['hijack_details'] as Map<String, dynamic>?;
+
+      _dnsCheckResult = DnsCheckResult(
+        isHijacked: response['is_hijacked'] as bool? ?? false,
+        isSecure: response['is_secure'] as bool? ?? false,
+        isEncrypted: response['is_encrypted'] as bool? ?? false,
+        providerName: provider?['name'] as String?,
+        hijackCheckStatus:
+            response['hijack_check_status'] as String? ?? 'unknown',
+        leakCheckStatus: response['leak_check_status'] as String? ?? 'unknown',
+        hijackDescription: hijackDetails?['description'] as String?,
+        hijackConfidence: (hijackDetails?['confidence'] as num?)?.toDouble(),
+        issues: issues,
+        canaryResolutions: resolutions,
+        resolverHint: resolverHint,
+        checkedAt: DateTime.now(),
+      );
+
+      _syncDnsHijackThreat();
+    } catch (e) {
+      _dnsCheckError = 'DNS check failed: $e';
+      debugPrint(_dnsCheckError);
+    } finally {
+      _isCheckingDns = false;
+      notifyListeners();
+    }
+  }
+
+  /// Keep the threats list in sync with the latest verified DNS check.
+  void _syncDnsHijackThreat() {
+    const threatId = 'dns_hijacking_local';
+    _threats.removeWhere((t) => t.id == threatId);
+
+    final result = _dnsCheckResult;
+    if (result == null || !result.isHijacked) return;
+
+    _threats.add(NetworkThreat(
+      id: threatId,
+      type: 'dns_hijacking',
+      title: _getThreatTitle('dns_hijacking'),
+      description: result.hijackDescription ??
+          'The DNS resolver used by this device is rewriting answers for well-known domains.',
+      severity: 'critical',
+      detectedAt: result.checkedAt,
+      recommendation: _getThreatRecommendation('dns_hijacking'),
+    ));
+  }
 
   /// Dismiss threat
   void dismissThreat(String id) {

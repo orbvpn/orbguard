@@ -68,6 +68,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     // replaced with empty placeholders.
     final errors = <String>[];
 
+    // On desktop platforms, network connections, browser extensions, the
+    // firewall state and code signing are collected/verified LOCALLY on this
+    // device (the backend's desktop scanners run on the server host, not
+    // here). The backend is only used for value-based lookups (VirusTotal)
+    // and the server-side rule list.
+    if (_isDesktopPlatform) {
+      final provider = context.read<DesktopSecurityProvider>();
+      // Each call manages its own state and surfaces its own errors.
+      await Future.wait([
+        provider.refreshHostFirewallStatus(),
+        provider.loadHostNetworkConnections(),
+        provider.loadHostBrowserExtensions(),
+      ]);
+    }
+
     List<PersistenceItem> persistenceItems = [];
     try {
       final persistenceData = await _apiClient.getPersistenceItems();
@@ -77,12 +92,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       errors.add('persistence: $e');
     }
 
+    // Backend code-signing cache reflects the SERVER host, so it is only
+    // meaningful off-desktop; desktop uses local verification instead.
     List<SignedApp> signedApps = [];
-    try {
-      final signedAppsData = await _apiClient.getSignedApps();
-      signedApps = signedAppsData.map((json) => SignedApp.fromJson(json)).toList();
-    } catch (e) {
-      errors.add('signed apps: $e');
+    if (!_isDesktopPlatform) {
+      try {
+        final signedAppsData = await _apiClient.getSignedApps();
+        signedApps =
+            signedAppsData.map((json) => SignedApp.fromJson(json)).toList();
+      } catch (e) {
+        errors.add('signed apps: $e');
+      }
     }
 
     List<FirewallRule> firewallRules = [];
@@ -94,17 +114,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     List<Map<String, dynamic>> networkData = [];
-    try {
-      networkData = await _apiClient.getNetworkConnections();
-    } catch (e) {
-      errors.add('network: $e');
-    }
-
     Map<String, dynamic> browserData = {};
-    try {
-      browserData = await _apiClient.scanBrowserExtensions();
-    } catch (e) {
-      errors.add('browser: $e');
+    if (!_isDesktopPlatform) {
+      try {
+        networkData = await _apiClient.getNetworkConnections();
+      } catch (e) {
+        errors.add('network: $e');
+      }
+      try {
+        browserData = await _apiClient.scanBrowserExtensions();
+      } catch (e) {
+        errors.add('browser: $e');
+      }
     }
 
     if (!mounted) return;
@@ -496,6 +517,121 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   Widget _buildCodeSigningTab() {
+    if (_isDesktopPlatform) {
+      // Local verification: the backend's codesign verifier runs on the
+      // SERVER host and cannot inspect files on this device, so signatures
+      // are verified here with codesign / Get-AuthenticodeSignature. The
+      // backend is used only for VirusTotal hash lookups.
+      return Consumer<DesktopSecurityProvider>(
+        builder: (context, provider, _) {
+          final apps = provider.localSignedApps
+              .map((json) => SignedApp.fromJson(json))
+              .toList();
+          final unsigned = apps.where((a) => !a.isSigned).length;
+          final invalid = apps.where((a) => a.isSigned && !a.isValid).length;
+          final valid = apps.where((a) => a.isSigned && a.isValid).length;
+          final unavailable = provider.codeSigningUnavailableReason;
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              GlassCard(
+                onTap: provider.isVerifyingCodeSigning
+                    ? null
+                    : () => provider.verifyLocalCodeSigning(),
+                child: Row(
+                  children: [
+                    GlassSvgIconBox(
+                        icon: 'verified_check', color: GlassTheme.primaryAccent),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Verify Code Signatures Locally',
+                            style: TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            provider.isVerifyingCodeSigning
+                                ? 'Verifying signatures on this device…'
+                                : Platform.isMacOS
+                                    ? 'codesign verification of installed apps and persistence executables'
+                                    : Platform.isWindows
+                                        ? 'Authenticode verification of persistence executables'
+                                        : 'Verification of persistence executables',
+                            style: TextStyle(
+                                color: Colors.white.withAlpha(128), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (provider.isVerifyingCodeSigning)
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            color: GlassTheme.primaryAccent, strokeWidth: 2),
+                      )
+                    else
+                      const DuotoneIcon('play', color: GlassTheme.primaryAccent),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (unavailable != null)
+                GlassCard(
+                  tintColor: GlassTheme.warningColor,
+                  child: Row(
+                    children: [
+                      const DuotoneIcon('danger_circle',
+                          color: GlassTheme.warningColor, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          unavailable,
+                          style: TextStyle(
+                              color: Colors.white.withAlpha(204), fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    _buildStatCard('Valid', valid.toString(), GlassTheme.successColor),
+                    const SizedBox(width: 12),
+                    _buildStatCard('Invalid', invalid.toString(), GlassTheme.errorColor),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildStatCard('Unsigned', unsigned.toString(), GlassTheme.warningColor),
+                    const SizedBox(width: 12),
+                    _buildStatCard('Verified', apps.length.toString(), GlassTheme.primaryAccent),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const GlassSectionHeader(title: 'Verified on This Device'),
+                if (apps.isEmpty && !provider.isVerifyingCodeSigning)
+                  _buildEmptyState(
+                    'Nothing Verified Yet',
+                    'Run the local verification above. Tip: run a persistence '
+                        'scan first so its executables are included.',
+                    'verified_check',
+                  )
+                else
+                  ...apps.map((app) => _buildSignedAppCard(app)),
+              ],
+            ],
+          );
+        },
+      );
+    }
+
     final unsigned = _signedApps.where((a) => !a.isSigned).length;
     final invalid = _signedApps.where((a) => a.isSigned && !a.isValid).length;
     final valid = _signedApps.where((a) => a.isSigned && a.isValid).length;
@@ -522,7 +658,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
         // Apps list
         const SizedBox(height: 24),
-        const GlassSectionHeader(title: 'Running Applications'),
+        const GlassSectionHeader(title: 'Applications (verified on server host)'),
         if (_signedApps.isEmpty && !_isLoading)
           _buildEmptyState(
             'No Apps Detected',
@@ -609,66 +745,93 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
   Widget _buildFirewallTab() {
     final enabled = _firewallRules.where((r) => r.isEnabled).length;
-    final blocked = _firewallRules.where((r) => r.action == 'Block').length;
+    final blocked =
+        _firewallRules.where((r) => r.action.toLowerCase() == 'block').length;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Firewall status
-        GlassCard(
-          tintColor: GlassTheme.successColor,
-          child: Row(
-            children: [
-              GlassSvgIconBox(icon: 'shield_check', color: GlassTheme.successColor),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Firewall Status',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Active and protecting your system',
-                      style: TextStyle(color: GlassTheme.successColor, fontSize: 12),
-                    ),
-                  ],
+        // REAL host firewall status, read from OS tooling
+        // (socketfilterfw / netsh advfirewall / ufw+firewalld).
+        if (_isDesktopPlatform)
+          Consumer<DesktopSecurityProvider>(
+            builder: (context, provider, _) =>
+                _buildHostFirewallCard(provider),
+          )
+        else
+          GlassCard(
+            tintColor: GlassTheme.warningColor,
+            child: Row(
+              children: [
+                GlassSvgIconBox(icon: 'shield', color: GlassTheme.warningColor),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Host Firewall',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'OS firewall control is only available on desktop platforms',
+                        style: TextStyle(color: GlassTheme.warningColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Switch(
-                value: true,
-                onChanged: (v) {},
-                activeTrackColor: GlassTheme.successColor.withAlpha(128),
-                activeThumbColor: GlassTheme.successColor,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
         // Stats
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildStatCard('Active Rules', enabled.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Server Rules', enabled.toString(), GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Blocked', blocked.toString(), GlassTheme.errorColor),
+            _buildStatCard('Blocking', blocked.toString(), GlassTheme.errorColor),
           ],
         ),
 
-        // Quick actions
-        const SizedBox(height: 24),
-        const GlassSectionHeader(title: 'Quick Actions'),
-        _buildQuickAction('forbidden', 'Block All Incoming', 'Block all incoming connections'),
-        _buildQuickAction('eye_closed', 'Stealth Mode', 'Hide from network scans'),
-        _buildQuickAction('smartphone', 'App Permissions', 'Manage application access'),
+        // Quick actions — each runs a real OS command and reports the real
+        // outcome (including admin-prompt cancellation).
+        if (_isDesktopPlatform) ...[
+          const SizedBox(height: 24),
+          const GlassSectionHeader(title: 'Quick Actions (local OS firewall)'),
+          _buildQuickAction(
+            'forbidden',
+            'Block All Incoming',
+            Platform.isLinux
+                ? 'Not supported by ufw/firewalld (incoming is denied by default)'
+                : 'Block all incoming connections at the OS firewall',
+            () => _runQuickFirewallAction('block_all'),
+          ),
+          _buildQuickAction(
+            'eye_closed',
+            'Stealth Mode',
+            Platform.isMacOS
+                ? 'Do not respond to probes (socketfilterfw stealth mode)'
+                : 'No separate stealth toggle on this OS — enabled firewalls already drop probes',
+            () => _runQuickFirewallAction('stealth'),
+          ),
+          _buildQuickAction(
+            'settings',
+            'Open System Firewall Settings',
+            'Open the OS firewall configuration UI',
+            () => _runQuickFirewallAction('open_settings'),
+          ),
+        ],
 
-        // Rules
+        // Rules — these live on the OrbGuard Lab backend host, not on this
+        // device, and are labeled accordingly.
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const GlassSectionHeader(title: 'Firewall Rules'),
+            const Flexible(
+              child: GlassSectionHeader(title: 'Server-Side Rules (OrbGuard Lab)'),
+            ),
             TextButton.icon(
               onPressed: () => _showAddRuleDialog(context),
               icon: const DuotoneIcon('add_circle', size: 18),
@@ -679,8 +842,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         ),
         if (_firewallRules.isEmpty && !_isLoading)
           _buildEmptyState(
-            'No Firewall Rules',
-            'Add custom rules to control network access.',
+            'No Server-Side Rules',
+            'Rules added here are enforced on the OrbGuard Lab host, not on this device.',
             'shield_network',
           )
         else
@@ -689,9 +852,127 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
-  Widget _buildQuickAction(String icon, String title, String subtitle) {
+  Widget _buildHostFirewallCard(DesktopSecurityProvider provider) {
+    final status = provider.hostFirewallStatus;
+
+    Color color;
+    String stateText;
+    String icon;
+    bool? switchValue;
+    if (status == null) {
+      color = Colors.grey;
+      stateText = 'Reading firewall state…';
+      icon = 'shield';
+      switchValue = null;
+    } else {
+      switch (status.state) {
+        case HostFirewallState.enabled:
+          color = GlassTheme.successColor;
+          stateText = status.detail;
+          icon = 'shield_check';
+          switchValue = true;
+          break;
+        case HostFirewallState.disabled:
+          color = GlassTheme.errorColor;
+          stateText = status.detail;
+          icon = 'shield';
+          switchValue = false;
+          break;
+        case HostFirewallState.unknown:
+          color = GlassTheme.warningColor;
+          stateText = status.detail;
+          icon = 'danger_triangle';
+          switchValue = null;
+          break;
+        case HostFirewallState.unavailable:
+          color = Colors.grey;
+          stateText = status.detail;
+          icon = 'danger_circle';
+          switchValue = null;
+          break;
+      }
+    }
+
     return GlassCard(
-      onTap: () => _showQuickActionDialog(icon),
+      tintColor: color,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GlassSvgIconBox(icon: icon, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_getPlatformName()} Firewall',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      stateText,
+                      style: TextStyle(color: color, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              if (switchValue != null)
+                Switch(
+                  value: switchValue,
+                  onChanged: (v) => _toggleHostFirewall(v),
+                  activeTrackColor: GlassTheme.successColor.withAlpha(128),
+                  activeThumbColor: GlassTheme.successColor,
+                )
+              else
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  onPressed: () => provider.refreshHostFirewallStatus(),
+                  tooltip: 'Re-read firewall state',
+                ),
+            ],
+          ),
+          if (status != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Source: ${status.source}',
+              style: TextStyle(
+                color: Colors.white.withAlpha(102),
+                fontSize: 10,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleHostFirewall(bool enable) async {
+    final provider = context.read<DesktopSecurityProvider>();
+    final scaffold = ScaffoldMessenger.of(context);
+    final result = await provider.setHostFirewallEnabled(enable);
+    if (!mounted) return;
+    scaffold.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? 'Firewall ${enable ? 'enabled' : 'disabled'}'
+              : result.message,
+        ),
+        backgroundColor: result.success
+            ? GlassTheme.successColor
+            : result.cancelled
+                ? GlassTheme.warningColor
+                : GlassTheme.errorColor,
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(
+      String icon, String title, String subtitle, VoidCallback onTap) {
+    return GlassCard(
+      onTap: onTap,
       child: Row(
         children: [
           GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
@@ -711,8 +992,83 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
+  /// Runs a quick action against the REAL OS firewall and reports the real
+  /// command outcome (success, admin-prompt cancellation, permission denial
+  /// or honest "not supported on this OS").
+  Future<void> _runQuickFirewallAction(String kind) async {
+    final provider = context.read<DesktopSecurityProvider>();
+    final scaffold = ScaffoldMessenger.of(context);
+
+    if (kind == 'open_settings') {
+      final result = await provider.openSystemFirewallSettings();
+      if (!mounted) return;
+      scaffold.showSnackBar(SnackBar(
+        content: Text(result.message),
+        backgroundColor:
+            result.success ? GlassTheme.successColor : GlassTheme.errorColor,
+      ));
+      return;
+    }
+
+    final isBlockAll = kind == 'block_all';
+    final title = isBlockAll ? 'Block All Incoming' : 'Stealth Mode';
+    final description = isBlockAll
+        ? 'This changes the OS firewall policy to block all incoming '
+            'connections. You may be asked for administrator credentials.'
+        : 'This makes the device ignore unsolicited network probes. '
+            'You may be asked for administrator credentials.';
+
+    final enable = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlassTheme.glassColor(true),
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: Text(
+          description,
+          style: TextStyle(color: Colors.white.withAlpha(204)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Disable'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GlassTheme.primaryAccent,
+            ),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    if (enable == null || !mounted) return;
+
+    final result = isBlockAll
+        ? await provider.setBlockAllIncoming(enable)
+        : await provider.setStealthMode(enable);
+    if (!mounted) return;
+    scaffold.showSnackBar(SnackBar(
+      content: Text(
+        result.success
+            ? '$title ${enable ? 'enabled' : 'disabled'}'
+            : result.message,
+      ),
+      backgroundColor: result.success
+          ? GlassTheme.successColor
+          : (result.cancelled || result.unsupported)
+              ? GlassTheme.warningColor
+              : GlassTheme.errorColor,
+      duration: const Duration(seconds: 5),
+    ));
+  }
+
   Widget _buildFirewallRuleCard(FirewallRule rule) {
-    final isBlock = rule.action == 'Block';
+    final isBlock = rule.action.toLowerCase() == 'block';
 
     return GlassCard(
       child: Row(
@@ -747,28 +1103,64 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       color: Colors.grey,
                       fontSize: 10,
                     ),
+                    if (!rule.isEnabled) ...[
+                      const SizedBox(width: 8),
+                      const GlassBadge(
+                        text: 'Disabled',
+                        color: Colors.grey,
+                        fontSize: 10,
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${rule.destPort != null ? "Port ${rule.destPort}" : "All ports"} • ${rule.destAddress ?? "Any address"}',
+                  '${rule.destPort != null ? "Port ${rule.destPort}" : "All ports"} • ${rule.destAddress ?? "Any address"} • enforced on server host',
                   style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
                 ),
               ],
             ),
           ),
-          Switch(
-            value: rule.isEnabled,
-            onChanged: (v) => setState(() => rule.isEnabled = v),
-            activeTrackColor: GlassTheme.successColor.withAlpha(128),
-            activeThumbColor: GlassTheme.successColor,
+          IconButton(
+            icon: const DuotoneIcon('trash_bin_minimalistic',
+                color: GlassTheme.errorColor, size: 20),
+            onPressed: () => _deleteServerFirewallRule(rule),
+            tooltip: 'Delete rule',
           ),
         ],
       ),
     );
   }
 
+  Future<void> _deleteServerFirewallRule(FirewallRule rule) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _apiClient.deleteFirewallRule(rule.id);
+      if (!mounted) return;
+      setState(() => _firewallRules.remove(rule));
+      scaffold.showSnackBar(SnackBar(
+        content: Text('Rule "${rule.name}" deleted from the server'),
+        backgroundColor: GlassTheme.successColor,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      scaffold.showSnackBar(SnackBar(
+        content: Text('Failed to delete rule: $e'),
+        backgroundColor: GlassTheme.errorColor,
+      ));
+    }
+  }
+
   Widget _buildNetworkTab() {
+    if (_isDesktopPlatform) {
+      // Client-side collection: the backend's network monitor observes the
+      // SERVER host, so this device's connections are gathered locally
+      // (lsof / ss / netstat) and only enriched via backend VT lookups.
+      return Consumer<DesktopSecurityProvider>(
+        builder: (context, provider, _) => _buildHostNetworkList(provider),
+      );
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
     }
@@ -791,7 +1183,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      'Monitoring network activity',
+                      'Observed on the OrbGuard Lab server host (not this device)',
                       style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
                     ),
                   ],
@@ -868,15 +1260,206 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
+  /// Network list collected on THIS device by the platform scanner service.
+  Widget _buildHostNetworkList(DesktopSecurityProvider provider) {
+    final connections = provider.hostNetworkConnections;
+    final errors = provider.hostNetworkErrors;
+    final collecting = provider.isCollectingNetwork;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        GlassCard(
+          child: Row(
+            children: [
+              const GlassDuotoneIconBox(
+                  icon: 'wi_fi_router',
+                  color: GlassTheme.primaryAccent,
+                  size: 48,
+                  iconSize: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      collecting
+                          ? 'Collecting…'
+                          : '${connections.length} Connections on This Device',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      provider.hostNetworkSource.isEmpty
+                          ? 'Tap refresh to collect network connections'
+                          : 'Source: ${provider.hostNetworkSource}',
+                      style: TextStyle(
+                          color: Colors.white.withAlpha(153), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              if (collecting)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      color: GlassTheme.primaryAccent, strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  onPressed: () => provider.loadHostNetworkConnections(),
+                ),
+            ],
+          ),
+        ),
+        if (errors.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          GlassCard(
+            tintColor: GlassTheme.warningColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Collection Notes',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                ...errors.map((e) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('• $e',
+                          style: TextStyle(
+                              color: Colors.white.withAlpha(179),
+                              fontSize: 11)),
+                    )),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (connections.isEmpty && !collecting)
+          GlassCard(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  errors.isEmpty
+                      ? 'No connections collected yet — tap refresh'
+                      : 'Collection failed — see notes above',
+                  style: TextStyle(color: Colors.white.withAlpha(128)),
+                ),
+              ),
+            ),
+          )
+        else
+          ...connections.map(_buildConnectionCard),
+      ],
+    );
+  }
+
+  Widget _buildConnectionCard(Map<String, dynamic> conn) {
+    final process = conn['process_name'] as String? ?? 'Unknown process';
+    final remoteIp = conn['remote_address'] as String? ?? '';
+    final remotePortNum = (conn['remote_port'] as num?)?.toInt() ?? 0;
+    final remotePort = remotePortNum > 0 ? remotePortNum.toString() : '';
+    final protocol = conn['protocol'] as String? ?? 'tcp';
+    final state = conn['state'] as String? ?? '';
+    final isSuspicious = (conn['is_known_bad'] as bool? ?? false) ||
+        (conn['is_cnc'] as bool? ?? false);
+    final tags = (conn['threat_tags'] as List?)?.whereType<String>().toList() ??
+        const <String>[];
+    final localPort = (conn['local_port'] as num?)?.toInt() ?? 0;
+
+    return GlassCard(
+      tintColor: isSuspicious ? GlassTheme.errorColor : null,
+      child: Row(
+        children: [
+          GlassDuotoneIconBox(
+            icon: isSuspicious ? 'danger_triangle' : 'link_round',
+            color: isSuspicious ? GlassTheme.errorColor : GlassTheme.successColor,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(process,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(
+                  remoteIp.isEmpty
+                      ? 'local port $localPort ($protocol)'
+                      : '$remoteIp${remotePort.isNotEmpty ? ':$remotePort' : ''} ($protocol)',
+                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                ),
+                if (tags.isNotEmpty)
+                  Text(
+                    tags.join(', '),
+                    style: const TextStyle(
+                        color: GlassTheme.errorColor, fontSize: 11),
+                  ),
+              ],
+            ),
+          ),
+          if (state.isNotEmpty)
+            GlassBadge(
+              text: state,
+              color: state == 'ESTABLISHED' || state == 'ESTAB'
+                  ? GlassTheme.successColor
+                  : Colors.grey,
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBrowserTab() {
+    final bool desktop = _isDesktopPlatform;
+    if (desktop) {
+      return Consumer<DesktopSecurityProvider>(
+        builder: (context, provider, _) {
+          final scan = provider.hostBrowserScan;
+          return _buildBrowserContent(
+            scanResult: scan,
+            collecting: provider.isCollectingBrowser,
+            onRefresh: () => provider.loadHostBrowserExtensions(),
+            sourceLabel: scan?['source'] as String? ??
+                'Filesystem scan of browser profiles on this device',
+            errors: (scan?['errors'] as List?)?.whereType<String>().toList() ??
+                const [],
+          );
+        },
+      );
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
     }
+    return _buildBrowserContent(
+      scanResult: _browserScanResult,
+      collecting: false,
+      onRefresh: () async {
+        final data = await _apiClient.scanBrowserExtensions().catchError((_) => <String, dynamic>{});
+        setState(() => _browserScanResult = data.isNotEmpty ? data : null);
+      },
+      sourceLabel: 'Scanned on the OrbGuard Lab server host (not this device)',
+      errors: const [],
+    );
+  }
 
-    final extensions = (_browserScanResult?['extensions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final totalExt = _browserScanResult?['total'] as int? ?? extensions.length;
-    final highRisk = _browserScanResult?['high_risk'] as int? ?? 0;
-    final byBrowser = (_browserScanResult?['by_browser'] as Map?)?.cast<String, dynamic>() ?? {};
+  Widget _buildBrowserContent({
+    required Map<String, dynamic>? scanResult,
+    required bool collecting,
+    required VoidCallback onRefresh,
+    required String sourceLabel,
+    required List<String> errors,
+  }) {
+    final extensions = (scanResult?['extensions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final totalExt = scanResult?['total'] as int? ?? extensions.length;
+    final highRisk = scanResult?['high_risk'] as int? ?? 0;
+    final byBrowser = (scanResult?['by_browser'] as Map?)?.cast<String, dynamic>() ?? {};
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -898,26 +1481,56 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$totalExt Extensions Found',
+                      collecting ? 'Scanning…' : '$totalExt Extensions Found',
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       highRisk > 0 ? '$highRisk high-risk extension${highRisk > 1 ? 's' : ''} detected' : 'No high-risk extensions',
                       style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sourceLabel,
+                      style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                    ),
                   ],
                 ),
               ),
-              IconButton(
-                icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
-                onPressed: () async {
-                  final data = await _apiClient.scanBrowserExtensions().catchError((_) => <String, dynamic>{});
-                  setState(() => _browserScanResult = data.isNotEmpty ? data : null);
-                },
-              ),
+              if (collecting)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      color: GlassTheme.primaryAccent, strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  onPressed: onRefresh,
+                ),
             ],
           ),
         ),
+        if (errors.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          GlassCard(
+            tintColor: GlassTheme.warningColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Scan Notes',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                ...errors.map((e) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('• $e',
+                          style: TextStyle(
+                              color: Colors.white.withAlpha(179), fontSize: 11)),
+                    )),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
 
         // Browser breakdown
@@ -1239,7 +1852,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   )
                 else
                   Tooltip(
-                    message: item.isRegistry ? 'Registry items require manual restoration' : 'Cannot auto-restore',
+                    message: item.isRegistry
+                        ? 'No registry backup exists for this item — it must be restored manually'
+                        : 'Cannot auto-restore',
                     child: IconButton(
                       icon: DuotoneIcon('refresh', color: Colors.white24, size: 20),
                       onPressed: null,
@@ -1714,9 +2329,44 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       _buildDetailRow('Developer', app.developer),
                       _buildDetailRow('Team ID', app.teamId ?? 'N/A'),
                     ],
+                    _buildDetailRow(
+                      'Verified',
+                      app.source == 'local'
+                          ? 'Locally on this device'
+                          : 'On the OrbGuard server host',
+                    ),
                   ],
                 ),
               ),
+              if (app.path != null && app.path!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('Path', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                GlassContainer(
+                  padding: const EdgeInsets.all(12),
+                  child: SelectableText(
+                    app.path!,
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(204),
+                        fontFamily: 'monospace',
+                        fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _lookupAppOnVirusTotal(app);
+                  },
+                  icon: const DuotoneIcon('shield', size: 20),
+                  label: const Text('Check Hash on VirusTotal'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GlassTheme.primaryAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1724,85 +2374,325 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     );
   }
 
-  void _showAddRuleDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    String action = 'Block';
-    String direction = 'Incoming';
+  /// Computes the file's SHA-256 locally and queries VirusTotal through the
+  /// backend (a genuinely client-value-based lookup). Shows the real report
+  /// or the real failure.
+  Future<void> _lookupAppOnVirusTotal(SignedApp app) async {
+    final provider = context.read<DesktopSecurityProvider>();
+    final scaffold = ScaffoldMessenger.of(context);
+    scaffold.showSnackBar(const SnackBar(
+      content: Text('Hashing file and querying VirusTotal…'),
+      duration: Duration(seconds: 2),
+    ));
+    try {
+      final report = await provider.lookupFileOnVirusTotal(app.path!);
+      if (!mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: GlassTheme.gradientTop,
-          title: const Text('Add Firewall Rule', style: TextStyle(color: Colors.white)),
+      final found = report['found'] as bool? ?? false;
+      final detections = (report['detections'] as num?)?.toInt() ?? 0;
+      final total = (report['total_engines'] as num?)?.toInt() ?? 0;
+      final malicious = report['malicious'] as bool? ?? false;
+      final hash = report['sha256'] as String? ?? report['hash'] as String? ?? '';
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: GlassTheme.glassColor(true),
+          title: Text('VirusTotal: ${app.name}',
+              style: const TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Rule Name',
-                  labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+              if (!found)
+                Text(
+                  'This file hash is not known to VirusTotal.',
+                  style: TextStyle(color: Colors.white.withAlpha(204)),
+                )
+              else
+                Text(
+                  '$detections of $total engines flagged this file.',
+                  style: TextStyle(
+                    color: malicious || detections > 0
+                        ? GlassTheme.errorColor
+                        : GlassTheme.successColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: action,
-                      dropdownColor: GlassTheme.gradientTop,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Action',
-                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                      ),
-                      items: ['Allow', 'Block'].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
-                      onChanged: (v) => setDialogState(() => action = v!),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: direction,
-                      dropdownColor: GlassTheme.gradientTop,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Direction',
-                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                      ),
-                      items: ['Incoming', 'Outgoing'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                      onChanged: (v) => setDialogState(() => direction = v!),
-                    ),
-                  ),
-                ],
-              ),
+              if (hash.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SelectableText(
+                  'SHA-256: $hash',
+                  style: TextStyle(
+                      color: Colors.white.withAlpha(153),
+                      fontFamily: 'monospace',
+                      fontSize: 11),
+                ),
+              ],
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             TextButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  setState(() {
-                    _firewallRules.add(FirewallRule(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameController.text,
-                      action: action,
-                      direction: direction,
-                      protocol: 'TCP',
-                    ));
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
             ),
           ],
         ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      scaffold.showSnackBar(SnackBar(
+        content: Text('VirusTotal lookup failed: $e'),
+        backgroundColor: GlassTheme.errorColor,
+      ));
+    }
+  }
+
+  /// Add Rule dialog. The user picks where the rule lives, and the labels
+  /// are explicit about it:
+  ///  - "OrbGuard server": persisted via POST /desktop/network/rules and
+  ///    enforced on the OrbGuard Lab backend host.
+  ///  - "This device": created in the local OS firewall (netsh / ufw /
+  ///    socketfilterfw app rules) with real elevation prompts.
+  void _showAddRuleDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final portController = TextEditingController();
+    final addressController = TextEditingController();
+    final appPathController = TextEditingController();
+    String action = 'Block';
+    String direction = 'Inbound';
+    String protocol = 'TCP';
+    String target = _isDesktopPlatform ? 'local' : 'server';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final isMacLocal = target == 'local' && Platform.isMacOS;
+          return AlertDialog(
+            backgroundColor: GlassTheme.gradientTop,
+            title: const Text('Add Firewall Rule', style: TextStyle(color: Colors.white)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: target,
+                    dropdownColor: GlassTheme.gradientTop,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Apply to',
+                      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                    ),
+                    items: [
+                      if (_isDesktopPlatform)
+                        const DropdownMenuItem(
+                          value: 'local',
+                          child: Text('This device (local OS firewall)'),
+                        ),
+                      const DropdownMenuItem(
+                        value: 'server',
+                        child: Text('OrbGuard server (backend host)'),
+                      ),
+                    ],
+                    onChanged: (v) => setDialogState(() => target = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Rule Name',
+                      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: action,
+                          dropdownColor: GlassTheme.gradientTop,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Action',
+                            labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                          ),
+                          items: ['Allow', 'Block'].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
+                          onChanged: (v) => setDialogState(() => action = v!),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: direction,
+                          dropdownColor: GlassTheme.gradientTop,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Direction',
+                            labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                          ),
+                          items: ['Inbound', 'Outbound'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                          onChanged: (v) => setDialogState(() => direction = v!),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!isMacLocal) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: protocol,
+                            dropdownColor: GlassTheme.gradientTop,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              labelText: 'Protocol',
+                              labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                            ),
+                            items: ['TCP', 'UDP', 'Any'].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                            onChanged: (v) => setDialogState(() => protocol = v!),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: portController,
+                            style: const TextStyle(color: Colors.white),
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Port (optional)',
+                              labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: addressController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Remote address / CIDR (optional)',
+                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: appPathController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Application path (required)',
+                        helperText: 'macOS Application Firewall only supports per-app rules',
+                        helperStyle: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () {
+                  if (nameController.text.isEmpty) return;
+                  Navigator.pop(dialogContext);
+                  _submitFirewallRule(
+                    target: target,
+                    name: nameController.text,
+                    action: action,
+                    direction: direction,
+                    protocol: protocol,
+                    port: portController.text.trim(),
+                    address: addressController.text.trim(),
+                    appPath: appPathController.text.trim(),
+                  );
+                },
+                child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  Future<void> _submitFirewallRule({
+    required String target,
+    required String name,
+    required String action,
+    required String direction,
+    required String protocol,
+    required String port,
+    required String address,
+    required String appPath,
+  }) async {
+    final scaffold = ScaffoldMessenger.of(context);
+
+    if (target == 'server') {
+      // Server-side rule: enforced on the OrbGuard Lab backend host.
+      try {
+        await _apiClient.addFirewallRule({
+          'name': name,
+          'action': action.toLowerCase(),
+          'direction': direction.toLowerCase(),
+          'protocol': protocol == 'Any' ? 'any' : protocol.toLowerCase(),
+          if (port.isNotEmpty) 'dest_port': port,
+          if (address.isNotEmpty) 'dest_address': address,
+          'enabled': true,
+        });
+        // Re-read the authoritative server rule list instead of fabricating
+        // a local entry.
+        final firewallData = await _apiClient.getDesktopFirewallRules();
+        if (!mounted) return;
+        setState(() {
+          _firewallRules
+            ..clear()
+            ..addAll(firewallData.map((json) => FirewallRule.fromJson(json)));
+        });
+        scaffold.showSnackBar(SnackBar(
+          content: Text('Rule "$name" added on the OrbGuard server'),
+          backgroundColor: GlassTheme.successColor,
+        ));
+      } catch (e) {
+        if (!mounted) return;
+        scaffold.showSnackBar(SnackBar(
+          content: Text('Failed to add server rule: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ));
+      }
+      return;
+    }
+
+    // Local OS firewall rule.
+    final provider = context.read<DesktopSecurityProvider>();
+    final result = await provider.addLocalFirewallRule(
+      name: name,
+      action: action.toLowerCase(),
+      direction: direction.toLowerCase(),
+      protocol: protocol == 'Any' ? 'any' : protocol.toLowerCase(),
+      port: port.isEmpty ? null : port,
+      remoteAddress: address.isEmpty ? null : address,
+      appPath: appPath.isEmpty ? null : appPath,
+    );
+    if (!mounted) return;
+    scaffold.showSnackBar(SnackBar(
+      content: Text(
+        result.success
+            ? 'Local firewall rule "$name" created on this device'
+            : result.message,
+      ),
+      backgroundColor: result.success
+          ? GlassTheme.successColor
+          : (result.cancelled || result.unsupported)
+              ? GlassTheme.warningColor
+              : GlassTheme.errorColor,
+      duration: const Duration(seconds: 5),
+    ));
   }
 
   Widget _buildDetailRow(String label, String value) {
@@ -1892,72 +2782,6 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       return 'folder';
     }
     return 'smartphone';
-  }
-
-  void _showQuickActionDialog(String action) {
-    String title;
-    String description;
-
-    switch (action) {
-      case 'forbidden':
-        title = 'Block All Incoming';
-        description = 'This will block all incoming network connections except for established connections and essential services.';
-        break;
-      case 'eye_closed':
-        title = 'Stealth Mode';
-        description = 'Your device will not respond to network discovery requests, making it invisible to port scans.';
-        break;
-      case 'smartphone':
-        title = 'App Permissions';
-        description = 'Manage which applications can access the network.';
-        break;
-      default:
-        return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.glassColor(true),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              description,
-              style: TextStyle(color: Colors.white.withAlpha(204)),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Note: This feature requires system-level firewall access.',
-              style: TextStyle(color: GlassTheme.warningColor.withAlpha(204), fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$title enabled'),
-                  backgroundColor: GlassTheme.successColor,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: GlassTheme.primaryAccent,
-            ),
-            child: const Text('Enable'),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildEmptyState(String title, String subtitle, String icon) {
@@ -2053,6 +2877,14 @@ class SignedApp {
   final String developer;
   final String? teamId;
 
+  /// Filesystem path of the verified binary/bundle (present for local
+  /// verification results; enables the VirusTotal hash lookup).
+  final String? path;
+
+  /// 'local' = verified on this device with codesign/Authenticode;
+  /// 'server' = cached verification from the OrbGuard Lab backend host.
+  final String source;
+
   SignedApp({
     required this.name,
     required this.bundleId,
@@ -2060,6 +2892,8 @@ class SignedApp {
     required this.isValid,
     required this.developer,
     this.teamId,
+    this.path,
+    this.source = 'server',
   });
 
   factory SignedApp.fromJson(Map<String, dynamic> json) {
@@ -2070,6 +2904,8 @@ class SignedApp {
       isValid: json['is_valid'] as bool? ?? false,
       developer: json['developer'] as String? ?? '',
       teamId: json['team_id'] as String?,
+      path: json['path'] as String?,
+      source: json['source'] as String? ?? 'server',
     );
   }
 }

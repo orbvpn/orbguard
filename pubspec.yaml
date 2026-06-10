@@ -44,6 +44,14 @@ dependencies:
   # File selection (forensic artifact uploads)
   file_picker: ^10.0.0
 
+  # Device security / anti-theft agent
+  geolocator: ^14.0.0
+  workmanager: ^0.9.0
+  camera: ^0.11.0
+  audioplayers: ^6.1.0
+  sim_card_info: ^1.0.2
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

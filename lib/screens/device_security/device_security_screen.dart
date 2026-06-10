@@ -1,6 +1,8 @@
 /// Device Security Screen
 /// Anti-theft features: locate, lock, wipe, ring, SIM monitoring
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +11,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/device_security_provider.dart';
+import '../../services/device_agent/device_agent.dart' show AgentDisplayMessage;
 
 class DeviceSecurityScreen extends StatefulWidget {
   const DeviceSecurityScreen({super.key});
@@ -176,6 +179,22 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           ),
           const SizedBox(height: 24),
 
+          // Initialization / API errors — surfaced, never swallowed.
+          if (provider.error != null) ...[
+            _buildErrorCard(provider),
+            const SizedBox(height: 16),
+          ],
+
+          // Owner message pushed via remote "message" command.
+          if (provider.agentDisplayMessage != null) ...[
+            _buildOwnerMessageCard(provider.agentDisplayMessage!),
+            const SizedBox(height: 16),
+          ],
+
+          // On-device agent state (real lifecycle, honest unavailability).
+          _buildAgentCard(provider),
+          const SizedBox(height: 24),
+
           // Security Score
           _buildSecurityScoreCard(status.securityScore),
           const SizedBox(height: 24),
@@ -223,6 +242,17 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             ],
           ),
 
+          // Issued command lifecycle (pending -> executed/failed).
+          if (provider.issuedCommands.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Recent Commands',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ...provider.issuedCommands.take(5).map(_buildCommandCard),
+          ],
+
           // Vulnerabilities
           if (status.vulnerabilities.isNotEmpty) ...[
             const SizedBox(height: 24),
@@ -247,12 +277,16 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     );
   }
 
-  Widget _buildSecurityScoreCard(int score) {
-    final color = score >= 80
-        ? GlassTheme.successColor
-        : score >= 50
-            ? GlassTheme.warningColor
-            : GlassTheme.errorColor;
+  Widget _buildSecurityScoreCard(int? score) {
+    // Score is null until the backend has actually computed it — shown as
+    // an explicit "not assessed" state rather than a fabricated 100.
+    final color = score == null
+        ? Colors.white38
+        : score >= 80
+            ? GlassTheme.successColor
+            : score >= 50
+                ? GlassTheme.warningColor
+                : GlassTheme.errorColor;
 
     return GlassCard(
       child: Row(
@@ -264,13 +298,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               alignment: Alignment.center,
               children: [
                 CircularProgressIndicator(
-                  value: score / 100,
+                  value: score == null ? 0 : score / 100,
                   strokeWidth: 6,
                   backgroundColor: Colors.white12,
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
-                  '$score',
+                  score == null ? '—' : '$score',
                   style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -287,11 +321,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  score >= 80
-                      ? 'Your device is well protected'
-                      : score >= 50
-                          ? 'Some security improvements needed'
-                          : 'Your device needs attention',
+                  score == null
+                      ? 'Not assessed yet — run a scan'
+                      : score >= 80
+                          ? 'Your device is well protected'
+                          : score >= 50
+                              ? 'Some security improvements needed'
+                              : 'Your device needs attention',
                   style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
                 ),
               ],
@@ -301,6 +337,170 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             onPressed: () => context.read<DeviceSecurityProvider>().auditVulnerabilities(),
             child: const Text('Scan'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(DeviceSecurityProvider provider) {
+    return GlassCard(
+      tintColor: GlassTheme.errorColor,
+      child: Row(
+        children: [
+          DuotoneIcon('danger_circle', size: 22, color: GlassTheme.errorColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              provider.error!,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: Colors.white54),
+            onPressed: provider.clearError,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOwnerMessageCard(AgentDisplayMessage message) {
+    return GlassCard(
+      tintColor: GlassTheme.primaryAccent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              DuotoneIcon('chat_dots', size: 20, color: GlassTheme.primaryAccent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message.title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                _formatTime(message.receivedAt),
+                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+              ),
+            ],
+          ),
+          if (message.message.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              message.message,
+              style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 13),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgentCard(DeviceSecurityProvider provider) {
+    final running = provider.agentRunning;
+    final color = running ? GlassTheme.successColor : GlassTheme.warningColor;
+
+    Widget statusLine(String label, String? value) {
+      if (value == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 90,
+              child: Text(
+                label,
+                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GlassSvgIconBox(icon: 'shield', color: color, size: 40, iconSize: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      running ? 'Anti-Theft Agent Active' : 'Anti-Theft Agent Stopped',
+                      style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                    ),
+                    if (provider.agentLastPollAt != null)
+                      Text(
+                        'Last check ${_formatTime(provider.agentLastPollAt!)}',
+                        style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                      ),
+                  ],
+                ),
+              ),
+              if (provider.status.pendingCommands > 0)
+                GlassBadge(
+                  text: '${provider.status.pendingCommands} pending',
+                  color: GlassTheme.warningColor,
+                ),
+            ],
+          ),
+          statusLine('Location', provider.agentLocationStatus),
+          statusLine('SIM', provider.agentSimStatus),
+          statusLine('Background', provider.agentBackgroundStatus),
+          statusLine('Agent error', provider.agentLastError),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommandCard(IssuedCommand cmd) {
+    final color = switch (cmd.status) {
+      CommandStatus.executed => GlassTheme.successColor,
+      CommandStatus.failed || CommandStatus.expired => GlassTheme.errorColor,
+      _ => GlassTheme.warningColor,
+    };
+    return GlassCard(
+      child: Row(
+        children: [
+          GlassSvgIconBox(icon: 'bolt_circle', color: color, size: 36, iconSize: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cmd.command.displayName,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+                if (cmd.detail != null)
+                  Text(
+                    cmd.detail!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                  ),
+                Text(
+                  _formatTime(cmd.issuedAt),
+                  style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          GlassBadge(text: cmd.status.displayName, color: color, fontSize: 10),
         ],
       ),
     );
@@ -376,20 +576,35 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             vuln.description,
             style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (vuln.isExploited) ...[
+                const GlassBadge(
+                  text: 'EXPLOITED IN THE WILD',
+                  color: GlassTheme.errorColor,
+                  fontSize: 9,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  'Affects ${vuln.affectedVersions} · CVSS ${vuln.cvssScore.toStringAsFixed(1)}',
+                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                ),
+              ),
+            ],
+          ),
           if (vuln.fixedVersion != null) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                DuotoneIcon(
-                  vuln.isPatched ? 'check_circle' : 'refresh',
-                  size: 14,
-                  color: vuln.isPatched ? GlassTheme.successColor : GlassTheme.warningColor,
-                ),
+                DuotoneIcon('refresh', size: 14, color: GlassTheme.warningColor),
                 const SizedBox(width: 4),
                 Text(
-                  vuln.isPatched ? 'Patched' : 'Update to ${vuln.fixedVersion}',
-                  style: TextStyle(
-                    color: vuln.isPatched ? GlassTheme.successColor : GlassTheme.warningColor,
+                  'Fixed in ${vuln.fixedVersion}',
+                  style: const TextStyle(
+                    color: GlassTheme.warningColor,
                     fontSize: 12,
                   ),
                 ),
@@ -522,7 +737,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => _showSelfiesDialog(context, provider),
                     child: const Text('View'),
                   ),
                 ],
@@ -684,44 +899,115 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Current SIM
-          if (provider.currentSIM != null) ...[
-            const Text(
-              'Current SIM Card',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          // Honest monitoring state (e.g. permission missing, unsupported
+          // platform) straight from the agent.
+          if (provider.agentSimStatus != null) ...[
+            GlassCard(
+              child: Row(
+                children: [
+                  DuotoneIcon('sim_card', size: 20, color: GlassTheme.primaryAccent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      provider.agentSimStatus!,
+                      style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _buildSimCard(provider.currentSIM!, isCurrent: true, provider: provider),
+            const SizedBox(height: 16),
           ],
 
-          // Trusted SIMs
-          if (provider.trustedSIMs.isNotEmpty) ...[
+          // Current SIMs (active subscriptions reported by this device).
+          if (provider.currentSims.isNotEmpty) ...[
+            const Text(
+              'Current SIM Cards',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Android does not expose real ICCIDs to apps — entries marked '
+              '"sub:" are stable subscription fingerprints used for change '
+              'detection.',
+              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+            ),
+            const SizedBox(height: 12),
+            ...provider.currentSims.map((sim) => _buildSimCard(
+                  sim,
+                  isCurrent: sim.isActive,
+                  provider: provider,
+                )),
+          ],
+
+          // SIM change events with backend risk assessment.
+          if (provider.simEvents.isNotEmpty) ...[
             const SizedBox(height: 24),
             const Text(
-              'Trusted SIM Cards',
+              'SIM Change Events',
               style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...provider.trustedSIMs.map((sim) => _buildSimCard(sim, provider: provider)),
+            ...provider.simEvents.map(_buildSimEventCard),
           ],
 
-          // SIM History
-          if (provider.simHistory.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Text(
-              'SIM History',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...provider.simHistory.map((sim) => _buildSimCard(sim, provider: provider)),
-          ],
-
-          if (provider.simHistory.isEmpty && provider.currentSIM == null)
+          if (provider.simEvents.isEmpty && provider.currentSims.isEmpty)
             _buildEmptyState(
               svgIcon: 'sim_card',
               title: 'No SIM Data',
-              subtitle: 'SIM card information will appear here',
+              subtitle: 'SIM card information will appear here once the '
+                  'agent has reported it',
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimEventCard(SIMChangeEvent event) {
+    final riskColor = switch (event.riskLevel) {
+      'critical' => GlassTheme.errorColor,
+      'high' => const Color(0xFFFF5722),
+      'medium' => GlassTheme.warningColor,
+      _ => GlassTheme.successColor,
+    };
+    final description = switch (event.eventType) {
+      'inserted' => 'SIM inserted${event.newSim?.carrier != null ? ' (${event.newSim!.carrier})' : ''}',
+      'removed' => 'SIM removed${event.oldSim?.carrier != null ? ' (${event.oldSim!.carrier})' : ''}',
+      'swapped' => 'SIM swapped'
+          '${event.oldSim?.carrier != null ? ' from ${event.oldSim!.carrier}' : ''}'
+          '${event.newSim?.carrier != null ? ' to ${event.newSim!.carrier}' : ''}',
+      'changed' => 'SIM changed in slot',
+      _ => 'SIM event: ${event.eventType}',
+    };
+
+    return GlassCard(
+      tintColor: event.riskLevel == 'critical' || event.riskLevel == 'high'
+          ? riskColor
+          : null,
+      child: Row(
+        children: [
+          GlassSvgIconBox(icon: 'sim_card', color: riskColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  _formatTime(event.detectedAt),
+                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          GlassBadge(
+            text: event.riskLevel.toUpperCase(),
+            color: riskColor,
+            fontSize: 10,
+          ),
         ],
       ),
     );
@@ -971,6 +1257,68 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showSelfiesDialog(BuildContext context, DeviceSecurityProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlassTheme.gradientTop,
+        title: const Text('Captured Photos', style: TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: provider.thiefSelfies.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final selfie = provider.thiefSelfies[index];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSelfieImage(selfie),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Trigger: ${selfie.triggerType}'
+                    '${selfie.capturedAt != null ? ' · ${_formatTime(selfie.capturedAt!)}' : ''}',
+                    style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelfieImage(ThiefSelfie selfie) {
+    // Selfies are uploaded as base64 data URIs (see SelfieCapture); render
+    // them inline. Anything else is shown as an unrenderable reference —
+    // never a placeholder image pretending to be the capture.
+    const dataUriPrefix = 'data:image/jpeg;base64,';
+    if (selfie.imageUrl.startsWith(dataUriPrefix)) {
+      try {
+        final bytes = base64Decode(selfie.imageUrl.substring(dataUriPrefix.length));
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(bytes, fit: BoxFit.cover),
+        );
+      } catch (_) {
+        // fall through to the unrenderable notice
+      }
+    }
+    return Text(
+      'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}) '
+      '— cannot be rendered inline',
+      style: const TextStyle(color: Colors.white70, fontSize: 12),
     );
   }
 

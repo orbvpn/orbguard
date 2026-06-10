@@ -4,6 +4,7 @@
 library sms_protection_screen;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -22,10 +23,12 @@ class SmsProtectionScreen extends StatefulWidget {
   State<SmsProtectionScreen> createState() => _SmsProtectionScreenState();
 }
 
-class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
-  final SmsProvider _provider = SmsProvider();
+class _SmsProtectionScreenState extends State<SmsProtectionScreen>
+    with WidgetsBindingObserver {
+  // The provider is owned by the app (registered in main.dart) and only
+  // consumed here; this field is re-bound from context.watch in build().
+  late SmsProvider _provider;
   final GlobalKey<GlassTabPageState> _tabPageKey = GlobalKey();
-  bool _isInitialized = false;
   SmsAnalysisResult? _manualAnalysisResult;
   bool _isManualAnalyzing = false;
   String _searchQuery = '';
@@ -33,31 +36,46 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
   @override
   void initState() {
     super.initState();
-    _initProvider();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Idempotent: loads persisted state, owns the platform service and
+      // reads the device inbox (no-op if main.dart already initialized it).
+      context.read<SmsProvider>().init();
+    });
   }
 
   @override
   void dispose() {
-    _provider.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  Future<void> _initProvider() async {
-    await _provider.init();
-    _provider.addListener(_onProviderChanged);
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      final provider = context.read<SmsProvider>();
+      // The Android permission dialog result arrives out-of-band; re-check
+      // when the user returns to the app.
+      if (provider.platformStatus == SmsPlatformStatus.permissionRequired) {
+        provider.loadMessages();
+      }
     }
-  }
-
-  void _onProviderChanged() {
-    if (mounted) setState(() {});
   }
 
   Future<void> _onRefresh() async {
     await _provider.loadMessages();
+  }
+
+  Future<void> _requestPermission() async {
+    final provider = context.read<SmsProvider>();
+    await provider.requestSmsPermission();
+    // Re-check shortly after; the dialog result also triggers a re-check on
+    // app resume via didChangeAppLifecycleState.
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) {
+      await provider.loadMessages();
+    }
   }
 
   void _navigateToDetail(SmsMessage message) {
@@ -108,11 +126,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    _provider = context.watch<SmsProvider>();
 
     return GlassTabPage(
       key: _tabPageKey,
@@ -179,6 +193,9 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
 
     return Column(
       children: [
+        // Honest pipeline state banner (permission / platform / errors)
+        if (_pipelineBanner() != null) _pipelineBanner()!,
+
         // Filter chips
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -265,6 +282,23 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              if (_searchQuery.isEmpty &&
+                  _provider.platformStatus ==
+                      SmsPlatformStatus.permissionRequired)
+                ElevatedButton.icon(
+                  onPressed: _requestPermission,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                  icon: const DuotoneIcon('shield_check',
+                      size: 18, color: Colors.black),
+                  label: const Text('Grant SMS Permission'),
+                ),
               if (_provider.filter != SmsFilter.all && _searchQuery.isEmpty)
                 OutlinedButton(
                   onPressed: () => _provider.setFilter(SmsFilter.all),
@@ -280,10 +314,61 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
     );
   }
 
+  /// Banner reflecting the real state of the SMS pipeline. Returns null when
+  /// the pipeline is ready (or still being checked) and nothing needs action.
+  Widget? _pipelineBanner() {
+    switch (_provider.platformStatus) {
+      case SmsPlatformStatus.permissionRequired:
+        return _InboxBanner(
+          icon: 'shield_keyhole_minimalistic',
+          color: Colors.orange,
+          message: 'SMS permission is required to scan your inbox for '
+              'smishing and phishing threats.',
+          actionLabel: 'Grant Permission',
+          onAction: _requestPermission,
+        );
+      case SmsPlatformStatus.unsupported:
+        return _InboxBanner(
+          icon: 'info_circle',
+          color: Colors.blueGrey,
+          message: _provider.platformStatusDetail ??
+              'The SMS inbox is not accessible on this platform. '
+                  'Use the Check tab to analyze message text manually.',
+        );
+      case SmsPlatformStatus.error:
+        return _InboxBanner(
+          icon: 'danger_triangle',
+          color: Colors.red,
+          message: _provider.platformStatusDetail ??
+              'The SMS pipeline reported an error.',
+          actionLabel: 'Retry',
+          onAction: _onRefresh,
+        );
+      case SmsPlatformStatus.ready:
+      case SmsPlatformStatus.unknown:
+        return null;
+    }
+  }
+
   String _getEmptyStateMessage() {
     switch (_provider.filter) {
       case SmsFilter.all:
-        return 'Grant SMS permission to start protecting your messages, or use the Check tab to analyze messages manually.';
+        switch (_provider.platformStatus) {
+          case SmsPlatformStatus.permissionRequired:
+            return 'Grant SMS permission to start protecting your messages, '
+                'or use the Check tab to analyze messages manually.';
+          case SmsPlatformStatus.unsupported:
+            return _provider.platformStatusDetail ??
+                'The SMS inbox is not accessible on this platform. '
+                    'Use the Check tab to analyze messages manually.';
+          case SmsPlatformStatus.error:
+            return _provider.platformStatusDetail ??
+                'Could not read the SMS inbox. Pull down to retry.';
+          case SmsPlatformStatus.ready:
+            return 'Your SMS inbox is empty.';
+          case SmsPlatformStatus.unknown:
+            return 'Checking SMS access...';
+        }
       case SmsFilter.safe:
         return 'No safe messages found.';
       case SmsFilter.suspicious:
@@ -515,6 +600,10 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
   }
 
   Widget _buildProtectionStatus() {
+    final monitoring = _monitoringStatus();
+    final analysis = _analysisStatus();
+    final cloud = _cloudStatus();
+
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,33 +619,83 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
           _StatusRow(
             icon: 'chat_dots',
             label: 'SMS Monitoring',
-            status: 'Active',
-            statusColor: Colors.green,
+            status: monitoring.$1,
+            statusColor: monitoring.$2,
+            onTap: _provider.platformStatus ==
+                    SmsPlatformStatus.permissionRequired
+                ? _requestPermission
+                : null,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'shield_check',
             label: 'Real-time Analysis',
-            status: 'Enabled',
-            statusColor: Colors.green,
+            status: analysis.$1,
+            statusColor: analysis.$2,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'cloud_storage',
             label: 'Cloud Intelligence',
-            status: 'Connected',
-            statusColor: Colors.green,
+            status: cloud.$1,
+            statusColor: cloud.$2,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'forbidden',
             label: 'Blocked Senders',
             status: '${_provider.blockedSenders.length}',
-            statusColor: Colors.orange,
+            statusColor:
+                _provider.blockedSenders.isEmpty ? Colors.grey : Colors.orange,
           ),
+          if (_provider.lastAnalyzeSucceeded == false &&
+              _provider.lastAnalyzeError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Last analysis error: ${_provider.lastAnalyzeError}',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Real SMS monitoring state: platform supported + permission granted +
+  /// inbox readable.
+  (String, Color) _monitoringStatus() {
+    switch (_provider.platformStatus) {
+      case SmsPlatformStatus.ready:
+        return ('Active', Colors.green);
+      case SmsPlatformStatus.permissionRequired:
+        return ('Permission Needed', Colors.orange);
+      case SmsPlatformStatus.unsupported:
+        return ('Unavailable', Colors.blueGrey);
+      case SmsPlatformStatus.error:
+        return ('Error', Colors.red);
+      case SmsPlatformStatus.unknown:
+        return ('Checking...', Colors.grey);
+    }
+  }
+
+  /// Real-time analysis state: monitoring must be active AND protection
+  /// enabled in settings.
+  (String, Color) _analysisStatus() {
+    if (_provider.platformStatus != SmsPlatformStatus.ready) {
+      return ('Inactive', Colors.grey);
+    }
+    return _provider.protectionEnabled
+        ? ('Enabled', Colors.green)
+        : ('Disabled', Colors.orange);
+  }
+
+  /// Cloud intelligence state: outcome of the most recent backend analyze
+  /// call. Never claims "Connected" before a real round-trip succeeded.
+  (String, Color) _cloudStatus() {
+    final ok = _provider.lastAnalyzeSucceeded;
+    if (ok == true) return ('Connected', Colors.green);
+    if (ok == false) return ('Error', Colors.red);
+    return ('Not contacted yet', Colors.grey);
   }
 
   Widget _buildRecentThreats() {
@@ -647,17 +786,19 @@ class _StatusRow extends StatelessWidget {
   final String label;
   final String status;
   final Color statusColor;
+  final VoidCallback? onTap;
 
   const _StatusRow({
     required this.icon,
     required this.label,
     required this.status,
     required this.statusColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final row = Row(
       children: [
         DuotoneIcon(icon, size: 20, color: Colors.grey[500]),
         const SizedBox(width: 12),
@@ -686,6 +827,67 @@ class _StatusRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: row,
+    );
+  }
+}
+
+/// Inline banner shown above the inbox when the SMS pipeline needs attention
+/// (missing permission, unsupported platform, channel error).
+class _InboxBanner extends StatelessWidget {
+  final String icon;
+  final Color color;
+  final String message;
+  final String? actionLabel;
+  final Future<void> Function()? onAction;
+
+  const _InboxBanner({
+    required this.icon,
+    required this.color,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          DuotoneIcon(icon, size: 22, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: Colors.grey[300],
+                fontSize: 13,
+              ),
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () => onAction!(),
+              style: TextButton.styleFrom(foregroundColor: color),
+              child: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,13 @@
 /// Identity Protection Provider
-/// State management for identity theft protection and monitoring
+/// State management for identity theft protection and monitoring.
+///
+/// Honesty notes:
+/// - Email assets are scanned against live backend services (dark-web
+///   breach corpus + digital footprint scanner). Other asset types have no
+///   live data source and surface an explicit "Unavailable" status.
+/// - Credit freeze state is self-reported by the user after they act on
+///   the bureau's official freeze page; OrbGuard never claims to have
+///   frozen credit itself.
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -14,7 +22,6 @@ class IdentityProtectionProvider extends ChangeNotifier {
   List<MonitoredAsset> _monitoredAssets = [];
   List<IdentityAlert> _alerts = [];
   List<RecoveryCase> _recoveryCases = [];
-  Map<CreditBureau, CreditScoreUpdate> _creditScores = {};
   Map<CreditBureau, CreditFreezeStatus> _freezeStatus = {};
   IdentityProtectionSummary? _summary;
 
@@ -33,13 +40,15 @@ class IdentityProtectionProvider extends ChangeNotifier {
   List<MonitoredAsset> get monitoredAssets => _monitoredAssets;
   List<IdentityAlert> get alerts => _alerts;
   List<RecoveryCase> get recoveryCases => _recoveryCases;
-  Map<CreditBureau, CreditScoreUpdate> get creditScores => _creditScores;
   Map<CreditBureau, CreditFreezeStatus> get freezeStatus => _freezeStatus;
   IdentityProtectionSummary? get summary => _summary;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
   bool get isAddingAsset => _isAddingAsset;
   String? get error => _error;
+
+  /// Per-asset failures from the most recent scan (asset id -> message).
+  Map<String, String> get lastScanErrors => _service.lastScanErrors;
 
   // Computed getters
   List<IdentityAlert> get activeAlerts =>
@@ -49,18 +58,22 @@ class IdentityProtectionProvider extends ChangeNotifier {
       .where((a) => !a.isResolved && a.severity == AlertSeverity.critical)
       .toList();
 
+  /// Assets stored locally but with no live monitoring source.
+  List<MonitoredAsset> get unmonitorableAssets => _monitoredAssets
+      .where((a) => a.status == MonitoringStatus.unavailable)
+      .toList();
+
   int get protectionScore => _summary?.protectionScore ?? 0;
 
   String get protectionGrade => _summary?.protectionGrade ?? 'N/A';
 
-  int get averageCreditScore {
-    if (_creditScores.isEmpty) return 0;
-    final total = _creditScores.values.fold<int>(0, (sum, s) => sum + s.score);
-    return total ~/ _creditScores.length;
-  }
-
+  /// Number of bureaus the user has declared frozen (self-reported, not
+  /// verified by OrbGuard).
   int get frozenBureausCount =>
       _freezeStatus.values.where((s) => s.isFrozen).length;
+
+  /// The bureau's official self-service freeze page.
+  String officialFreezeUrl(CreditBureau bureau) => bureau.officialFreezeUrl;
 
   /// Initialize the provider
   Future<void> initialize() async {
@@ -70,15 +83,17 @@ class IdentityProtectionProvider extends ChangeNotifier {
     try {
       // Listen to alerts
       _alertSub = _service.alertStream.listen((alert) {
-        _alerts.insert(0, alert);
+        if (!_alerts.any((a) => a.id == alert.id)) {
+          _alerts.insert(0, alert);
+        }
         _updateSummary();
         notifyListeners();
       });
 
-      // Load initial data
+      // Load persisted state, then expose it.
+      await _service.initialize();
       _monitoredAssets = _service.getMonitoredAssets();
       _alerts = _service.getAlerts(includeResolved: true);
-      _creditScores = _service.getCreditScores();
       _freezeStatus = _service.getFreezeStatus();
       _recoveryCases = _service.getRecoveryCases();
       _updateSummary();
@@ -86,7 +101,7 @@ class IdentityProtectionProvider extends ChangeNotifier {
       // Start monitoring
       _service.startMonitoring();
     } catch (e) {
-      _error = 'Failed to initialize identity protection';
+      _error = 'Failed to initialize identity protection: $e';
       debugPrint('Error: $e');
     } finally {
       _isLoading = false;
@@ -106,11 +121,12 @@ class IdentityProtectionProvider extends ChangeNotifier {
     try {
       final asset = await _service.addMonitoredAsset(type: type, value: value);
       _monitoredAssets = _service.getMonitoredAssets();
+      _alerts = _service.getAlerts(includeResolved: true);
       _updateSummary();
       notifyListeners();
       return asset;
     } catch (e) {
-      _error = 'Failed to add asset';
+      _error = 'Failed to add asset: $e';
       notifyListeners();
       return null;
     } finally {
@@ -127,12 +143,12 @@ class IdentityProtectionProvider extends ChangeNotifier {
       _updateSummary();
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to remove asset';
+      _error = 'Failed to remove asset: $e';
       notifyListeners();
     }
   }
 
-  /// Scan all assets
+  /// Scan all assets against the live backend services
   Future<void> scanAllAssets() async {
     _isScanning = true;
     _error = null;
@@ -140,11 +156,17 @@ class IdentityProtectionProvider extends ChangeNotifier {
 
     try {
       await _service.scanAllAssets();
+      if (_service.lastScanErrors.isNotEmpty) {
+        _error =
+            '${_service.lastScanErrors.length} asset scan(s) failed — '
+            'results may be incomplete';
+      }
+    } catch (e) {
+      _error = 'Scan failed: $e';
+    } finally {
+      _monitoredAssets = _service.getMonitoredAssets();
       _alerts = _service.getAlerts(includeResolved: true);
       _updateSummary();
-    } catch (e) {
-      _error = 'Scan failed';
-    } finally {
       _isScanning = false;
       notifyListeners();
     }
@@ -157,7 +179,7 @@ class IdentityProtectionProvider extends ChangeNotifier {
       _alerts = _service.getAlerts(includeResolved: true);
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to acknowledge alert';
+      _error = 'Failed to acknowledge alert: $e';
       notifyListeners();
     }
   }
@@ -167,45 +189,31 @@ class IdentityProtectionProvider extends ChangeNotifier {
     try {
       await _service.resolveAlert(alertId);
       _alerts = _service.getAlerts(includeResolved: true);
+      _monitoredAssets = _service.getMonitoredAssets();
       _updateSummary();
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to resolve alert';
+      _error = 'Failed to resolve alert: $e';
       notifyListeners();
     }
   }
 
-  /// Freeze credit at bureau
-  Future<CreditFreezeStatus?> freezeCredit(CreditBureau bureau) async {
+  /// Record the user's self-declared freeze status for a bureau.
+  /// This does NOT freeze credit — the user must do that on the bureau's
+  /// official page (see [officialFreezeUrl]).
+  Future<CreditFreezeStatus?> setSelfReportedFreeze(
+    CreditBureau bureau,
+    bool isFrozen,
+  ) async {
     try {
-      final status = await _service.freezeCredit(bureau);
+      final status =
+          await _service.setSelfReportedFreezeStatus(bureau, isFrozen);
       _freezeStatus = _service.getFreezeStatus();
       _updateSummary();
       notifyListeners();
       return status;
     } catch (e) {
-      _error = 'Failed to freeze credit';
-      notifyListeners();
-      return null;
-    }
-  }
-
-  /// Unfreeze credit at bureau
-  Future<CreditFreezeStatus?> unfreezeCredit(
-    CreditBureau bureau, {
-    Duration? temporaryDuration,
-  }) async {
-    try {
-      final status = await _service.unfreezeCredit(
-        bureau,
-        temporaryDuration: temporaryDuration,
-      );
-      _freezeStatus = _service.getFreezeStatus();
-      _updateSummary();
-      notifyListeners();
-      return status;
-    } catch (e) {
-      _error = 'Failed to unfreeze credit';
+      _error = 'Failed to record freeze status: $e';
       notifyListeners();
       return null;
     }
@@ -227,7 +235,7 @@ class IdentityProtectionProvider extends ChangeNotifier {
       notifyListeners();
       return recoveryCase;
     } catch (e) {
-      _error = 'Failed to open recovery case';
+      _error = 'Failed to open recovery case: $e';
       notifyListeners();
       return null;
     }
@@ -296,15 +304,6 @@ class IdentityProtectionProvider extends ChangeNotifier {
     }
   }
 
-  /// Get credit score color
-  static int getCreditScoreColor(int score) {
-    if (score >= 800) return 0xFF4CAF50;
-    if (score >= 740) return 0xFF8BC34A;
-    if (score >= 670) return 0xFFFFEB3B;
-    if (score >= 580) return 0xFFFF9800;
-    return 0xFFFF5722;
-  }
-
   /// Get monitoring status color
   static int getStatusColor(MonitoringStatus status) {
     switch (status) {
@@ -316,6 +315,8 @@ class IdentityProtectionProvider extends ChangeNotifier {
         return 0xFF9E9E9E;
       case MonitoringStatus.alertTriggered:
         return 0xFFFF5722;
+      case MonitoringStatus.unavailable:
+        return 0xFF9E9E9E;
     }
   }
 

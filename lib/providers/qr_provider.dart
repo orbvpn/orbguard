@@ -2,7 +2,11 @@
 /// State management for QR code scanning features
 library qr_provider;
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api/orbguard_api_client.dart';
 import '../models/api/sms_analysis.dart';
@@ -68,7 +72,17 @@ class QrStats {
 
 /// QR Provider
 class QrProvider extends ChangeNotifier {
+  static const _prefsHistoryKey = 'qr_scan_history';
+  static const _maxPersistedEntries = 100;
+
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+  SharedPreferences? _prefs;
+
+  /// Restores persisted scan history as soon as the provider is created
+  /// (the QR screen reads the provider without calling [init] itself).
+  QrProvider() {
+    unawaited(init());
+  }
 
   // State
   final List<QrScanEntry> _history = [];
@@ -76,6 +90,7 @@ class QrProvider extends ChangeNotifier {
   QrScanResult? _lastResult;
 
   bool _isScanning = false;
+  bool _isReportingFalsePositive = false;
   String? _error;
 
   // Getters
@@ -83,6 +98,7 @@ class QrProvider extends ChangeNotifier {
   QrStats get stats => _stats;
   QrScanResult? get lastResult => _lastResult;
   bool get isScanning => _isScanning;
+  bool get isReportingFalsePositive => _isReportingFalsePositive;
   String? get error => _error;
 
   /// Recent threats from history
@@ -95,6 +111,7 @@ class QrProvider extends ChangeNotifier {
   Future<void> init() async {
     await loadHistory();
     _updateStats();
+    notifyListeners();
   }
 
   /// Scan QR code content
@@ -142,6 +159,7 @@ class QrProvider extends ChangeNotifier {
       _lastResult = result;
       _updateStats();
       _isScanning = false;
+      await _saveHistory();
       notifyListeners();
       return result;
     } catch (e) {
@@ -176,15 +194,134 @@ class QrProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load history from storage
-  Future<void> loadHistory() async {
-    // TODO: Load from persistent storage
+  /// Report the last scan (or any scanned content) as a false positive.
+  ///
+  /// Mediates the QR screen's report button via the live
+  /// POST /qr/report-false-positive endpoint.
+  Future<bool> reportFalsePositive(String content, {String? reason}) async {
+    if (content.isEmpty) return false;
+
+    _isReportingFalsePositive = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _api.reportQrFalsePositive(content, reason: reason);
+      _isReportingFalsePositive = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isReportingFalsePositive = false;
+      _error = 'Failed to report false positive: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
-  /// Save history to storage
-  Future<void> _saveHistory() async {
-    // TODO: Save to persistent storage
+  /// Load history from persistent storage (shared_preferences, same pattern
+  /// as SettingsProvider).
+  Future<void> loadHistory() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('QrProvider: failed to open preferences: $e');
+      return;
+    }
+
+    final raw = _prefs!.getString(_prefsHistoryKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      final restored = <QrScanEntry>[];
+      for (final item in decoded) {
+        try {
+          restored.add(_entryFromJson(Map<String, dynamic>.from(item as Map)));
+        } catch (e) {
+          // Skip individual corrupt entries rather than dropping everything.
+          debugPrint('QrProvider: skipping corrupt history entry: $e');
+        }
+      }
+      _history
+        ..clear()
+        ..addAll(restored);
+    } catch (e) {
+      debugPrint('QrProvider: failed to restore scan history: $e');
+    }
   }
+
+  /// Save history to persistent storage.
+  Future<void> _saveHistory() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    try {
+      final payload = _history
+          .where((e) => !e.isPending)
+          .take(_maxPersistedEntries)
+          .map(_entryToJson)
+          .toList();
+      await prefs.setString(_prefsHistoryKey, jsonEncode(payload));
+    } catch (e) {
+      debugPrint('QrProvider: failed to persist scan history: $e');
+    }
+  }
+
+  Map<String, dynamic> _entryToJson(QrScanEntry entry) => {
+        'id': entry.id,
+        'content': entry.content,
+        'content_type': entry.contentType,
+        'scanned_at': entry.scannedAt.toIso8601String(),
+        if (entry.result != null) 'result': _resultToJson(entry.result!),
+      };
+
+  QrScanEntry _entryFromJson(Map<String, dynamic> json) {
+    final resultJson = json['result'];
+    return QrScanEntry(
+      id: json['id'] as String,
+      content: json['content'] as String,
+      contentType: json['content_type'] as String?,
+      scannedAt: DateTime.parse(json['scanned_at'] as String),
+      result: resultJson != null
+          ? QrScanResult.fromJson(Map<String, dynamic>.from(resultJson as Map))
+          : null,
+    );
+  }
+
+  /// Serialize a [QrScanResult] back into the exact backend wire shape so
+  /// [QrScanResult.fromJson] can round-trip it on restore.
+  Map<String, dynamic> _resultToJson(QrScanResult result) => {
+        'id': result.id,
+        'raw_content': result.rawContent,
+        'content_type': result.contentType,
+        'threat_level': result.qrThreatLevel.value,
+        'threat_score': result.threatScore,
+        'threats': result.threats
+            .map((t) => {
+                  'type': t.type,
+                  'severity': t.severity.value,
+                  'description': t.description,
+                  if (t.evidence != null) 'evidence': t.evidence,
+                  if (t.threatIntelMatch != null)
+                    'threat_intel_match': {
+                      'indicator_id': t.threatIntelMatch!.indicatorId,
+                      'indicator_type': t.threatIntelMatch!.indicatorType,
+                      'campaign': t.threatIntelMatch!.campaign,
+                      'threat_actor': t.threatIntelMatch!.threatActor,
+                      'confidence': t.threatIntelMatch!.confidence,
+                    },
+                })
+            .toList(),
+        if (result.parsedContent != null)
+          'parsed_content': result.parsedContent,
+        'is_safe': result.isSafe,
+        'should_block': result.shouldBlock,
+        'warnings': result.warnings,
+        'recommendations': result.recommendations,
+        'scanned_at': result.scannedAt.toIso8601String(),
+        if (result.analysisDuration != null)
+          'analysis_duration': result.analysisDuration!.inMicroseconds * 1000,
+      };
 
   /// Update stats
   void _updateStats() {

@@ -22,6 +22,11 @@
 		<string>allow-vpn</string>
 	</array>
 
+	<!-- Access WiFi Information - Required for NEHotspotNetwork.fetchCurrent
+	     (current SSID/BSSID on the com.orb.guard/wifi channel) -->
+	<key>com.apple.developer.networking.wifi-info</key>
+	<true/>
+
 	<!-- Keychain Sharing - For secure credential storage -->
 	<key>keychain-access-groups</key>
 	<array>

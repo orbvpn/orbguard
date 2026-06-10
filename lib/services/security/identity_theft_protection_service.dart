@@ -1,24 +1,36 @@
 /// Identity Theft Protection Service
 ///
-/// Comprehensive identity monitoring and protection:
-/// - SSN exposure monitoring
-/// - Credit monitoring alerts
-/// - Bank account monitoring
-/// - Address change detection
-/// - Identity fraud alerts
-/// - Credit freeze recommendations
-/// - Identity recovery assistance
+/// Honest identity monitoring built on live backend capabilities:
+/// - Email exposure monitoring via the dark-web breach service
+///   (POST /darkweb/check/email)
+/// - Data-broker / public-record exposure via the digital footprint
+///   scanner (POST /footprint/scan)
+/// - Credit freeze guidance via the bureaus' OFFICIAL freeze pages
+///   (OrbGuard cannot freeze credit on a user's behalf; freeze state is
+///   recorded locally as user-declared / self-reported only)
+/// - Identity recovery checklists (local, user-managed)
+///
+/// Asset types without a live monitoring source (SSN, credit cards, bank
+/// accounts, ...) are stored locally and explicitly surfaced with the
+/// `unavailable` status — they are never presented as "monitored".
 
 import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../models/api/sms_analysis.dart' show BreachCheckResult;
+import '../api/orbguard_api_client.dart';
 
 /// Identity monitoring status
 enum MonitoringStatus {
   active('Active', 'Monitoring enabled'),
   paused('Paused', 'Monitoring temporarily paused'),
   inactive('Inactive', 'Monitoring not configured'),
-  alertTriggered('Alert', 'Action required');
+  alertTriggered('Alert', 'Action required'),
+  unavailable('Unavailable',
+      'No live monitoring source exists for this asset type');
 
   final String displayName;
   final String description;
@@ -33,9 +45,9 @@ enum IdentityAlertType {
   newAccount('New Account', 'New account opened in your name', AlertSeverity.critical),
   addressChange('Address Change', 'Address change detected', AlertSeverity.high),
   bankAccountExposure('Bank Exposure', 'Bank account information exposed', AlertSeverity.critical),
-  creditScoreChange('Score Change', 'Significant credit score change', AlertSeverity.medium),
   publicRecords('Public Records', 'New public record in your name', AlertSeverity.medium),
   darkWebExposure('Dark Web', 'Personal info found on dark web', AlertSeverity.high),
+  dataBrokerExposure('Data Broker', 'Personal info listed by a data broker', AlertSeverity.medium),
   paydayLoan('Payday Loan', 'Payday loan application detected', AlertSeverity.high),
   sexOffenderRegistry('Registry Alert', 'Name appeared in registry', AlertSeverity.critical),
   courtRecords('Court Records', 'New court record filed', AlertSeverity.medium),
@@ -71,6 +83,20 @@ enum CreditBureau {
   final String displayName;
 
   const CreditBureau(this.displayName);
+
+  /// The bureau's official self-service credit-freeze page. These are the
+  /// well-known canonical URLs; freezing must be done by the user directly
+  /// with the bureau.
+  String get officialFreezeUrl {
+    switch (this) {
+      case CreditBureau.equifax:
+        return 'https://www.equifax.com/personal/credit-report-services/credit-freeze/';
+      case CreditBureau.experian:
+        return 'https://www.experian.com/freeze/center.html';
+      case CreditBureau.transunion:
+        return 'https://www.transunion.com/credit-freeze';
+    }
+  }
 }
 
 /// Monitored identity asset
@@ -79,6 +105,11 @@ class MonitoredAsset {
   final AssetType type;
   final String maskedValue;
   final String hashedValue;
+
+  /// Raw value retained ONLY for asset types with a live backend scan
+  /// (currently email). For all other types only the hash + mask are kept.
+  final String? scanValue;
+
   final DateTime addedDate;
   final DateTime? lastChecked;
   final MonitoringStatus status;
@@ -89,17 +120,40 @@ class MonitoredAsset {
     required this.type,
     required this.maskedValue,
     required this.hashedValue,
+    this.scanValue,
     required this.addedDate,
     this.lastChecked,
     this.status = MonitoringStatus.active,
     this.alertCount = 0,
   });
 
+  /// Whether a live backend data source exists for this asset type.
+  bool get supportsLiveScan => type == AssetType.email;
+
+  MonitoredAsset copyWith({
+    DateTime? lastChecked,
+    MonitoringStatus? status,
+    int? alertCount,
+  }) {
+    return MonitoredAsset(
+      id: id,
+      type: type,
+      maskedValue: maskedValue,
+      hashedValue: hashedValue,
+      scanValue: scanValue,
+      addedDate: addedDate,
+      lastChecked: lastChecked ?? this.lastChecked,
+      status: status ?? this.status,
+      alertCount: alertCount ?? this.alertCount,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type.name,
     'masked_value': maskedValue,
     'hashed_value': hashedValue,
+    'scan_value': scanValue,
     'added_date': addedDate.toIso8601String(),
     'last_checked': lastChecked?.toIso8601String(),
     'status': status.name,
@@ -115,6 +169,7 @@ class MonitoredAsset {
       ),
       maskedValue: json['masked_value'] as String,
       hashedValue: json['hashed_value'] as String,
+      scanValue: json['scan_value'] as String?,
       addedDate: DateTime.parse(json['added_date'] as String),
       lastChecked: json['last_checked'] != null
           ? DateTime.parse(json['last_checked'] as String)
@@ -176,6 +231,22 @@ class IdentityAlert {
     this.recommendedActions = const [],
   });
 
+  IdentityAlert copyWith({bool? isAcknowledged, bool? isResolved}) {
+    return IdentityAlert(
+      id: id,
+      type: type,
+      severity: severity,
+      title: title,
+      description: description,
+      detectedDate: detectedDate,
+      source: source,
+      details: details,
+      isAcknowledged: isAcknowledged ?? this.isAcknowledged,
+      isResolved: isResolved ?? this.isResolved,
+      recommendedActions: recommendedActions,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type.name,
@@ -205,7 +276,7 @@ class IdentityAlert {
       description: json['description'] as String,
       detectedDate: DateTime.parse(json['detected_date'] as String),
       source: json['source'] as String?,
-      details: json['details'] as Map<String, dynamic>? ?? {},
+      details: (json['details'] as Map?)?.cast<String, dynamic>() ?? {},
       isAcknowledged: json['is_acknowledged'] as bool? ?? false,
       isResolved: json['is_resolved'] as bool? ?? false,
       recommendedActions: (json['recommended_actions'] as List<dynamic>?)
@@ -214,54 +285,48 @@ class IdentityAlert {
   }
 }
 
-/// Credit score update
-class CreditScoreUpdate {
-  final CreditBureau bureau;
-  final int score;
-  final int? previousScore;
-  final int change;
-  final DateTime date;
-  final String? factors;
-
-  CreditScoreUpdate({
-    required this.bureau,
-    required this.score,
-    this.previousScore,
-    required this.change,
-    required this.date,
-    this.factors,
-  });
-
-  String get changeDescription {
-    if (change > 0) return '+$change points';
-    if (change < 0) return '$change points';
-    return 'No change';
-  }
-
-  String get scoreRating {
-    if (score >= 800) return 'Excellent';
-    if (score >= 740) return 'Very Good';
-    if (score >= 670) return 'Good';
-    if (score >= 580) return 'Fair';
-    return 'Poor';
-  }
-}
-
-/// Credit freeze status
+/// User-declared credit freeze record.
+///
+/// OrbGuard has no API integration with the bureaus, so this is an honest,
+/// clearly-labeled self-reported record of what the user says they did on
+/// the bureau's official freeze page — never an authoritative state.
 class CreditFreezeStatus {
   final CreditBureau bureau;
   final bool isFrozen;
-  final DateTime? frozenDate;
-  final DateTime? unfreezeDate;
-  final String? pin;
+
+  /// When the user recorded this status in the app.
+  final DateTime? reportedAt;
+
+  /// Always true: this state is declared by the user, not verified.
+  final bool selfReported;
 
   CreditFreezeStatus({
     required this.bureau,
     required this.isFrozen,
-    this.frozenDate,
-    this.unfreezeDate,
-    this.pin,
+    this.reportedAt,
+    this.selfReported = true,
   });
+
+  Map<String, dynamic> toJson() => {
+    'bureau': bureau.name,
+    'is_frozen': isFrozen,
+    'reported_at': reportedAt?.toIso8601String(),
+    'self_reported': selfReported,
+  };
+
+  factory CreditFreezeStatus.fromJson(Map<String, dynamic> json) {
+    return CreditFreezeStatus(
+      bureau: CreditBureau.values.firstWhere(
+        (b) => b.name == json['bureau'],
+        orElse: () => CreditBureau.equifax,
+      ),
+      isFrozen: json['is_frozen'] as bool? ?? false,
+      reportedAt: json['reported_at'] != null
+          ? DateTime.tryParse(json['reported_at'] as String)
+          : null,
+      selfReported: json['self_reported'] as bool? ?? true,
+    );
+  }
 }
 
 /// Identity protection summary
@@ -271,7 +336,6 @@ class IdentityProtectionSummary {
   final int activeAlerts;
   final int resolvedAlerts;
   final DateTime? lastScanDate;
-  final Map<CreditBureau, CreditScoreUpdate?> creditScores;
   final Map<CreditBureau, CreditFreezeStatus> freezeStatus;
   final int protectionScore;
   final List<String> recommendations;
@@ -282,7 +346,6 @@ class IdentityProtectionSummary {
     required this.activeAlerts,
     required this.resolvedAlerts,
     this.lastScanDate,
-    this.creditScores = const {},
     this.freezeStatus = const {},
     required this.protectionScore,
     this.recommendations = const [],
@@ -322,6 +385,43 @@ class RecoveryCase {
     this.estimatedLoss = 0,
     this.recoveredAmount = 0,
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'status': status.name,
+    'opened_date': openedDate.toIso8601String(),
+    'resolved_date': resolvedDate?.toIso8601String(),
+    'assigned_agent': assignedAgent,
+    'steps': steps.map((s) => s.toJson()).toList(),
+    'documents_required': documentsRequired,
+    'estimated_loss': estimatedLoss,
+    'recovered_amount': recoveredAmount,
+  };
+
+  factory RecoveryCase.fromJson(Map<String, dynamic> json) {
+    return RecoveryCase(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? '',
+      status: RecoveryCaseStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => RecoveryCaseStatus.open,
+      ),
+      openedDate: DateTime.parse(json['opened_date'] as String),
+      resolvedDate: json['resolved_date'] != null
+          ? DateTime.tryParse(json['resolved_date'] as String)
+          : null,
+      assignedAgent: json['assigned_agent'] as String?,
+      steps: (json['steps'] as List<dynamic>?)
+              ?.map((s) => RecoveryStep.fromJson(s as Map<String, dynamic>))
+              .toList() ??
+          [],
+      documentsRequired:
+          (json['documents_required'] as List<dynamic>?)?.cast<String>() ?? [],
+      estimatedLoss: (json['estimated_loss'] as num?)?.toDouble() ?? 0,
+      recoveredAmount: (json['recovered_amount'] as num?)?.toDouble() ?? 0,
+    );
+  }
 }
 
 enum RecoveryCaseStatus {
@@ -351,45 +451,172 @@ class RecoveryStep {
     this.completedDate,
     this.notes,
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'description': description,
+    'is_completed': isCompleted,
+    'completed_date': completedDate?.toIso8601String(),
+    'notes': notes,
+  };
+
+  factory RecoveryStep.fromJson(Map<String, dynamic> json) {
+    return RecoveryStep(
+      id: json['id'] as String,
+      description: json['description'] as String? ?? '',
+      isCompleted: json['is_completed'] as bool? ?? false,
+      completedDate: json['completed_date'] != null
+          ? DateTime.tryParse(json['completed_date'] as String)
+          : null,
+      notes: json['notes'] as String?,
+    );
+  }
 }
 
 /// Identity Theft Protection Service
 class IdentityTheftProtectionService {
+  static const String _assetsPrefsKey = 'identity.assets';
+  static const String _alertsPrefsKey = 'identity.alerts';
+  static const String _freezePrefsKey = 'identity.freeze_status';
+  static const String _recoveryPrefsKey = 'identity.recovery_cases';
+
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+
   final List<MonitoredAsset> _monitoredAssets = [];
   final List<IdentityAlert> _alerts = [];
   final List<RecoveryCase> _recoveryCases = [];
-  final Map<CreditBureau, CreditScoreUpdate> _creditScores = {};
   final Map<CreditBureau, CreditFreezeStatus> _freezeStatus = {};
+
+  DateTime? _lastScanDate;
+
+  /// Per-asset scan errors from the most recent scan, keyed by asset id.
+  final Map<String, String> _lastScanErrors = {};
 
   Timer? _monitoringTimer;
   final _alertController = StreamController<IdentityAlert>.broadcast();
 
   Stream<IdentityAlert> get alertStream => _alertController.stream;
 
-  /// Add asset for monitoring
+  /// Errors from the last scan (asset id -> message). Empty when the last
+  /// scan completed cleanly.
+  Map<String, String> get lastScanErrors => Map.unmodifiable(_lastScanErrors);
+
+  /// Load persisted state. Must be called before use.
+  Future<void> initialize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final rawAssets = prefs.getString(_assetsPrefsKey);
+      if (rawAssets != null && rawAssets.isNotEmpty) {
+        final decoded = jsonDecode(rawAssets);
+        if (decoded is List) {
+          _monitoredAssets
+            ..clear()
+            ..addAll(decoded.whereType<Map>().map(
+                (a) => MonitoredAsset.fromJson(a.cast<String, dynamic>())));
+        }
+      }
+
+      final rawAlerts = prefs.getString(_alertsPrefsKey);
+      if (rawAlerts != null && rawAlerts.isNotEmpty) {
+        final decoded = jsonDecode(rawAlerts);
+        if (decoded is List) {
+          _alerts
+            ..clear()
+            ..addAll(decoded.whereType<Map>().map(
+                (a) => IdentityAlert.fromJson(a.cast<String, dynamic>())));
+        }
+      }
+
+      final rawFreeze = prefs.getString(_freezePrefsKey);
+      if (rawFreeze != null && rawFreeze.isNotEmpty) {
+        final decoded = jsonDecode(rawFreeze);
+        if (decoded is List) {
+          _freezeStatus.clear();
+          for (final entry in decoded.whereType<Map>()) {
+            final status =
+                CreditFreezeStatus.fromJson(entry.cast<String, dynamic>());
+            _freezeStatus[status.bureau] = status;
+          }
+        }
+      }
+
+      final rawRecovery = prefs.getString(_recoveryPrefsKey);
+      if (rawRecovery != null && rawRecovery.isNotEmpty) {
+        final decoded = jsonDecode(rawRecovery);
+        if (decoded is List) {
+          _recoveryCases
+            ..clear()
+            ..addAll(decoded.whereType<Map>().map(
+                (c) => RecoveryCase.fromJson(c.cast<String, dynamic>())));
+        }
+      }
+    } catch (e) {
+      debugPrint('IdentityProtection: failed to load persisted state: $e');
+    }
+  }
+
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_assetsPrefsKey,
+          jsonEncode(_monitoredAssets.map((a) => a.toJson()).toList()));
+      await prefs.setString(_alertsPrefsKey,
+          jsonEncode(_alerts.map((a) => a.toJson()).toList()));
+      await prefs.setString(_freezePrefsKey,
+          jsonEncode(_freezeStatus.values.map((f) => f.toJson()).toList()));
+      await prefs.setString(_recoveryPrefsKey,
+          jsonEncode(_recoveryCases.map((c) => c.toJson()).toList()));
+    } catch (e) {
+      debugPrint('IdentityProtection: failed to persist state: $e');
+    }
+  }
+
+  /// Add asset for monitoring.
+  ///
+  /// Email assets are scanned against the live dark-web and digital
+  /// footprint services. Other asset types have no live data source and
+  /// are stored with [MonitoringStatus.unavailable] — explicitly NOT
+  /// presented as monitored.
   Future<MonitoredAsset> addMonitoredAsset({
     required AssetType type,
     required String value,
   }) async {
-    // Hash the value for secure storage
-    final hashedValue = sha256.convert(utf8.encode(value)).toString();
+    final normalized = type == AssetType.email ? value.trim().toLowerCase() : value.trim();
 
-    // Mask the value for display
-    final maskedValue = _maskValue(type, value);
+    // Hash the value for secure storage / dedupe.
+    final hashedValue = sha256.convert(utf8.encode(normalized)).toString();
+
+    // Mask the value for display.
+    final maskedValue = _maskValue(type, normalized);
+
+    final supportsLiveScan = type == AssetType.email;
+    if (!supportsLiveScan) {
+      debugPrint(
+          'IdentityProtection: no live monitoring source for asset type '
+          '"${type.name}" — stored with status=unavailable');
+    }
 
     final asset = MonitoredAsset(
       id: 'asset_${DateTime.now().millisecondsSinceEpoch}',
       type: type,
       maskedValue: maskedValue,
       hashedValue: hashedValue,
+      // Raw value retained only when a live scan needs it.
+      scanValue: supportsLiveScan ? normalized : null,
       addedDate: DateTime.now(),
-      status: MonitoringStatus.active,
+      status: supportsLiveScan
+          ? MonitoringStatus.active
+          : MonitoringStatus.unavailable,
     );
 
     _monitoredAssets.add(asset);
+    await _persist();
 
-    // Run initial scan
-    await _scanAsset(asset);
+    // Run initial scan for scannable assets.
+    if (supportsLiveScan) {
+      await _scanAsset(asset);
+    }
 
     return asset;
   }
@@ -444,76 +671,183 @@ class IdentityTheftProtectionService {
   /// Remove asset from monitoring
   Future<void> removeMonitoredAsset(String assetId) async {
     _monitoredAssets.removeWhere((a) => a.id == assetId);
+    await _persist();
   }
 
   /// Get all monitored assets
   List<MonitoredAsset> getMonitoredAssets() => List.unmodifiable(_monitoredAssets);
 
-  /// Scan all assets for exposure
+  /// Scan all assets that have a live data source. Assets without one keep
+  /// their explicit `unavailable` status. Throws if every scannable asset
+  /// failed (so callers never mistake a total failure for a clean result).
   Future<List<IdentityAlert>> scanAllAssets() async {
+    _lastScanErrors.clear();
     final newAlerts = <IdentityAlert>[];
 
-    for (final asset in _monitoredAssets) {
-      final alerts = await _scanAsset(asset);
-      newAlerts.addAll(alerts);
+    final scannable =
+        _monitoredAssets.where((a) => a.supportsLiveScan).toList();
+
+    for (final asset in scannable) {
+      try {
+        final alerts = await _scanAsset(asset);
+        newAlerts.addAll(alerts);
+      } catch (e) {
+        _lastScanErrors[asset.id] = e.toString();
+        debugPrint(
+            'IdentityProtection: scan failed for ${asset.maskedValue}: $e');
+      }
+    }
+
+    _lastScanDate = DateTime.now();
+    await _persist();
+
+    if (scannable.isNotEmpty && _lastScanErrors.length == scannable.length) {
+      throw Exception(
+          'All asset scans failed: ${_lastScanErrors.values.first}');
     }
 
     return newAlerts;
   }
 
-  /// Scan specific asset
+  /// Scan a single asset against the live backend services.
   Future<List<IdentityAlert>> _scanAsset(MonitoredAsset asset) async {
-    final alerts = <IdentityAlert>[];
-
-    // Simulate scanning various sources
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Check dark web databases
-    final darkWebAlerts = await _checkDarkWeb(asset);
-    alerts.addAll(darkWebAlerts);
-
-    // Check data broker sites
-    final dataBrokerAlerts = await _checkDataBrokers(asset);
-    alerts.addAll(dataBrokerAlerts);
-
-    // Check public records
-    final publicRecordAlerts = await _checkPublicRecords(asset);
-    alerts.addAll(publicRecordAlerts);
-
-    for (final alert in alerts) {
-      _alerts.add(alert);
-      _alertController.add(alert);
+    if (!asset.supportsLiveScan || asset.scanValue == null) {
+      // No live source — never fabricate a result.
+      _replaceAsset(asset.copyWith(status: MonitoringStatus.unavailable));
+      return [];
     }
 
-    return alerts;
+    final newAlerts = <IdentityAlert>[];
+    final email = asset.scanValue!;
+
+    // 1) Dark-web breach corpus (POST /darkweb/check/email).
+    final BreachCheckResult breachResult =
+        await _api.checkEmailBreaches(email);
+    if (breachResult.isBreached) {
+      for (final breach in breachResult.breaches) {
+        final alertId = 'alert_breach_${asset.id}_'
+            '${sha256.convert(utf8.encode(breach.name)).toString().substring(0, 12)}';
+        if (_alerts.any((a) => a.id == alertId)) continue; // Already known.
+
+        final alert = IdentityAlert(
+          id: alertId,
+          type: IdentityAlertType.darkWebExposure,
+          severity: breach.isSensitive
+              ? AlertSeverity.critical
+              : AlertSeverity.high,
+          title: 'Breach: ${breach.title.isNotEmpty ? breach.title : breach.name}',
+          description:
+              '${asset.maskedValue} appeared in the "${breach.title.isNotEmpty ? breach.title : breach.name}" '
+              'breach${breach.breachDate != null ? ' (${breach.breachDate!.year})' : ''}. '
+              'Exposed data: ${breach.dataClasses.isEmpty ? 'unknown' : breach.dataClasses.join(', ')}.',
+          detectedDate: DateTime.now(),
+          source: breach.domain.isNotEmpty ? breach.domain : 'dark web monitor',
+          details: {
+            'asset_id': asset.id,
+            'breach_name': breach.name,
+            'breach_date': breach.breachDate?.toIso8601String(),
+            'data_classes': breach.dataClasses,
+            'verified': breach.isVerified,
+          },
+          recommendedActions: [
+            'Change the password for accounts using this email',
+            'Enable two-factor authentication',
+            if (breach.dataClasses
+                .any((d) => d.toLowerCase().contains('password')))
+              'This breach exposed passwords — change reused passwords everywhere',
+          ],
+        );
+        _alerts.add(alert);
+        _alertController.add(alert);
+        newAlerts.add(alert);
+      }
+    }
+
+    // 2) Data-broker / public-record footprint (POST /footprint/scan).
+    final scanResult = await _api.scanDigitalFootprint({
+      'email': email,
+      'scan_type': 'data_broker_only',
+    });
+    final rawExposures = scanResult['exposures'];
+    if (rawExposures is List) {
+      for (final raw in rawExposures.whereType<Map>()) {
+        final exposure = raw.cast<String, dynamic>();
+        final sourceName =
+            exposure['source_name']?.toString() ?? 'unknown source';
+        final exposureType = exposure['type']?.toString() ?? 'unknown';
+        final source = exposure['source']?.toString() ?? '';
+
+        final alertId = 'alert_exposure_${asset.id}_'
+            '${sha256.convert(utf8.encode('$sourceName|$exposureType')).toString().substring(0, 12)}';
+        if (_alerts.any((a) => a.id == alertId)) continue;
+
+        final alert = IdentityAlert(
+          id: alertId,
+          type: source == 'public_record'
+              ? IdentityAlertType.publicRecords
+              : source == 'dark_web'
+                  ? IdentityAlertType.darkWebExposure
+                  : IdentityAlertType.dataBrokerExposure,
+          severity: _exposureSeverity(exposure['severity']?.toString()),
+          title: 'Exposure on $sourceName',
+          description:
+              'Your $exposureType information was found on $sourceName '
+              '(${exposure['exposed_value'] ?? asset.maskedValue}).',
+          detectedDate: DateTime.now(),
+          source: sourceName,
+          details: {
+            'asset_id': asset.id,
+            ...exposure,
+          },
+          recommendedActions: [
+            if (exposure['can_auto_remove'] == true)
+              'Request automated removal from the Digital Footprint screen'
+            else
+              'Request removal directly from $sourceName',
+            'Review what other data this source links to you',
+          ],
+        );
+        _alerts.add(alert);
+        _alertController.add(alert);
+        newAlerts.add(alert);
+      }
+    }
+
+    // Update asset bookkeeping with real results.
+    final assetAlerts = _alerts
+        .where((a) => a.details['asset_id'] == asset.id && !a.isResolved)
+        .length;
+    _replaceAsset(asset.copyWith(
+      lastChecked: DateTime.now(),
+      status: assetAlerts > 0
+          ? MonitoringStatus.alertTriggered
+          : MonitoringStatus.active,
+      alertCount: assetAlerts,
+    ));
+
+    return newAlerts;
   }
 
-  /// Check dark web for asset exposure
-  Future<List<IdentityAlert>> _checkDarkWeb(MonitoredAsset asset) async {
-    // Simulate dark web scanning
-    // In production, this would call a dark web monitoring API
-    return [];
+  AlertSeverity _exposureSeverity(String? severity) {
+    switch (severity) {
+      case 'critical':
+        return AlertSeverity.critical;
+      case 'high':
+        return AlertSeverity.high;
+      case 'medium':
+        return AlertSeverity.medium;
+      case 'low':
+        return AlertSeverity.low;
+      default:
+        return AlertSeverity.info;
+    }
   }
 
-  /// Check data broker sites
-  Future<List<IdentityAlert>> _checkDataBrokers(MonitoredAsset asset) async {
-    // Known data broker sites to check
-    final dataBrokers = [
-      'Spokeo', 'WhitePages', 'BeenVerified', 'Intelius',
-      'PeopleFinder', 'TruePeopleSearch', 'FastPeopleSearch',
-      'Radaris', 'USSearch', 'Pipl', 'ZabaSearch',
-    ];
-
-    // Simulate checking data brokers
-    // In production, this would scrape or API-call each broker
-    return [];
-  }
-
-  /// Check public records
-  Future<List<IdentityAlert>> _checkPublicRecords(MonitoredAsset asset) async {
-    // Check various public record databases
-    // Court records, property records, voter registration, etc.
-    return [];
+  void _replaceAsset(MonitoredAsset updated) {
+    final index = _monitoredAssets.indexWhere((a) => a.id == updated.id);
+    if (index >= 0) {
+      _monitoredAssets[index] = updated;
+    }
   }
 
   /// Get all alerts
@@ -534,20 +868,8 @@ class IdentityTheftProtectionService {
   Future<void> acknowledgeAlert(String alertId) async {
     final index = _alerts.indexWhere((a) => a.id == alertId);
     if (index >= 0) {
-      final alert = _alerts[index];
-      _alerts[index] = IdentityAlert(
-        id: alert.id,
-        type: alert.type,
-        severity: alert.severity,
-        title: alert.title,
-        description: alert.description,
-        detectedDate: alert.detectedDate,
-        source: alert.source,
-        details: alert.details,
-        isAcknowledged: true,
-        isResolved: alert.isResolved,
-        recommendedActions: alert.recommendedActions,
-      );
+      _alerts[index] = _alerts[index].copyWith(isAcknowledged: true);
+      await _persist();
     }
   }
 
@@ -555,112 +877,34 @@ class IdentityTheftProtectionService {
   Future<void> resolveAlert(String alertId) async {
     final index = _alerts.indexWhere((a) => a.id == alertId);
     if (index >= 0) {
-      final alert = _alerts[index];
-      _alerts[index] = IdentityAlert(
-        id: alert.id,
-        type: alert.type,
-        severity: alert.severity,
-        title: alert.title,
-        description: alert.description,
-        detectedDate: alert.detectedDate,
-        source: alert.source,
-        details: alert.details,
-        isAcknowledged: true,
-        isResolved: true,
-        recommendedActions: alert.recommendedActions,
-      );
+      _alerts[index] =
+          _alerts[index].copyWith(isAcknowledged: true, isResolved: true);
+      await _persist();
     }
   }
 
-  /// Get credit scores
-  Map<CreditBureau, CreditScoreUpdate> getCreditScores() =>
-      Map.unmodifiable(_creditScores);
-
-  /// Update credit score
-  Future<void> updateCreditScore(CreditBureau bureau, int score) async {
-    final previous = _creditScores[bureau];
-    final change = previous != null ? score - previous.score : 0;
-
-    _creditScores[bureau] = CreditScoreUpdate(
-      bureau: bureau,
-      score: score,
-      previousScore: previous?.score,
-      change: change,
-      date: DateTime.now(),
-    );
-
-    // Alert on significant changes
-    if (change.abs() >= 50) {
-      final alert = IdentityAlert(
-        id: 'alert_credit_${DateTime.now().millisecondsSinceEpoch}',
-        type: IdentityAlertType.creditScoreChange,
-        severity: change < -50 ? AlertSeverity.high : AlertSeverity.medium,
-        title: 'Credit Score Change',
-        description: 'Your ${bureau.displayName} credit score changed by $change points',
-        detectedDate: DateTime.now(),
-        source: bureau.displayName,
-        details: {
-          'bureau': bureau.name,
-          'previous_score': previous?.score,
-          'new_score': score,
-          'change': change,
-        },
-        recommendedActions: [
-          'Review recent credit inquiries',
-          'Check for new accounts',
-          'Verify account balances',
-        ],
-      );
-
-      _alerts.add(alert);
-      _alertController.add(alert);
-    }
-  }
-
-  /// Freeze credit at bureau
-  Future<CreditFreezeStatus> freezeCredit(CreditBureau bureau) async {
-    // Generate a secure PIN
-    final pin = _generateSecurePin();
-
+  /// Record the user's self-declared freeze status for a bureau.
+  ///
+  /// OrbGuard cannot freeze or unfreeze credit — the user must do it on the
+  /// bureau's official page ([CreditBureau.officialFreezeUrl]); this only
+  /// stores what they tell us, clearly labeled self-reported.
+  Future<CreditFreezeStatus> setSelfReportedFreezeStatus(
+    CreditBureau bureau,
+    bool isFrozen,
+  ) async {
     final status = CreditFreezeStatus(
       bureau: bureau,
-      isFrozen: true,
-      frozenDate: DateTime.now(),
-      pin: pin,
+      isFrozen: isFrozen,
+      reportedAt: DateTime.now(),
     );
-
     _freezeStatus[bureau] = status;
-
+    await _persist();
     return status;
   }
 
-  /// Unfreeze credit at bureau
-  Future<CreditFreezeStatus> unfreezeCredit(
-    CreditBureau bureau, {
-    Duration? temporaryDuration,
-  }) async {
-    final status = CreditFreezeStatus(
-      bureau: bureau,
-      isFrozen: false,
-      unfreezeDate: temporaryDuration != null
-          ? DateTime.now().add(temporaryDuration)
-          : null,
-    );
-
-    _freezeStatus[bureau] = status;
-
-    return status;
-  }
-
-  /// Get freeze status
+  /// Get self-reported freeze status records
   Map<CreditBureau, CreditFreezeStatus> getFreezeStatus() =>
       Map.unmodifiable(_freezeStatus);
-
-  String _generateSecurePin() {
-    // Generate 10-digit PIN
-    final random = DateTime.now().millisecondsSinceEpoch;
-    return (random % 10000000000).toString().padLeft(10, '0');
-  }
 
   /// Open identity recovery case
   Future<RecoveryCase> openRecoveryCase({
@@ -679,6 +923,7 @@ class IdentityTheftProtectionService {
     );
 
     _recoveryCases.add(recoveryCase);
+    await _persist();
 
     return recoveryCase;
   }
@@ -731,42 +976,50 @@ class IdentityTheftProtectionService {
     final activeAlerts = _alerts.where((a) => !a.isResolved).length;
     final resolvedAlerts = _alerts.where((a) => a.isResolved).length;
 
-    // Calculate protection score
+    // Calculate protection score from what we can actually verify.
     var score = 100;
 
-    // Deduct for unmonitored asset types
-    if (!_monitoredAssets.any((a) => a.type == AssetType.ssn)) score -= 15;
-    if (!_monitoredAssets.any((a) => a.type == AssetType.email)) score -= 10;
-    if (!_monitoredAssets.any((a) => a.type == AssetType.phone)) score -= 5;
+    // Live monitoring only exists for email; not having one monitored is
+    // the biggest gap we can honestly assess.
+    if (!_monitoredAssets.any((a) => a.type == AssetType.email)) score -= 20;
 
-    // Deduct for active alerts
+    // Deduct for active alerts.
     for (final alert in _alerts.where((a) => !a.isResolved)) {
       score -= alert.severity.weight * 3;
     }
 
-    // Bonus for credit freezes
+    // Small credit for self-reported freezes (clearly labeled unverified).
     final frozenBureaus = _freezeStatus.values.where((s) => s.isFrozen).length;
     score += frozenBureaus * 5;
 
     score = score.clamp(0, 100);
 
-    // Generate recommendations
+    // Generate recommendations.
     final recommendations = <String>[];
 
-    if (!_monitoredAssets.any((a) => a.type == AssetType.ssn)) {
-      recommendations.add('Add your SSN for monitoring');
+    if (!_monitoredAssets.any((a) => a.type == AssetType.email)) {
+      recommendations.add(
+          'Add your email address — it is checked against live breach and '
+          'data-broker sources');
     }
 
     if (frozenBureaus < 3) {
-      recommendations.add('Freeze credit at ${3 - frozenBureaus} more bureau(s)');
+      recommendations.add(
+          'Freeze credit at ${3 - frozenBureaus} more bureau(s) via their '
+          'official pages, then record it here');
     }
 
     if (activeAlerts > 0) {
       recommendations.add('Review and resolve $activeAlerts active alert(s)');
     }
 
-    if (_monitoredAssets.length < 3) {
-      recommendations.add('Add more assets for comprehensive monitoring');
+    final unavailableAssets = _monitoredAssets
+        .where((a) => a.status == MonitoringStatus.unavailable)
+        .length;
+    if (unavailableAssets > 0) {
+      recommendations.add(
+          '$unavailableAssets stored asset(s) have no live monitoring '
+          'source yet and are not being scanned');
     }
 
     return IdentityProtectionSummary(
@@ -776,8 +1029,7 @@ class IdentityTheftProtectionService {
       totalAssets: _monitoredAssets.length,
       activeAlerts: activeAlerts,
       resolvedAlerts: resolvedAlerts,
-      lastScanDate: DateTime.now(),
-      creditScores: Map.unmodifiable(_creditScores),
+      lastScanDate: _lastScanDate,
       freezeStatus: Map.unmodifiable(_freezeStatus),
       protectionScore: score,
       recommendations: recommendations,
@@ -787,7 +1039,13 @@ class IdentityTheftProtectionService {
   /// Start continuous monitoring
   void startMonitoring({Duration interval = const Duration(hours: 24)}) {
     _monitoringTimer?.cancel();
-    _monitoringTimer = Timer.periodic(interval, (_) => scanAllAssets());
+    _monitoringTimer = Timer.periodic(interval, (_) async {
+      try {
+        await scanAllAssets();
+      } catch (e) {
+        debugPrint('IdentityProtection: periodic scan failed: $e');
+      }
+    });
   }
 
   /// Stop monitoring

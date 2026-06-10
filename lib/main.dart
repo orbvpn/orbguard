@@ -34,6 +34,7 @@ import 'screens/enterprise/stix_taxii_screen.dart';
 import 'screens/intelligence/intelligence_core_screen.dart';
 import 'screens/security_center_screen.dart';
 import 'screens/desktop/desktop_security_screen.dart';
+import 'screens/device_security/device_security_screen.dart';
 import 'permissions/special_permissions_manager.dart';
 import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
@@ -63,10 +64,14 @@ import 'providers/social_media_provider.dart';
 import 'providers/rogue_ap_provider.dart' show RogueAPProvider;
 import 'providers/enterprise_policy_provider.dart';
 import 'providers/desktop_security_provider.dart';
+import 'providers/device_security_provider.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
 import 'services/api/api_config.dart';
+
+// On-device scan engine
+import 'services/security/device_scan_service.dart';
 
 // Global instances
 late ThreatIntelligenceManager threatIntel;
@@ -112,7 +117,7 @@ class AntiSpywareApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => QrProvider()),
-        ChangeNotifierProvider(create: (_) => SmsProvider()),
+        ChangeNotifierProvider(create: (_) => SmsProvider()..init()),
         ChangeNotifierProvider(create: (_) => UrlProvider()),
         ChangeNotifierProvider(create: (_) => AppSecurityProvider()),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
@@ -128,6 +133,8 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RogueAPProvider()),
         ChangeNotifierProvider(create: (_) => EnterprisePolicyProvider()),
         ChangeNotifierProvider(create: (_) => DesktopSecurityProvider()),
+        ChangeNotifierProvider(
+            lazy: false, create: (_) => DeviceSecurityProvider()..init()),
       ],
       child: MaterialApp(
         title: 'OrbGuard',
@@ -320,7 +327,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
-          onScan: () => _performScan(deepScan: deepScan),
+          onScanWithProgress: (onProgress) =>
+              DeviceScanService.instance.performScan(
+            deepScan: deepScan,
+            hasRoot: _hasRootAccess,
+            onProgress: onProgress,
+          ),
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -354,125 +366,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _performScan({bool deepScan = false}) async {
-    List<Map<String, dynamic>> allThreats = [];
-
-    try {
-      await platform.invokeMethod('initializeScan', {
-        'deepScan': deepScan || _hasRootAccess,
-        'hasRoot': _hasRootAccess,
-      });
-    } catch (e) {
-      print('Initialize scan error: $e');
-    }
-
-    // Run native scans
-    try {
-      final result = await platform.invokeMethod('scanNetwork');
-      if (result['threats'] != null) {
-        for (var threat in result['threats']) {
-          allThreats.add(Map<String, dynamic>.from(threat));
-        }
-      }
-    } catch (e) {
-      print('Network scan error: $e');
-    }
-
-    try {
-      final result = await platform.invokeMethod('scanProcesses');
-      if (result['threats'] != null) {
-        for (var threat in result['threats']) {
-          allThreats.add(Map<String, dynamic>.from(threat));
-        }
-      }
-    } catch (e) {
-      print('Process scan error: $e');
-    }
-
-    try {
-      final result = await platform.invokeMethod('scanFileSystem');
-      if (result['threats'] != null) {
-        for (var threat in result['threats']) {
-          allThreats.add(Map<String, dynamic>.from(threat));
-        }
-      }
-    } catch (e) {
-      print('File system scan error: $e');
-    }
-
-    try {
-      final result = await platform.invokeMethod('scanDatabases');
-      if (result['threats'] != null) {
-        for (var threat in result['threats']) {
-          allThreats.add(Map<String, dynamic>.from(threat));
-        }
-      }
-    } catch (e) {
-      print('Database scan error: $e');
-    }
-
-    try {
-      final result = await platform.invokeMethod('scanMemory');
-      if (result['threats'] != null) {
-        for (var threat in result['threats']) {
-          allThreats.add(Map<String, dynamic>.from(threat));
-        }
-      }
-    } catch (e) {
-      print('Memory scan error: $e');
-    }
-
-    // Advanced detection modules
-    try {
-      final behavioral = await advancedDetection.runModule('behavioral');
-      allThreats.addAll(behavioral);
-    } catch (e) {
-      print('Behavioral analysis error: $e');
-    }
-
-    try {
-      final certs = await advancedDetection.runModule('certificate');
-      allThreats.addAll(certs);
-    } catch (e) {
-      print('Certificate analysis error: $e');
-    }
-
-    try {
-      final perms = await advancedDetection.runModule('permission');
-      allThreats.addAll(perms);
-    } catch (e) {
-      print('Permission analysis error: $e');
-    }
-
-    try {
-      final access = await advancedDetection.runModule('accessibility');
-      allThreats.addAll(access);
-    } catch (e) {
-      print('Accessibility check error: $e');
-    }
-
-    try {
-      final keyloggers = await advancedDetection.runModule('keylogger');
-      allThreats.addAll(keyloggers);
-    } catch (e) {
-      print('Keylogger detection error: $e');
-    }
-
-    try {
-      final location = await advancedDetection.runModule('location');
-      allThreats.addAll(location);
-    } catch (e) {
-      print('Location stalker detection error: $e');
-    }
-
-    // Debug: Log scan results
-    print('[OrbGuard] Scan complete: ${allThreats.length} threats detected');
-    for (var threat in allThreats) {
-      print('[OrbGuard] Threat: ${threat['name']} (${threat['severity']})');
-    }
-
-    return allThreats;
-  }
 
   void _showNoThreatsDialog() {
     showDialog(
@@ -1672,6 +1565,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (context) => const NetworkFirewallScreen(),
+                    ));
+                  },
+                ),
+                _buildDrawerItem(
+                  svgIcon: 'smartphone',
+                  title: 'Device Security',
+                  subtitle: 'Anti-theft, SIM & OS protection',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const DeviceSecurityScreen(),
                     ));
                   },
                 ),

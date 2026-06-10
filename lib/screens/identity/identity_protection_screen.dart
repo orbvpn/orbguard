@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -100,17 +101,6 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       ),
                     )
                   : _buildAlertsTab(provider),
-            ),
-            GlassTab(
-              label: 'Credit',
-              iconPath: 'history',
-              content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
-                      ),
-                    )
-                  : _buildCreditTab(provider),
             ),
           ],
         );
@@ -235,7 +225,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         ),
                         const SizedBox(width: 16),
                         _buildMiniStat(
-                          'Frozen',
+                          'Frozen (self)',
                           '${provider.frozenBureausCount}/3',
                         ),
                       ],
@@ -290,13 +280,13 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         ),
         const SizedBox(width: 12),
         _buildStatCard(
-          'Avg Credit',
-          provider.averageCreditScore > 0
-              ? provider.averageCreditScore.toString()
-              : '--',
-          'card',
-          Color(IdentityProtectionProvider.getCreditScoreColor(
-              provider.averageCreditScore)),
+          'Live Monitored',
+          provider.monitoredAssets
+              .where((a) => a.supportsLiveScan)
+              .length
+              .toString(),
+          'shield_check',
+          GlassTheme.successColor,
         ),
       ],
     );
@@ -359,7 +349,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  '${provider.frozenBureausCount}/3 Frozen',
+                  '${provider.frozenBureausCount}/3 Self-Reported',
                   style: TextStyle(
                     color: provider.frozenBureausCount == 3
                         ? GlassTheme.successColor
@@ -368,6 +358,16 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'OrbGuard cannot freeze credit on your behalf. Use each '
+              'bureau\'s official freeze page, then record your status '
+              'here — it is stored as self-reported and is not verified.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 16),
             ...CreditBureau.values.map((bureau) {
@@ -402,30 +402,49 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        bureau.displayName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bureau.displayName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            isFrozen
+                                ? 'Frozen (self-reported)'
+                                : 'Not frozen (self-reported)',
+                            style: TextStyle(
+                              color: isFrozen
+                                  ? GlassTheme.successColor
+                                  : Colors.white54,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        if (isFrozen) {
-                          provider.unfreezeCredit(bureau);
-                        } else {
-                          provider.freezeCredit(bureau);
-                        }
-                      },
-                      child: Text(
-                        isFrozen ? 'Unfreeze' : 'Freeze',
-                        style: TextStyle(
-                          color: isFrozen
-                              ? GlassTheme.warningColor
-                              : GlassTheme.primaryAccent,
-                        ),
+                    IconButton(
+                      tooltip: 'Open ${bureau.displayName}\'s official '
+                          'freeze page',
+                      icon: const DuotoneIcon(
+                        'link',
+                        size: 18,
+                        color: GlassTheme.primaryAccent,
                       ),
+                      onPressed: () => _openOfficialFreezePage(
+                        context,
+                        provider,
+                        bureau,
+                      ),
+                    ),
+                    Switch(
+                      value: isFrozen,
+                      activeThumbColor: GlassTheme.successColor,
+                      onChanged: (value) =>
+                          provider.setSelfReportedFreeze(bureau, value),
                     ),
                   ],
                 ),
@@ -435,6 +454,35 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openOfficialFreezePage(
+    BuildContext context,
+    IdentityProtectionProvider provider,
+    CreditBureau bureau,
+  ) async {
+    final url = Uri.parse(provider.officialFreezeUrl(bureau));
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final launched =
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+                'Could not open ${bureau.displayName}\'s freeze page '
+                '($url). Open it manually in your browser.'),
+          ),
+        );
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+              'Could not open ${bureau.displayName}\'s freeze page: $e'),
+        ),
+      );
+    }
   }
 
   Widget _buildRecommendationCard(String recommendation) {
@@ -566,11 +614,16 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              asset.status.displayName,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-                fontSize: 12,
+            Flexible(
+              child: Text(
+                asset.status == MonitoringStatus.unavailable
+                    ? '${asset.status.displayName} — no live data source'
+                    : asset.status.displayName,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 12,
+                ),
               ),
             ),
             if (asset.alertCount > 0) ...[
@@ -788,159 +841,6 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
     );
   }
 
-  Widget _buildCreditTab(IdentityProtectionProvider provider) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Average Score Card
-        if (provider.averageCreditScore > 0) ...[
-          GlassCard(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Text(
-                    provider.averageCreditScore.toString(),
-                    style: TextStyle(
-                      color: Color(IdentityProtectionProvider.getCreditScoreColor(
-                          provider.averageCreditScore)),
-                      fontSize: 56,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Text(
-                    'Average Credit Score',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Bureau Scores
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'Credit Bureau Scores',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ...CreditBureau.values.map((bureau) {
-          final score = provider.creditScores[bureau];
-          return _buildBureauScoreCard(bureau, score);
-        }),
-      ],
-    );
-  }
-
-  Widget _buildBureauScoreCard(CreditBureau bureau, CreditScoreUpdate? score) {
-    final bureauColor = Color(IdentityProtectionProvider.getBureauColor(bureau));
-
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: bureauColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  bureau.displayName[0],
-                  style: TextStyle(
-                    color: bureauColor,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bureau.displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (score != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      score.scoreRating,
-                      style: TextStyle(
-                        color: Color(IdentityProtectionProvider.getCreditScoreColor(
-                            score.score)),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ] else
-                    Text(
-                      'Not available',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (score != null) ...[
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    score.score.toString(),
-                    style: TextStyle(
-                      color: Color(IdentityProtectionProvider.getCreditScoreColor(
-                          score.score)),
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (score.change != 0)
-                    Text(
-                      score.changeDescription,
-                      style: TextStyle(
-                        color: score.change > 0
-                            ? GlassTheme.successColor
-                            : GlassTheme.errorColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
-              ),
-            ] else
-              const DuotoneIcon(
-                'add_circle',
-                color: GlassTheme.primaryAccent,
-                size: 24,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState({
     required String icon,
     required String title,
@@ -1021,12 +921,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         return 'home';
       case IdentityAlertType.bankAccountExposure:
         return 'wallet';
-      case IdentityAlertType.creditScoreChange:
-        return 'graph_down';
       case IdentityAlertType.publicRecords:
         return 'folder';
       case IdentityAlertType.darkWebExposure:
         return 'incognito';
+      case IdentityAlertType.dataBrokerExposure:
+        return 'database';
       case IdentityAlertType.paydayLoan:
         return 'money_bag';
       case IdentityAlertType.sexOffenderRegistry:
@@ -1106,7 +1006,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your information is encrypted and securely monitored',
+                  'Email addresses are checked against live breach and '
+                  'data-broker sources. Other asset types are stored only '
+                  'on this device (masked and hashed) and are shown as '
+                  '"Unavailable" until a live data source exists for them.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),
                     fontSize: 14,
@@ -1131,7 +1034,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                             ? Colors.white
                             : GlassTheme.primaryAccent,
                       ),
-                      label: Text(type.displayName),
+                      label: Text(type == AssetType.email
+                          ? '${type.displayName} • Live'
+                          : type.displayName),
                       selected: isSelected,
                       selectedColor: GlassTheme.primaryAccent,
                       backgroundColor:

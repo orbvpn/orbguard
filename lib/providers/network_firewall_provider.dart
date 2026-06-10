@@ -35,7 +35,22 @@ class NetworkFirewallProvider extends ChangeNotifier {
   List<AppNetworkProfile> get appProfiles => _appProfiles;
   FirewallStats get stats => _stats;
   bool get isLoading => _isLoading;
+
+  /// Authoritative firewall state, read from the service. Only true after the
+  /// native engine confirmed it is enforcing.
   bool get isEnabled => _isEnabled;
+
+  /// Availability of the native firewall engine on this build.
+  FirewallEngineStatus get engineStatus => _service.engineStatus;
+
+  /// Human-readable reason when the engine is unavailable
+  /// (e.g. "firewall engine not available on this build").
+  String? get engineUnavailableReason => _service.engineUnavailableReason;
+
+  /// True when the firewall can actually be enabled on this build.
+  bool get isEngineAvailable =>
+      _service.engineStatus == FirewallEngineStatus.available;
+
   String? get error => _error;
   List<NetworkConnection> get recentAlerts => _recentAlerts;
 
@@ -83,41 +98,61 @@ class NetworkFirewallProvider extends ChangeNotifier {
 
       await _loadRules();
       _updateStats();
+
+      // Surface an explicit unavailable state instead of a silent no-op.
+      if (_service.engineStatus == FirewallEngineStatus.unavailable) {
+        _error = _service.engineUnavailableReason;
+      }
     } catch (e) {
-      _error = 'Failed to initialize firewall';
+      _error = 'Failed to initialize firewall: $e';
       debugPrint('Error: $e');
     } finally {
+      _isEnabled = _service.isEnabled;
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Enable firewall
-  Future<void> enable() async {
-    if (_isEnabled) return;
+  /// Enable firewall.
+  ///
+  /// Returns true only when the native engine confirmed enforcement is on.
+  /// On failure (including a missing engine on this build) the error is
+  /// surfaced via [error] and the state remains honest.
+  Future<bool> enable() async {
+    if (_isEnabled) return true;
 
     try {
       await _service.enable();
-      _isEnabled = true;
-      notifyListeners();
+      _error = null;
+    } on StateError catch (e) {
+      _error = e.message;
     } catch (e) {
-      _error = 'Failed to enable firewall';
-      notifyListeners();
+      _error = 'Failed to enable firewall: $e';
     }
+
+    _isEnabled = _service.isEnabled;
+    notifyListeners();
+    return _isEnabled;
   }
 
-  /// Disable firewall
-  Future<void> disable() async {
-    if (!_isEnabled) return;
+  /// Disable firewall.
+  ///
+  /// Returns true when the firewall is actually off afterwards.
+  Future<bool> disable() async {
+    if (!_isEnabled) return true;
 
     try {
       await _service.disable();
-      _isEnabled = false;
-      notifyListeners();
+      _error = null;
+    } on StateError catch (e) {
+      _error = e.message;
     } catch (e) {
-      _error = 'Failed to disable firewall';
-      notifyListeners();
+      _error = 'Failed to disable firewall: $e';
     }
+
+    _isEnabled = _service.isEnabled;
+    notifyListeners();
+    return !_isEnabled;
   }
 
   /// Toggle firewall

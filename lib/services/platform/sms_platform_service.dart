@@ -1,5 +1,13 @@
 /// SMS Platform Service
-/// Flutter-side platform channel for Android SMS integration
+/// Flutter-side platform channel for Android SMS integration.
+///
+/// The native side of this channel lives in
+/// `android/app/src/main/kotlin/com/orb/guard/MainActivity.kt`
+/// (`setupSmsChannel`) and `SMSAnalyzer.kt`. There is intentionally no iOS
+/// implementation: iOS does not expose the SMS inbox to third-party apps, so
+/// every inbox-related call on non-Android platforms surfaces an explicit
+/// [SmsPlatformUnavailableException] instead of pretending to return an
+/// empty-but-clean result.
 library sms_platform_service;
 
 import 'dart:async';
@@ -10,7 +18,22 @@ import '../api/orbguard_api_client.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/sms_provider.dart';
 
-/// SMS Platform Service - Handles native Android SMS integration
+/// Thrown when an SMS capability genuinely does not exist on this platform
+/// (or the native channel is not registered in the running binary).
+class SmsPlatformUnavailableException implements Exception {
+  final String message;
+  const SmsPlatformUnavailableException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// SMS Platform Service - Handles native Android SMS integration.
+///
+/// This is a singleton because it owns the single [MethodChannel] handler for
+/// `com.orb.guard/sms`, but it is *owned and initialized by [SmsProvider]*
+/// (constructor-injected there). UI code must never construct or talk to this
+/// service directly; it consumes [SmsProvider] instead.
 class SmsPlatformService {
   static const _channelName = 'com.orb.guard/sms';
   static final SmsPlatformService _instance = SmsPlatformService._internal();
@@ -30,24 +53,49 @@ class SmsPlatformService {
   final StreamController<SmsMessage> _smsStreamController =
       StreamController<SmsMessage>.broadcast();
 
-  // Settings
   bool _isInitialized = false;
   SmsProvider? _smsProvider;
 
-  /// Stream of incoming SMS messages
-  Stream<SmsMessage> get smsStream => _smsStreamController.stream;
+  /// Whether the device SMS inbox is reachable on this platform.
+  /// Only Android exposes SMS to apps; iOS/macOS/desktop/web do not.
+  bool get isSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  /// Initialize the service
-  Future<void> init({SmsProvider? smsProvider}) async {
-    if (_isInitialized) return;
-
-    _smsProvider = smsProvider;
-    _isInitialized = true;
-
-    debugPrint('SmsPlatformService: Initialized');
+  /// Human-readable reason used when [isSupported] is false.
+  String get unsupportedReason {
+    if (kIsWeb) {
+      return 'The SMS inbox is not accessible from the web. '
+          'Use the Check tab to analyze message text manually.';
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return 'iOS does not allow apps to read the SMS inbox. '
+            'Use the Check tab to analyze message text manually.';
+      case TargetPlatform.android:
+        return 'SMS channel unavailable.';
+      default:
+        return '${defaultTargetPlatform.name} does not expose an SMS inbox. '
+            'Use the Check tab to analyze message text manually.';
+    }
   }
 
-  /// Set the SMS provider for state management
+  bool get isInitialized => _isInitialized;
+
+  /// Stream of incoming SMS messages (forwarded from the Android receiver).
+  Stream<SmsMessage> get smsStream => _smsStreamController.stream;
+
+  /// Initialize the service. Called by [SmsProvider.init]; the provider owns
+  /// this service's lifecycle and receives all incoming messages.
+  Future<void> init({SmsProvider? smsProvider}) async {
+    if (smsProvider != null) {
+      _smsProvider = smsProvider;
+    }
+    if (_isInitialized) return;
+    _isInitialized = true;
+    debugPrint('SmsPlatformService: Initialized (supported=$isSupported)');
+  }
+
+  /// Set the SMS provider for state management.
   void setSmsProvider(SmsProvider provider) {
     _smsProvider = provider;
   }
@@ -84,11 +132,19 @@ class SmsPlatformService {
       // Notify listeners
       _smsStreamController.add(message);
 
-      // Add to provider
-      _smsProvider?.addMessage(message);
-
-      // Analyze the message
-      final result = await _analyzeMessage(message);
+      final provider = _smsProvider;
+      SmsAnalysisResult? result;
+      if (provider != null) {
+        // Route through the provider so state, stats and persistence all
+        // reflect this analysis.
+        provider.addMessage(message);
+        result = await provider.analyzeMessage(message.id);
+      } else {
+        // No provider attached (should not happen once main.dart wires the
+        // provider) - analyze directly so the native notification path still
+        // receives a verdict.
+        result = await _analyzeMessageDirect(message);
+      }
 
       // Send result back to native
       if (result != null) {
@@ -99,8 +155,9 @@ class SmsPlatformService {
     }
   }
 
-  /// Analyze an SMS message
-  Future<SmsAnalysisResult?> _analyzeMessage(SmsMessage message) async {
+  /// Analyze an SMS message directly against the backend (fallback path
+  /// used only when no provider is attached).
+  Future<SmsAnalysisResult?> _analyzeMessageDirect(SmsMessage message) async {
     try {
       final request = SmsAnalysisRequest(
         content: message.content,
@@ -120,6 +177,7 @@ class SmsPlatformService {
     String messageId,
     SmsAnalysisResult result,
   ) async {
+    if (!isSupported) return;
     try {
       await _channel.invokeMethod('onAnalysisComplete', {
         'messageId': messageId,
@@ -153,28 +211,48 @@ class SmsPlatformService {
     }
   }
 
-  /// Check if SMS permission is granted
+  /// Check if SMS permission is granted.
+  ///
+  /// Returns false on platforms without an SMS inbox; throws
+  /// [SmsPlatformUnavailableException] if the Android channel itself is
+  /// missing from the binary so callers can distinguish "denied" from
+  /// "broken".
   Future<bool> checkSmsPermission() async {
+    if (!isSupported) return false;
     try {
       final result = await _channel.invokeMethod<Map>('checkSmsPermission');
       return result?['hasPermission'] as bool? ?? false;
-    } catch (e) {
-      debugPrint('SmsPlatformService: Permission check failed: $e');
-      return false;
+    } on MissingPluginException {
+      throw const SmsPlatformUnavailableException(
+          'SMS channel is not registered in this build.');
     }
   }
 
-  /// Request SMS permission
+  /// Request SMS permission (Android runtime permission dialog).
+  ///
+  /// The result is not delivered synchronously; callers must re-check via
+  /// [checkSmsPermission] (e.g. on app resume).
   Future<void> requestSmsPermission() async {
+    if (!isSupported) {
+      throw SmsPlatformUnavailableException(unsupportedReason);
+    }
     try {
       await _channel.invokeMethod('requestSmsPermission');
-    } catch (e) {
-      debugPrint('SmsPlatformService: Permission request failed: $e');
+    } on MissingPluginException {
+      throw const SmsPlatformUnavailableException(
+          'SMS channel is not registered in this build.');
     }
   }
 
-  /// Read SMS inbox from device
+  /// Read SMS inbox from device.
+  ///
+  /// Throws [SmsPlatformUnavailableException] on platforms that do not
+  /// expose the SMS inbox, and rethrows channel errors. It never converts a
+  /// failure into an empty (fake-clean) inbox.
   Future<List<SmsMessage>> readSmsInbox({int limit = 100}) async {
+    if (!isSupported) {
+      throw SmsPlatformUnavailableException(unsupportedReason);
+    }
     try {
       final result = await _channel.invokeMethod<Map>('readSmsInbox', {
         'limit': limit,
@@ -189,23 +267,29 @@ class SmsPlatformService {
           sender: data['sender'] as String? ?? 'Unknown',
           content: data['content'] as String? ?? '',
           timestamp: DateTime.fromMillisecondsSinceEpoch(
-            (data['timestamp'] as int?) ?? DateTime.now().millisecondsSinceEpoch,
+            (data['timestamp'] as int?) ??
+                DateTime.now().millisecondsSinceEpoch,
           ),
           isRead: data['isRead'] as bool? ?? false,
         );
       }).toList();
-    } catch (e) {
-      debugPrint('SmsPlatformService: Failed to read inbox: $e');
-      return [];
+    } on MissingPluginException {
+      throw const SmsPlatformUnavailableException(
+          'SMS channel is not registered in this build.');
     }
   }
 
-  /// Update SMS protection settings
+  /// Update SMS protection settings on the native side.
   Future<void> updateSettings({
     bool protectionEnabled = true,
     bool notifyOnThreat = true,
     bool autoBlockDangerous = false,
   }) async {
+    if (!isSupported) {
+      debugPrint(
+          'SmsPlatformService: updateSettings skipped (platform unsupported)');
+      return;
+    }
     try {
       await _channel.invokeMethod('updateSettings', {
         'protectionEnabled': protectionEnabled,
@@ -219,6 +303,7 @@ class SmsPlatformService {
 
   /// Clear native cache
   Future<void> clearCache() async {
+    if (!isSupported) return;
     try {
       await _channel.invokeMethod('clearCache');
     } catch (e) {
