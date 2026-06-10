@@ -10,30 +10,81 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	App         AppConfig         `mapstructure:"app"`
-	Server      ServerConfig      `mapstructure:"server"`
-	Database    DatabaseConfig    `mapstructure:"database"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	Neo4j       Neo4jConfig       `mapstructure:"neo4j"`
-	NATS        NATSConfig        `mapstructure:"nats"`
-	JWT         JWTConfig         `mapstructure:"jwt"`
-	CORS        CORSConfig        `mapstructure:"cors"`
-	RateLimit   RateLimitConfig   `mapstructure:"ratelimit"`
-	Logger      LoggerConfig      `mapstructure:"logger"`
-	Aggregation AggregationConfig `mapstructure:"aggregation"`
-	Sources     SourcesConfig     `mapstructure:"sources"`
-	Scoring     ScoringConfig     `mapstructure:"scoring"`
-	Detection   DetectionConfig   `mapstructure:"detection"`
-	MITRE       MITREConfig       `mapstructure:"mitre"`
-	STIX        STIXConfig        `mapstructure:"stix"`
-	ML          MLConfig          `mapstructure:"ml"`
-	HIBP        HIBPConfig        `mapstructure:"hibp"`
+	App          AppConfig          `mapstructure:"app"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	Neo4j        Neo4jConfig        `mapstructure:"neo4j"`
+	NATS         NATSConfig         `mapstructure:"nats"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	CORS         CORSConfig         `mapstructure:"cors"`
+	RateLimit    RateLimitConfig    `mapstructure:"ratelimit"`
+	Logger       LoggerConfig       `mapstructure:"logger"`
+	Aggregation  AggregationConfig  `mapstructure:"aggregation"`
+	Sources      SourcesConfig      `mapstructure:"sources"`
+	Scoring      ScoringConfig      `mapstructure:"scoring"`
+	Detection    DetectionConfig    `mapstructure:"detection"`
+	MITRE        MITREConfig        `mapstructure:"mitre"`
+	STIX         STIXConfig         `mapstructure:"stix"`
+	ML           MLConfig           `mapstructure:"ml"`
+	HIBP         HIBPConfig         `mapstructure:"hibp"`
+	LeakCheck    LeakCheckConfig    `mapstructure:"leakcheck"`
+	IntelX       IntelXConfig       `mapstructure:"intelx"`
+	SafeBrowsing SafeBrowsingConfig `mapstructure:"safe_browsing"`
+	ScamDetector ScamDetectorConfig `mapstructure:"scam_detector"`
 }
 
 // HIBPConfig holds Have I Been Pwned API configuration
 type HIBPConfig struct {
 	APIKey  string `mapstructure:"api_key"`
 	Enabled bool   `mapstructure:"enabled"`
+}
+
+// LeakCheckConfig holds LeakCheck breach-search API configuration
+type LeakCheckConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	Enabled bool   `mapstructure:"enabled"`
+}
+
+// IntelXConfig holds Intelligence X dark-web search API configuration
+type IntelXConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	BaseURL string `mapstructure:"base_url"`
+	Enabled bool   `mapstructure:"enabled"`
+}
+
+// SafeBrowsingConfig holds the Google Safe Browsing key used by the URL
+// reputation service. When APIKey is empty it falls back to
+// sources.google_safebrowsing.api_key (see EffectiveSafeBrowsingKey).
+type SafeBrowsingConfig struct {
+	APIKey string `mapstructure:"api_key"`
+}
+
+// EffectiveSafeBrowsingKey returns the Safe Browsing API key for URL
+// reputation lookups, falling back to the source connector key so a single
+// key can drive both the feed connector and live lookups.
+func (c *Config) EffectiveSafeBrowsingKey() string {
+	if c.SafeBrowsing.APIKey != "" {
+		return c.SafeBrowsing.APIKey
+	}
+	return c.Sources.GoogleSafeBrowsing.APIKey
+}
+
+// ScamDetectorConfig holds AI-powered scam detection configuration.
+// LLM, vision and speech capabilities are only activated at startup when the
+// corresponding API keys are configured; pattern and phone reputation
+// databases are local and have no external dependency.
+type ScamDetectorConfig struct {
+	EnableLLM        bool    `mapstructure:"enable_llm"`
+	EnablePatternDB  bool    `mapstructure:"enable_pattern_db"`
+	EnablePhoneRep   bool    `mapstructure:"enable_phone_rep"`
+	EnableVision     bool    `mapstructure:"enable_vision"`
+	EnableSpeech     bool    `mapstructure:"enable_speech"`
+	LLMProvider      string  `mapstructure:"llm_provider"`
+	ClaudeAPIKey     string  `mapstructure:"claude_api_key"`
+	OpenAIAPIKey     string  `mapstructure:"openai_api_key"`
+	ScamThreshold    float64 `mapstructure:"scam_threshold"`
+	SuspiciousThresh float64 `mapstructure:"suspicious_threshold"`
 }
 
 type AppConfig struct {
@@ -176,9 +227,9 @@ type SourceConfig struct {
 }
 
 type ScoringConfig struct {
-	Weights           ScoringWeights           `mapstructure:"weights"`
-	Bonuses           ScoringBonuses           `mapstructure:"bonuses"`
-	SourceReliability map[string]float64       `mapstructure:"source_reliability"`
+	Weights           ScoringWeights     `mapstructure:"weights"`
+	Bonuses           ScoringBonuses     `mapstructure:"bonuses"`
+	SourceReliability map[string]float64 `mapstructure:"source_reliability"`
 }
 
 type ScoringWeights struct {
@@ -212,8 +263,8 @@ type BehavioralConfig struct {
 }
 
 type SupplyChainConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	OSVAPURL  string `mapstructure:"osv_api_url"`
+	Enabled  bool   `mapstructure:"enabled"`
+	OSVAPURL string `mapstructure:"osv_api_url"`
 }
 
 type MITREConfig struct {
@@ -223,7 +274,7 @@ type MITREConfig struct {
 }
 
 type STIXConfig struct {
-	Enabled     bool             `mapstructure:"enabled"`
+	Enabled     bool              `mapstructure:"enabled"`
 	TAXIIServer TAXIIServerConfig `mapstructure:"taxii_server"`
 }
 
@@ -288,6 +339,45 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("neo4j.database", "ORBGUARD_NEO4J_DATABASE")
 	v.BindEnv("nats.enabled", "ORBGUARD_NATS_ENABLED")
 	v.BindEnv("app.environment", "ORBGUARD_APP_ENVIRONMENT")
+
+	// Dark web / breach intelligence API keys
+	v.BindEnv("hibp.api_key", "ORBGUARD_HIBP_API_KEY")
+	v.BindEnv("hibp.enabled", "ORBGUARD_HIBP_ENABLED")
+	v.BindEnv("leakcheck.api_key", "ORBGUARD_LEAKCHECK_API_KEY")
+	v.BindEnv("leakcheck.enabled", "ORBGUARD_LEAKCHECK_ENABLED")
+	v.BindEnv("intelx.api_key", "ORBGUARD_INTELX_API_KEY")
+	v.BindEnv("intelx.base_url", "ORBGUARD_INTELX_BASE_URL")
+	v.BindEnv("intelx.enabled", "ORBGUARD_INTELX_ENABLED")
+
+	// URL reputation Safe Browsing key (falls back to sources.google_safebrowsing.api_key)
+	v.BindEnv("safe_browsing.api_key", "ORBGUARD_SAFE_BROWSING_API_KEY")
+
+	// AI scam detector
+	v.BindEnv("scam_detector.enable_llm", "ORBGUARD_SCAM_DETECTOR_ENABLE_LLM")
+	v.BindEnv("scam_detector.enable_pattern_db", "ORBGUARD_SCAM_DETECTOR_ENABLE_PATTERN_DB")
+	v.BindEnv("scam_detector.enable_phone_rep", "ORBGUARD_SCAM_DETECTOR_ENABLE_PHONE_REP")
+	v.BindEnv("scam_detector.enable_vision", "ORBGUARD_SCAM_DETECTOR_ENABLE_VISION")
+	v.BindEnv("scam_detector.enable_speech", "ORBGUARD_SCAM_DETECTOR_ENABLE_SPEECH")
+	v.BindEnv("scam_detector.llm_provider", "ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER")
+	v.BindEnv("scam_detector.claude_api_key", "ORBGUARD_CLAUDE_API_KEY")
+	v.BindEnv("scam_detector.openai_api_key", "ORBGUARD_OPENAI_API_KEY")
+
+	// Defaults for sections that may be absent from older config files.
+	// PatternDB and PhoneRep are local databases with no external dependency,
+	// so they default to enabled. LLM/vision/speech default to enabled but
+	// are gated at startup on the presence of their API keys.
+	v.SetDefault("scam_detector.enable_pattern_db", true)
+	v.SetDefault("scam_detector.enable_phone_rep", true)
+	v.SetDefault("scam_detector.enable_llm", true)
+	v.SetDefault("scam_detector.enable_vision", true)
+	v.SetDefault("scam_detector.enable_speech", true)
+	v.SetDefault("scam_detector.llm_provider", "claude")
+	v.SetDefault("scam_detector.scam_threshold", 0.7)
+	v.SetDefault("scam_detector.suspicious_threshold", 0.4)
+	v.SetDefault("hibp.enabled", true)
+	v.SetDefault("leakcheck.enabled", true)
+	v.SetDefault("intelx.enabled", true)
+	v.SetDefault("intelx.base_url", "https://2.intelx.io")
 
 	// Source API keys
 	v.BindEnv("sources.threatfox.api_key", "ORBGUARD_THREATFOX_API_KEY")

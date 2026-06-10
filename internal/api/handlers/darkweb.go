@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/pkg/logger"
@@ -24,6 +25,41 @@ func NewDarkWebHandler(monitor *services.DarkWebMonitor, log *logger.Logger) *Da
 		monitor: monitor,
 		logger:  log.WithComponent("darkweb-handler"),
 	}
+}
+
+// authorizedIdentity resolves the identity that owns dark-web monitoring
+// data for this request. Identity always comes from the authenticated
+// context (user_id, falling back to device_id) — never from client input.
+// A client-supplied user ID is only accepted when it matches the
+// authenticated identity, or when the caller authenticated with the
+// service-to-service secret (trusted internal callers acting on behalf of a
+// user). On failure it writes the error response and returns ok=false.
+func (h *DarkWebHandler) authorizedIdentity(w http.ResponseWriter, r *http.Request, requested string) (string, bool) {
+	ctx := r.Context()
+	userID := middleware.GetUserID(ctx)
+	deviceID := middleware.GetDeviceID(ctx)
+
+	if middleware.IsServiceRequest(ctx) {
+		if requested != "" {
+			return requested, true
+		}
+		h.respondError(w, http.StatusBadRequest, "user_id is required for service requests")
+		return "", false
+	}
+
+	identity := userID
+	if identity == "" {
+		identity = deviceID
+	}
+	if identity == "" {
+		h.respondError(w, http.StatusUnauthorized, "authenticated identity required")
+		return "", false
+	}
+	if requested != "" && requested != userID && requested != deviceID {
+		h.respondError(w, http.StatusForbidden, "user_id does not match authenticated identity")
+		return "", false
+	}
+	return identity, true
 }
 
 // CheckEmail handles POST /api/v1/darkweb/check/email
@@ -95,7 +131,17 @@ func (h *DarkWebHandler) AddMonitoredAsset(w http.ResponseWriter, r *http.Reques
 		assetType = models.BreachTypeEmail
 	}
 
-	asset, err := h.monitor.AddMonitoredAsset(r.Context(), req.UserID, req.DeviceID, assetType, req.Value)
+	identity, ok := h.authorizedIdentity(w, r, req.UserID)
+	if !ok {
+		return
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" && middleware.IsServiceRequest(r.Context()) {
+		deviceID = req.DeviceID
+	}
+
+	asset, err := h.monitor.AddMonitoredAsset(r.Context(), identity, deviceID, assetType, req.Value)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to add monitored asset")
 		h.respondError(w, http.StatusInternalServerError, "failed to add monitored asset")
@@ -125,9 +171,9 @@ func (h *DarkWebHandler) RemoveMonitoredAsset(w http.ResponseWriter, r *http.Req
 
 // GetMonitoredAssets handles GET /api/v1/darkweb/monitor
 func (h *DarkWebHandler) GetMonitoredAssets(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		userID = "default"
+	userID, ok := h.authorizedIdentity(w, r, r.URL.Query().Get("user_id"))
+	if !ok {
+		return
 	}
 
 	assets, err := h.monitor.GetMonitoredAssets(r.Context(), userID)
@@ -145,9 +191,9 @@ func (h *DarkWebHandler) GetMonitoredAssets(w http.ResponseWriter, r *http.Reque
 
 // GetMonitoringStatus handles GET /api/v1/darkweb/status
 func (h *DarkWebHandler) GetMonitoringStatus(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		userID = "default"
+	userID, ok := h.authorizedIdentity(w, r, r.URL.Query().Get("user_id"))
+	if !ok {
+		return
 	}
 
 	status, err := h.monitor.GetMonitoringStatus(r.Context(), userID)
@@ -162,9 +208,9 @@ func (h *DarkWebHandler) GetMonitoringStatus(w http.ResponseWriter, r *http.Requ
 
 // GetAlerts handles GET /api/v1/darkweb/alerts
 func (h *DarkWebHandler) GetAlerts(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		userID = "default"
+	userID, ok := h.authorizedIdentity(w, r, r.URL.Query().Get("user_id"))
+	if !ok {
+		return
 	}
 
 	alerts, err := h.monitor.GetAlerts(r.Context(), userID)

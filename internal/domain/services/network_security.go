@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/infrastructure/cache"
@@ -17,38 +19,111 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
+// gatewayBaseline records the gateway MAC observed by a specific device for a
+// specific gateway IP. Baselines are scoped per device because gateway IPs are
+// not globally unique: nearly every home router is 192.168.1.1, so a global
+// IP -> MAC map would compare gateways across unrelated users and raise false
+// CRITICAL "ARP spoofing" alerts.
+type gatewayBaseline struct {
+	GatewayMAC string    `json:"gateway_mac"`
+	FirstSeen  time.Time `json:"first_seen"`
+	LastSeen   time.Time `json:"last_seen"`
+}
+
+const (
+	// gatewayBaselineKeyPrefix is the Redis key prefix for persisted gateway baselines.
+	gatewayBaselineKeyPrefix = "network:gateway-baseline:"
+	// gatewayBaselineTTL bounds how long a gateway baseline is remembered.
+	// A legitimate router replacement stops alerting once the old baseline expires.
+	gatewayBaselineTTL = 30 * 24 * time.Hour
+)
+
 // NetworkSecurityService handles network security analysis
 type NetworkSecurityService struct {
-	repos           *repository.Repositories
-	cache           *cache.RedisCache
-	logger          *logger.Logger
-	knownGateways   map[string]string // IP -> MAC mapping for known gateways
-	gatewaysMu      sync.RWMutex
-	trustedNetworks map[string]bool   // SSID -> trusted
-	trustedMu       sync.RWMutex
+	repos            *repository.Repositories
+	cache            *cache.RedisCache
+	logger           *logger.Logger
+	gatewayBaselines map[string]gatewayBaseline // L1: "deviceID|gatewayIP" -> baseline (L2 persisted in Redis)
+	gatewaysMu       sync.RWMutex
 }
 
 // NewNetworkSecurityService creates a new network security service
 func NewNetworkSecurityService(repos *repository.Repositories, cache *cache.RedisCache, log *logger.Logger) *NetworkSecurityService {
 	return &NetworkSecurityService{
-		repos:           repos,
-		cache:           cache,
-		logger:          log.WithComponent("network-security"),
-		knownGateways:   make(map[string]string),
-		trustedNetworks: make(map[string]bool),
+		repos:            repos,
+		cache:            cache,
+		logger:           log.WithComponent("network-security"),
+		gatewayBaselines: make(map[string]gatewayBaseline),
+	}
+}
+
+func gatewayBaselineCacheKey(deviceID, gatewayIP string) string {
+	return gatewayBaselineKeyPrefix + deviceID + ":" + gatewayIP
+}
+
+// loadGatewayBaseline returns the recorded gateway baseline for a device,
+// checking the in-process map first and falling back to Redis so baselines
+// survive process restarts.
+func (s *NetworkSecurityService) loadGatewayBaseline(ctx context.Context, deviceID, gatewayIP string) (gatewayBaseline, bool) {
+	l1Key := deviceID + "|" + gatewayIP
+
+	s.gatewaysMu.RLock()
+	baseline, ok := s.gatewayBaselines[l1Key]
+	s.gatewaysMu.RUnlock()
+	if ok {
+		return baseline, true
+	}
+
+	if s.cache == nil {
+		return gatewayBaseline{}, false
+	}
+
+	var cached gatewayBaseline
+	if err := s.cache.GetJSON(ctx, gatewayBaselineCacheKey(deviceID, gatewayIP), &cached); err != nil {
+		if !errors.Is(err, redis.Nil) {
+			s.logger.Warn().Err(err).
+				Str("device_id", deviceID).
+				Str("gateway_ip", gatewayIP).
+				Msg("failed to load gateway baseline from cache")
+		}
+		return gatewayBaseline{}, false
+	}
+
+	s.gatewaysMu.Lock()
+	s.gatewayBaselines[l1Key] = cached
+	s.gatewaysMu.Unlock()
+
+	return cached, true
+}
+
+// storeGatewayBaseline persists a gateway baseline to the in-process map and Redis.
+func (s *NetworkSecurityService) storeGatewayBaseline(ctx context.Context, deviceID, gatewayIP string, baseline gatewayBaseline) {
+	s.gatewaysMu.Lock()
+	s.gatewayBaselines[deviceID+"|"+gatewayIP] = baseline
+	s.gatewaysMu.Unlock()
+
+	if s.cache == nil {
+		return
+	}
+
+	if err := s.cache.SetJSON(ctx, gatewayBaselineCacheKey(deviceID, gatewayIP), baseline, gatewayBaselineTTL); err != nil {
+		s.logger.Warn().Err(err).
+			Str("device_id", deviceID).
+			Str("gateway_ip", gatewayIP).
+			Msg("failed to persist gateway baseline to cache")
 	}
 }
 
 // AuditWiFi performs a comprehensive Wi-Fi security audit
 func (s *NetworkSecurityService) AuditWiFi(ctx context.Context, req *models.WiFiAuditRequest) (*models.WiFiAuditResult, error) {
 	result := &models.WiFiAuditResult{
-		ID:              uuid.New(),
-		Network:         req.CurrentNetwork,
-		SecurityIssues:  make([]models.WiFiSecurityIssue, 0),
-		RogueAPDetected: make([]models.RogueAPAlert, 0),
+		ID:               uuid.New(),
+		Network:          req.CurrentNetwork,
+		SecurityIssues:   make([]models.WiFiSecurityIssue, 0),
+		RogueAPDetected:  make([]models.RogueAPAlert, 0),
 		EvilTwinDetected: make([]models.EvilTwinAlert, 0),
-		Recommendations: make([]models.NetworkRecommendation, 0),
-		AuditedAt:       time.Now(),
+		Recommendations:  make([]models.NetworkRecommendation, 0),
+		AuditedAt:        time.Now(),
 	}
 
 	// Check current network security
@@ -180,10 +255,10 @@ func (s *NetworkSecurityService) detectRogueAPs(result *models.WiFiAuditResult, 
 func (s *NetworkSecurityService) checkSSIDImpersonation(result *models.WiFiAuditResult, ssid string, networks []models.WiFiNetwork) {
 	// Known legitimate SSIDs that are commonly impersonated
 	knownSSIDs := map[string]bool{
-		"attwifi":        true,
-		"xfinitywifi":    true,
-		"Starbucks WiFi": true,
-		"Google Starbucks": true,
+		"attwifi":              true,
+		"xfinitywifi":          true,
+		"Starbucks WiFi":       true,
+		"Google Starbucks":     true,
 		"McDonald's Free WiFi": true,
 	}
 
@@ -619,30 +694,46 @@ func (s *NetworkSecurityService) CheckARPSpoofing(ctx context.Context, req *mode
 		}
 	}
 
-	// Check if gateway MAC has changed (if we have history)
+	// Check if gateway MAC has changed against this device's own baseline.
+	// Without a device identifier there is no safe scoping key, so the
+	// history check is skipped rather than risking cross-user false positives.
 	if req.GatewayIP != "" && req.GatewayMAC != "" {
-		s.gatewaysMu.RLock()
-		knownMAC, exists := s.knownGateways[req.GatewayIP]
-		s.gatewaysMu.RUnlock()
-
-		if exists && knownMAC != req.GatewayMAC {
-			result.IsSpoofDetected = true
-			attackInfo := models.NetworkAttackDescriptions[models.NetworkAttackARPSpoofing]
-			result.Alerts = append(result.Alerts, models.NetworkAttackAlert{
-				ID:          uuid.New(),
-				Type:        models.NetworkAttackARPSpoofing,
-				Severity:    models.NetworkRiskLevelCritical,
-				Title:       "Gateway MAC Address Changed",
-				Description: fmt.Sprintf("Gateway %s MAC changed from %s to %s", req.GatewayIP, knownMAC, req.GatewayMAC),
-				Evidence:    []string{fmt.Sprintf("Previous: %s, Current: %s", knownMAC, req.GatewayMAC)},
-				Mitigation:  attackInfo.Mitigation,
-				DetectedAt:  time.Now(),
-			})
-		} else if !exists {
-			// Store for future comparison
-			s.gatewaysMu.Lock()
-			s.knownGateways[req.GatewayIP] = req.GatewayMAC
-			s.gatewaysMu.Unlock()
+		if req.DeviceID == "" {
+			s.logger.Debug().
+				Str("gateway_ip", req.GatewayIP).
+				Msg("skipping gateway MAC baseline check: request has no device_id")
+		} else {
+			baseline, exists := s.loadGatewayBaseline(ctx, req.DeviceID, req.GatewayIP)
+			switch {
+			case exists && baseline.GatewayMAC != req.GatewayMAC:
+				result.IsSpoofDetected = true
+				attackInfo := models.NetworkAttackDescriptions[models.NetworkAttackARPSpoofing]
+				result.Alerts = append(result.Alerts, models.NetworkAttackAlert{
+					ID:          uuid.New(),
+					Type:        models.NetworkAttackARPSpoofing,
+					Severity:    models.NetworkRiskLevelCritical,
+					Title:       "Gateway MAC Address Changed",
+					Description: fmt.Sprintf("Gateway %s MAC changed from %s to %s", req.GatewayIP, baseline.GatewayMAC, req.GatewayMAC),
+					Evidence:    []string{fmt.Sprintf("Previous: %s, Current: %s", baseline.GatewayMAC, req.GatewayMAC)},
+					Mitigation:  attackInfo.Mitigation,
+					DetectedAt:  time.Now(),
+				})
+				// Keep the existing baseline: the new MAC may belong to an
+				// attacker and must not silently become the trusted value.
+				// If the change is legitimate (router replaced), the old
+				// baseline ages out via TTL.
+			case exists:
+				// MAC matches the baseline - refresh last-seen and TTL.
+				baseline.LastSeen = time.Now()
+				s.storeGatewayBaseline(ctx, req.DeviceID, req.GatewayIP, baseline)
+			default:
+				now := time.Now()
+				s.storeGatewayBaseline(ctx, req.DeviceID, req.GatewayIP, gatewayBaseline{
+					GatewayMAC: req.GatewayMAC,
+					FirstSeen:  now,
+					LastSeen:   now,
+				})
+			}
 		}
 	}
 

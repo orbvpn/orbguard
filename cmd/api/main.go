@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -16,6 +17,7 @@ import (
 	"orbguard-lab/internal/config"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/domain/services/ai"
+	"orbguard-lab/internal/domain/services/desktop_security"
 	"orbguard-lab/internal/forensics"
 	grpcserver "orbguard-lab/internal/grpc/threatintel"
 	"orbguard-lab/internal/infrastructure/cache"
@@ -134,10 +136,22 @@ func main() {
 	aggregator.SetEventPublisher(eventPublisher)
 
 	// Initialize URL reputation service (Safe Web protection)
-	urlService := services.NewURLReputationService(repos, redisCache, nil, log)
-	log.Info().Msg("URL reputation service initialized")
+	var safeBrowsingClient services.SafeBrowsingClient
+	if sbKey := cfg.EffectiveSafeBrowsingKey(); sbKey != "" {
+		safeBrowsingClient = services.NewGoogleSafeBrowsingClient(services.SafeBrowsingConfig{
+			APIKey: sbKey,
+		}, log)
+		log.Info().Msg("Google Safe Browsing client initialized for URL reputation")
+	} else {
+		log.Warn().Msg("Safe Browsing disabled (no API key) - set ORBGUARD_SAFE_BROWSING_API_KEY to enable live URL lookups")
+	}
+	urlService := services.NewURLReputationService(repos, redisCache, safeBrowsingClient, log)
+	log.Info().Bool("safe_browsing", safeBrowsingClient != nil).Msg("URL reputation service initialized")
 
 	// Initialize dark web monitoring (HIBP integration)
+	if cfg.HIBP.APIKey == "" {
+		log.Warn().Msg("HIBP API key not configured - dark web breach lookups degraded (set ORBGUARD_HIBP_API_KEY)")
+	}
 	hibpClient := services.NewHIBPClient(services.HIBPConfig{
 		APIKey: cfg.HIBP.APIKey,
 	}, log)
@@ -168,8 +182,23 @@ func main() {
 		Msg("MITRE ATT&CK service initialized")
 
 	// Initialize ML service
-	mlService := services.NewMLService(services.DefaultMLServiceConfig(), repos, redisCache, log)
-	log.Info().Msg("ML service initialized")
+	mlConfig := services.DefaultMLServiceConfig()
+	mlService := services.NewMLService(mlConfig, repos, redisCache, log)
+	log.Info().
+		Bool("auto_train", mlConfig.AutoTrain).
+		Dur("train_interval", mlConfig.TrainInterval).
+		Int("min_training_size", mlConfig.MinTrainingSize).
+		Msg("ML service initialized")
+
+	// Start ML auto-training loop: waits for enough indicators, runs an
+	// initial training pass, then re-trains on a fixed interval.
+	if mlConfig.AutoTrain {
+		if repos != nil {
+			go runMLAutoTrain(ctx, mlService, mlConfig, repos, log)
+		} else {
+			log.Warn().Msg("ML auto-training disabled: no database connection available")
+		}
+	}
 
 	// Initialize privacy protection service
 	privacyService := services.NewPrivacyService(redisCache, log)
@@ -215,12 +244,35 @@ func main() {
 	log.Info().Msg("integration hub service initialized (Slack, Teams, PagerDuty)")
 
 	// Initialize AI-powered scam detection service
-	scamDetector := ai.NewScamDetector(log, ai.ScamDetectorConfig{})
-	log.Info().Msg("AI scam detection service initialized")
+	scamConfig := buildScamDetectorConfig(cfg, log)
+	scamDetector := ai.NewScamDetector(log, scamConfig)
+	log.Info().
+		Bool("llm", scamConfig.EnableLLM).
+		Bool("pattern_db", scamConfig.EnablePatternDB).
+		Bool("phone_reputation", scamConfig.EnablePhoneRep).
+		Bool("vision", scamConfig.EnableVision).
+		Bool("speech", scamConfig.EnableSpeech).
+		Str("llm_provider", scamConfig.LLMProvider).
+		Msg("AI scam detection service initialized")
 
 	// Initialize forensics service (Pegasus/Spyware detection)
 	forensicsService := forensics.NewServiceWithCache(redisCache, log)
 	log.Info().Msg("forensics service initialized")
+
+	// Initialize desktop security services (persistence, code signing,
+	// network monitoring, browser extensions, VirusTotal lookups)
+	persistenceScanner := desktop_security.NewPersistenceScanner(redisCache, log)
+	codeVerifier := desktop_security.NewCodeSigningVerifier(log)
+	networkMonitor := desktop_security.NewNetworkMonitor(redisCache, log)
+	browserScanner := desktop_security.NewBrowserExtensionScanner(log)
+	var vtClient *desktop_security.VirusTotalClient
+	if vtKey := cfg.Sources.VirusTotal.APIKey; vtKey != "" {
+		vtClient = desktop_security.NewVirusTotalClient(vtKey, redisCache, log)
+		log.Info().Msg("desktop security VirusTotal client initialized")
+	} else {
+		log.Warn().Msg("desktop security VirusTotal lookups disabled (no API key) - set ORBGUARD_VIRUSTOTAL_API_KEY to enable")
+	}
+	log.Info().Msg("desktop security services initialized (persistence, code signing, network monitor, browser extensions)")
 
 	// Initialize Neo4j graph database (if enabled)
 	var graphService *services.GraphService
@@ -238,24 +290,24 @@ func main() {
 
 	// Initialize handlers
 	deps := handlers.Dependencies{
-		Aggregator:        aggregator,
-		Normalizer:        normalizer,
-		Deduplicator:      deduplicator,
-		Scorer:            scorer,
-		Scheduler:         scheduler,
-		Cache:             redisCache,
-		Logger:            log,
-		Repos:             repos,
-		JWTSecret:         cfg.JWT.Secret,
-		EventBus:          eventBus,
-		WSHub:             wsHub,
-		URLService:        urlService,
-		DarkWebMonitor:    darkWebMonitor,
-		AppAnalyzer:       appAnalyzer,
-		NetworkSecurity:   networkSecurity,
-		GraphService:      graphService,
-		YARAService:       yaraService,
-		CorrelationEngine: correlationEngine,
+		Aggregator:            aggregator,
+		Normalizer:            normalizer,
+		Deduplicator:          deduplicator,
+		Scorer:                scorer,
+		Scheduler:             scheduler,
+		Cache:                 redisCache,
+		Logger:                log,
+		Repos:                 repos,
+		JWTSecret:             cfg.JWT.Secret,
+		EventBus:              eventBus,
+		WSHub:                 wsHub,
+		URLService:            urlService,
+		DarkWebMonitor:        darkWebMonitor,
+		AppAnalyzer:           appAnalyzer,
+		NetworkSecurity:       networkSecurity,
+		GraphService:          graphService,
+		YARAService:           yaraService,
+		CorrelationEngine:     correlationEngine,
 		MITREService:          mitreService,
 		MLService:             mlService,
 		PrivacyService:        privacyService,
@@ -270,6 +322,11 @@ func main() {
 		IntegrationService:    integrationService,
 		ScamDetector:          scamDetector,
 		ForensicsService:      forensicsService,
+		PersistenceScanner:    persistenceScanner,
+		CodeVerifier:          codeVerifier,
+		NetworkMonitor:        networkMonitor,
+		BrowserScanner:        browserScanner,
+		VTClient:              vtClient,
 	}
 	h := handlers.NewHandlers(deps)
 
@@ -304,6 +361,11 @@ func main() {
 	grpcServer := grpc.NewServer()
 	threatIntelServer := grpcserver.NewServer(aggregator, repos, redisCache, eventBus, log)
 	threatIntelServer.Register(grpcServer)
+	// NOTE: Register currently delegates to a placeholder (no generated
+	// protobuf bindings exist yet), so ThreatIntelligenceService methods are
+	// not reachable over gRPC. The health service reports it NOT_SERVING
+	// until real protoc-generated registration lands.
+	log.Warn().Msg("gRPC ThreatIntelligenceService registration is a placeholder - RPC methods not reachable until protobuf bindings are generated; only the gRPC health service is functional")
 
 	// Register gRPC health check service
 	grpcserver.RegisterHealthServer(grpcServer, db, redisCache)
@@ -376,6 +438,134 @@ func initInfrastructure(ctx context.Context, cfg *config.Config, log *logger.Log
 	}
 
 	return db, redisCache, nil
+}
+
+// buildScamDetectorConfig translates the application config into the AI scam
+// detector configuration, enabling LLM-backed capabilities only when their
+// API keys are present so the service degrades gracefully (never fakes
+// results) without external credentials.
+func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDetectorConfig {
+	sc := cfg.ScamDetector
+
+	hasClaude := sc.ClaudeAPIKey != ""
+	hasOpenAI := sc.OpenAIAPIKey != ""
+	hasLLMKey := hasClaude || hasOpenAI
+
+	provider := sc.LLMProvider
+	switch {
+	case provider == "claude" && !hasClaude && hasOpenAI:
+		log.Warn().Msg("scam detector: llm_provider=claude but only OpenAI key configured, switching provider to openai")
+		provider = "openai"
+	case provider == "openai" && !hasOpenAI && hasClaude:
+		log.Warn().Msg("scam detector: llm_provider=openai but only Claude key configured, switching provider to claude")
+		provider = "claude"
+	case provider == "":
+		if hasOpenAI && !hasClaude {
+			provider = "openai"
+		} else {
+			provider = "claude"
+		}
+	}
+
+	enableLLM := sc.EnableLLM && hasLLMKey
+	if sc.EnableLLM && !hasLLMKey {
+		log.Warn().Msg("scam detector LLM analysis disabled: no Claude or OpenAI API key configured (set ORBGUARD_CLAUDE_API_KEY or ORBGUARD_OPENAI_API_KEY)")
+	}
+
+	enableVision := sc.EnableVision && enableLLM
+	if sc.EnableVision && !enableLLM {
+		log.Warn().Msg("scam detector vision analysis disabled: requires an LLM API key")
+	}
+
+	enableSpeech := sc.EnableSpeech && hasOpenAI
+	if sc.EnableSpeech && !hasOpenAI {
+		log.Warn().Msg("scam detector speech analysis disabled: requires an OpenAI API key (set ORBGUARD_OPENAI_API_KEY)")
+	}
+
+	return ai.ScamDetectorConfig{
+		ClaudeAPIKey:     sc.ClaudeAPIKey,
+		OpenAIAPIKey:     sc.OpenAIAPIKey,
+		LLMProvider:      provider,
+		EnableLLM:        enableLLM,
+		EnablePatternDB:  sc.EnablePatternDB,
+		EnablePhoneRep:   sc.EnablePhoneRep,
+		EnableVision:     enableVision,
+		EnableSpeech:     enableSpeech,
+		ScamThreshold:    sc.ScamThreshold,
+		SuspiciousThresh: sc.SuspiciousThresh,
+	}
+}
+
+// runMLAutoTrain waits until the indicator store holds at least
+// minTrainingSize records, performs an initial training pass, then re-trains
+// every TrainInterval. It exits when the application context is cancelled.
+// Trained model state is in-memory only; models are rebuilt after restart.
+func runMLAutoTrain(
+	ctx context.Context,
+	mlService *services.MLService,
+	mlConfig services.MLServiceConfig,
+	repos *repository.Repositories,
+	baseLog *logger.Logger,
+) {
+	log := baseLog.WithComponent("ml-autotrain")
+	const pollInterval = 5 * time.Minute
+
+	// Wait for enough training data before the first run.
+	for {
+		_, total, err := repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: 1})
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to count indicators for ML training, will retry")
+		} else if total >= int64(mlConfig.MinTrainingSize) {
+			log.Info().
+				Int64("indicators", total).
+				Int("min_required", mlConfig.MinTrainingSize).
+				Msg("sufficient training data available, starting initial ML training")
+			break
+		} else {
+			log.Debug().
+				Int64("indicators", total).
+				Int("min_required", mlConfig.MinTrainingSize).
+				Msg("waiting for ML training data")
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(pollInterval):
+		}
+	}
+
+	train := func() {
+		start := time.Now()
+		result, err := mlService.Train(ctx)
+		switch {
+		case err != nil:
+			log.Error().Err(err).Dur("elapsed", time.Since(start)).Msg("ML training failed")
+		case result == nil:
+			log.Error().Dur("elapsed", time.Since(start)).Msg("ML training returned no result")
+		case !result.Success:
+			log.Warn().Str("reason", result.Error).Dur("elapsed", time.Since(start)).Msg("ML training did not complete")
+		default:
+			log.Info().
+				Int("training_size", result.TrainingSize).
+				Dur("training_time", result.TrainingTime).
+				Interface("metrics", result.Metrics).
+				Msg("ML training completed")
+		}
+	}
+
+	train()
+
+	ticker := time.NewTicker(mlConfig.TrainInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			train()
+		}
+	}
 }
 
 // registerConnectors registers all available source connectors

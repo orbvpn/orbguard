@@ -233,3 +233,37 @@ ml:
     enabled: true
     min_samples: 5
     eps: 0.5
+
+# Have I Been Pwned breach data (dark web monitoring)
+hibp:
+  enabled: true
+  api_key: ""  # Set via ORBGUARD_HIBP_API_KEY env
+
+# LeakCheck breach search (dark web monitoring)
+leakcheck:
+  enabled: true
+  api_key: ""  # Set via ORBGUARD_LEAKCHECK_API_KEY env
+
+# Intelligence X dark web search
+intelx:
+  enabled: true
+  base_url: https://2.intelx.io
+  api_key: ""  # Set via ORBGUARD_INTELX_API_KEY env
+
+# Google Safe Browsing for live URL reputation lookups.
+# Falls back to sources.google_safebrowsing.api_key when empty.
+safe_browsing:
+  api_key: ""  # Set via ORBGUARD_SAFE_BROWSING_API_KEY env
+
+# AI-powered scam detection
+scam_detector:
+  enable_pattern_db: true   # local pattern database, no external dependency
+  enable_phone_rep: true    # local phone reputation database
+  enable_llm: true          # effective only when a Claude/OpenAI API key is set
+  enable_vision: true       # requires an LLM API key
+  enable_speech: true       # requires an OpenAI API key (transcription)
+  llm_provider: claude      # claude or openai
+  claude_api_key: ""        # Set via ORBGUARD_CLAUDE_API_KEY env
+  openai_api_key: ""        # Set via ORBGUARD_OPENAI_API_KEY env
+  scam_threshold: 0.7
+  suspicious_threshold: 0.4
