@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,6 +50,7 @@ func (h *ScamDetectionHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		URL         string `json:"url,omitempty"`
 		Language    string `json:"language,omitempty"`
 		DeviceID    string `json:"device_id,omitempty"`
+		MimeType    string `json:"mime_type,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -81,12 +84,43 @@ func (h *ScamDetectionHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		analysisReq.ContentType = models.ContentTypeText
 	}
 
+	// For image/voice analysis the client sends the media base64-encoded in
+	// `content` (the model documents Content as "text content or base64 for
+	// images"). Decode it into the raw byte fields the detector consumes.
+	if analysisReq.ContentType == models.ContentTypeImage ||
+		analysisReq.ContentType == models.ContentTypeVoice {
+		data, err := base64.StdEncoding.DecodeString(req.Content)
+		if err != nil {
+			http.Error(w, `{"error":"content must be base64-encoded for image/voice analysis"}`, http.StatusBadRequest)
+			return
+		}
+		analysisReq.MimeType = req.MimeType
+		if analysisReq.ContentType == models.ContentTypeImage {
+			analysisReq.ImageData = data
+		} else {
+			analysisReq.AudioData = data
+		}
+		// The base64 blob is not text; don't run language detection on it.
+		analysisReq.Content = ""
+	}
+
 	result, err := h.detector.Analyze(r.Context(), analysisReq)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("scam analysis failed")
 		// Do NOT fabricate a "safe" verdict on failure — surface the error so
 		// clients can show an error state instead of a false negative.
 		w.Header().Set("Content-Type", "application/json")
+		msg := err.Error()
+		if strings.Contains(msg, "not enabled") {
+			// Vision/speech analyzers are config-gated: this is a capability
+			// gap, not a server fault — surface it as a typed 503.
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": msg,
+				"code":  "analyzer_not_enabled",
+			})
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error": "scam analysis failed",

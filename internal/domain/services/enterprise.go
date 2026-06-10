@@ -314,9 +314,10 @@ type ZeroTrustService struct {
 	cache   *cache.RedisCache
 	logger  *logger.Logger
 
-	// Policies
-	policies map[uuid.UUID]*models.ConditionalAccessPolicy
-	mu       sync.RWMutex
+	// Policies (in-memory working set, backed by policyRepo when available)
+	policies   map[uuid.UUID]*models.ConditionalAccessPolicy
+	policyRepo *repository.EnterprisePolicyRepository
+	mu         sync.RWMutex
 }
 
 // NewZeroTrustService creates a new Zero Trust service
@@ -327,11 +328,65 @@ func NewZeroTrustService(repos *repository.Repositories, cache *cache.RedisCache
 		logger:   log.WithComponent("zero-trust"),
 		policies: make(map[uuid.UUID]*models.ConditionalAccessPolicy),
 	}
+	if repos != nil {
+		svc.policyRepo = repos.EnterprisePolicies
+	}
 
-	// Add default policies
-	svc.initDefaultPolicies()
+	// Load persisted policies; seed defaults only on first run (or when no
+	// database is available).
+	svc.loadPolicies()
 
 	return svc
+}
+
+// loadPolicies populates the in-memory policy set from the database. When
+// the table is empty (first run) the default policies are seeded and
+// persisted; when no repository is available the defaults exist in memory
+// only.
+func (s *ZeroTrustService) loadPolicies() {
+	if s.policyRepo == nil {
+		s.initDefaultPolicies()
+		s.logger.Warn().Msg("no database available: conditional access policies are in-memory only")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stored, err := s.policyRepo.List(ctx)
+	if err != nil {
+		// Do not seed on a load failure — that would shadow persisted
+		// policies with defaults. Operate on an empty set until restart.
+		s.logger.Error().Err(err).Msg("failed to load conditional access policies")
+		return
+	}
+
+	if len(stored) == 0 {
+		s.initDefaultPolicies()
+		for _, policy := range s.policies {
+			if err := s.policyRepo.Upsert(ctx, policy); err != nil {
+				s.logger.Error().Err(err).Str("policy", policy.Name).Msg("failed to persist default policy")
+			}
+		}
+		s.logger.Info().Int("count", len(s.policies)).Msg("seeded default conditional access policies")
+		return
+	}
+
+	for _, policy := range stored {
+		s.policies[policy.ID] = policy
+	}
+	s.logger.Info().Int("count", len(stored)).Msg("loaded conditional access policies")
+}
+
+// persistPolicy writes a policy to the database when persistence is
+// configured.
+func (s *ZeroTrustService) persistPolicy(policy *models.ConditionalAccessPolicy) error {
+	if s.policyRepo == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return s.policyRepo.Upsert(ctx, policy)
 }
 
 // initDefaultPolicies creates default conditional access policies
@@ -622,6 +677,10 @@ func (s *ZeroTrustService) CreatePolicy(policy *models.ConditionalAccessPolicy) 
 	policy.CreatedAt = time.Now()
 	policy.UpdatedAt = time.Now()
 
+	if err := s.persistPolicy(policy); err != nil {
+		return fmt.Errorf("persist policy: %w", err)
+	}
+
 	s.policies[policy.ID] = policy
 	return nil
 }
@@ -655,11 +714,18 @@ func (s *ZeroTrustService) UpdatePolicy(policy *models.ConditionalAccessPolicy) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.policies[policy.ID]; !ok {
+	existing, ok := s.policies[policy.ID]
+	if !ok {
 		return fmt.Errorf("policy not found: %s", policy.ID)
 	}
 
+	policy.CreatedAt = existing.CreatedAt
 	policy.UpdatedAt = time.Now()
+
+	if err := s.persistPolicy(policy); err != nil {
+		return fmt.Errorf("persist policy: %w", err)
+	}
+
 	s.policies[policy.ID] = policy
 	return nil
 }
@@ -671,6 +737,14 @@ func (s *ZeroTrustService) DeletePolicy(id uuid.UUID) error {
 
 	if _, ok := s.policies[id]; !ok {
 		return fmt.Errorf("policy not found: %s", id)
+	}
+
+	if s.policyRepo != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.policyRepo.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete persisted policy: %w", err)
+		}
 	}
 
 	delete(s.policies, id)

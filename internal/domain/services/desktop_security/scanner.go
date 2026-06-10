@@ -28,7 +28,6 @@ type PersistenceScanner struct {
 	locationDB    *PersistenceLocationDB
 	cache         *cache.RedisCache
 	logger        *logger.Logger
-	knownGoodDB   *KnownGoodDB
 	platform      models.DesktopPlatform
 	homeDir       string
 }
@@ -39,12 +38,11 @@ func NewPersistenceScanner(redisCache *cache.RedisCache, log *logger.Logger) *Pe
 	homeDir := getHomeDir()
 
 	return &PersistenceScanner{
-		locationDB:  NewPersistenceLocationDB(),
-		cache:       redisCache,
-		logger:      log.WithComponent("persistence-scanner"),
-		knownGoodDB: NewKnownGoodDB(),
-		platform:    platform,
-		homeDir:     homeDir,
+		locationDB: NewPersistenceLocationDB(),
+		cache:      redisCache,
+		logger:     log.WithComponent("persistence-scanner"),
+		platform:   platform,
+		homeDir:    homeDir,
 	}
 }
 
@@ -515,14 +513,10 @@ func (s *PersistenceScanner) assessRisk(item *models.PersistenceItem, loc models
 	// Base risk from location
 	riskScore += loc.RiskFactor * 10
 
-	// Check if known good
-	if item.BinaryHash != "" {
-		if s.knownGoodDB.IsKnownGood(item.BinaryHash) {
-			item.IsKnownGood = true
-			item.RiskLevel = models.PersistenceRiskClean
-			return
-		}
-	}
+	// Known-good determination is hash-reputation based and comes from
+	// VirusTotal enrichment (VirusTotalClient.EnrichPersistenceItem and the
+	// /desktop/virustotal/* endpoints set IsKnownGood on clean reports).
+	// There is intentionally no local known-good hash database.
 
 	// Code signing assessment
 	switch item.CodeSigning {
@@ -728,37 +722,6 @@ func getOSVersion() string {
 		}
 	}
 	return runtime.GOOS
-}
-
-// KnownGoodDB provides a database of known good hashes
-type KnownGoodDB struct {
-	hashes map[string]models.KnownGoodHash
-}
-
-// NewKnownGoodDB creates a new known good database
-func NewKnownGoodDB() *KnownGoodDB {
-	db := &KnownGoodDB{
-		hashes: make(map[string]models.KnownGoodHash),
-	}
-	db.loadBuiltinHashes()
-	return db
-}
-
-// IsKnownGood checks if a hash is known good
-func (db *KnownGoodDB) IsKnownGood(hash string) bool {
-	_, exists := db.hashes[strings.ToLower(hash)]
-	return exists
-}
-
-// AddHash adds a known good hash
-func (db *KnownGoodDB) AddHash(hash models.KnownGoodHash) {
-	db.hashes[strings.ToLower(hash.Hash)] = hash
-}
-
-// loadBuiltinHashes loads built-in known good hashes
-func (db *KnownGoodDB) loadBuiltinHashes() {
-	// Apple system binaries are verified via code signing instead
-	// This is a placeholder for future known good hash database
 }
 
 // QuickScan performs a quick scan of high-priority locations only

@@ -27,19 +27,16 @@ type SpeechAnalyzer struct {
 // SpeechAnalyzerConfig contains configuration for speech analysis
 type SpeechAnalyzerConfig struct {
 	// Speech-to-text services
-	OpenAIAPIKey      string
-	WhisperEndpoint   string // For self-hosted Whisper
-	GoogleSpeechKey   string
+	OpenAIAPIKey    string
+	WhisperEndpoint string // For self-hosted Whisper
 
 	// Provider preference
-	Provider          string // "openai", "whisper", "google"
+	Provider string // "openai", "whisper"
 
 	// Analysis settings
-	MaxAudioDuration  time.Duration
-	MaxAudioSize      int64
-	EnableTranscript  bool
-	EnableVoiceprint  bool
-	EnableEmotionDetection bool
+	MaxAudioDuration time.Duration
+	MaxAudioSize     int64
+	EnableTranscript bool
 }
 
 // SpeechAnalysisResult contains the result of voice message analysis
@@ -54,9 +51,6 @@ type SpeechAnalysisResult struct {
 	ScamConfidence    float64             `json:"scam_confidence"`
 	ScamType          models.ScamType     `json:"scam_type,omitempty"`
 	Severity          models.ScamSeverity `json:"severity"`
-
-	// Voice characteristics
-	VoiceAnalysis     *VoiceCharacteristics `json:"voice_analysis,omitempty"`
 
 	// Content analysis
 	ContentAnalysis   *AudioContentAnalysis `json:"content_analysis,omitempty"`
@@ -76,28 +70,6 @@ type SpeechAnalysisResult struct {
 	// Metadata
 	AudioDuration     time.Duration       `json:"audio_duration"`
 	ProcessingTime    time.Duration       `json:"processing_time"`
-}
-
-// VoiceCharacteristics contains voice analysis results
-type VoiceCharacteristics struct {
-	// Speaker analysis
-	SpeakerCount      int                 `json:"speaker_count"`
-	IsSynthetic       bool                `json:"is_synthetic"` // AI-generated voice
-	SyntheticConf     float64             `json:"synthetic_confidence"`
-
-	// Emotional indicators
-	Emotion           string              `json:"emotion,omitempty"` // urgent, threatening, friendly, etc.
-	EmotionConf       float64             `json:"emotion_confidence"`
-	Urgency           float64             `json:"urgency"` // 0-1 scale
-	Aggression        float64             `json:"aggression"` // 0-1 scale
-
-	// Voice quality
-	AudioQuality      string              `json:"audio_quality"` // good, poor, synthetic
-	BackgroundNoise   string              `json:"background_noise,omitempty"`
-	CallCenterLikely  bool                `json:"call_center_likely"`
-
-	// Accent/region (for context)
-	AccentRegion      string              `json:"accent_region,omitempty"`
 }
 
 // AudioContentAnalysis contains analysis of the spoken content
@@ -180,10 +152,10 @@ func (s *SpeechAnalyzer) AnalyzeAudio(ctx context.Context, audioData []byte, mim
 		s.analyzeTranscript(ctx, transcript, result)
 	}
 
-	// Voice analysis (if enabled)
-	if s.config.EnableVoiceprint {
-		result.VoiceAnalysis = s.analyzeVoiceCharacteristics(audioData)
-	}
+	// Note: voice-characteristic analysis (synthetic-voice detection, emotion,
+	// speaker count) is intentionally not implemented — it requires real
+	// audio-feature extraction. The response must never contain fabricated
+	// pitch/tone values, so no placeholder is emitted.
 
 	// Calculate severity
 	s.calculateSeverity(result)
@@ -508,20 +480,6 @@ func (s *SpeechAnalyzer) checkAudioScamIndicators(transcript string, result *Spe
 	checkIndicators(techSupportIndicators, models.ScamTypeTechSupport)
 	checkIndicators(bankIndicators, models.ScamTypePhishing)
 	checkIndicators(generalIndicators, models.ScamType("general"))
-}
-
-// analyzeVoiceCharacteristics analyzes voice characteristics
-func (s *SpeechAnalyzer) analyzeVoiceCharacteristics(audioData []byte) *VoiceCharacteristics {
-	// This is a placeholder - real implementation would use audio analysis libraries
-	// or call specialized APIs for voice analysis
-
-	return &VoiceCharacteristics{
-		SpeakerCount:     1,
-		IsSynthetic:      false,
-		SyntheticConf:    0.1,
-		AudioQuality:     "unknown",
-		CallCenterLikely: false,
-	}
 }
 
 // calculateSeverity calculates the severity based on analysis

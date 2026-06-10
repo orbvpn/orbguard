@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -28,7 +31,11 @@ type DesktopSecurityDeps struct {
 	// the last known results. Optional: when nil, scans still work but the
 	// cached GET endpoints report storage as unavailable.
 	Results *repository.DesktopResultsRepository
-	Logger  *logger.Logger
+	// Indicators is the threat-intel indicator repository used by the
+	// upload-analyze endpoints to match remote IPs and extension IDs against
+	// known IOCs. Optional: when nil, intel matching is skipped.
+	Indicators *repository.IndicatorRepository
+	Logger     *logger.Logger
 }
 
 // DesktopSecurityHandler handles desktop security endpoints
@@ -39,6 +46,7 @@ type DesktopSecurityHandler struct {
 	browser     *desktop_security.BrowserExtensionScanner
 	vt          *desktop_security.VirusTotalClient
 	results     *repository.DesktopResultsRepository
+	indicators  *repository.IndicatorRepository
 	logger      *logger.Logger
 }
 
@@ -51,6 +59,7 @@ func NewDesktopSecurityHandler(deps DesktopSecurityDeps) *DesktopSecurityHandler
 		browser:     deps.BrowserScanner,
 		vt:          deps.VTClient,
 		results:     deps.Results,
+		indicators:  deps.Indicators,
 		logger:      deps.Logger.WithComponent("desktop-security-handler"),
 	}
 }
@@ -551,27 +560,320 @@ func (h *DesktopSecurityHandler) LookupIP(w http.ResponseWriter, r *http.Request
 }
 
 // FullSecurityScan handles POST /api/v1/desktop/scan/full
+//
+// Sub-scan failures are never silently dropped: each section reports its own
+// status ("ok", "error", or "unavailable") plus the error message under
+// result["sections"], so clients can distinguish "scanned clean" from
+// "scan failed".
 func (h *DesktopSecurityHandler) FullSecurityScan(w http.ResponseWriter, r *http.Request) {
+	sections := map[string]map[string]interface{}{}
 	result := map[string]interface{}{
 		"scan_type": "full",
+		"sections":  sections,
 	}
 
-	if h.persistence != nil {
-		if scan, err := h.persistence.Scan(r.Context()); err == nil {
-			result["persistence"] = scan
-			h.persistScanResults(r, repository.DesktopScanTypePersistence, scan.Items)
+	if h.persistence == nil {
+		sections["persistence"] = map[string]interface{}{
+			"status": "unavailable",
+			"error":  "persistence scanner not available",
 		}
+	} else if scan, err := h.persistence.Scan(r.Context()); err != nil {
+		h.logger.Error().Err(err).Msg("full scan: persistence scan failed")
+		sections["persistence"] = map[string]interface{}{
+			"status": "error",
+			"error":  err.Error(),
+		}
+	} else {
+		sections["persistence"] = map[string]interface{}{"status": "ok"}
+		result["persistence"] = scan
+		h.persistScanResults(r, repository.DesktopScanTypePersistence, scan.Items)
 	}
-	if h.browser != nil {
-		if exts, err := h.browser.Scan(r.Context()); err == nil {
-			result["browser_extensions"] = exts
+
+	if h.browser == nil {
+		sections["browser_extensions"] = map[string]interface{}{
+			"status": "unavailable",
+			"error":  "browser scanner not available",
 		}
+	} else if exts, err := h.browser.Scan(r.Context()); err != nil {
+		h.logger.Error().Err(err).Msg("full scan: browser extension scan failed")
+		sections["browser_extensions"] = map[string]interface{}{
+			"status": "error",
+			"error":  err.Error(),
+		}
+	} else {
+		sections["browser_extensions"] = map[string]interface{}{"status": "ok"}
+		result["browser_extensions"] = exts
 	}
-	if h.network != nil {
-		if conns, err := h.network.GetConnections(r.Context()); err == nil {
-			result["network_connections"] = len(conns)
+
+	if h.network == nil {
+		sections["network_connections"] = map[string]interface{}{
+			"status": "unavailable",
+			"error":  "network monitor not available",
 		}
+	} else if conns, err := h.network.GetConnections(r.Context()); err != nil {
+		h.logger.Error().Err(err).Msg("full scan: network connection scan failed")
+		sections["network_connections"] = map[string]interface{}{
+			"status": "error",
+			"error":  err.Error(),
+		}
+	} else {
+		sections["network_connections"] = map[string]interface{}{"status": "ok"}
+		result["network_connections"] = len(conns)
 	}
 
 	respondJSON(w, http.StatusOK, result)
+}
+
+// maxVTIPLookups bounds how many VirusTotal IP lookups a single
+// network-analyze request may trigger. The VT free tier allows 4
+// requests/minute (cached reports are free), so this keeps the endpoint
+// responsive instead of stalling on the client's whole connection table.
+const maxVTIPLookups = 8
+
+// AnalyzeNetworkConnections handles POST /api/v1/desktop/network/analyze.
+//
+// Desktop clients collect their local connection table (the backend's network
+// monitor sees only the SERVER host) and upload it here for server-side
+// enrichment: IOC blocklist + C2 heuristics, threat-intel indicator matching
+// on remote IPs, and VirusTotal IP reputation. The enriched snapshot is
+// persisted as the device's latest "network" scan.
+func (h *DesktopSecurityHandler) AnalyzeNetworkConnections(w http.ResponseWriter, r *http.Request) {
+	if h.network == nil && h.indicators == nil && h.vt == nil {
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no network analysis capability configured"})
+		return
+	}
+
+	var req struct {
+		Connections []models.NetworkConnection `json:"connections"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Connections) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "connections are required"})
+		return
+	}
+	conns := req.Connections
+
+	// Local heuristics: IOC blocklist, reverse DNS, C2 / risky-port checks.
+	if h.network != nil {
+		for i := range conns {
+			h.network.AnalyzeConnection(&conns[i])
+		}
+	}
+
+	publicIPs := uniquePublicRemoteIPs(conns)
+
+	// Threat intel: match remote IPs against the indicator database.
+	if h.indicators != nil && len(publicIPs) > 0 {
+		matches, err := h.indicators.CheckBatch(r.Context(), publicIPs)
+		if err != nil {
+			h.logger.Error().Err(err).Msg("network analyze: indicator batch check failed")
+		} else {
+			byValue := make(map[string]*models.Indicator, len(matches))
+			for _, ind := range matches {
+				byValue[ind.Value] = ind
+			}
+			for i := range conns {
+				ind, ok := byValue[conns[i].RemoteAddress]
+				if !ok {
+					continue
+				}
+				conns[i].IsKnownBad = true
+				conns[i].ThreatTags = appendUniqueTag(conns[i].ThreatTags, "threat_intel:"+string(ind.Severity))
+				for _, tag := range ind.Tags {
+					conns[i].ThreatTags = appendUniqueTag(conns[i].ThreatTags, tag)
+				}
+				if ind.Confidence > conns[i].ThreatConfidence {
+					conns[i].ThreatConfidence = ind.Confidence
+				}
+			}
+		}
+	}
+
+	// VirusTotal IP reputation for unique public remote IPs (bounded).
+	if h.vt != nil && len(publicIPs) > 0 {
+		vtCtx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+
+		reports := make(map[string]*desktop_security.VTIPReport)
+		for _, ip := range publicIPs {
+			if len(reports) >= maxVTIPLookups {
+				break
+			}
+			report, err := h.vt.LookupIP(vtCtx, ip)
+			if err != nil {
+				h.logger.Debug().Err(err).Str("ip", ip).Msg("network analyze: VT IP lookup failed")
+				if vtCtx.Err() != nil {
+					break
+				}
+				continue
+			}
+			reports[ip] = report
+		}
+
+		for i := range conns {
+			report, ok := reports[conns[i].RemoteAddress]
+			if !ok {
+				continue
+			}
+			if conns[i].RemoteCountry == "" {
+				conns[i].RemoteCountry = report.Country
+			}
+			if conns[i].RemoteASN == "" && report.ASN != 0 {
+				conns[i].RemoteASN = fmt.Sprintf("AS%d %s", report.ASN, report.ASOwner)
+			}
+			if report.IsKnownBad {
+				conns[i].IsKnownBad = true
+				conns[i].ThreatTags = appendUniqueTag(conns[i].ThreatTags,
+					fmt.Sprintf("virustotal:%d_malicious_%d_suspicious", report.Malicious, report.Suspicious))
+				if total := report.Malicious + report.Suspicious + report.Harmless + report.Undetected; total > 0 {
+					ratio := float64(report.Malicious+report.Suspicious) / float64(total)
+					if ratio > conns[i].ThreatConfidence {
+						conns[i].ThreatConfidence = ratio
+					}
+				}
+			}
+		}
+	}
+
+	h.persistScanResults(r, repository.DesktopScanTypeNetwork, conns)
+
+	flagged := 0
+	for i := range conns {
+		if conns[i].IsKnownBad || conns[i].IsCnC {
+			flagged++
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"connections": conns,
+		"total":       len(conns),
+		"flagged":     flagged,
+		"analyzed_at": time.Now().UTC(),
+	})
+}
+
+// AnalyzeBrowserExtensions handles POST /api/v1/desktop/browser/analyze.
+//
+// Desktop clients collect their locally installed browser extensions (the
+// backend's browser scanner sees only the SERVER host) and upload them here
+// for server-side risk assessment and known-malicious matching against the
+// threat-intel indicator database. The assessed snapshot is persisted as the
+// device's latest "browser" scan.
+func (h *DesktopSecurityHandler) AnalyzeBrowserExtensions(w http.ResponseWriter, r *http.Request) {
+	if h.browser == nil && h.indicators == nil {
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no browser analysis capability configured"})
+		return
+	}
+
+	var req struct {
+		Extensions []models.BrowserExtension `json:"extensions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Extensions) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "extensions are required"})
+		return
+	}
+	exts := req.Extensions
+
+	// Server-side risk assessment (permissions, store origin, known-bad IDs).
+	if h.browser != nil {
+		for i := range exts {
+			h.browser.Assess(&exts[i])
+		}
+	}
+
+	// Threat intel: match extension IDs against the indicator database.
+	if h.indicators != nil {
+		seen := make(map[string]bool, len(exts))
+		ids := make([]string, 0, len(exts))
+		for i := range exts {
+			id := exts[i].ExtensionID
+			if id == "" || seen[id] {
+				continue
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+
+		if len(ids) > 0 {
+			matches, err := h.indicators.CheckBatch(r.Context(), ids)
+			if err != nil {
+				h.logger.Error().Err(err).Msg("browser analyze: indicator batch check failed")
+			} else {
+				byValue := make(map[string]*models.Indicator, len(matches))
+				for _, ind := range matches {
+					byValue[ind.Value] = ind
+				}
+				for i := range exts {
+					ind, ok := byValue[exts[i].ExtensionID]
+					if !ok {
+						continue
+					}
+					exts[i].IsKnownMalware = true
+					exts[i].RiskLevel = models.PersistenceRiskCritical
+					reason := "Threat intel: known malicious extension"
+					if ind.Description != "" {
+						reason = "Threat intel: " + ind.Description
+					}
+					exts[i].RiskReasons = appendUniqueTag(exts[i].RiskReasons, reason)
+				}
+			}
+		}
+	}
+
+	h.persistScanResults(r, repository.DesktopScanTypeBrowser, exts)
+
+	highRisk := 0
+	byBrowser := make(map[string]int)
+	for i := range exts {
+		byBrowser[exts[i].Browser]++
+		if exts[i].IsKnownMalware ||
+			exts[i].RiskLevel == models.PersistenceRiskHigh ||
+			exts[i].RiskLevel == models.PersistenceRiskCritical {
+			highRisk++
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"extensions":  exts,
+		"total":       len(exts),
+		"high_risk":   highRisk,
+		"by_browser":  byBrowser,
+		"analyzed_at": time.Now().UTC(),
+	})
+}
+
+// uniquePublicRemoteIPs returns the de-duplicated public, routable remote
+// addresses from a connection list. Private/loopback/link-local addresses are
+// excluded — they are meaningless to threat intel and VT.
+func uniquePublicRemoteIPs(conns []models.NetworkConnection) []string {
+	seen := make(map[string]bool, len(conns))
+	var ips []string
+	for i := range conns {
+		addr := conns[i].RemoteAddress
+		if addr == "" || seen[addr] || !isPublicRoutableIP(addr) {
+			continue
+		}
+		seen[addr] = true
+		ips = append(ips, addr)
+	}
+	return ips
+}
+
+// isPublicRoutableIP reports whether s parses as a public, routable IP.
+func isPublicRoutableIP(s string) bool {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return false
+	}
+	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified())
+}
+
+// appendUniqueTag appends tag to tags unless already present.
+func appendUniqueTag(tags []string, tag string) []string {
+	for _, t := range tags {
+		if t == tag {
+			return tags
+		}
+	}
+	return append(tags, tag)
 }

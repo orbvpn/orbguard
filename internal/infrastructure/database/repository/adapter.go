@@ -220,6 +220,8 @@ type Repositories struct {
 	AnalyticsReports *AnalyticsReportRepository
 	Footprint        *FootprintRepository
 	NetworkSecurity  *NetworkSecurityRepository
+	// Wave 6: Zero Trust conditional access policy persistence
+	EnterprisePolicies *EnterprisePolicyRepository
 }
 
 // NewRepositories creates all repository instances from a database pool
@@ -248,7 +250,8 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		URLLists:          NewURLListRepository(pool),
 		Analytics:         NewAnalyticsRepository(pool),
 		AnalyticsReports:  NewAnalyticsReportRepository(pool),
-		Footprint:         NewFootprintRepository(pool),
-		NetworkSecurity:   NewNetworkSecurityRepository(pool),
+		Footprint:          NewFootprintRepository(pool),
+		NetworkSecurity:    NewNetworkSecurityRepository(pool),
+		EnterprisePolicies: NewEnterprisePolicyRepository(pool),
 	}
 }

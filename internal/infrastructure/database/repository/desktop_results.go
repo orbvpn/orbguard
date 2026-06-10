@@ -17,6 +17,8 @@ const (
 	DesktopScanTypePersistence = "persistence"
 	DesktopScanTypeApps        = "apps"
 	DesktopScanTypeFirewall    = "firewall"
+	DesktopScanTypeNetwork     = "network"
+	DesktopScanTypeBrowser     = "browser"
 )
 
 // DesktopResultsRepository persists the most recent desktop security scan

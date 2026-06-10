@@ -566,6 +566,58 @@ func (h *EnterpriseHandler) ResolveFinding(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// complianceControlEntry is a framework control definition served by
+// GET /enterprise/compliance/controls: the static control catalog plus the
+// framework it belongs to.
+type complianceControlEntry struct {
+	models.ControlAssessment
+	Framework models.ComplianceFramework `json:"framework"`
+}
+
+// GetComplianceControls handles GET /api/v1/enterprise/compliance/controls.
+//
+// Serves the static control CATALOGS (GDPR / SOC 2 / CIS definitions that
+// compliance reports are assessed against), optionally filtered by
+// ?framework=. These are control definitions, not assessments: status is
+// "unknown" and no score/evidence is fabricated — assessed values appear
+// only inside generated compliance reports.
+func (h *EnterpriseHandler) GetComplianceControls(w http.ResponseWriter, r *http.Request) {
+	catalogs := []struct {
+		framework models.ComplianceFramework
+		controls  []models.ControlAssessment
+	}{
+		{models.ComplianceGDPR, models.GDPRControls},
+		{models.ComplianceSOC2, models.SOC2Controls},
+		{models.ComplianceCIS, models.CISControls},
+	}
+
+	filter := models.ComplianceFramework(r.URL.Query().Get("framework"))
+
+	controls := make([]complianceControlEntry, 0)
+	for _, catalog := range catalogs {
+		if filter != "" && catalog.framework != filter {
+			continue
+		}
+		for _, control := range catalog.controls {
+			control.Status = models.ComplianceStatusUnknown
+			controls = append(controls, complianceControlEntry{
+				ControlAssessment: control,
+				Framework:         catalog.framework,
+			})
+		}
+	}
+
+	if filter != "" && len(controls) == 0 {
+		h.respondError(w, http.StatusNotFound, "unknown framework: supported control catalogs are gdpr, soc2, cis")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"controls": controls,
+		"count":    len(controls),
+	})
+}
+
 // GetSupportedFrameworks handles GET /api/v1/enterprise/compliance/frameworks
 func (h *EnterpriseHandler) GetSupportedFrameworks(w http.ResponseWriter, r *http.Request) {
 	frameworks := h.enterprise.Compliance.GetSupportedFrameworks()

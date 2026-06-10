@@ -389,6 +389,7 @@ func (r *Router) Setup() http.Handler {
 
 			// Navigator export
 			mitre.Post("/navigator/export", r.handlers.MITRE.ExportNavigatorLayer)
+			mitre.Get("/navigator/export", r.handlers.MITRE.ExportNavigatorLayer)
 
 			// Stats and admin
 			mitre.Get("/stats", r.handlers.MITRE.GetStats)
@@ -541,6 +542,10 @@ func (r *Router) Setup() http.Handler {
 			ent.Get("/overview", r.handlers.Enterprise.GetEnterpriseOverview)
 			ent.Get("/stats", r.handlers.Enterprise.GetEnterpriseStats)
 
+			// Client-path alias for the Zero Trust policy list (the Flutter
+			// client uses /enterprise/policies).
+			ent.Get("/policies", r.handlers.Enterprise.ListPolicies)
+
 			// MDM/UEM Integration
 			ent.Route("/mdm", func(mdm chi.Router) {
 				mdm.Get("/integrations", r.handlers.Enterprise.ListMDMIntegrations)
@@ -578,6 +583,7 @@ func (r *Router) Setup() http.Handler {
 			// Compliance Reporting
 			ent.Route("/compliance", func(comp chi.Router) {
 				comp.Get("/frameworks", r.handlers.Enterprise.GetSupportedFrameworks)
+				comp.Get("/controls", r.handlers.Enterprise.GetComplianceControls)
 				comp.Get("/reports", r.handlers.Enterprise.ListComplianceReports)
 				comp.Post("/reports", r.handlers.Enterprise.GenerateComplianceReport)
 				comp.Get("/reports/{id}", r.handlers.Enterprise.GetComplianceReport)
@@ -672,7 +678,9 @@ func (r *Router) Setup() http.Handler {
 			desktop.Post("/network/rules", r.handlers.DesktopSecurity.AddFirewallRule)
 			desktop.Delete("/network/rules/{id}", r.handlers.DesktopSecurity.DeleteFirewallRule)
 			desktop.Post("/network/block-ip", r.handlers.DesktopSecurity.BlockIP)
+			desktop.Post("/network/analyze", r.handlers.DesktopSecurity.AnalyzeNetworkConnections)
 			desktop.Post("/browser/extensions/scan", r.handlers.DesktopSecurity.ScanBrowserExtensions)
+			desktop.Post("/browser/analyze", r.handlers.DesktopSecurity.AnalyzeBrowserExtensions)
 			desktop.Get("/virustotal/hash/{hash}", r.handlers.DesktopSecurity.LookupHash)
 			desktop.Post("/virustotal/file", r.handlers.DesktopSecurity.LookupFile)
 			desktop.Post("/virustotal/batch", r.handlers.DesktopSecurity.LookupHashBatch)

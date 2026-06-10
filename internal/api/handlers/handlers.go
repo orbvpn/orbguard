@@ -99,6 +99,11 @@ type Dependencies struct {
 
 // NewHandlers creates all handlers
 func NewHandlers(deps Dependencies) *Handlers {
+	var indicatorRepo *repository.IndicatorRepository
+	if deps.Repos != nil {
+		indicatorRepo = deps.Repos.Indicators
+	}
+
 	return &Handlers{
 		Health:          NewHealthHandler(deps.Cache, deps.Repos, deps.Logger),
 		Intelligence:    NewIntelligenceHandler(deps.Repos, deps.Cache, deps.Logger),
@@ -139,6 +144,7 @@ func NewHandlers(deps Dependencies) *Handlers {
 			VTClient:           deps.VTClient,
 			Logger:             deps.Logger,
 			Results:            repository.NewDesktopResultsRepositoryFromRepos(deps.Repos),
+			Indicators:         indicatorRepo,
 		}),
 		Webhooks:     NewWebhookHandler(deps.Logger, deps.WebhookService),
 		Playbooks:    NewPlaybookHandler(deps.Logger, deps.PlaybookService),
