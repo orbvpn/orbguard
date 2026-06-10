@@ -638,6 +638,100 @@ func (r *IndicatorRepository) IncrementReportCount(ctx context.Context, id uuid.
 	return r.queries.IncrementIndicatorReportCount(ctx, id)
 }
 
+// Pool exposes the underlying connection pool so sibling repositories that
+// are constructed lazily (e.g. ThreatReportRepository inside handlers) can
+// share the same pool without new wiring in main.go.
+func (r *IndicatorRepository) Pool() *pgxpool.Pool {
+	return r.pool
+}
+
+// ListForSync returns non-expired indicators for the given platforms,
+// optionally restricted to those updated after updatedAfter, ordered by
+// updated_at (oldest first) for stable cursor-style pagination. It also
+// returns the total matching count.
+func (r *IndicatorRepository) ListForSync(ctx context.Context, platforms []models.Platform, updatedAfter *time.Time, limit, offset int) ([]*models.Indicator, int64, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+
+	var conditions []string
+	var args []interface{}
+	argNum := 1
+
+	conditions = append(conditions, "(expires_at IS NULL OR expires_at > NOW())")
+
+	if len(platforms) > 0 {
+		plats := make([]string, len(platforms))
+		for i, p := range platforms {
+			plats[i] = string(p)
+		}
+		conditions = append(conditions, fmt.Sprintf("platforms && $%d::platform_type[]", argNum))
+		args = append(args, plats)
+		argNum++
+	}
+
+	if updatedAfter != nil {
+		conditions = append(conditions, fmt.Sprintf("updated_at > $%d", argNum))
+		args = append(args, *updatedAfter)
+		argNum++
+	}
+
+	whereClause := strings.Join(conditions, " AND ")
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM indicators WHERE %s", whereClause)
+	var total int64
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count sync indicators: %w", err)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, value, value_hash, type::text, severity::text, confidence, description,
+			   tags, platforms::text[], first_seen, last_seen, expires_at,
+			   campaign_id, threat_actor_id, malware_family_id,
+			   mitre_techniques, mitre_tactics, cve_ids,
+			   report_count, source_count, metadata, graph_node_id,
+			   created_at, updated_at
+		FROM indicators
+		WHERE %s
+		ORDER BY updated_at ASC, id ASC
+		LIMIT $%d OFFSET $%d`, whereClause, argNum, argNum+1)
+
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list sync indicators: %w", err)
+	}
+	defer rows.Close()
+
+	indicators := make([]*models.Indicator, 0)
+	for rows.Next() {
+		ind, err := scanIndicatorRow(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		indicators = append(indicators, ind)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate sync indicators: %w", err)
+	}
+
+	return indicators, total, nil
+}
+
+// LatestUpdatedAt returns the most recent updated_at across all indicators.
+// When the table is empty it returns the zero time with ok=false.
+func (r *IndicatorRepository) LatestUpdatedAt(ctx context.Context) (time.Time, bool, error) {
+	var latest *time.Time
+	if err := r.pool.QueryRow(ctx, "SELECT MAX(updated_at) FROM indicators").Scan(&latest); err != nil {
+		return time.Time{}, false, fmt.Errorf("failed to get latest indicator update: %w", err)
+	}
+	if latest == nil {
+		return time.Time{}, false, nil
+	}
+	return *latest, true, nil
+}
+
 // WithTx returns a repository that uses the given transaction
 func (r *IndicatorRepository) WithTx(tx pgx.Tx) *IndicatorRepository {
 	return &IndicatorRepository{

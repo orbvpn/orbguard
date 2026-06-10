@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,9 @@ import (
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/pkg/logger"
 )
+
+// ErrBreachNotFound is returned when a breach lookup by name finds nothing.
+var ErrBreachNotFound = errors.New("breach not found")
 
 // HIBPClient provides access to Have I Been Pwned API
 type HIBPClient struct {
@@ -48,25 +52,24 @@ func NewHIBPClient(config HIBPConfig, log *logger.Logger) *HIBPClient {
 	}
 }
 
+// Configured reports whether the client has an API key for the breached
+// account API. The pwned-passwords and public breach catalog endpoints work
+// without a key.
+func (c *HIBPClient) Configured() bool {
+	return c.apiKey != ""
+}
+
 // CheckEmail checks if an email has been involved in any breaches
 func (c *HIBPClient) CheckEmail(ctx context.Context, email string) (*models.BreachCheckResponse, error) {
 	response := &models.BreachCheckResponse{
-		Email:     email,
+		Email:      email,
 		IsBreached: false,
-		CheckedAt: time.Now(),
+		CheckedAt:  time.Now(),
 	}
 
-	// Check if API key is configured
+	// The breached-account API requires an API key; never fabricate results.
 	if c.apiKey == "" {
-		c.logger.Warn().Str("email", email).Msg("HIBP API key not configured, returning simulated response")
-		// Return simulated response for development/testing
-		response.RiskLevel = models.BreachSeverityLow
-		response.Recommendations = []string{
-			"HIBP API key not configured - this is a simulated response.",
-			"Configure ORBGUARD_SOURCES_HIBP_API_KEY for real breach checks.",
-			"Get an API key at: https://haveibeenpwned.com/API/Key",
-		}
-		return response, nil
+		return nil, fmt.Errorf("hibp: API key not configured (set ORBGUARD_HIBP_API_KEY)")
 	}
 
 	// Get breaches for this email
@@ -200,6 +203,10 @@ func (c *HIBPClient) GetBreachByName(ctx context.Context, name string) (*models.
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrBreachNotFound
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
@@ -384,6 +391,13 @@ func (c *HIBPClient) generatePasswordMessage(count int) string {
 
 // generateRecommendations creates recommendations based on breaches
 func (c *HIBPClient) generateRecommendations(breaches []models.Breach, exposedTypes map[string]bool) []string {
+	return generateBreachRecommendations(exposedTypes)
+}
+
+// generateBreachRecommendations creates user-facing recommendations based on
+// the data classes exposed across all detected breaches. Shared by the HIBP
+// client and the multi-provider aggregation in DarkWebMonitor.
+func generateBreachRecommendations(exposedTypes map[string]bool) []string {
 	recommendations := []string{}
 
 	if exposedTypes["Passwords"] {

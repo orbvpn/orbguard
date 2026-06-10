@@ -1,19 +1,23 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
 // NetworkSecurityHandler handles network security API requests
 type NetworkSecurityHandler struct {
 	service *services.NetworkSecurityService
+	repo    *repository.NetworkSecurityRepository
 	logger  *logger.Logger
 }
 
@@ -22,6 +26,38 @@ func NewNetworkSecurityHandler(service *services.NetworkSecurityService, log *lo
 	return &NetworkSecurityHandler{
 		service: service,
 		logger:  log.WithComponent("network-security-handler"),
+	}
+}
+
+// SetRepository wires the Postgres-backed repository used for audit history,
+// per-device DNS/VPN configuration and stats aggregation. Without it,
+// configuration endpoints return an explicit unavailable error.
+func (h *NetworkSecurityHandler) SetRepository(repo *repository.NetworkSecurityRepository) {
+	h.repo = repo
+}
+
+// auditDeviceID resolves the device identity for persisting audit results:
+// the authenticated device takes precedence over a client-supplied value.
+func (h *NetworkSecurityHandler) auditDeviceID(ctx context.Context, bodyDeviceID string) string {
+	if id := middleware.GetDeviceID(ctx); id != "" {
+		return id
+	}
+	return bodyDeviceID
+}
+
+// persistAudit stores a completed audit result; persistence failures are
+// logged but do not fail the audit response.
+func (h *NetworkSecurityHandler) persistAudit(ctx context.Context, rec repository.NetworkAuditRecord) {
+	if h.repo == nil {
+		h.logger.Warn().Str("audit_type", rec.AuditType).Msg("network audit not persisted: repository not configured")
+		return
+	}
+	if rec.DeviceID == "" {
+		h.logger.Debug().Str("audit_type", rec.AuditType).Msg("network audit not persisted: no device identity")
+		return
+	}
+	if err := h.repo.SaveNetworkAudit(ctx, rec); err != nil {
+		h.logger.Error().Err(err).Str("audit_type", rec.AuditType).Msg("failed to persist network audit")
 	}
 }
 
@@ -39,6 +75,24 @@ func (h *NetworkSecurityHandler) AuditWiFi(w http.ResponseWriter, r *http.Reques
 		h.respondError(w, http.StatusInternalServerError, "failed to audit Wi-Fi")
 		return
 	}
+
+	identity := ""
+	if result.Network != nil {
+		identity = result.Network.SSID
+		if identity == "" {
+			identity = result.Network.BSSID
+		}
+	}
+	h.persistAudit(r.Context(), repository.NetworkAuditRecord{
+		DeviceID:        h.auditDeviceID(r.Context(), req.DeviceID),
+		AuditType:       "wifi",
+		NetworkIdentity: identity,
+		RiskLevel:       string(result.RiskLevel),
+		RiskScore:       result.RiskScore,
+		RogueAPCount:    len(result.RogueAPDetected),
+		EvilTwinCount:   len(result.EvilTwinDetected),
+		Findings:        result,
+	})
 
 	h.respondJSON(w, http.StatusOK, result)
 }
@@ -79,6 +133,25 @@ func (h *NetworkSecurityHandler) CheckDNS(w http.ResponseWriter, r *http.Request
 		h.respondError(w, http.StatusInternalServerError, "failed to check DNS")
 		return
 	}
+
+	dnsRiskLevel := string(models.NetworkRiskLevelSafe)
+	dnsRiskScore := 0.0
+	if result.IsHijacked {
+		dnsRiskLevel = string(models.NetworkRiskLevelCritical)
+		dnsRiskScore = 0.9
+	} else if !result.IsSecure {
+		dnsRiskLevel = string(models.NetworkRiskLevelMedium)
+		dnsRiskScore = 0.4
+	}
+	h.persistAudit(r.Context(), repository.NetworkAuditRecord{
+		DeviceID:        h.auditDeviceID(r.Context(), req.DeviceID),
+		AuditType:       "dns",
+		NetworkIdentity: result.CurrentDNS,
+		RiskLevel:       dnsRiskLevel,
+		RiskScore:       dnsRiskScore,
+		HijackDetected:  result.IsHijacked,
+		Findings:        result,
+	})
 
 	h.respondJSON(w, http.StatusOK, result)
 }
@@ -135,12 +208,38 @@ func (h *NetworkSecurityHandler) ConfigureDNS(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// In production, this would configure the device's DNS
-	// For now, just return the configuration
+	if h.repo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "configuration persistence unavailable")
+		return
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	if err := h.repo.UpsertDeviceDNSConfig(r.Context(), deviceID, &req); err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to persist DNS configuration")
+		h.respondError(w, http.StatusInternalServerError, "failed to save DNS configuration")
+		return
+	}
+
+	// Return what was actually stored.
+	stored, err := h.repo.GetDeviceNetworkConfig(r.Context(), deviceID)
+	if err != nil || stored == nil || stored.DNS == nil {
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to read back DNS configuration")
+		}
+		h.respondError(w, http.StatusInternalServerError, "failed to read back DNS configuration")
+		return
+	}
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "configured",
-		"config":  req,
-		"message": "DNS configuration saved. Apply on device to take effect.",
+		"status":     "configured",
+		"config":     stored.DNS,
+		"updated_at": stored.UpdatedAt,
+		"message":    "DNS configuration saved. Apply on device to take effect.",
 	})
 }
 
@@ -207,7 +306,22 @@ func (h *NetworkSecurityHandler) GetVPNRecommendation(w http.ResponseWriter, r *
 
 // GetVPNConfig handles GET /api/v1/network/vpn/config
 func (h *NetworkSecurityHandler) GetVPNConfig(w http.ResponseWriter, r *http.Request) {
-	// Return default VPN configuration for OrbNet integration
+	// Return the device's stored configuration when one exists.
+	if deviceID := middleware.GetDeviceID(r.Context()); deviceID != "" && h.repo != nil {
+		stored, err := h.repo.GetDeviceNetworkConfig(r.Context(), deviceID)
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to load VPN configuration")
+			h.respondError(w, http.StatusInternalServerError, "failed to load VPN configuration")
+			return
+		}
+		if stored != nil && stored.VPN != nil {
+			h.respondJSON(w, http.StatusOK, stored.VPN)
+			return
+		}
+	}
+
+	// No stored configuration: return the default VPN configuration for
+	// OrbNet integration.
 	config := models.VPNConfig{
 		AutoConnect:         false,
 		AutoConnectOnPublic: true,
@@ -230,11 +344,37 @@ func (h *NetworkSecurityHandler) UpdateVPNConfig(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// In production, this would save the configuration
+	if h.repo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "configuration persistence unavailable")
+		return
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	if err := h.repo.UpsertDeviceVPNConfig(r.Context(), deviceID, &config); err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to persist VPN configuration")
+		h.respondError(w, http.StatusInternalServerError, "failed to save VPN configuration")
+		return
+	}
+
+	stored, err := h.repo.GetDeviceNetworkConfig(r.Context(), deviceID)
+	if err != nil || stored == nil || stored.VPN == nil {
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to read back VPN configuration")
+		}
+		h.respondError(w, http.StatusInternalServerError, "failed to read back VPN configuration")
+		return
+	}
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "updated",
-		"config":  config,
-		"message": "VPN configuration updated",
+		"status":     "updated",
+		"config":     stored.VPN,
+		"updated_at": stored.UpdatedAt,
+		"message":    "VPN configuration updated",
 	})
 }
 
@@ -258,13 +398,48 @@ func (h *NetworkSecurityHandler) GetAttackTypes(w http.ResponseWriter, r *http.R
 	})
 }
 
-// GetStats handles GET /api/v1/network/stats
+// GetStats handles GET /api/v1/network/stats. Stats are aggregated from the
+// persisted per-device audit history: device-scoped for authenticated devices
+// and global for service-to-service callers.
 func (h *NetworkSecurityHandler) GetStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.service.GetStats(r.Context())
+	if h.repo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "network stats unavailable: persistence not configured")
+		return
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" && !middleware.IsServiceRequest(r.Context()) {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	agg, err := h.repo.GetNetworkAuditStats(r.Context(), deviceID)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to get network stats")
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to aggregate network stats")
 		h.respondError(w, http.StatusInternalServerError, "failed to get stats")
 		return
+	}
+
+	stats := &models.NetworkSecurityStats{
+		TotalScans:         agg.TotalScans,
+		WiFiAudits:         agg.WiFiAudits,
+		DNSChecks:          agg.DNSChecks,
+		AttacksDetected:    agg.AttacksDetected,
+		RogueAPsDetected:   agg.RogueAPs,
+		EvilTwinsDetected:  agg.EvilTwins,
+		DNSHijacksDetected: agg.DNSHijacks,
+		UnsecureNetworks:   agg.UnsecureNetworks,
+		AttacksByType: map[string]int64{
+			"rogue_ap":   agg.RogueAPs,
+			"evil_twin":  agg.EvilTwins,
+			"dns_hijack": agg.DNSHijacks,
+		},
+		Last24Hours: &models.NetworkStats24H{
+			Scans:           agg.Last24hScans,
+			AttacksDetected: agg.Last24hAttacks,
+			RogueAPs:        agg.Last24hRogueAPs,
+			EvilTwins:       agg.Last24hEvilTwins,
+		},
 	}
 
 	h.respondJSON(w, http.StatusOK, stats)
@@ -335,6 +510,44 @@ func (h *NetworkSecurityHandler) FullNetworkAudit(w http.ResponseWriter, r *http
 	// Calculate overall network risk
 	overallRisk := h.calculateOverallRisk(result)
 	result["overall_risk"] = overallRisk
+
+	// Persist the completed full audit for stats aggregation.
+	fullIdentity := ""
+	rogueAPs := 0
+	evilTwins := 0
+	hijacked := false
+	if wifi, ok := result["wifi"].(*models.WiFiAuditResult); ok {
+		if wifi.Network != nil {
+			fullIdentity = wifi.Network.SSID
+			if fullIdentity == "" {
+				fullIdentity = wifi.Network.BSSID
+			}
+		}
+		rogueAPs = len(wifi.RogueAPDetected)
+		evilTwins = len(wifi.EvilTwinDetected)
+	}
+	if dns, ok := result["dns"].(*models.DNSCheckResult); ok {
+		hijacked = dns.IsHijacked
+		if fullIdentity == "" {
+			fullIdentity = dns.CurrentDNS
+		}
+	}
+	riskScore, _ := overallRisk["risk_score"].(float64)
+	riskLevel := ""
+	if lvl, ok := overallRisk["risk_level"].(models.NetworkRiskLevel); ok {
+		riskLevel = string(lvl)
+	}
+	h.persistAudit(r.Context(), repository.NetworkAuditRecord{
+		DeviceID:        h.auditDeviceID(r.Context(), req.DeviceID),
+		AuditType:       "full",
+		NetworkIdentity: fullIdentity,
+		RiskLevel:       riskLevel,
+		RiskScore:       riskScore,
+		RogueAPCount:    rogueAPs,
+		EvilTwinCount:   evilTwins,
+		HijackDetected:  hijacked,
+		Findings:        result,
+	})
 
 	// Get VPN recommendation
 	var wifiResult *models.WiFiAuditResult

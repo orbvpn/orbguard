@@ -136,7 +136,7 @@ func (r *Router) Setup() http.Handler {
 			sms.Post("/check-url", r.handlers.SMS.CheckURL)
 			sms.Get("/patterns", r.handlers.SMS.GetPatterns)
 			sms.Get("/stats", r.handlers.SMS.GetStats)
-			sms.Post("/report-false-positive", r.handlers.SMS.GetStats) // Alias for now, returns stats
+			sms.Post("/report-false-positive", r.handlers.SMS.ReportFalsePositive)
 		})
 
 		// Path aliases: /api/v1/indicators -> /api/v1/intelligence (Flutter compatibility)
@@ -686,6 +686,7 @@ func (r *Router) Setup() http.Handler {
 			an.Get("/reports", r.handlers.Analytics.ListReports)
 			an.Post("/reports", r.handlers.Analytics.CreateReport)
 			an.Get("/reports/{id}", r.handlers.Analytics.GetReport)
+			an.Get("/reports/{id}/download", r.handlers.Analytics.DownloadReport)
 		})
 
 		// Integrations endpoints (Slack, Teams, PagerDuty)

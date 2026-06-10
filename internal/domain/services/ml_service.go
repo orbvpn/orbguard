@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +28,7 @@ type MLService struct {
 	logger            *logger.Logger
 
 	// Training state
+	minTrainingSize   int
 	lastTrainedAt     time.Time
 	trainingInProgress atomic.Bool
 	trainingMu        sync.Mutex
@@ -67,6 +70,11 @@ func NewMLService(
 	c *cache.RedisCache,
 	log *logger.Logger,
 ) *MLService {
+	minTrainingSize := config.MinTrainingSize
+	if minTrainingSize <= 0 {
+		minTrainingSize = DefaultMLServiceConfig().MinTrainingSize
+	}
+
 	return &MLService{
 		featureExtractor: NewFeatureExtractor(log),
 		isolationForest:  NewIsolationForest(config.IsolationForest, log),
@@ -76,7 +84,83 @@ func NewMLService(
 		repos:            repos,
 		cache:            c,
 		logger:           log.WithComponent("ml-service"),
+		minTrainingSize:  minTrainingSize,
 	}
+}
+
+// ModelsNotTrainedError indicates that a requested ML operation requires a
+// trained model, but training has not (yet) happened — typically because the
+// indicator store does not hold enough data, or the auto-train loop has not
+// run since startup (models are in-memory only).
+type ModelsNotTrainedError struct {
+	// ModelType is the model the operation required.
+	ModelType string
+	// IndicatorsNeeded is how many more indicators are needed before
+	// training can start (0 means enough data exists and training is
+	// pending or in progress).
+	IndicatorsNeeded int
+}
+
+// Error implements the error interface.
+func (e *ModelsNotTrainedError) Error() string {
+	return fmt.Sprintf("ml model %q is not trained yet (%d more indicators needed)", e.ModelType, e.IndicatorsNeeded)
+}
+
+// modelsNotTrainedError builds a ModelsNotTrainedError, computing how many
+// more indicators are required from the current store size.
+func (s *MLService) modelsNotTrainedError(ctx context.Context, modelType string) *ModelsNotTrainedError {
+	needed := s.minTrainingSize
+	if s.repos != nil && s.repos.Indicators != nil {
+		if _, total, err := s.repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: 1}); err == nil {
+			remaining := s.minTrainingSize - int(total)
+			if remaining < 0 {
+				remaining = 0
+			}
+			needed = remaining
+		} else {
+			s.logger.Warn().Err(err).Msg("failed to count indicators for training-state report")
+		}
+	}
+
+	return &ModelsNotTrainedError{
+		ModelType:        modelType,
+		IndicatorsNeeded: needed,
+	}
+}
+
+// GetIndicatorsByIDs fetches indicators by ID for batch ML operations.
+// Missing IDs are returned separately; database errors abort the fetch.
+func (s *MLService) GetIndicatorsByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Indicator, []uuid.UUID, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	indicators := make([]*models.Indicator, 0, len(ids))
+	missing := make([]uuid.UUID, 0)
+
+	for _, id := range ids {
+		indicator, err := s.repos.Indicators.GetByID(ctx, id)
+		if err != nil {
+			return nil, nil, err
+		}
+		if indicator == nil {
+			missing = append(missing, id)
+			continue
+		}
+		indicators = append(indicators, indicator)
+	}
+
+	return indicators, missing, nil
+}
+
+// ListIndicators fetches indicators matching a filter for batch ML operations.
+func (s *MLService) ListIndicators(ctx context.Context, filter repository.IndicatorFilter) ([]*models.Indicator, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	indicators, _, err := s.repos.Indicators.List(ctx, filter)
+	return indicators, err
 }
 
 // EnrichIndicator enriches an indicator with ML analysis
@@ -142,12 +226,22 @@ func (s *MLService) EnrichBatch(ctx context.Context, indicators []*models.Indica
 	return results, nil
 }
 
-// DetectAnomalies runs anomaly detection on indicators
+// DetectAnomalies runs anomaly detection on indicators. Returns
+// ModelsNotTrainedError when the isolation forest has not been trained.
 func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.Indicator) (*models.AnomalyDetectionResult, error) {
 	startTime := time.Now()
 
 	if !s.isolationForest.IsTrained() {
-		return nil, nil
+		return nil, s.modelsNotTrainedError(ctx, "isolation_forest")
+	}
+
+	if len(indicators) == 0 {
+		return &models.AnomalyDetectionResult{
+			TotalProcessed: 0,
+			AnomalyCount:   0,
+			Scores:         []models.AnomalyScore{},
+			ProcessingTime: time.Since(startTime),
+		}, nil
 	}
 
 	// Extract feature vectors
@@ -164,6 +258,7 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 	for _, score := range scores {
 		if score.IsAnomaly {
 			anomalyCount++
+			s.totalAnomalies.Add(1)
 		}
 		sum += score.Score
 		sumSq += score.Score * score.Score
@@ -176,12 +271,21 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 	}
 
 	n := float64(len(scores))
-	mean := sum / n
-	variance := (sumSq / n) - (mean * mean)
+	mean := 0.0
 	stdDev := 0.0
-	if variance > 0 {
-		stdDev = variance
+	anomalyRate := 0.0
+	if n > 0 {
+		mean = sum / n
+		variance := (sumSq / n) - (mean * mean)
+		if variance > 0 {
+			stdDev = math.Sqrt(variance)
+		}
+		anomalyRate = float64(anomalyCount) / n
+	} else {
+		min = 0
 	}
+
+	s.totalPredictions.Add(int64(len(scores)))
 
 	return &models.AnomalyDetectionResult{
 		TotalProcessed: len(indicators),
@@ -192,16 +296,21 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 			StdDevScore: stdDev,
 			MinScore:    min,
 			MaxScore:    max,
-			AnomalyRate: float64(anomalyCount) / n,
+			AnomalyRate: anomalyRate,
 		},
 		ProcessingTime: time.Since(startTime),
 	}, nil
 }
 
-// ClusterIndicators clusters indicators into groups
+// ClusterIndicators clusters indicators into groups. Clustering trains an
+// ad-hoc K-Means model on the provided indicators, so it requires at least k
+// data points but no pre-trained model.
 func (s *MLService) ClusterIndicators(ctx context.Context, indicators []*models.Indicator, k int) (*models.ClusteringResult, error) {
-	if len(indicators) == 0 {
-		return nil, nil
+	if k < 2 {
+		return nil, fmt.Errorf("k must be at least 2, got %d", k)
+	}
+	if len(indicators) < k {
+		return nil, fmt.Errorf("clustering requires at least k=%d indicators, got %d", k, len(indicators))
 	}
 
 	// Extract feature vectors
@@ -220,12 +329,21 @@ func (s *MLService) ClusterIndicators(ctx context.Context, indicators []*models.
 	return km.Predict(vectors), nil
 }
 
-// PredictSeverity predicts severity for indicators
+// PredictSeverity predicts severity for indicators. Returns
+// ModelsNotTrainedError when the random forest has not been trained.
 func (s *MLService) PredictSeverity(ctx context.Context, indicators []*models.Indicator) (*models.SeverityPredictionResult, error) {
 	startTime := time.Now()
 
 	if !s.randomForest.IsTrained() {
-		return nil, nil
+		return nil, s.modelsNotTrainedError(ctx, "random_forest")
+	}
+
+	if len(indicators) == 0 {
+		return &models.SeverityPredictionResult{
+			TotalProcessed: 0,
+			Predictions:    []models.SeverityPrediction{},
+			ProcessingTime: time.Since(startTime),
+		}, nil
 	}
 
 	// Extract feature vectors
@@ -233,6 +351,7 @@ func (s *MLService) PredictSeverity(ctx context.Context, indicators []*models.In
 
 	// Run predictions
 	predictions := s.randomForest.Predict(vectors)
+	s.totalPredictions.Add(int64(len(predictions)))
 
 	return &models.SeverityPredictionResult{
 		TotalProcessed: len(indicators),
@@ -286,7 +405,7 @@ func (s *MLService) Train(ctx context.Context) (*models.MLTrainingResult, error)
 		}
 	}
 
-	if len(indicators) < 100 {
+	if len(indicators) < s.minTrainingSize {
 		return &models.MLTrainingResult{
 			Success: false,
 			Error:   "insufficient training data",
@@ -362,7 +481,7 @@ func (s *MLService) TrainModel(ctx context.Context, modelType string) (*models.M
 		}
 	}
 
-	if len(indicators) < 100 {
+	if len(indicators) < s.minTrainingSize {
 		return &models.MLTrainingResult{
 			Success: false,
 			Error:   "insufficient training data",
@@ -483,15 +602,19 @@ func (s *MLService) FindOptimalClusters(ctx context.Context, indicators []*model
 	return s.kmeans.OptimalK(vectors, maxK)
 }
 
-// AnalyzeIndicator provides comprehensive ML analysis of a single indicator
+// AnalyzeIndicator provides comprehensive ML analysis of a single indicator.
+// Returns (nil, nil) when the indicator does not exist.
 func (s *MLService) AnalyzeIndicator(ctx context.Context, indicatorID uuid.UUID) (*models.MLEnrichmentResult, error) {
-	if s.repos == nil {
-		return nil, nil
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
 	}
 
 	indicator, err := s.repos.Indicators.GetByID(ctx, indicatorID)
 	if err != nil {
 		return nil, err
+	}
+	if indicator == nil {
+		return nil, nil
 	}
 
 	return s.EnrichIndicator(ctx, indicator)

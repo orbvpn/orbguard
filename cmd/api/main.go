@@ -18,6 +18,7 @@ import (
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/domain/services/ai"
 	"orbguard-lab/internal/domain/services/desktop_security"
+	"orbguard-lab/internal/domain/services/digital_footprint"
 	"orbguard-lab/internal/forensics"
 	grpcserver "orbguard-lab/internal/grpc/threatintel"
 	"orbguard-lab/internal/infrastructure/cache"
@@ -81,8 +82,12 @@ func main() {
 
 	// Initialize repositories
 	var repos *repository.Repositories
+	var urlListRepo *repository.URLListRepository
+	var deviceSecurityRepo *repository.DeviceSecurityRepository
 	if db != nil {
 		repos = repository.NewRepositories(db.Pool())
+		urlListRepo = repository.NewURLListRepository(db.Pool())
+		deviceSecurityRepo = repository.NewDeviceSecurityRepository(db.Pool())
 		log.Info().Msg("repositories initialized with database")
 	} else {
 		log.Warn().Msg("running without database - repositories unavailable")
@@ -146,6 +151,9 @@ func main() {
 		log.Warn().Msg("Safe Browsing disabled (no API key) - set ORBGUARD_SAFE_BROWSING_API_KEY to enable live URL lookups")
 	}
 	urlService := services.NewURLReputationService(repos, redisCache, safeBrowsingClient, log)
+	if urlListRepo != nil {
+		urlService.SetURLListRepository(urlListRepo)
+	}
 	log.Info().Bool("safe_browsing", safeBrowsingClient != nil).Msg("URL reputation service initialized")
 
 	// Initialize dark web monitoring (HIBP integration)
@@ -155,11 +163,37 @@ func main() {
 	hibpClient := services.NewHIBPClient(services.HIBPConfig{
 		APIKey: cfg.HIBP.APIKey,
 	}, log)
-	darkWebMonitor := services.NewDarkWebMonitor(hibpClient, redisCache, log)
+	var leakCheckClient *services.LeakCheckClient
+	if cfg.LeakCheck.Enabled && cfg.LeakCheck.APIKey != "" {
+		leakCheckClient = services.NewLeakCheckClient(services.LeakCheckClientConfig{
+			APIKey: cfg.LeakCheck.APIKey,
+		}, log)
+		log.Info().Msg("LeakCheck breach provider enabled")
+	} else {
+		log.Warn().Msg("LeakCheck breach provider disabled (set ORBGUARD_LEAKCHECK_API_KEY and ORBGUARD_LEAKCHECK_ENABLED=true)")
+	}
+	var intelXClient *services.IntelXClient
+	if cfg.IntelX.Enabled && cfg.IntelX.APIKey != "" {
+		intelXClient = services.NewIntelXClient(services.IntelXClientConfig{
+			APIKey:  cfg.IntelX.APIKey,
+			BaseURL: cfg.IntelX.BaseURL,
+		}, log)
+		log.Info().Msg("Intelligence X breach provider enabled")
+	} else {
+		log.Warn().Msg("Intelligence X breach provider disabled (set ORBGUARD_INTELX_API_KEY and ORBGUARD_INTELX_ENABLED=true)")
+	}
+	var darkWebRepo *repository.DarkWebRepository
+	if db != nil {
+		darkWebRepo = repository.NewDarkWebRepository(db.Pool())
+	}
+	darkWebMonitor := services.NewDarkWebMonitor(hibpClient, leakCheckClient, intelXClient, darkWebRepo, redisCache, log)
 	log.Info().Msg("dark web monitor initialized")
 
 	// Initialize app security analyzer
 	appAnalyzer := services.NewAppAnalyzer(repos, redisCache, log)
+	if db != nil {
+		appAnalyzer.SetAppSecurityRepository(repository.NewAppSecurityRepository(db.Pool()))
+	}
 	log.Info().Msg("app security analyzer initialized")
 
 	// Initialize network security service
@@ -205,7 +239,7 @@ func main() {
 	log.Info().Msg("privacy protection service initialized")
 
 	// Initialize device security service (anti-theft, SIM monitoring, OS vulnerabilities)
-	deviceSecurityService := services.NewDeviceSecurityService(redisCache, log)
+	deviceSecurityService := services.NewDeviceSecurityService(deviceSecurityRepo, redisCache, log)
 	log.Info().Msg("device security service initialized")
 
 	// Initialize QR security service (quishing protection)
@@ -236,6 +270,7 @@ func main() {
 
 	// Initialize analytics and reporting service
 	analyticsService := services.NewAnalyticsService(repos, redisCache, log)
+	analyticsService.SetMITREService(mitreService)
 	log.Info().Msg("analytics and reporting service initialized")
 
 	// Initialize integration hub service (Slack, Teams, PagerDuty)
@@ -264,6 +299,11 @@ func main() {
 	persistenceScanner := desktop_security.NewPersistenceScanner(redisCache, log)
 	codeVerifier := desktop_security.NewCodeSigningVerifier(log)
 	networkMonitor := desktop_security.NewNetworkMonitor(redisCache, log)
+	if repos != nil {
+		if err := networkMonitor.SetStore(ctx, repository.NewNetworkSecurityRepositoryFromRepos(repos)); err != nil {
+			log.Warn().Err(err).Msg("failed to load persisted firewall state")
+		}
+	}
 	browserScanner := desktop_security.NewBrowserExtensionScanner(log)
 	var vtClient *desktop_security.VirusTotalClient
 	if vtKey := cfg.Sources.VirusTotal.APIKey; vtKey != "" {
@@ -287,6 +327,13 @@ func main() {
 			log.Info().Str("uri", cfg.Neo4j.URI).Msg("Neo4j graph database initialized")
 		}
 	}
+
+	// Initialize digital footprint scanner
+	footprintScanner := digital_footprint.NewScanner(redisCache, log, digital_footprint.DefaultScannerConfig())
+	if repos != nil {
+		footprintScanner.SetRemovalStore(repository.NewFootprintRepositoryFromRepos(repos))
+	}
+	log.Info().Msg("digital footprint scanner initialized")
 
 	// Initialize handlers
 	deps := handlers.Dependencies{
@@ -327,8 +374,12 @@ func main() {
 		NetworkMonitor:        networkMonitor,
 		BrowserScanner:        browserScanner,
 		VTClient:              vtClient,
+		FootprintScanner:      footprintScanner,
 	}
 	h := handlers.NewHandlers(deps)
+	if repos != nil {
+		h.NetworkSecurity.SetRepository(repository.NewNetworkSecurityRepositoryFromRepos(repos))
+	}
 
 	// Create router
 	router := api.NewRouter(*cfg, h, redisCache, log)

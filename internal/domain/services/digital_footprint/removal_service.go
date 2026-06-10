@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,14 +17,23 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
+// RemovalStore is the persistence interface for removal requests.
+// *repository.FootprintRepository satisfies it.
+type RemovalStore interface {
+	CreateRemovalRequest(ctx context.Context, req *models.RemovalRequest) error
+	UpdateRemovalRequest(ctx context.Context, req *models.RemovalRequest) error
+	GetRemovalRequest(ctx context.Context, id uuid.UUID) (*models.RemovalRequest, error)
+	ListRemovalRequestsByUser(ctx context.Context, userID uuid.UUID) ([]models.RemovalRequest, error)
+}
+
 // RemovalService handles data removal requests
 type RemovalService struct {
 	brokerDB   *brokers.BrokerDatabase
 	httpClient *http.Client
 	logger     *logger.Logger
 
-	// In-memory store for removal requests (until DB repo is available)
-	requests sync.Map // map[uuid.UUID]*models.RemovalRequest
+	// Durable store for removal requests (Postgres-backed)
+	store RemovalStore
 
 	// Templates for opt-out requests
 	templates map[string]*template.Template
@@ -46,8 +54,20 @@ func NewRemovalService(brokerDB *brokers.BrokerDatabase, log *logger.Logger) *Re
 	return svc
 }
 
+// SetStore wires the durable Postgres-backed store for removal requests.
+// Until a store is wired, creating or reading removal requests returns an
+// explicit error (no in-memory fallback).
+func (s *RemovalService) SetStore(store RemovalStore) {
+	s.store = store
+}
+
 // CreateRequest creates a new removal request
 func (s *RemovalService) CreateRequest(ctx context.Context, userID, brokerID uuid.UUID, email string) (*models.RemovalRequest, error) {
+	if s.store == nil {
+		s.logger.Error().Msg("removal request rejected: persistence store not configured")
+		return nil, fmt.Errorf("removal request persistence not configured")
+	}
+
 	broker := s.brokerDB.GetBroker(brokerID)
 	if broker == nil {
 		return nil, fmt.Errorf("broker not found: %s", brokerID)
@@ -74,8 +94,11 @@ func (s *RemovalService) CreateRequest(ctx context.Context, userID, brokerID uui
 		UpdatedAt:    time.Now(),
 	}
 
-	// Store in memory
-	s.requests.Store(request.ID, request)
+	// Persist durably
+	if err := s.store.CreateRemovalRequest(ctx, request); err != nil {
+		s.logger.Error().Err(err).Str("broker", broker.Name).Msg("failed to persist removal request")
+		return nil, fmt.Errorf("persist removal request: %w", err)
+	}
 
 	s.logger.Info().
 		Str("request_id", request.ID.String()).
@@ -110,7 +133,8 @@ func (s *RemovalService) CreateBatchRequest(ctx context.Context, userID uuid.UUI
 	return batch, nil
 }
 
-// ProcessRequest processes a removal request
+// ProcessRequest processes a removal request, persisting each status
+// transition so progress survives restarts.
 func (s *RemovalService) ProcessRequest(ctx context.Context, request *models.RemovalRequest) error {
 	broker := s.brokerDB.GetBroker(request.BrokerID)
 	if broker == nil {
@@ -122,6 +146,7 @@ func (s *RemovalService) ProcessRequest(ctx context.Context, request *models.Rem
 	now := time.Now()
 	request.SubmittedAt = &now
 	request.UpdatedAt = now
+	s.persistUpdate(ctx, request)
 
 	var err error
 
@@ -148,16 +173,41 @@ func (s *RemovalService) ProcessRequest(ctx context.Context, request *models.Rem
 	}
 
 	request.UpdatedAt = time.Now()
+	s.persistUpdate(ctx, request)
 	return err
+}
+
+// persistUpdate writes the current request state to the store, logging (but
+// not propagating) persistence failures so processing outcomes are preserved.
+func (s *RemovalService) persistUpdate(ctx context.Context, request *models.RemovalRequest) {
+	if s.store == nil {
+		s.logger.Warn().
+			Str("request_id", request.ID.String()).
+			Msg("removal request store not configured; status update not persisted")
+		return
+	}
+	if err := s.store.UpdateRemovalRequest(ctx, request); err != nil {
+		s.logger.Error().Err(err).
+			Str("request_id", request.ID.String()).
+			Str("status", string(request.Status)).
+			Msg("failed to persist removal request update")
+	}
 }
 
 // GetStatus returns the status of a removal request
 func (s *RemovalService) GetStatus(ctx context.Context, requestID uuid.UUID) (*models.RemovalRequest, error) {
-	val, ok := s.requests.Load(requestID)
-	if !ok {
-		return nil, fmt.Errorf("removal request not found: %s", requestID)
+	if s.store == nil {
+		return nil, fmt.Errorf("removal request persistence not configured")
 	}
-	return val.(*models.RemovalRequest), nil
+	return s.store.GetRemovalRequest(ctx, requestID)
+}
+
+// ListByUser returns all removal requests for a user.
+func (s *RemovalService) ListByUser(ctx context.Context, userID uuid.UUID) ([]models.RemovalRequest, error) {
+	if s.store == nil {
+		return nil, fmt.Errorf("removal request persistence not configured")
+	}
+	return s.store.ListRemovalRequestsByUser(ctx, userID)
 }
 
 // getRemovalMethod determines the best removal method for a broker
@@ -506,6 +556,9 @@ func (s *RemovalService) VerifyRemoval(ctx context.Context, request *models.Remo
 		request.RecheckAt = &nextRecheck
 	}
 
+	request.UpdatedAt = now
+	s.persistUpdate(ctx, request)
+
 	return removed, nil
 }
 
@@ -595,4 +648,27 @@ func (s *RemovalService) generateFootprintSummary(footprint *models.DigitalFootp
 // ExportReport exports the privacy report as JSON
 func (r *PrivacyReport) ExportJSON() ([]byte, error) {
 	return json.MarshalIndent(r, "", "  ")
+}
+
+// ---------------------------------------------------------------------------
+// Scanner pass-throughs (Scanner lives in scanner.go; these helpers expose
+// removal persistence and processing without changing its constructor).
+// ---------------------------------------------------------------------------
+
+// SetRemovalStore wires the durable removal-request store into the scanner's
+// removal service. Must be called at startup when a database is available.
+func (s *Scanner) SetRemovalStore(store RemovalStore) {
+	s.removalService.SetStore(store)
+}
+
+// ProcessRemovalRequest submits the opt-out for an already-created removal
+// request (automated form submission / CCPA / GDPR / email generation) and
+// persists every status transition.
+func (s *Scanner) ProcessRemovalRequest(ctx context.Context, request *models.RemovalRequest) error {
+	return s.removalService.ProcessRequest(ctx, request)
+}
+
+// ListRemovalRequests returns all removal requests for a user.
+func (s *Scanner) ListRemovalRequests(ctx context.Context, userID uuid.UUID) ([]models.RemovalRequest, error) {
+	return s.removalService.ListByUser(ctx, userID)
 }

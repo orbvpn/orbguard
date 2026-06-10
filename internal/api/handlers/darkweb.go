@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -77,6 +78,10 @@ func (h *DarkWebHandler) CheckEmail(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.monitor.CheckEmail(r.Context(), &req)
 	if err != nil {
+		if errors.Is(err, services.ErrNoBreachProviders) {
+			h.respondError(w, http.StatusServiceUnavailable, "breach checking is not available: no breach data providers configured")
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to check email")
 		h.respondError(w, http.StatusInternalServerError, "failed to check email")
 		return
@@ -160,7 +165,16 @@ func (h *DarkWebHandler) RemoveMonitoredAsset(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.monitor.RemoveMonitoredAsset(r.Context(), id); err != nil {
+	identity, ok := h.authorizedIdentity(w, r, r.URL.Query().Get("user_id"))
+	if !ok {
+		return
+	}
+
+	if err := h.monitor.RemoveMonitoredAsset(r.Context(), identity, id); err != nil {
+		if errors.Is(err, services.ErrAssetNotFound) {
+			h.respondError(w, http.StatusNotFound, "monitored asset not found")
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to remove monitored asset")
 		h.respondError(w, http.StatusInternalServerError, "failed to remove monitored asset")
 		return
@@ -248,7 +262,16 @@ func (h *DarkWebHandler) AcknowledgeAlert(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.monitor.AcknowledgeAlert(r.Context(), id); err != nil {
+	identity, ok := h.authorizedIdentity(w, r, r.URL.Query().Get("user_id"))
+	if !ok {
+		return
+	}
+
+	if err := h.monitor.AcknowledgeAlert(r.Context(), identity, id); err != nil {
+		if errors.Is(err, services.ErrAlertNotFound) {
+			h.respondError(w, http.StatusNotFound, "alert not found")
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to acknowledge alert")
 		h.respondError(w, http.StatusInternalServerError, "failed to acknowledge alert")
 		return
@@ -270,12 +293,18 @@ func (h *DarkWebHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetBreaches handles GET /api/v1/darkweb/breaches
+// Returns the public breach catalog (HIBP), cached server-side for 24h.
 func (h *DarkWebHandler) GetBreaches(w http.ResponseWriter, r *http.Request) {
-	// This would typically query all known breaches
-	// For now, return a message that HIBP API key is needed
+	breaches, err := h.monitor.GetAllBreaches(r.Context())
+	if err != nil {
+		h.logger.Error().Err(err).Msg("failed to fetch breach catalog")
+		h.respondError(w, http.StatusBadGateway, "failed to fetch breach catalog from upstream provider")
+		return
+	}
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "To list all breaches, configure HIBP API key",
-		"count":   0,
+		"breaches": breaches,
+		"count":    len(breaches),
 	})
 }
 
@@ -287,11 +316,18 @@ func (h *DarkWebHandler) GetBreachByName(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// This would query HIBP for breach details
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "Breach details would be fetched from HIBP",
-		"name":    name,
-	})
+	breach, err := h.monitor.GetBreachByName(r.Context(), name)
+	if err != nil {
+		if errors.Is(err, services.ErrBreachNotFound) {
+			h.respondError(w, http.StatusNotFound, "breach not found")
+			return
+		}
+		h.logger.Error().Err(err).Msg("failed to fetch breach details")
+		h.respondError(w, http.StatusBadGateway, "failed to fetch breach details from upstream provider")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, breach)
 }
 
 // RefreshMonitoring handles POST /api/v1/darkweb/refresh

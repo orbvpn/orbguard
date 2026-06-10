@@ -209,6 +209,17 @@ type Repositories struct {
 	// Adapter for aggregator
 	AggregatorAdapter *AggregatorRepositoryAdapter
 	Devices           *DeviceRepository
+	// Wave 2 production-hardening repositories
+	SMS              *SMSRepository
+	ThreatReports    *ThreatReportRepository
+	AppSecurity      *AppSecurityRepository
+	DarkWeb          *DarkWebRepository
+	DeviceSecurity   *DeviceSecurityRepository
+	URLLists         *URLListRepository
+	Analytics        *AnalyticsRepository
+	AnalyticsReports *AnalyticsReportRepository
+	Footprint        *FootprintRepository
+	NetworkSecurity  *NetworkSecurityRepository
 }
 
 // NewRepositories creates all repository instances from a database pool
@@ -229,5 +240,15 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		UpdateHistory:     updateHistory,
 		AggregatorAdapter: adapter,
 		Devices:           devices,
+		SMS:               NewSMSRepository(pool),
+		ThreatReports:     NewThreatReportRepository(pool),
+		AppSecurity:       NewAppSecurityRepository(pool),
+		DarkWeb:           NewDarkWebRepository(pool),
+		DeviceSecurity:    NewDeviceSecurityRepository(pool),
+		URLLists:          NewURLListRepository(pool),
+		Analytics:         NewAnalyticsRepository(pool),
+		AnalyticsReports:  NewAnalyticsReportRepository(pool),
+		Footprint:         NewFootprintRepository(pool),
+		NetworkSecurity:   NewNetworkSecurityRepository(pool),
 	}
 }

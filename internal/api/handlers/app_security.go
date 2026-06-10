@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -38,6 +41,13 @@ func (h *AppSecurityHandler) AnalyzeApp(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Scope the analysis to the authenticated identity. The user ID is never
+	// accepted from the request body.
+	req.UserID = middleware.GetUserID(r.Context())
+	if req.DeviceID == "" {
+		req.DeviceID = middleware.GetDeviceID(r.Context())
+	}
+
 	result, err := h.analyzer.AnalyzeApp(r.Context(), &req)
 	if err != nil {
 		h.logger.Error().Err(err).Str("package", req.PackageName).Msg("failed to analyze app")
@@ -66,6 +76,18 @@ func (h *AppSecurityHandler) AnalyzeBatch(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Scope each analysis to the authenticated identity.
+	userID := middleware.GetUserID(r.Context())
+	if req.DeviceID == "" {
+		req.DeviceID = middleware.GetDeviceID(r.Context())
+	}
+	for i := range req.Apps {
+		req.Apps[i].UserID = userID
+		if req.Apps[i].DeviceID == "" {
+			req.Apps[i].DeviceID = req.DeviceID
+		}
+	}
+
 	result, err := h.analyzer.AnalyzeBatch(r.Context(), &req)
 	if err != nil {
 		h.logger.Error().Err(err).Int("count", len(req.Apps)).Msg("failed to analyze apps batch")
@@ -84,12 +106,22 @@ func (h *AppSecurityHandler) GetAppReputation(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// In production, this would query a reputation database
-	reputation := &models.AppReputation{
-		PackageName: packageName,
-		RiskLevel:   models.AppRiskLevelSafe,
-		RiskScore:   0,
-		IsVerified:  false,
+	reputation, err := h.analyzer.GetAppReputation(r.Context(), packageName)
+	if err != nil {
+		h.logger.Error().Err(err).Str("package", packageName).Msg("failed to get app reputation")
+		h.respondError(w, http.StatusInternalServerError, "failed to get app reputation")
+		return
+	}
+
+	if reputation == nil {
+		// Nothing is known about this package: no indicators, no analysis
+		// history, no reports. Be explicit rather than fabricating "safe".
+		h.respondJSON(w, http.StatusNotFound, map[string]interface{}{
+			"package_name": packageName,
+			"known":        false,
+			"message":      "no reputation data available for this package",
+		})
+		return
 	}
 
 	h.respondJSON(w, http.StatusOK, reputation)
@@ -141,6 +173,18 @@ func (h *AppSecurityHandler) GetPrivacyReport(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Scope each analysis to the authenticated identity.
+	userID := middleware.GetUserID(r.Context())
+	if req.DeviceID == "" {
+		req.DeviceID = middleware.GetDeviceID(r.Context())
+	}
+	for i := range req.Apps {
+		req.Apps[i].UserID = userID
+		if req.Apps[i].DeviceID == "" {
+			req.Apps[i].DeviceID = req.DeviceID
+		}
+	}
+
 	// Analyze all apps first
 	batchResult, err := h.analyzer.AnalyzeBatch(r.Context(), &models.AppBatchAnalysisRequest{
 		Apps:     req.Apps,
@@ -167,6 +211,10 @@ func (h *AppSecurityHandler) GetPrivacyReport(w http.ResponseWriter, r *http.Req
 func (h *AppSecurityHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.analyzer.GetStats(r.Context())
 	if err != nil {
+		if errors.Is(err, services.ErrAppSecurityUnavailable) {
+			h.respondError(w, http.StatusServiceUnavailable, "app security statistics unavailable: persistence not configured")
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to get app stats")
 		h.respondError(w, http.StatusInternalServerError, "failed to get stats")
 		return
@@ -214,14 +262,47 @@ func (h *AppSecurityHandler) ReportApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	switch req.ReportType {
+	case "malware", "privacy", "scam", "fraud", "other":
+		// valid
+	default:
+		h.respondError(w, http.StatusBadRequest, "report_type must be one of: malware, privacy, scam, fraud, other")
+		return
+	}
+
+	deviceID := req.DeviceID
+	if deviceID == "" {
+		deviceID = middleware.GetDeviceID(r.Context())
+	}
+
+	saved, err := h.analyzer.SaveAppReport(r.Context(), &repository.AppReportRecord{
+		PackageName: req.PackageName,
+		ReportType:  req.ReportType,
+		Description: req.Description,
+		DeviceID:    deviceID,
+		UserID:      middleware.GetUserID(r.Context()),
+	})
+	if err != nil {
+		if errors.Is(err, services.ErrAppSecurityUnavailable) {
+			h.respondError(w, http.StatusServiceUnavailable, "app reports unavailable: persistence not configured")
+			return
+		}
+		h.logger.Error().Err(err).Str("package", req.PackageName).Msg("failed to save app report")
+		h.respondError(w, http.StatusInternalServerError, "failed to save app report")
+		return
+	}
+
 	h.logger.Info().
 		Str("package", req.PackageName).
 		Str("type", req.ReportType).
+		Str("report_id", saved.ID.String()).
 		Msg("app report received")
 
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "received",
-		"message": "Thank you for your report. It will be reviewed by our team.",
+	h.respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":         saved.ID.String(),
+		"status":     saved.Status,
+		"created_at": saved.CreatedAt,
+		"message":    "Thank you for your report. It will be reviewed by our team.",
 	})
 }
 

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,6 +11,7 @@ import (
 
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -49,31 +52,131 @@ func (h *MLHandler) EnrichIndicator(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, result)
 }
 
-// DetectAnomalies runs anomaly detection on indicators
-func (h *MLHandler) DetectAnomalies(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		IndicatorIDs []uuid.UUID `json:"indicator_ids"`
+// mlBatchRequest is the shared request body for batch ML operations.
+// Either indicator_ids or filter fields select the input set; when
+// indicator_ids is non-empty the filter fields are ignored.
+type mlBatchRequest struct {
+	IndicatorIDs []uuid.UUID `json:"indicator_ids"`
+
+	// Filter-based selection (used when indicator_ids is empty)
+	Types         []models.IndicatorType `json:"types,omitempty"`
+	Severities    []models.Severity      `json:"severities,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
+	MinConfidence float64                `json:"min_confidence,omitempty"`
+	Limit         int                    `json:"limit,omitempty"`
+
+	// K is the number of clusters (clustering only)
+	K int `json:"k,omitempty"`
+}
+
+const (
+	mlMaxIndicatorIDs   = 1000
+	mlDefaultBatchLimit = 1000
+	mlMaxBatchLimit     = 10000
+)
+
+// fetchIndicatorsForBatch resolves the indicator set for a batch ML request,
+// either by explicit IDs or by filter. The second return value lists
+// requested IDs that do not exist.
+func (h *MLHandler) fetchIndicatorsForBatch(ctx context.Context, req *mlBatchRequest) ([]*models.Indicator, []uuid.UUID, error) {
+	if len(req.IndicatorIDs) > 0 {
+		if len(req.IndicatorIDs) > mlMaxIndicatorIDs {
+			return nil, nil, &mlRequestError{message: "too many indicator IDs", status: http.StatusBadRequest}
+		}
+		return h.service.GetIndicatorsByIDs(ctx, req.IndicatorIDs)
 	}
 
+	limit := req.Limit
+	if limit <= 0 {
+		limit = mlDefaultBatchLimit
+	}
+	if limit > mlMaxBatchLimit {
+		limit = mlMaxBatchLimit
+	}
+
+	filter := repository.IndicatorFilter{
+		Types:         req.Types,
+		Severities:    req.Severities,
+		Tags:          req.Tags,
+		MinConfidence: req.MinConfidence,
+		Limit:         limit,
+	}
+
+	indicators, err := h.service.ListIndicators(ctx, filter)
+	return indicators, nil, err
+}
+
+// mlRequestError is a request-level error with an associated HTTP status.
+type mlRequestError struct {
+	message string
+	status  int
+}
+
+func (e *mlRequestError) Error() string { return e.message }
+
+// respondMLError maps ML service errors to HTTP responses, handling the
+// explicit "models not trained" state with a 409.
+func (h *MLHandler) respondMLError(w http.ResponseWriter, err error, fallbackMessage string) {
+	var notTrained *services.ModelsNotTrainedError
+	if errors.As(err, &notTrained) {
+		h.logger.Warn().Str("model", notTrained.ModelType).Int("indicators_needed", notTrained.IndicatorsNeeded).Msg("ml operation requested before models trained")
+		h.respondJSON(w, http.StatusConflict, map[string]interface{}{
+			"error":             "models_not_trained",
+			"model":             notTrained.ModelType,
+			"indicators_needed": notTrained.IndicatorsNeeded,
+			"details":           notTrained.Error(),
+		})
+		return
+	}
+
+	var reqErr *mlRequestError
+	if errors.As(err, &reqErr) {
+		h.respondError(w, reqErr.status, reqErr.message, nil)
+		return
+	}
+
+	h.respondError(w, http.StatusInternalServerError, fallbackMessage, err)
+}
+
+// DetectAnomalies runs anomaly detection on indicators selected by ID or filter
+func (h *MLHandler) DetectAnomalies(w http.ResponseWriter, r *http.Request) {
+	var req mlBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body", err)
 		return
 	}
 
-	// Note: In production, would fetch indicators from database
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "anomaly detection requires indicators to be fetched from database",
-		"count":   len(req.IndicatorIDs),
-	})
+	indicators, missing, err := h.fetchIndicatorsForBatch(r.Context(), &req)
+	if err != nil {
+		h.respondMLError(w, err, "failed to fetch indicators")
+		return
+	}
+
+	if len(req.IndicatorIDs) > 0 && len(indicators) == 0 {
+		h.respondError(w, http.StatusNotFound, "none of the requested indicators exist", nil)
+		return
+	}
+
+	result, err := h.service.DetectAnomalies(r.Context(), indicators)
+	if err != nil {
+		h.respondMLError(w, err, "anomaly detection failed")
+		return
+	}
+
+	response := map[string]interface{}{
+		"result":    result,
+		"processed": len(indicators),
+	}
+	if len(missing) > 0 {
+		response["missing_indicator_ids"] = missing
+	}
+
+	h.respondJSON(w, http.StatusOK, response)
 }
 
 // ClusterIndicators clusters indicators into groups
 func (h *MLHandler) ClusterIndicators(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		IndicatorIDs []uuid.UUID `json:"indicator_ids"`
-		K            int         `json:"k"`
-	}
-
+	var req mlBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body", err)
 		return
@@ -82,30 +185,79 @@ func (h *MLHandler) ClusterIndicators(w http.ResponseWriter, r *http.Request) {
 	if req.K <= 0 {
 		req.K = 5 // Default
 	}
-
-	// Note: In production, would fetch indicators and cluster
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message":       "clustering requires indicators to be fetched from database",
-		"requested_k":   req.K,
-		"indicator_ids": len(req.IndicatorIDs),
-	})
-}
-
-// PredictSeverity predicts severity for indicators
-func (h *MLHandler) PredictSeverity(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		IndicatorIDs []uuid.UUID `json:"indicator_ids"`
+	if req.K < 2 {
+		h.respondError(w, http.StatusBadRequest, "k must be at least 2", nil)
+		return
 	}
 
+	indicators, missing, err := h.fetchIndicatorsForBatch(r.Context(), &req)
+	if err != nil {
+		h.respondMLError(w, err, "failed to fetch indicators")
+		return
+	}
+
+	if len(indicators) < req.K {
+		h.respondJSON(w, http.StatusUnprocessableEntity, map[string]interface{}{
+			"error":            "insufficient_indicators",
+			"details":          "clustering requires at least k indicators",
+			"k":                req.K,
+			"indicators_found": len(indicators),
+		})
+		return
+	}
+
+	result, err := h.service.ClusterIndicators(r.Context(), indicators, req.K)
+	if err != nil {
+		h.respondMLError(w, err, "clustering failed")
+		return
+	}
+
+	response := map[string]interface{}{
+		"result":    result,
+		"processed": len(indicators),
+		"k":         req.K,
+	}
+	if len(missing) > 0 {
+		response["missing_indicator_ids"] = missing
+	}
+
+	h.respondJSON(w, http.StatusOK, response)
+}
+
+// PredictSeverity predicts severity for indicators selected by ID or filter
+func (h *MLHandler) PredictSeverity(w http.ResponseWriter, r *http.Request) {
+	var req mlBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body", err)
 		return
 	}
 
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "severity prediction requires indicators to be fetched from database",
-		"count":   len(req.IndicatorIDs),
-	})
+	indicators, missing, err := h.fetchIndicatorsForBatch(r.Context(), &req)
+	if err != nil {
+		h.respondMLError(w, err, "failed to fetch indicators")
+		return
+	}
+
+	if len(req.IndicatorIDs) > 0 && len(indicators) == 0 {
+		h.respondError(w, http.StatusNotFound, "none of the requested indicators exist", nil)
+		return
+	}
+
+	result, err := h.service.PredictSeverity(r.Context(), indicators)
+	if err != nil {
+		h.respondMLError(w, err, "severity prediction failed")
+		return
+	}
+
+	response := map[string]interface{}{
+		"result":    result,
+		"processed": len(indicators),
+	}
+	if len(missing) > 0 {
+		response["missing_indicator_ids"] = missing
+	}
+
+	h.respondJSON(w, http.StatusOK, response)
 }
 
 // ExtractEntities extracts entities from text

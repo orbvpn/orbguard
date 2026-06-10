@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 // AppAnalyzer provides app security analysis services
 type AppAnalyzer struct {
 	repos  *repository.Repositories
+	appSec *repository.AppSecurityRepository
 	cache  *cache.RedisCache
 	logger *logger.Logger
 
@@ -37,6 +40,13 @@ func NewAppAnalyzer(repos *repository.Repositories, redisCache *cache.RedisCache
 
 	analyzer.initPermissionMaps()
 	return analyzer
+}
+
+// SetAppSecurityRepository wires the Postgres-backed app security repository.
+// Without it, analysis still runs but history persistence, reputation lookups
+// from history, app reports, and stats are unavailable.
+func (a *AppAnalyzer) SetAppSecurityRepository(repo *repository.AppSecurityRepository) {
+	a.appSec = repo
 }
 
 // initPermissionMaps initializes permission classification maps
@@ -131,6 +141,9 @@ func (a *AppAnalyzer) AnalyzeApp(ctx context.Context, req *models.AppAnalysisReq
 	// 7. Set overall verdict
 	result.OverallVerdict = a.generateVerdict(result)
 
+	// 8. Persist the analysis so reputation and stats reflect real history.
+	a.persistAnalysis(ctx, req, result)
+
 	a.logger.Info().
 		Str("package", req.PackageName).
 		Str("risk_level", string(result.RiskLevel)).
@@ -138,6 +151,47 @@ func (a *AppAnalyzer) AnalyzeApp(ctx context.Context, req *models.AppAnalysisReq
 		Msg("app analysis completed")
 
 	return result, nil
+}
+
+// persistAnalysis stores an analysis row in Postgres. Persistence failures are
+// logged but do not fail the analysis itself.
+func (a *AppAnalyzer) persistAnalysis(ctx context.Context, req *models.AppAnalysisRequest, result *models.AppAnalysisResult) {
+	if a.appSec == nil {
+		a.logger.Warn().
+			Str("package", req.PackageName).
+			Msg("app security repository not configured - analysis not persisted")
+		return
+	}
+
+	flags := map[string]interface{}{
+		"sideloaded":                    result.SecurityRisk.IsSideloaded,
+		"targets_old_sdk":               result.SecurityRisk.TargetsOldSDK,
+		"tracker_count":                 len(result.PrivacyRisk.TrackerSDKs),
+		"dangerous_permissions_granted": result.PermissionRisk.GrantedDangerous,
+		"dangerous_combo_count":         len(result.PermissionRisk.DangerousCombos),
+		"known_malware":                 result.ThreatIntelMatch != nil && result.ThreatIntelMatch.IsKnownMalware,
+		"potentially_harmful":           result.ThreatIntelMatch != nil && result.ThreatIntelMatch.IsPotentiallyHarmful,
+	}
+
+	rec := &repository.AppAnalysisRecord{
+		ID:            result.ID,
+		DeviceID:      req.DeviceID,
+		UserID:        req.UserID,
+		PackageName:   req.PackageName,
+		AppName:       req.AppName,
+		Version:       req.VersionName,
+		InstallSource: string(req.InstallSource),
+		RiskScore:     result.RiskScore,
+		RiskLevel:     string(result.RiskLevel),
+		Flags:         flags,
+		AnalyzedAt:    result.AnalyzedAt,
+	}
+
+	if err := a.appSec.InsertAnalysis(ctx, rec); err != nil {
+		a.logger.Error().Err(err).
+			Str("package", req.PackageName).
+			Msg("failed to persist app analysis")
+	}
 }
 
 // AnalyzeBatch analyzes multiple apps
@@ -283,12 +337,10 @@ func (a *AppAnalyzer) analyzePrivacy(req *models.AppAnalysisRequest) models.Priv
 		analysis.DataCollection.CanRunInBackground = true
 	}
 
-	// Check for known trackers based on package name patterns
-	for pkgPrefix, tracker := range models.KnownTrackers {
-		if strings.Contains(req.PackageName, pkgPrefix) {
-			analysis.TrackerSDKs = append(analysis.TrackerSDKs, tracker)
-		}
-	}
+	// Check for known trackers based on the libraries detected inside the app
+	// (e.g. from DEX class scanning on the client). An empty detected_libraries
+	// list legitimately yields no tracker findings.
+	analysis.TrackerSDKs = a.detectTrackers(req.DetectedLibraries)
 
 	// Generate privacy concerns
 	if analysis.DataCollection.CollectsLocation && analysis.DataCollection.HasInternetAccess {
@@ -308,6 +360,38 @@ func (a *AppAnalyzer) analyzePrivacy(req *models.AppAnalysisRequest) models.Priv
 	analysis.Score = a.calculatePrivacyScore(analysis)
 
 	return analysis
+}
+
+// detectTrackers matches detected library package names against the known
+// tracker SDK list. Matching is prefix-based: a library like
+// "com.appsflyer.internal.AFc1qSDK" matches the "com.appsflyer" tracker.
+// Results are deduplicated by tracker name.
+func (a *AppAnalyzer) detectTrackers(detectedLibraries []string) []models.TrackerSDK {
+	trackers := []models.TrackerSDK{}
+	if len(detectedLibraries) == 0 {
+		return trackers
+	}
+
+	seen := make(map[string]bool)
+	for _, lib := range detectedLibraries {
+		lib = strings.ToLower(strings.TrimSpace(lib))
+		if lib == "" {
+			continue
+		}
+		for pkgPrefix, tracker := range models.KnownTrackers {
+			if seen[tracker.Name] {
+				continue
+			}
+			prefix := strings.ToLower(pkgPrefix)
+			// Library equals the tracker prefix, or is a sub-package of it.
+			if lib == prefix || strings.HasPrefix(lib, prefix+".") {
+				seen[tracker.Name] = true
+				trackers = append(trackers, tracker)
+			}
+		}
+	}
+
+	return trackers
 }
 
 // analyzeSecurityRisks analyzes security-related risks
@@ -362,11 +446,11 @@ func (a *AppAnalyzer) checkThreatIntelligence(ctx context.Context, req *models.A
 	indicator, err := a.repos.Indicators.GetByValue(ctx, req.PackageName, models.IndicatorTypePackage)
 	if err == nil && indicator != nil {
 		return &models.ThreatIntelMatch{
-			IsKnownMalware:     indicator.Severity == models.SeverityCritical,
-			IsPotentiallyHarmful: indicator.Severity >= models.SeverityMedium,
-			IndicatorIDs:       []string{indicator.ID.String()},
-			DetectionSource:    "threat_intel_db",
-			FirstSeen:          indicator.FirstSeen,
+			IsKnownMalware:       indicator.Severity == models.SeverityCritical,
+			IsPotentiallyHarmful: severityRank(indicator.Severity) >= severityRank(models.SeverityMedium),
+			IndicatorIDs:         []string{indicator.ID.String()},
+			DetectionSource:      "threat_intel_db",
+			FirstSeen:            indicator.FirstSeen,
 		}
 	}
 
@@ -375,11 +459,11 @@ func (a *AppAnalyzer) checkThreatIntelligence(ctx context.Context, req *models.A
 		indicator, err = a.repos.Indicators.GetByValue(ctx, req.APKHash, models.IndicatorTypeHash)
 		if err == nil && indicator != nil {
 			match := &models.ThreatIntelMatch{
-				IsKnownMalware:     indicator.Severity == models.SeverityCritical,
-				IsPotentiallyHarmful: indicator.Severity >= models.SeverityMedium,
-				IndicatorIDs:       []string{indicator.ID.String()},
-				DetectionSource:    "threat_intel_db",
-				FirstSeen:          indicator.FirstSeen,
+				IsKnownMalware:       indicator.Severity == models.SeverityCritical,
+				IsPotentiallyHarmful: severityRank(indicator.Severity) >= severityRank(models.SeverityMedium),
+				IndicatorIDs:         []string{indicator.ID.String()},
+				DetectionSource:      "threat_intel_db",
+				FirstSeen:            indicator.FirstSeen,
 			}
 
 			// Check for campaign association
@@ -396,6 +480,25 @@ func (a *AppAnalyzer) checkThreatIntelligence(ctx context.Context, req *models.A
 	}
 
 	return nil
+}
+
+// severityRank orders Severity values for comparison (string comparison on the
+// Severity type is lexicographic and therefore wrong for ordering).
+func severityRank(s models.Severity) int {
+	switch s {
+	case models.SeverityCritical:
+		return 4
+	case models.SeverityHigh:
+		return 3
+	case models.SeverityMedium:
+		return 2
+	case models.SeverityLow:
+		return 1
+	case models.SeverityInfo:
+		return 0
+	default:
+		return 0
+	}
 }
 
 // calculateOverallRisk calculates the overall risk score and level
@@ -719,13 +822,192 @@ func (a *AppAnalyzer) GeneratePrivacyReport(ctx context.Context, results []model
 	return report, nil
 }
 
-// GetStats returns app security statistics
+// ErrAppSecurityUnavailable is returned when app security persistence is not
+// configured (no database) and a persistence-backed operation is requested.
+var ErrAppSecurityUnavailable = errors.New("app security persistence not configured")
+
+// GetStats returns app security statistics aggregated from stored analyses.
 func (a *AppAnalyzer) GetStats(ctx context.Context) (*models.AppSecurityStats, error) {
-	// In production, this would query the database
-	stats := &models.AppSecurityStats{
-		BySafetyLevel:   make(map[string]int64),
-		ByInstallSource: make(map[string]int64),
+	if a.appSec == nil {
+		a.logger.Warn().Msg("app security stats requested but repository not configured")
+		return nil, ErrAppSecurityUnavailable
+	}
+
+	stats, err := a.appSec.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load app security stats: %w", err)
 	}
 
 	return stats, nil
+}
+
+// reputationCacheTTL controls how long computed reputations are cached.
+const reputationCacheTTL = 10 * time.Minute
+
+// GetAppReputation computes the reputation of a package from threat
+// intelligence indicators, stored analysis history, and user reports.
+// Returns (nil, nil) when nothing at all is known about the package.
+func (a *AppAnalyzer) GetAppReputation(ctx context.Context, packageName string) (*models.AppReputation, error) {
+	cacheKey := "appsec:reputation:" + packageName
+	if a.cache != nil {
+		var cached models.AppReputation
+		if err := a.cache.GetJSON(ctx, cacheKey, &cached); err == nil && cached.PackageName == packageName {
+			return &cached, nil
+		}
+	}
+
+	var (
+		indicator *models.Indicator
+		summary   *repository.PackageAnalysisSummary
+		reports   int64
+	)
+
+	// 1. Threat intelligence lookup (package-type IOCs).
+	if a.repos != nil && a.repos.Indicators != nil {
+		ind, err := a.repos.Indicators.GetByValue(ctx, packageName, models.IndicatorTypePackage)
+		if err != nil {
+			a.logger.Error().Err(err).Str("package", packageName).Msg("threat intel lookup failed for reputation")
+			return nil, fmt.Errorf("threat intelligence lookup failed: %w", err)
+		}
+		indicator = ind
+	}
+
+	// 2. Stored analysis history.
+	if a.appSec != nil {
+		s, err := a.appSec.GetPackageSummary(ctx, packageName)
+		if err != nil {
+			a.logger.Error().Err(err).Str("package", packageName).Msg("analysis history lookup failed for reputation")
+			return nil, fmt.Errorf("analysis history lookup failed: %w", err)
+		}
+		summary = s
+
+		count, err := a.appSec.CountReportsForPackage(ctx, packageName)
+		if err != nil {
+			a.logger.Error().Err(err).Str("package", packageName).Msg("report count lookup failed for reputation")
+			return nil, fmt.Errorf("report count lookup failed: %w", err)
+		}
+		reports = count
+	}
+
+	// Nothing known about this package — no fabricated verdict.
+	if indicator == nil && summary == nil && reports == 0 {
+		return nil, nil
+	}
+
+	rep := &models.AppReputation{
+		PackageName: packageName,
+		ReportCount: int(reports),
+		IsVerified:  false,
+	}
+
+	// Risk from analysis history (latest analysis is the freshest signal).
+	if summary != nil {
+		rep.AppName = summary.LatestAppName
+		rep.RiskScore = summary.LatestRiskScore
+		rep.FirstSeen = summary.FirstAnalyzedAt
+		rep.LastUpdated = summary.LastAnalyzedAt
+	}
+
+	// Risk from threat intelligence overrides history when stronger.
+	if indicator != nil {
+		intelScore := severityToScore(indicator.Severity)
+		if intelScore > rep.RiskScore {
+			rep.RiskScore = intelScore
+		}
+		if indicator.Severity == models.SeverityCritical || indicator.Severity == models.SeverityHigh {
+			rep.IsBlacklisted = true
+		}
+		if rep.FirstSeen.IsZero() || (!indicator.FirstSeen.IsZero() && indicator.FirstSeen.Before(rep.FirstSeen)) {
+			rep.FirstSeen = indicator.FirstSeen
+		}
+		if indicator.LastSeen.After(rep.LastUpdated) {
+			rep.LastUpdated = indicator.LastSeen
+		}
+	}
+
+	// Many independent user reports raise the floor of the risk score.
+	if reports >= 3 && rep.RiskScore < 40 {
+		rep.RiskScore = 40
+	}
+
+	rep.RiskLevel = riskLevelFromScore(rep.RiskScore)
+	if indicator != nil && indicator.Severity == models.SeverityCritical {
+		rep.RiskLevel = models.AppRiskLevelCritical
+	}
+
+	if rep.LastUpdated.IsZero() {
+		rep.LastUpdated = time.Now()
+	}
+	if rep.FirstSeen.IsZero() {
+		rep.FirstSeen = rep.LastUpdated
+	}
+
+	if a.cache != nil {
+		if err := a.cache.SetJSON(ctx, cacheKey, rep, reputationCacheTTL); err != nil {
+			a.logger.Warn().Err(err).Str("package", packageName).Msg("failed to cache app reputation")
+		}
+	}
+
+	return rep, nil
+}
+
+// SaveAppReport persists a user-submitted report about a suspicious app.
+func (a *AppAnalyzer) SaveAppReport(ctx context.Context, rec *repository.AppReportRecord) (*repository.AppReportRecord, error) {
+	if a.appSec == nil {
+		a.logger.Warn().Str("package", rec.PackageName).Msg("app report received but repository not configured")
+		return nil, ErrAppSecurityUnavailable
+	}
+
+	saved, err := a.appSec.InsertReport(ctx, rec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save app report: %w", err)
+	}
+
+	// A new report invalidates the cached reputation for the package.
+	if a.cache != nil {
+		if err := a.cache.Delete(ctx, "appsec:reputation:"+rec.PackageName); err != nil {
+			a.logger.Warn().Err(err).Str("package", rec.PackageName).Msg("failed to invalidate reputation cache")
+		}
+	}
+
+	a.logger.Info().
+		Str("package", rec.PackageName).
+		Str("type", rec.ReportType).
+		Str("report_id", saved.ID.String()).
+		Msg("app report persisted")
+
+	return saved, nil
+}
+
+// severityToScore maps a threat-intel severity to a 0-100 risk score.
+func severityToScore(s models.Severity) float64 {
+	switch s {
+	case models.SeverityCritical:
+		return 95
+	case models.SeverityHigh:
+		return 80
+	case models.SeverityMedium:
+		return 55
+	case models.SeverityLow:
+		return 30
+	default:
+		return 10
+	}
+}
+
+// riskLevelFromScore maps a 0-100 risk score to a risk level using the same
+// thresholds as calculateOverallRisk.
+func riskLevelFromScore(score float64) models.AppRiskLevel {
+	switch {
+	case score >= 80:
+		return models.AppRiskLevelCritical
+	case score >= 60:
+		return models.AppRiskLevelHigh
+	case score >= 40:
+		return models.AppRiskLevelMedium
+	case score >= 20:
+		return models.AppRiskLevelLow
+	default:
+		return models.AppRiskLevelSafe
+	}
 }
