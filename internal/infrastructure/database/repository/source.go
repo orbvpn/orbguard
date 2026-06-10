@@ -58,6 +58,43 @@ func (r *SourceRepository) Create(ctx context.Context, s *models.Source) (*model
 	return s, nil
 }
 
+// Update persists changes to a source's mutable fields, keyed by ID.
+// Returns nil, nil when no source with the given ID exists.
+func (r *SourceRepository) Update(ctx context.Context, s *models.Source) (*models.Source, error) {
+	query := `
+		UPDATE sources SET
+			name = $2,
+			description = $3,
+			category = $4,
+			type = $5,
+			status = $6,
+			api_url = $7,
+			feed_url = $8,
+			github_urls = $9,
+			requires_api_key = $10,
+			reliability = $11,
+			weight = $12,
+			update_interval = $13,
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING updated_at`
+
+	err := r.pool.QueryRow(ctx, query,
+		s.ID, s.Name, s.Description, s.Category, s.Type, s.Status,
+		s.APIURL, s.FeedURL, s.GithubURLs, s.RequiresAPIKey,
+		s.Reliability, s.Weight, s.UpdateInterval,
+	).Scan(&s.UpdatedAt)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to update source: %w", err)
+	}
+
+	return s, nil
+}
+
 // GetByID retrieves a source by ID
 func (r *SourceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Source, error) {
 	query := `

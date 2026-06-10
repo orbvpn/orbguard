@@ -63,6 +63,9 @@ func (r *Router) Setup() http.Handler {
 		// Health check
 		pub.Get("/health", r.handlers.Health.Check)
 		pub.Get("/ready", r.handlers.Health.Ready)
+		// /api/v1/health alias must stay public: the client pings health
+		// before login, and the /api/v1 Route block applies APIKeyAuth.
+		pub.Get("/api/v1/health", r.handlers.Health.Check)
 
 		// Public stats
 		pub.Get("/api/v1/stats", r.handlers.Stats.Get)
@@ -119,7 +122,9 @@ func (r *Router) Setup() http.Handler {
 		// Sources endpoints
 		api.Route("/sources", func(sources chi.Router) {
 			sources.Get("/", r.handlers.Sources.List)
+			sources.Post("/", r.handlers.Sources.Create)
 			sources.Get("/{slug}", r.handlers.Sources.Get)
+			sources.Patch("/{slug}", r.handlers.Sources.Update)
 		})
 
 		// Alerts endpoints
@@ -127,6 +132,13 @@ func (r *Router) Setup() http.Handler {
 			alerts.Get("/", r.handlers.Alerts.List)
 			alerts.Delete("/", r.handlers.Alerts.Clear)
 			alerts.Post("/{id}/read", r.handlers.Alerts.MarkRead)
+		})
+
+		// Supply-chain security endpoints
+		api.Route("/supply-chain", func(sc chi.Router) {
+			sc.Get("/vulnerabilities", r.handlers.SupplyChain.GetVulnerabilities)
+			sc.Post("/check", r.handlers.SupplyChain.CheckPackages)
+			sc.Get("/trackers", r.handlers.SupplyChain.GetTrackers)
 		})
 
 		// SMS/Smishing protection endpoints
@@ -142,10 +154,13 @@ func (r *Router) Setup() http.Handler {
 		// Path aliases: /api/v1/indicators -> /api/v1/intelligence (Flutter compatibility)
 		api.Get("/indicators", r.handlers.Intelligence.List)
 		api.Post("/indicators/check", r.handlers.Intelligence.Check)
+		api.Get("/indicators/{id}", r.handlers.Indicators.GetByID)
 
 		// Path aliases: /api/v1/intel/sources -> /api/v1/sources (Flutter compatibility)
 		api.Get("/intel/sources", r.handlers.Sources.List)
 		api.Get("/intel/sources/{slug}", r.handlers.Sources.Get)
+		api.Post("/intel/sources", r.handlers.Sources.Create)
+		api.Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
 
 		// URL/Safe Web protection endpoints
 		api.Route("/url", func(url chi.Router) {
@@ -281,6 +296,10 @@ func (r *Router) Setup() http.Handler {
 			graph.Post("/sync", r.handlers.Graph.SyncFromPostgres)
 			graph.Post("/build-relationships", r.handlers.Graph.BuildRelationships)
 			graph.Get("/stats", r.handlers.Graph.GetStats)
+
+			// Graph exploration (node/relation listings)
+			graph.Get("/nodes", r.handlers.Graph.GetNodes)
+			graph.Get("/relations", r.handlers.Graph.GetRelations)
 		})
 
 		// YARA Rules Engine endpoints
@@ -314,7 +333,9 @@ func (r *Router) Setup() http.Handler {
 		// Correlation Engine endpoints
 		api.Route("/correlation", func(corr chi.Router) {
 			// Main correlation
+			corr.Get("/", r.handlers.Correlation.ListCorrelations)
 			corr.Post("/", r.handlers.Correlation.Correlate)
+			corr.Post("/run", r.handlers.Correlation.RunCorrelation)
 			corr.Post("/batch", r.handlers.Correlation.CorrelateBatch)
 			corr.Post("/analyze", r.handlers.Correlation.AnalyzeValue)
 
@@ -333,6 +354,11 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats
 			corr.Get("/stats", r.handlers.Correlation.GetStats)
+
+			// Correlate by indicator ID (Flutter compatibility: GET /correlation/{id}).
+			// chi gives static segments (run, stats, batch, analyze, indicator,
+			// campaigns, cluster) priority over this wildcard, so no shadowing.
+			corr.Get("/{id}", r.handlers.Correlation.CorrelateIndicator)
 		})
 
 		// MITRE ATT&CK endpoints
@@ -389,7 +415,7 @@ func (r *Router) Setup() http.Handler {
 			ml.Post("/severity/predict", r.handlers.ML.PredictSeverity)
 
 			// Model management
-			ml.Get("/models", r.handlers.ML.GetStats)
+			ml.Get("/models", r.handlers.ML.GetModels)
 			ml.Get("/models/{model}", r.handlers.ML.GetModelInfo)
 			ml.Post("/models/train", r.handlers.ML.Train)
 			ml.Post("/models/{model}/train", r.handlers.ML.TrainModel)
@@ -504,6 +530,9 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats
 			qr.Get("/stats", r.handlers.QRSecurity.GetStats)
+
+			// False-positive reporting
+			qr.Post("/report-false-positive", r.handlers.QRSecurity.ReportFalsePositive)
 		})
 
 		// Enterprise endpoints (MDM, Zero Trust, SIEM, Compliance)
@@ -603,7 +632,10 @@ func (r *Router) Setup() http.Handler {
 
 			// iOS upload variants
 			fr.Post("/ios/shutdown-log/upload", r.handlers.Forensics.UploadShutdownLog)
+			fr.Post("/ios/backup/upload", r.handlers.Forensics.UploadIOSBackup)
+			fr.Post("/ios/sysdiagnose/upload", r.handlers.Forensics.UploadSysdiagnose)
 			fr.Post("/android/logcat/upload", r.handlers.Forensics.UploadLogcat)
+			fr.Post("/android/bugreport/upload", r.handlers.Forensics.UploadBugreport)
 
 			// Comprehensive Analysis
 			fr.Post("/full-analysis", r.handlers.Forensics.FullAnalysis)
@@ -628,6 +660,9 @@ func (r *Router) Setup() http.Handler {
 			desktop.Post("/persistence/scan", r.handlers.DesktopSecurity.ScanPersistence)
 			desktop.Post("/persistence/quick-scan", r.handlers.DesktopSecurity.QuickScanPersistence)
 			desktop.Post("/persistence/scan-path", r.handlers.DesktopSecurity.ScanPath)
+			desktop.Get("/persistence", r.handlers.DesktopSecurity.GetCachedPersistence)
+			desktop.Get("/apps", r.handlers.DesktopSecurity.GetCachedApps)
+			desktop.Get("/firewall", r.handlers.DesktopSecurity.GetCachedFirewall)
 			desktop.Post("/codesign/verify", r.handlers.DesktopSecurity.VerifyCodeSigning)
 			desktop.Post("/codesign/verify-batch", r.handlers.DesktopSecurity.VerifyCodeSigningBatch)
 			desktop.Get("/network/connections", r.handlers.DesktopSecurity.GetNetworkConnections)
@@ -717,14 +752,16 @@ func (r *Router) Setup() http.Handler {
 		api.Get("/vpn/blocked", r.handlers.OrbNet.ListBlockRules)
 		api.Get("/vpn/stats", r.handlers.OrbNet.GetDashboardStats)
 
-		// ML insights alias
-		api.Get("/ml/insights", r.handlers.ML.GetStats)
-		api.Get("/ml/anomalies", r.handlers.ML.GetStats)
+		// ML insights and anomaly listings
+		api.Get("/ml/insights", r.handlers.ML.GetInsights)
+		api.Get("/ml/anomalies", r.handlers.ML.GetAnomalies)
 
-		// Network rogue-ap endpoints (map to wifi/audit for now)
-		api.Post("/network/rogue-ap/scan", r.handlers.NetworkSecurity.AuditWiFi)
-		api.Get("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.GetWiFiSecurityInfo)
-		api.Post("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.AuditWiFi)
+		// Network rogue-AP detection and trusted-AP management
+		api.Post("/network/rogue-ap/scan", r.handlers.NetworkSecurity.ScanRogueAPs)
+		api.Get("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.GetTrustedAPs)
+		api.Post("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.AddTrustedAP)
+		api.Delete("/network/rogue-ap/trusted/{id}", r.handlers.NetworkSecurity.RemoveTrustedAP)
+		api.Get("/network/threats", r.handlers.NetworkSecurity.GetNetworkThreats)
 
 		// Admin endpoints
 		api.Route("/admin", func(admin chi.Router) {

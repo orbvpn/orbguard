@@ -375,10 +375,12 @@ func main() {
 		BrowserScanner:        browserScanner,
 		VTClient:              vtClient,
 		FootprintScanner:      footprintScanner,
+		OSVBaseURL:            cfg.Detection.SupplyChain.OSVAPURL,
 	}
 	h := handlers.NewHandlers(deps)
 	if repos != nil {
 		h.NetworkSecurity.SetRepository(repository.NewNetworkSecurityRepositoryFromRepos(repos))
+		h.NetworkSecurity.SetRogueAPRepository(repository.NewRogueAPRepositoryFromRepos(repos))
 	}
 
 	// Create router

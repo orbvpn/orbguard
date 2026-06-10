@@ -3,9 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
@@ -16,9 +19,10 @@ import (
 
 // NetworkSecurityHandler handles network security API requests
 type NetworkSecurityHandler struct {
-	service *services.NetworkSecurityService
-	repo    *repository.NetworkSecurityRepository
-	logger  *logger.Logger
+	service   *services.NetworkSecurityService
+	repo      *repository.NetworkSecurityRepository
+	rogueRepo *repository.RogueAPRepository
+	logger    *logger.Logger
 }
 
 // NewNetworkSecurityHandler creates a new network security handler
@@ -34,6 +38,15 @@ func NewNetworkSecurityHandler(service *services.NetworkSecurityService, log *lo
 // configuration endpoints return an explicit unavailable error.
 func (h *NetworkSecurityHandler) SetRepository(repo *repository.NetworkSecurityRepository) {
 	h.repo = repo
+}
+
+// SetRogueAPRepository wires the Postgres-backed repository for per-device
+// trusted access points and the persisted threat-audit feed. Without it, the
+// rogue-AP trusted-list and /network/threats endpoints return an explicit
+// unavailable error (the scan endpoint still works, without trusted-AP
+// suppression).
+func (h *NetworkSecurityHandler) SetRogueAPRepository(repo *repository.RogueAPRepository) {
+	h.rogueRepo = repo
 }
 
 // auditDeviceID resolves the device identity for persisting audit results:
@@ -611,6 +624,596 @@ func (h *NetworkSecurityHandler) calculateOverallRisk(result map[string]interfac
 		"risk_score": riskScore,
 		"risk_level": riskLevel,
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Rogue-AP scan + trusted access points
+// ---------------------------------------------------------------------------
+
+// rogueAPScanAP is one access point in a rogue-AP scan request. Both
+// signal_strength and signal_level are accepted; security may be a plain type
+// name ("WPA2") or an Android capabilities string ("[WPA2-PSK-CCMP][ESS]").
+type rogueAPScanAP struct {
+	SSID           string `json:"ssid"`
+	BSSID          string `json:"bssid"`
+	SignalStrength *int   `json:"signal_strength,omitempty"`
+	SignalLevel    *int   `json:"signal_level,omitempty"`
+	Channel        int    `json:"channel"`
+	Security       string `json:"security"`
+	SecurityType   string `json:"security_type"`
+	Frequency      int    `json:"frequency"`
+	Capabilities   string `json:"capabilities"`
+	IsConnected    bool   `json:"is_connected"`
+	IsHidden       bool   `json:"is_hidden"`
+}
+
+// rogueAPScanRequest is the body of POST /network/rogue-ap/scan.
+type rogueAPScanRequest struct {
+	AccessPoints   []rogueAPScanAP `json:"access_points"`
+	CurrentNetwork *rogueAPScanAP  `json:"current_network,omitempty"`
+	DeviceID       string          `json:"device_id,omitempty"`
+}
+
+// toWiFiNetwork converts a scan-request AP to the domain model.
+func (ap *rogueAPScanAP) toWiFiNetwork() models.WiFiNetwork {
+	signal := -100
+	if ap.SignalStrength != nil {
+		signal = *ap.SignalStrength
+	} else if ap.SignalLevel != nil {
+		signal = *ap.SignalLevel
+	}
+
+	security := ap.Security
+	if security == "" {
+		security = ap.SecurityType
+	}
+	if security == "" {
+		security = ap.Capabilities
+	}
+
+	return models.WiFiNetwork{
+		SSID:         ap.SSID,
+		BSSID:        ap.BSSID,
+		SecurityType: parseWiFiSecurityType(security),
+		SignalLevel:  signal,
+		Frequency:    ap.Frequency,
+		Channel:      ap.Channel,
+		IsConnected:  ap.IsConnected,
+		IsHidden:     ap.IsHidden,
+		Capabilities: ap.Capabilities,
+	}
+}
+
+// parseWiFiSecurityType normalizes a security descriptor into a
+// models.WiFiSecurityType. Order matters: WPA3 before WPA2 before WPA.
+func parseWiFiSecurityType(raw string) models.WiFiSecurityType {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case s == "":
+		return models.WiFiSecurityUnknown
+	case strings.Contains(s, "wpa3") || strings.Contains(s, "sae"):
+		return models.WiFiSecurityWPA3
+	case strings.Contains(s, "wpa2") || strings.Contains(s, "rsn"):
+		return models.WiFiSecurityWPA2
+	case strings.Contains(s, "wpa"):
+		return models.WiFiSecurityWPA
+	case strings.Contains(s, "wep"):
+		return models.WiFiSecurityWEP
+	case s == "open" || s == "none" || s == "[ess]" || s == "ess":
+		return models.WiFiSecurityOpen
+	default:
+		return models.WiFiSecurityUnknown
+	}
+}
+
+// trustedAPKeys builds lookup sets for trusted-AP suppression: exact
+// (ssid, bssid) pairs and bare BSSIDs.
+func trustedAPKeys(trusted []repository.TrustedAP) (pairs map[string]bool, bssids map[string]bool) {
+	pairs = make(map[string]bool, len(trusted))
+	bssids = make(map[string]bool, len(trusted))
+	for _, t := range trusted {
+		pairs[strings.ToLower(t.SSID)+"|"+strings.ToLower(t.BSSID)] = true
+		if t.BSSID != "" {
+			bssids[strings.ToLower(t.BSSID)] = true
+		}
+	}
+	return pairs, bssids
+}
+
+func isTrustedAP(ssid, bssid string, pairs, bssids map[string]bool) bool {
+	if len(pairs) == 0 && len(bssids) == 0 {
+		return false
+	}
+	if bssids[strings.ToLower(bssid)] {
+		return true
+	}
+	return pairs[strings.ToLower(ssid)+"|"+strings.ToLower(bssid)]
+}
+
+// recalculateWiFiRisk mirrors the service risk formula so the score stays
+// consistent after trusted-AP findings are suppressed: security issues weigh
+// 0.4/0.25/0.15/0.05 by severity, each rogue AP adds 0.2, each evil twin 0.3.
+func recalculateWiFiRisk(result *models.WiFiAuditResult) {
+	score := 0.0
+	for _, issue := range result.SecurityIssues {
+		switch issue.Severity {
+		case models.NetworkRiskLevelCritical:
+			score += 0.4
+		case models.NetworkRiskLevelHigh:
+			score += 0.25
+		case models.NetworkRiskLevelMedium:
+			score += 0.15
+		case models.NetworkRiskLevelLow:
+			score += 0.05
+		}
+	}
+	score += float64(len(result.RogueAPDetected)) * 0.2
+	score += float64(len(result.EvilTwinDetected)) * 0.3
+	if score > 1.0 {
+		score = 1.0
+	}
+
+	var level models.NetworkRiskLevel
+	switch {
+	case score >= 0.8:
+		level = models.NetworkRiskLevelCritical
+	case score >= 0.6:
+		level = models.NetworkRiskLevelHigh
+	case score >= 0.4:
+		level = models.NetworkRiskLevelMedium
+	case score >= 0.2:
+		level = models.NetworkRiskLevelLow
+	default:
+		level = models.NetworkRiskLevelSafe
+	}
+
+	result.RiskScore = score
+	result.RiskLevel = level
+}
+
+// ScanRogueAPs handles POST /api/v1/network/rogue-ap/scan. It runs the
+// rogue-AP / evil-twin detection over the submitted access points, suppresses
+// findings for the device's trusted APs, and returns a per-AP threat
+// assessment alongside the raw alerts.
+func (h *NetworkSecurityHandler) ScanRogueAPs(w http.ResponseWriter, r *http.Request) {
+	var req rogueAPScanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.AccessPoints) == 0 && req.CurrentNetwork == nil {
+		h.respondError(w, http.StatusBadRequest, "access_points is required")
+		return
+	}
+
+	nearby := make([]models.WiFiNetwork, 0, len(req.AccessPoints))
+	var current *models.WiFiNetwork
+	for i := range req.AccessPoints {
+		network := req.AccessPoints[i].toWiFiNetwork()
+		nearby = append(nearby, network)
+		if current == nil && network.IsConnected {
+			n := network
+			current = &n
+		}
+	}
+	if req.CurrentNetwork != nil {
+		n := req.CurrentNetwork.toWiFiNetwork()
+		n.IsConnected = true
+		current = &n
+	}
+
+	deviceID := h.auditDeviceID(r.Context(), req.DeviceID)
+
+	result, err := h.service.AuditWiFi(r.Context(), &models.WiFiAuditRequest{
+		CurrentNetwork: current,
+		NearbyNetworks: nearby,
+		DeviceID:       deviceID,
+	})
+	if err != nil {
+		h.logger.Error().Err(err).Msg("rogue-AP scan failed")
+		h.respondError(w, http.StatusInternalServerError, "rogue-AP scan failed")
+		return
+	}
+
+	// Suppress findings against the device's trusted APs.
+	var trustedPairs, trustedBSSIDs map[string]bool
+	suppressed := 0
+	if authDeviceID := middleware.GetDeviceID(r.Context()); authDeviceID != "" && h.rogueRepo != nil {
+		trusted, err := h.rogueRepo.ListTrustedAPs(r.Context(), authDeviceID)
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", authDeviceID).Msg("failed to load trusted APs for scan suppression")
+		} else {
+			trustedPairs, trustedBSSIDs = trustedAPKeys(trusted)
+		}
+	}
+	if len(trustedPairs) > 0 || len(trustedBSSIDs) > 0 {
+		keptRogue := result.RogueAPDetected[:0]
+		for _, alert := range result.RogueAPDetected {
+			if isTrustedAP(alert.SSID, alert.BSSID, trustedPairs, trustedBSSIDs) {
+				suppressed++
+				continue
+			}
+			keptRogue = append(keptRogue, alert)
+		}
+		result.RogueAPDetected = keptRogue
+
+		keptTwins := result.EvilTwinDetected[:0]
+		for _, alert := range result.EvilTwinDetected {
+			if isTrustedAP(alert.SSID, alert.EvilBSSID, trustedPairs, trustedBSSIDs) {
+				suppressed++
+				continue
+			}
+			keptTwins = append(keptTwins, alert)
+		}
+		result.EvilTwinDetected = keptTwins
+
+		if suppressed > 0 {
+			recalculateWiFiRisk(result)
+		}
+	}
+
+	// Index alerts by offending BSSID for the per-AP assessment.
+	rogueByBSSID := make(map[string]models.RogueAPAlert, len(result.RogueAPDetected))
+	for _, alert := range result.RogueAPDetected {
+		rogueByBSSID[strings.ToLower(alert.BSSID)] = alert
+	}
+	twinByBSSID := make(map[string]models.EvilTwinAlert, len(result.EvilTwinDetected))
+	for _, alert := range result.EvilTwinDetected {
+		twinByBSSID[strings.ToLower(alert.EvilBSSID)] = alert
+	}
+
+	accessPoints := make([]map[string]interface{}, 0, len(nearby))
+	for _, network := range nearby {
+		threats := make([]string, 0, 2)
+		threatLevel := "safe"
+		trusted := isTrustedAP(network.SSID, network.BSSID, trustedPairs, trustedBSSIDs)
+
+		if !trusted {
+			key := strings.ToLower(network.BSSID)
+			if _, ok := twinByBSSID[key]; ok {
+				threats = append(threats, "evil_twin")
+				threatLevel = "dangerous"
+			}
+			if alert, ok := rogueByBSSID[key]; ok {
+				if strings.Contains(alert.Reason, "impersonate") {
+					threats = append(threats, "suspicious_ssid")
+				} else {
+					threats = append(threats, "evil_twin")
+				}
+				threatLevel = "dangerous"
+			}
+			switch network.SecurityType {
+			case models.WiFiSecurityOpen:
+				threats = append(threats, "open_network")
+				if threatLevel == "safe" {
+					threatLevel = "caution"
+				}
+			case models.WiFiSecurityWEP, models.WiFiSecurityWPA:
+				threats = append(threats, "weak_encryption")
+				if threatLevel == "safe" {
+					threatLevel = "caution"
+				}
+			}
+		}
+
+		id := network.BSSID
+		if id == "" {
+			id = network.SSID
+		}
+
+		accessPoints = append(accessPoints, map[string]interface{}{
+			"id":              id,
+			"ssid":            network.SSID,
+			"bssid":           network.BSSID,
+			"signal_strength": network.SignalLevel,
+			"security":        string(network.SecurityType),
+			"channel":         network.Channel,
+			"frequency":       network.Frequency,
+			"is_connected":    network.IsConnected,
+			"is_trusted":      trusted,
+			"threat_level":    threatLevel,
+			"threats":         threats,
+		})
+	}
+
+	// Persist the scan outcome for the threat feed and stats aggregation.
+	identity := ""
+	if current != nil {
+		identity = current.SSID
+		if identity == "" {
+			identity = current.BSSID
+		}
+	}
+	h.persistAudit(r.Context(), repository.NetworkAuditRecord{
+		DeviceID:        deviceID,
+		AuditType:       "rogue_ap",
+		NetworkIdentity: identity,
+		RiskLevel:       string(result.RiskLevel),
+		RiskScore:       result.RiskScore,
+		RogueAPCount:    len(result.RogueAPDetected),
+		EvilTwinCount:   len(result.EvilTwinDetected),
+		Findings:        result,
+	})
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"access_points":       accessPoints,
+		"count":               len(accessPoints),
+		"rogue_aps":           result.RogueAPDetected,
+		"evil_twins":          result.EvilTwinDetected,
+		"security_issues":     result.SecurityIssues,
+		"recommendations":     result.Recommendations,
+		"risk_level":          result.RiskLevel,
+		"risk_score":          result.RiskScore,
+		"suppressed_by_trust": suppressed,
+		"scanned_at":          result.AuditedAt,
+	})
+}
+
+// GetTrustedAPs handles GET /api/v1/network/rogue-ap/trusted.
+func (h *NetworkSecurityHandler) GetTrustedAPs(w http.ResponseWriter, r *http.Request) {
+	if h.rogueRepo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "trusted AP persistence unavailable")
+		return
+	}
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	trusted, err := h.rogueRepo.ListTrustedAPs(r.Context(), deviceID)
+	if err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to list trusted APs")
+		h.respondError(w, http.StatusInternalServerError, "failed to list trusted APs")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"trusted_aps": trusted,
+		"count":       len(trusted),
+	})
+}
+
+// AddTrustedAP handles POST /api/v1/network/rogue-ap/trusted.
+func (h *NetworkSecurityHandler) AddTrustedAP(w http.ResponseWriter, r *http.Request) {
+	if h.rogueRepo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "trusted AP persistence unavailable")
+		return
+	}
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	var req struct {
+		SSID  string `json:"ssid"`
+		BSSID string `json:"bssid"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.SSID = strings.TrimSpace(req.SSID)
+	req.BSSID = strings.TrimSpace(req.BSSID)
+	if req.SSID == "" && req.BSSID == "" {
+		h.respondError(w, http.StatusBadRequest, "ssid or bssid is required")
+		return
+	}
+
+	ap, err := h.rogueRepo.AddTrustedAP(r.Context(), deviceID, req.SSID, req.BSSID)
+	if err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to add trusted AP")
+		h.respondError(w, http.StatusInternalServerError, "failed to add trusted AP")
+		return
+	}
+
+	h.respondJSON(w, http.StatusCreated, ap)
+}
+
+// RemoveTrustedAP handles DELETE /api/v1/network/rogue-ap/trusted/{id}.
+func (h *NetworkSecurityHandler) RemoveTrustedAP(w http.ResponseWriter, r *http.Request) {
+	if h.rogueRepo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "trusted AP persistence unavailable")
+		return
+	}
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid trusted AP ID")
+		return
+	}
+
+	deleted, err := h.rogueRepo.DeleteTrustedAP(r.Context(), deviceID, id)
+	if err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to remove trusted AP")
+		h.respondError(w, http.StatusInternalServerError, "failed to remove trusted AP")
+		return
+	}
+	if !deleted {
+		h.respondError(w, http.StatusNotFound, "trusted AP not found")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status": "deleted",
+		"id":     id,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Network threats feed (persisted audit findings)
+// ---------------------------------------------------------------------------
+
+// storedWiFiFindings is the subset of a persisted Wi-Fi/rogue-AP audit
+// findings document needed to derive threat entries.
+type storedWiFiFindings struct {
+	RogueAPDetected  []models.RogueAPAlert      `json:"rogue_ap_detected"`
+	EvilTwinDetected []models.EvilTwinAlert     `json:"evil_twin_detected"`
+	SecurityIssues   []models.WiFiSecurityIssue `json:"security_issues"`
+}
+
+// storedDNSFindings is the subset of a persisted DNS audit findings document
+// needed to derive threat entries.
+type storedDNSFindings struct {
+	CurrentDNS string `json:"current_dns"`
+	IsHijacked bool   `json:"is_hijacked"`
+}
+
+// storedFullFindings is the shape persisted by full audits, nesting the Wi-Fi
+// and DNS results.
+type storedFullFindings struct {
+	WiFi *storedWiFiFindings `json:"wifi"`
+	DNS  *storedDNSFindings  `json:"dns"`
+}
+
+// appendWiFiThreats converts persisted Wi-Fi findings into threat entries.
+func appendWiFiThreats(threats []map[string]interface{}, row repository.ThreatAuditRow, findings *storedWiFiFindings) []map[string]interface{} {
+	network := row.NetworkIdentity
+	for i, alert := range findings.RogueAPDetected {
+		detectedAt := alert.DetectedAt
+		if detectedAt.IsZero() {
+			detectedAt = row.AuditedAt
+		}
+		net := alert.SSID
+		if net == "" {
+			net = network
+		}
+		threats = append(threats, map[string]interface{}{
+			"id":          fmt.Sprintf("%s:rogue_ap:%d", row.ID, i),
+			"type":        "rogue_ap",
+			"severity":    string(alert.RiskLevel),
+			"description": alert.Reason,
+			"network":     net,
+			"detected_at": detectedAt,
+		})
+	}
+	for i, alert := range findings.EvilTwinDetected {
+		detectedAt := alert.DetectedAt
+		if detectedAt.IsZero() {
+			detectedAt = row.AuditedAt
+		}
+		net := alert.SSID
+		if net == "" {
+			net = network
+		}
+		threats = append(threats, map[string]interface{}{
+			"id":          fmt.Sprintf("%s:evil_twin:%d", row.ID, i),
+			"type":        "evil_twin",
+			"severity":    string(alert.RiskLevel),
+			"description": alert.Description,
+			"network":     net,
+			"detected_at": detectedAt,
+		})
+	}
+	for i, issue := range findings.SecurityIssues {
+		if issue.Severity != models.NetworkRiskLevelHigh && issue.Severity != models.NetworkRiskLevelCritical {
+			continue
+		}
+		threats = append(threats, map[string]interface{}{
+			"id":          fmt.Sprintf("%s:%s:%d", row.ID, issue.Type, i),
+			"type":        issue.Type,
+			"severity":    string(issue.Severity),
+			"description": issue.Description,
+			"network":     network,
+			"detected_at": row.AuditedAt,
+		})
+	}
+	return threats
+}
+
+// appendDNSThreats converts persisted DNS findings into threat entries.
+func appendDNSThreats(threats []map[string]interface{}, row repository.ThreatAuditRow, findings *storedDNSFindings) []map[string]interface{} {
+	if findings == nil || !findings.IsHijacked {
+		return threats
+	}
+	network := findings.CurrentDNS
+	if network == "" {
+		network = row.NetworkIdentity
+	}
+	return append(threats, map[string]interface{}{
+		"id":          fmt.Sprintf("%s:dns_hijack", row.ID),
+		"type":        "dns_hijack",
+		"severity":    string(models.NetworkRiskLevelCritical),
+		"description": fmt.Sprintf("DNS hijacking detected: device DNS resolves through %s", network),
+		"network":     network,
+		"detected_at": row.AuditedAt,
+	})
+}
+
+// GetNetworkThreats handles GET /api/v1/network/threats. Threats are derived
+// from the persisted per-device audit findings (orbguard_lab.network_audits):
+// device-scoped for authenticated devices and global for service callers.
+func (h *NetworkSecurityHandler) GetNetworkThreats(w http.ResponseWriter, r *http.Request) {
+	if h.rogueRepo == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "network threats unavailable: persistence not configured")
+		return
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" && !middleware.IsServiceRequest(r.Context()) {
+		h.respondError(w, http.StatusBadRequest, "device identity required")
+		return
+	}
+
+	rows, err := h.rogueRepo.ListThreatAudits(r.Context(), deviceID, 200)
+	if err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to load network threat audits")
+		h.respondError(w, http.StatusInternalServerError, "failed to load network threats")
+		return
+	}
+
+	threats := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		if len(row.Findings) == 0 {
+			// Audit rows persisted without a findings document still carry the
+			// scalar threat flags; surface DNS hijacks recorded that way.
+			if row.HijackDetected {
+				threats = appendDNSThreats(threats, row, &storedDNSFindings{
+					CurrentDNS: row.NetworkIdentity,
+					IsHijacked: true,
+				})
+			}
+			continue
+		}
+
+		switch row.AuditType {
+		case "wifi", "rogue_ap":
+			var findings storedWiFiFindings
+			if err := json.Unmarshal(row.Findings, &findings); err != nil {
+				h.logger.Warn().Err(err).Str("audit_id", row.ID.String()).Msg("failed to decode wifi audit findings")
+				continue
+			}
+			threats = appendWiFiThreats(threats, row, &findings)
+		case "dns":
+			var findings storedDNSFindings
+			if err := json.Unmarshal(row.Findings, &findings); err != nil {
+				h.logger.Warn().Err(err).Str("audit_id", row.ID.String()).Msg("failed to decode dns audit findings")
+				continue
+			}
+			threats = appendDNSThreats(threats, row, &findings)
+		case "full":
+			var findings storedFullFindings
+			if err := json.Unmarshal(row.Findings, &findings); err != nil {
+				h.logger.Warn().Err(err).Str("audit_id", row.ID.String()).Msg("failed to decode full audit findings")
+				continue
+			}
+			if findings.WiFi != nil {
+				threats = appendWiFiThreats(threats, row, findings.WiFi)
+			}
+			threats = appendDNSThreats(threats, row, findings.DNS)
+		}
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"threats": threats,
+		"count":   len(threats),
+	})
 }
 
 func (h *NetworkSecurityHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {

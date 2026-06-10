@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/pkg/logger"
@@ -25,6 +27,80 @@ func NewCorrelationHandler(engine *services.CorrelationEngine, log *logger.Logge
 		engine: engine,
 		logger: log.WithComponent("correlation-handler"),
 	}
+}
+
+// ListCorrelations returns recently persisted correlation events
+// GET /api/v1/correlation
+// Query params: query (free-text filter), limit (default 50, cap 200)
+// Response: { "results": [CorrelationEvent...], "count": N }
+func (h *CorrelationHandler) ListCorrelations(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("query")
+	if search == "" {
+		search = r.URL.Query().Get("search")
+	}
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	events, err := h.engine.GetRecentEvents(r.Context(), search, limit)
+	if err != nil {
+		if errors.Is(err, services.ErrCorrelationPersistenceUnavailable) {
+			h.respondError(w, http.StatusServiceUnavailable, "correlation results are unavailable", err)
+			return
+		}
+		h.respondError(w, http.StatusInternalServerError, "failed to list correlation results", err)
+		return
+	}
+
+	if events == nil {
+		events = []models.CorrelationEvent{}
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"results": events,
+		"count":   len(events),
+	})
+}
+
+// RunCorrelation runs a server-scoped correlation over recent indicators,
+// persists the results, and returns the run summary plus the events found
+// POST /api/v1/correlation/run
+func (h *CorrelationHandler) RunCorrelation(w http.ResponseWriter, r *http.Request) {
+	requestedBy := middleware.GetUserID(r.Context())
+	if requestedBy == "" {
+		requestedBy = middleware.GetDeviceID(r.Context())
+	}
+	if requestedBy == "" && middleware.IsServiceRequest(r.Context()) {
+		requestedBy = "service"
+	}
+
+	summary, response, err := h.engine.RunServerCorrelation(r.Context(), requestedBy)
+	if err != nil {
+		if errors.Is(err, services.ErrCorrelationPersistenceUnavailable) {
+			h.respondError(w, http.StatusServiceUnavailable, "correlation runs are unavailable", err)
+			return
+		}
+		h.respondError(w, http.StatusInternalServerError, "correlation run failed", err)
+		return
+	}
+
+	correlations := response.Correlations
+	if correlations == nil {
+		correlations = []models.CorrelationEvent{}
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"run":          summary,
+		"correlations": correlations,
+		"statistics":   response.Statistics,
+	})
 }
 
 // Correlate performs correlation analysis on provided indicators

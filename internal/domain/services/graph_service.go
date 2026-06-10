@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -38,6 +39,44 @@ func NewGraphService(
 		cache:     cache,
 		logger:    log.WithComponent("graph-service"),
 	}
+}
+
+// ErrGraphUnavailable is returned when Neo4j is not configured or could not
+// be reached at startup, so graph exploration features cannot be served.
+var ErrGraphUnavailable = errors.New("graph database (Neo4j) is not available")
+
+// Available reports whether the graph backend can serve queries. The service
+// is only constructed when Neo4j connects at startup, but this guards against
+// partially-wired instances.
+func (s *GraphService) Available() bool {
+	return s != nil && s.graphRepo != nil
+}
+
+// ListNodes returns graph nodes for the exploration API, optionally filtered
+// by node label (type) and a free-text search. Limit is capped by the caller.
+func (s *GraphService) ListNodes(ctx context.Context, nodeType, search string, limit int) ([]graph.NodeView, error) {
+	if !s.Available() {
+		return nil, ErrGraphUnavailable
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	return s.graphRepo.ListNodes(queryCtx, nodeType, search, limit)
+}
+
+// ListRelations returns graph relationships for the exploration API,
+// optionally filtered by relationship type, endpoint node id, and free-text
+// search. Limit is capped by the caller.
+func (s *GraphService) ListRelations(ctx context.Context, relType, nodeID, search string, limit int) ([]graph.RelationView, error) {
+	if !s.Available() {
+		return nil, ErrGraphUnavailable
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	return s.graphRepo.ListRelations(queryCtx, relType, nodeID, search, limit)
 }
 
 // SyncFromPostgres syncs data from PostgreSQL to Neo4j

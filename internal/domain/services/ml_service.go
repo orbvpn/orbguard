@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,27 +20,27 @@ import (
 
 // MLService orchestrates all ML operations for threat intelligence
 type MLService struct {
-	featureExtractor  *FeatureExtractor
-	isolationForest   *IsolationForest
-	kmeans            *KMeans
-	randomForest      *RandomForest
-	entityExtractor   *EntityExtractor
-	repos             *repository.Repositories
-	cache             *cache.RedisCache
-	logger            *logger.Logger
+	featureExtractor *FeatureExtractor
+	isolationForest  *IsolationForest
+	kmeans           *KMeans
+	randomForest     *RandomForest
+	entityExtractor  *EntityExtractor
+	repos            *repository.Repositories
+	cache            *cache.RedisCache
+	logger           *logger.Logger
 
 	// Training state
-	minTrainingSize   int
-	lastTrainedAt     time.Time
+	minTrainingSize    int
+	lastTrainedAt      time.Time
 	trainingInProgress atomic.Bool
-	trainingMu        sync.Mutex
+	trainingMu         sync.Mutex
 
 	// Stats
-	totalPredictions   atomic.Int64
-	totalAnomalies     atomic.Int64
-	totalEntities      atomic.Int64
-	cacheHits          atomic.Int64
-	cacheMisses        atomic.Int64
+	totalPredictions atomic.Int64
+	totalAnomalies   atomic.Int64
+	totalEntities    atomic.Int64
+	cacheHits        atomic.Int64
+	cacheMisses      atomic.Int64
 }
 
 // MLServiceConfig holds configuration for the ML service
@@ -441,11 +443,11 @@ func (s *MLService) Train(ctx context.Context) (*models.MLTrainingResult, error)
 	s.lastTrainedAt = time.Now()
 
 	return &models.MLTrainingResult{
-		ModelType:      "all",
-		Version:        "1.0",
-		TrainingSize:   len(indicators),
-		TrainingTime:   time.Since(startTime),
-		Success:        true,
+		ModelType:    "all",
+		Version:      "1.0",
+		TrainingSize: len(indicators),
+		TrainingTime: time.Since(startTime),
+		Success:      true,
 		Metrics: map[string]float64{
 			"isolation_forest_threshold": s.isolationForest.threshold,
 			"kmeans_silhouette":          s.kmeans.silhouette,
@@ -600,6 +602,264 @@ func (s *MLService) GetFeatureNames() []string {
 func (s *MLService) FindOptimalClusters(ctx context.Context, indicators []*models.Indicator, maxK int) int {
 	vectors := s.featureExtractor.ExtractBatchFeatures(indicators)
 	return s.kmeans.OptimalK(vectors, maxK)
+}
+
+// IsAnomalyModelTrained reports whether the isolation forest is trained and
+// anomaly detection can run.
+func (s *MLService) IsAnomalyModelTrained() bool {
+	return s.isolationForest.IsTrained()
+}
+
+// MLInsight is a narrative insight derived from real indicator and model
+// state. Every insight is computed from persisted data — no values are
+// fabricated; when a data source is empty the corresponding insight is simply
+// omitted.
+type MLInsight struct {
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Severity    string         `json:"severity"` // info, warning, high, critical
+	GeneratedAt time.Time      `json:"generated_at"`
+	Data        map[string]any `json:"data,omitempty"`
+}
+
+// mlInsightRecentLimit bounds how many recent indicators are scored when
+// computing the anomaly-cluster insight.
+const mlInsightRecentLimit = 1000
+
+// GenerateInsights derives narrative insights from the indicator store and
+// the in-memory model state: indicator velocity vs the prior period, dominant
+// types and severities, Pegasus presence, and (when the anomaly model is
+// trained) the types that cluster among anomalous indicators.
+func (s *MLService) GenerateInsights(ctx context.Context) ([]MLInsight, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	stats, err := s.repos.Indicators.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load indicator stats: %w", err)
+	}
+
+	now := time.Now()
+	insights := make([]MLInsight, 0, 5)
+
+	if stats.TotalCount == 0 {
+		return insights, nil
+	}
+
+	// --- Indicator velocity: this week vs the average of the prior three weeks.
+	priorMonthRemainder := stats.MonthlyNew - stats.WeeklyNew
+	if priorMonthRemainder > 0 {
+		prevWeeklyAvg := float64(priorMonthRemainder) / 3.0
+		changePct := (float64(stats.WeeklyNew) - prevWeeklyAvg) / prevWeeklyAvg * 100.0
+		severity := "info"
+		direction := "down"
+		if changePct >= 0 {
+			direction = "up"
+		}
+		if changePct >= 50 {
+			severity = "warning"
+		}
+		insights = append(insights, MLInsight{
+			ID:    "indicator-velocity",
+			Title: "Indicator Velocity",
+			Description: fmt.Sprintf(
+				"%d new indicators in the last 7 days, %s %.0f%% vs the prior three-week average of %.1f per week.",
+				stats.WeeklyNew, direction, math.Abs(changePct), prevWeeklyAvg),
+			Severity:    severity,
+			GeneratedAt: now,
+			Data: map[string]any{
+				"weekly_new":          stats.WeeklyNew,
+				"monthly_new":         stats.MonthlyNew,
+				"today_new":           stats.TodayNew,
+				"prev_weekly_average": prevWeeklyAvg,
+				"change_percent":      changePct,
+			},
+		})
+	} else if stats.WeeklyNew > 0 {
+		// No prior-period baseline exists; report counts without a trend claim.
+		insights = append(insights, MLInsight{
+			ID:    "indicator-velocity",
+			Title: "Indicator Velocity",
+			Description: fmt.Sprintf(
+				"%d new indicators in the last 7 days (%d today). No prior-period data is available for trend comparison.",
+				stats.WeeklyNew, stats.TodayNew),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data: map[string]any{
+				"weekly_new":  stats.WeeklyNew,
+				"monthly_new": stats.MonthlyNew,
+				"today_new":   stats.TodayNew,
+			},
+		})
+	}
+
+	// --- Dominant indicator types.
+	if len(stats.ByType) > 0 {
+		type typeCount struct {
+			Type  string
+			Count int64
+		}
+		counts := make([]typeCount, 0, len(stats.ByType))
+		for t, c := range stats.ByType {
+			counts = append(counts, typeCount{Type: t, Count: c})
+		}
+		sort.Slice(counts, func(i, j int) bool {
+			if counts[i].Count != counts[j].Count {
+				return counts[i].Count > counts[j].Count
+			}
+			return counts[i].Type < counts[j].Type
+		})
+		top := counts
+		if len(top) > 3 {
+			top = top[:3]
+		}
+		parts := make([]string, 0, len(top))
+		data := map[string]any{"total_count": stats.TotalCount}
+		for _, tc := range top {
+			pct := float64(tc.Count) / float64(stats.TotalCount) * 100.0
+			parts = append(parts, fmt.Sprintf("%s (%d, %.1f%%)", tc.Type, tc.Count, pct))
+			data[tc.Type] = tc.Count
+		}
+		insights = append(insights, MLInsight{
+			ID:          "dominant-types",
+			Title:       "Dominant Indicator Types",
+			Description: fmt.Sprintf("Top indicator types across %d stored indicators: %s.", stats.TotalCount, strings.Join(parts, ", ")),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data:        data,
+		})
+	}
+
+	// --- Severity distribution.
+	if stats.CriticalCount > 0 {
+		criticalShare := float64(stats.CriticalCount) / float64(stats.TotalCount) * 100.0
+		severity := "info"
+		if criticalShare >= 25 {
+			severity = "high"
+		} else if criticalShare >= 10 {
+			severity = "warning"
+		}
+		insights = append(insights, MLInsight{
+			ID:    "critical-share",
+			Title: "Critical Severity Share",
+			Description: fmt.Sprintf(
+				"%d of %d indicators (%.1f%%) are rated critical severity.",
+				stats.CriticalCount, stats.TotalCount, criticalShare),
+			Severity:    severity,
+			GeneratedAt: now,
+			Data: map[string]any{
+				"critical_count":   stats.CriticalCount,
+				"total_count":      stats.TotalCount,
+				"critical_percent": criticalShare,
+				"by_severity":      stats.BySeverity,
+			},
+		})
+	}
+
+	// --- Pegasus presence.
+	if stats.PegasusCount > 0 {
+		insights = append(insights, MLInsight{
+			ID:    "pegasus-presence",
+			Title: "Pegasus-Linked Indicators",
+			Description: fmt.Sprintf(
+				"%d indicators in the store are linked to Pegasus spyware infrastructure.",
+				stats.PegasusCount),
+			Severity:    "critical",
+			GeneratedAt: now,
+			Data:        map[string]any{"pegasus_count": stats.PegasusCount},
+		})
+	}
+
+	// --- Anomaly clusters over recent indicators (only when the model is
+	// actually trained — no fabricated anomaly data).
+	if s.isolationForest.IsTrained() {
+		indicators, _, err := s.repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: mlInsightRecentLimit})
+		if err != nil {
+			s.logger.Warn().Err(err).Msg("insights: failed to list recent indicators for anomaly clustering")
+		} else if len(indicators) > 0 {
+			result, err := s.DetectAnomalies(ctx, indicators)
+			if err != nil {
+				s.logger.Warn().Err(err).Msg("insights: anomaly detection failed")
+			} else if result.AnomalyCount > 0 {
+				byID := make(map[uuid.UUID]*models.Indicator, len(indicators))
+				for _, ind := range indicators {
+					byID[ind.ID] = ind
+				}
+				typeCounts := make(map[string]int)
+				for _, score := range result.Scores {
+					if !score.IsAnomaly {
+						continue
+					}
+					if ind, ok := byID[score.IndicatorID]; ok {
+						typeCounts[string(ind.Type)]++
+					}
+				}
+				type cluster struct {
+					Type  string
+					Count int
+				}
+				clusters := make([]cluster, 0, len(typeCounts))
+				for t, c := range typeCounts {
+					clusters = append(clusters, cluster{Type: t, Count: c})
+				}
+				sort.Slice(clusters, func(i, j int) bool {
+					if clusters[i].Count != clusters[j].Count {
+						return clusters[i].Count > clusters[j].Count
+					}
+					return clusters[i].Type < clusters[j].Type
+				})
+				top := clusters
+				if len(top) > 3 {
+					top = top[:3]
+				}
+				parts := make([]string, 0, len(top))
+				data := map[string]any{
+					"anomaly_count":  result.AnomalyCount,
+					"processed":      result.TotalProcessed,
+					"anomaly_rate":   result.Statistics.AnomalyRate,
+					"mean_score":     result.Statistics.MeanScore,
+					"detection_time": result.ProcessingTime.String(),
+				}
+				for _, c := range top {
+					parts = append(parts, fmt.Sprintf("%s (%d)", c.Type, c.Count))
+					data["cluster_"+c.Type] = c.Count
+				}
+				severity := "info"
+				if result.Statistics.AnomalyRate >= 0.2 {
+					severity = "warning"
+				}
+				insights = append(insights, MLInsight{
+					ID:    "anomaly-clusters",
+					Title: "Anomaly Clusters",
+					Description: fmt.Sprintf(
+						"Anomaly detection flags %d of %d recent indicators (%.1f%%); most anomalous types: %s.",
+						result.AnomalyCount, result.TotalProcessed,
+						result.Statistics.AnomalyRate*100.0, strings.Join(parts, ", ")),
+					Severity:    severity,
+					GeneratedAt: now,
+					Data:        data,
+				})
+			}
+		}
+	} else {
+		// Honest model state: anomaly insights are unavailable until training.
+		notTrained := s.modelsNotTrainedError(ctx, "isolation_forest")
+		insights = append(insights, MLInsight{
+			ID:          "anomaly-model-untrained",
+			Title:       "Anomaly Model Not Trained",
+			Description: fmt.Sprintf("Anomaly-based insights are unavailable: %s.", notTrained.Error()),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data: map[string]any{
+				"model":             notTrained.ModelType,
+				"indicators_needed": notTrained.IndicatorsNeeded,
+			},
+		})
+	}
+
+	return insights, nil
 }
 
 // AnalyzeIndicator provides comprehensive ML analysis of a single indicator.

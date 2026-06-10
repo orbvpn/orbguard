@@ -16,6 +16,8 @@ import (
 type Handlers struct {
 	Health          *HealthHandler
 	Intelligence    *IntelligenceHandler
+	Indicators      *IndicatorsHandler
+	SupplyChain     *SupplyChainHandler
 	Stats           *StatsHandler
 	Campaigns       *CampaignsHandler
 	Actors          *ActorsHandler
@@ -90,6 +92,9 @@ type Dependencies struct {
 	AnalyticsService      *services.AnalyticsService
 	IntegrationService    *services.IntegrationService
 	ScamDetector          *ai.ScamDetector
+	// OSVBaseURL overrides the OSV.dev API base URL used by the
+	// supply-chain handler. Empty means the public https://api.osv.dev.
+	OSVBaseURL string
 }
 
 // NewHandlers creates all handlers
@@ -97,6 +102,8 @@ func NewHandlers(deps Dependencies) *Handlers {
 	return &Handlers{
 		Health:          NewHealthHandler(deps.Cache, deps.Repos, deps.Logger),
 		Intelligence:    NewIntelligenceHandler(deps.Repos, deps.Cache, deps.Logger),
+		Indicators:      NewIndicatorsHandler(deps.Repos, deps.Logger),
+		SupplyChain:     NewSupplyChainHandler(deps.Repos, deps.Logger, deps.OSVBaseURL),
 		Stats:           NewStatsHandler(deps.Repos, deps.Cache, deps.Logger),
 		Campaigns:       NewCampaignsHandler(deps.Repos, deps.Logger),
 		Actors:          NewActorsHandler(deps.Repos, deps.Logger),
@@ -116,7 +123,7 @@ func NewHandlers(deps Dependencies) *Handlers {
 		ML:              NewMLHandler(deps.MLService, deps.Logger),
 		Privacy:         NewPrivacyHandler(deps.PrivacyService, deps.Logger),
 		DeviceSecurity:  NewDeviceSecurityHandler(deps.DeviceSecurityService, deps.Logger),
-		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger),
+		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger).WithRepositories(deps.Repos),
 		Enterprise:      NewEnterpriseHandler(deps.EnterpriseService, deps.Logger),
 		OrbNet:          NewOrbNetHandler(deps.OrbNetService, deps.Logger),
 		Auth:            newAuthHandler(deps),
@@ -131,6 +138,7 @@ func NewHandlers(deps Dependencies) *Handlers {
 			BrowserScanner:     deps.BrowserScanner,
 			VTClient:           deps.VTClient,
 			Logger:             deps.Logger,
+			Results:            repository.NewDesktopResultsRepositoryFromRepos(deps.Repos),
 		}),
 		Webhooks:     NewWebhookHandler(deps.Logger, deps.WebhookService),
 		Playbooks:    NewPlaybookHandler(deps.Logger, deps.PlaybookService),

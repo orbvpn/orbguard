@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -334,6 +335,104 @@ func (h *MLHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, stats)
 }
 
+// mlAnomaliesDefaultLimit bounds how many recent indicators GET /ml/anomalies
+// scores by default; ?limit= overrides up to mlMaxBatchLimit.
+const mlAnomaliesDefaultLimit = 500
+
+// GetAnomalies handles GET /api/v1/ml/anomalies. It scores recent indicators
+// with the trained isolation forest and returns the anomalous ones. Responds
+// 409 models_not_trained while the anomaly model is untrained.
+func (h *MLHandler) GetAnomalies(w http.ResponseWriter, r *http.Request) {
+	limit := mlAnomaliesDefaultLimit
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			h.respondError(w, http.StatusBadRequest, "limit must be a positive integer", nil)
+			return
+		}
+		limit = parsed
+		if limit > mlMaxBatchLimit {
+			limit = mlMaxBatchLimit
+		}
+	}
+
+	indicators, err := h.service.ListIndicators(r.Context(), repository.IndicatorFilter{Limit: limit})
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, "failed to fetch indicators", err)
+		return
+	}
+
+	result, err := h.service.DetectAnomalies(r.Context(), indicators)
+	if err != nil {
+		h.respondMLError(w, err, "anomaly detection failed")
+		return
+	}
+
+	byID := make(map[uuid.UUID]*models.Indicator, len(indicators))
+	for _, ind := range indicators {
+		byID[ind.ID] = ind
+	}
+
+	anomalies := make([]map[string]interface{}, 0, result.AnomalyCount)
+	for _, score := range result.Scores {
+		if !score.IsAnomaly {
+			continue
+		}
+		entry := map[string]interface{}{
+			"indicator_id": score.IndicatorID,
+			"score":        score.Score,
+			"is_anomaly":   score.IsAnomaly,
+			"threshold":    score.Threshold,
+			"confidence":   score.Confidence,
+			"contributors": score.Contributors,
+			"method":       score.Method,
+			"computed_at":  score.ComputedAt,
+		}
+		if ind, ok := byID[score.IndicatorID]; ok {
+			entry["value"] = ind.Value
+			entry["type"] = ind.Type
+			entry["severity"] = ind.Severity
+		}
+		anomalies = append(anomalies, entry)
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"anomalies":  anomalies,
+		"count":      len(anomalies),
+		"processed":  result.TotalProcessed,
+		"statistics": result.Statistics,
+	})
+}
+
+// GetInsights handles GET /api/v1/ml/insights. Insights are derived from real
+// indicator-store statistics and the trained model state — nothing is
+// fabricated; an empty store yields an empty insight list.
+func (h *MLHandler) GetInsights(w http.ResponseWriter, r *http.Request) {
+	insights, err := h.service.GenerateInsights(r.Context())
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, "failed to generate insights", err)
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"insights": insights,
+		"count":    len(insights),
+	})
+}
+
+// GetModels handles GET /api/v1/ml/models, emitting the real in-memory model
+// registry under the "models" key the client parses.
+func (h *MLHandler) GetModels(w http.ResponseWriter, r *http.Request) {
+	stats := h.service.GetStats()
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"models":          stats.Models,
+		"count":           len(stats.Models),
+		"models_loaded":   stats.ModelsLoaded,
+		"last_trained_at": stats.LastTrainedAt,
+	})
+}
+
 // GetModelInfo returns information about a specific model
 func (h *MLHandler) GetModelInfo(w http.ResponseWriter, r *http.Request) {
 	modelType := chi.URLParam(r, "model")
@@ -360,7 +459,7 @@ func (h *MLHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 // AnalyzeValue performs ML analysis on a raw value
 func (h *MLHandler) AnalyzeValue(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Value string              `json:"value"`
+		Value string               `json:"value"`
 		Type  models.IndicatorType `json:"type"`
 	}
 
@@ -406,7 +505,7 @@ func (h *MLHandler) respondError(w http.ResponseWriter, status int, message stri
 	}
 
 	h.respondJSON(w, status, map[string]interface{}{
-		"error":   message,
+		"error": message,
 		"details": func() string {
 			if err != nil {
 				return err.Error()
