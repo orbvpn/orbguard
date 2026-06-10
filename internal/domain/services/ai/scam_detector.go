@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/pkg/logger"
 )
@@ -68,6 +70,14 @@ type ScamDetectorStats struct {
 
 // NewScamDetector creates a new scam detector
 func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetector {
+	// Set default thresholds before the config is captured by the detector.
+	if config.ScamThreshold == 0 {
+		config.ScamThreshold = 0.7
+	}
+	if config.SuspiciousThresh == 0 {
+		config.SuspiciousThresh = 0.4
+	}
+
 	detector := &ScamDetector{
 		logger: log.WithComponent("scam-detector"),
 		config: config,
@@ -75,14 +85,6 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 			ByType:     make(map[models.ScamType]int64),
 			BySeverity: make(map[models.ScamSeverity]int64),
 		},
-	}
-
-	// Set default thresholds
-	if config.ScamThreshold == 0 {
-		config.ScamThreshold = 0.7
-	}
-	if config.SuspiciousThresh == 0 {
-		config.SuspiciousThresh = 0.4
 	}
 
 	// Initialize components
@@ -139,6 +141,7 @@ func (d *ScamDetector) Analyze(ctx context.Context, req *models.ScamAnalysisRequ
 	startTime := time.Now()
 
 	result := &models.ScamAnalysisResult{
+		ID:          uuid.New(),
 		RequestID:   req.ID,
 		ContentType: req.ContentType,
 		Timestamp:   time.Now(),
@@ -598,17 +601,91 @@ func (d *ScamDetector) finalizeResult(result *models.ScamAnalysisResult, startTi
 		}
 	}
 
-	// Generate recommendation
-	result.Recommendation = d.generateRecommendation(result)
+	// Derive verdict confidence from the actual analysis signals
+	result.Confidence = d.computeConfidence(result)
+
+	// Generate recommendation (single string) and safety tips (one per line)
+	tips := d.buildRecommendations(result)
+	result.Recommendation = strings.Join(tips, "\n")
+	if len(tips) > 0 {
+		result.SafetyTips = tips
+	}
+
+	result.AnalyzedAt = time.Now()
 
 	// Calculate processing time
 	result.ProcessingTime = time.Since(startTime)
 }
 
-// generateRecommendation generates a recommendation based on the analysis
-func (d *ScamDetector) generateRecommendation(result *models.ScamAnalysisResult) string {
+// computeConfidence derives an overall verdict confidence from the strength
+// and agreement of the underlying analysis signals: individual indicator
+// confidences (pattern matches, phone reputation, LLM-provided indicators),
+// the intent classifier confidence, and how decisively the final risk score
+// sits away from the scam decision boundary.
+func (d *ScamDetector) computeConfidence(result *models.ScamAnalysisResult) float64 {
+	threshold := d.config.ScamThreshold
+	if threshold <= 0 || threshold >= 1 {
+		threshold = 0.7
+	}
+
+	// Decisiveness: normalized distance of the risk score from the decision
+	// boundary on whichever side of it the score falls.
+	var decisiveness float64
+	if result.RiskScore >= threshold {
+		decisiveness = (result.RiskScore - threshold) / (1 - threshold)
+	} else {
+		decisiveness = (threshold - result.RiskScore) / threshold
+	}
+	if decisiveness > 1 {
+		decisiveness = 1
+	}
+
+	// Collect positive signal confidences.
+	var sum, maxConf float64
+	var n int
+	for _, ind := range result.Indicators {
+		if ind.Confidence > 0 {
+			sum += ind.Confidence
+			if ind.Confidence > maxConf {
+				maxConf = ind.Confidence
+			}
+			n++
+		}
+	}
+	if result.Intent != nil && result.Intent.Confidence > 0 {
+		sum += result.Intent.Confidence
+		if result.Intent.Confidence > maxConf {
+			maxConf = result.Intent.Confidence
+		}
+		n++
+	}
+
+	var confidence float64
+	if n == 0 {
+		// No positive signals: the verdict rests on the absence of risk
+		// signals. Confidence grows with distance below the boundary but is
+		// capped, since absence of evidence is weaker than positive evidence.
+		confidence = 0.5 + 0.4*decisiveness
+	} else {
+		avg := sum / float64(n)
+		strength := 0.5*maxConf + 0.5*avg
+		confidence = 0.55*strength + 0.45*decisiveness
+	}
+
+	if confidence < 0 {
+		confidence = 0
+	}
+	if confidence > 1 {
+		confidence = 1
+	}
+	return confidence
+}
+
+// buildRecommendations generates recommendations based on the analysis,
+// one actionable item per entry.
+func (d *ScamDetector) buildRecommendations(result *models.ScamAnalysisResult) []string {
 	if !result.IsScam && result.RiskScore < d.config.SuspiciousThresh {
-		return "This content appears to be safe. However, always exercise caution with unsolicited messages."
+		return []string{"This content appears to be safe. However, always exercise caution with unsolicited messages."}
 	}
 
 	recommendations := []string{}
@@ -646,7 +723,7 @@ func (d *ScamDetector) generateRecommendation(result *models.ScamAnalysisResult)
 		recommendations = append(recommendations, "Proceed with caution and verify through official channels.")
 	}
 
-	return strings.Join(recommendations, "\n")
+	return recommendations
 }
 
 // updateStats updates detection statistics

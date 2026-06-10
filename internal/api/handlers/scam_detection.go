@@ -84,15 +84,12 @@ func (h *ScamDetectionHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	result, err := h.detector.Analyze(r.Context(), analysisReq)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("scam analysis failed")
-		// Return safe fallback on error
+		// Do NOT fabricate a "safe" verdict on failure — surface the error so
+		// clients can show an error state instead of a false negative.
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"is_scam":      false,
-			"risk_score":   0,
-			"severity":     "none",
-			"indicators":   []interface{}{},
-			"analyzed_at":  time.Now().UTC().Format(time.RFC3339),
-			"explanation":  "Analysis service temporarily unavailable",
+			"error": "scam analysis failed",
 		})
 		return
 	}
@@ -202,15 +199,13 @@ func (h *ScamDetectionHandler) GetPhoneReputation(w http.ResponseWriter, r *http
 
 	result, err := h.detector.Analyze(r.Context(), analysisReq)
 	if err != nil {
-		// Return clean reputation on error
+		h.logger.Error().Err(err).Str("number", number).Msg("phone reputation lookup failed")
+		// Do NOT fabricate a clean reputation on failure — surface the error
+		// so clients can show an error state instead of a false "clean".
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"phone_number":     number,
-			"reputation_score": 100,
-			"is_scam":          false,
-			"is_suspicious":    false,
-			"report_count":     0,
-			"scam_types":       []string{},
+			"error": "phone reputation lookup failed",
 		})
 		return
 	}
