@@ -2,7 +2,9 @@
 /// iOS/Android forensic analysis for Pegasus/spyware detection
 
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
@@ -127,21 +129,34 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             _buildAnalysisButton(
               icon: 'cloud_storage',
               title: 'Backup Analysis',
-              description: 'Scan iOS backup for spyware artifacts',
+              description: 'Upload an iOS backup (.zip) for spyware analysis',
               color: Colors.blue,
               onTap: provider.isAnalyzing
                   ? null
-                  : () => _showBackupPathInput(context, provider),
+                  : () => _pickAndUpload(
+                        context,
+                        provider,
+                        allowedExtensions: const ['zip'],
+                        serverAcceptedSuffixes: const ['.zip'],
+                        upload: provider.uploadIosBackup,
+                      ),
             ),
             const SizedBox(height: 12),
             _buildAnalysisButton(
               icon: 'bug',
               title: 'Sysdiagnose Analysis',
-              description: 'Deep analysis of system diagnostics',
+              description:
+                  'Upload a sysdiagnose archive (.tar.gz/.tgz/.zip) for deep analysis',
               color: Colors.purple,
               onTap: provider.isAnalyzing
                   ? null
-                  : () => _showSysdiagnoseInput(context, provider),
+                  : () => _pickAndUpload(
+                        context,
+                        provider,
+                        allowedExtensions: const ['gz', 'tgz', 'zip'],
+                        serverAcceptedSuffixes: const ['.tar.gz', '.tgz', '.zip'],
+                        upload: provider.uploadSysdiagnose,
+                      ),
             ),
           ] else if (Platform.isAndroid) ...[
             _buildAnalysisButton(
@@ -153,18 +168,24 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                   ? null
                   : () => _showLogcatInput(context, provider),
             ),
+            const SizedBox(height: 12),
+            _buildAnalysisButton(
+              icon: 'cloud_storage',
+              title: 'Bugreport Analysis',
+              description:
+                  'Upload an Android bugreport (.zip/.txt) for malware analysis',
+              color: Colors.teal,
+              onTap: provider.isAnalyzing
+                  ? null
+                  : () => _pickAndUpload(
+                        context,
+                        provider,
+                        allowedExtensions: const ['zip', 'txt'],
+                        serverAcceptedSuffixes: const ['.zip', '.txt'],
+                        upload: provider.uploadAndroidBugreport,
+                      ),
+            ),
           ],
-
-          const SizedBox(height: 12),
-          _buildAnalysisButton(
-            icon: 'chart',
-            title: 'Data Usage Analysis',
-            description: 'Detect suspicious network activity patterns',
-            color: Colors.teal,
-            onTap: provider.isAnalyzing
-                ? null
-                : () => provider.analyzeDataUsage({}),
-          ),
 
           // Info section
           const SizedBox(height: 32),
@@ -257,6 +278,54 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
   }
 
   Widget _buildResultCard(ForensicAnalysisResult result) {
+    // A failed analysis must never render as "No Threats Found".
+    if (result.error != null) {
+      return GlassCard(
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.orange.withAlpha(40),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: DuotoneIcon('danger_circle', color: Colors.orange, size: 28),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${result.type.displayName} Failed',
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    result.error!,
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const DuotoneIcon('close_circle', color: Colors.grey, size: 24),
+              onPressed: () {
+                context.read<ForensicsProvider>().clearCurrentAnalysis();
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasThreats = result.hasThreat;
     final color = hasThreats ? Colors.red : Colors.green;
 
@@ -951,22 +1020,52 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     );
   }
 
-  void _showBackupPathInput(BuildContext context, ForensicsProvider provider) {
-    _showPathInputSheet(
-      context,
-      'Backup Analysis',
-      'Enter the path to your iOS backup folder',
-      (path) => provider.analyzeBackup(path),
-    );
-  }
+  /// Opens a real file picker and uploads the chosen artifact through the
+  /// provider's multipart upload flow. Upload progress comes from dio's
+  /// onSendProgress and is rendered by the progress card.
+  Future<void> _pickAndUpload(
+    BuildContext context,
+    ForensicsProvider provider, {
+    required List<String> allowedExtensions,
+    required List<String> serverAcceptedSuffixes,
+    required Future<ForensicAnalysisResult?> Function(String path) upload,
+  }) async {
+    FilePickerResult? picked;
+    try {
+      picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowedExtensions,
+      );
+    } on PlatformException catch (_) {
+      // Some platforms reject uncommon extension filters (e.g. tgz/gz on
+      // iOS); fall back to an unfiltered picker and validate below.
+      picked = await FilePicker.platform.pickFiles(type: FileType.any);
+    } on ArgumentError catch (_) {
+      picked = await FilePicker.platform.pickFiles(type: FileType.any);
+    }
 
-  void _showSysdiagnoseInput(BuildContext context, ForensicsProvider provider) {
-    _showPathInputSheet(
-      context,
-      'Sysdiagnose Analysis',
-      'Enter the path to your sysdiagnose archive',
-      (path) => provider.analyzeSysdiagnose(path),
-    );
+    final path = picked?.files.single.path;
+    if (path == null) return; // user cancelled
+
+    final lowerName = path.split(Platform.pathSeparator).last.toLowerCase();
+    final accepted =
+        serverAcceptedSuffixes.any((suffix) => lowerName.endsWith(suffix));
+    if (!accepted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Unsupported file type "$lowerName" — expected: '
+              '${serverAcceptedSuffixes.join(', ')}',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    await upload(path);
   }
 
   void _showLogcatInput(BuildContext context, ForensicsProvider provider) {
@@ -1039,78 +1138,4 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     );
   }
 
-  void _showPathInputSheet(
-    BuildContext context,
-    String title,
-    String hint,
-    Function(String) onSubmit,
-  ) {
-    final controller = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(hint, style: TextStyle(color: Colors.grey[500])),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: '/path/to/file',
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: DuotoneIcon('folder', color: Colors.grey, size: 24),
-                ),
-                filled: true,
-                fillColor: const Color(0xFF2A2B40),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (controller.text.isNotEmpty) {
-                    Navigator.pop(context);
-                    onSubmit(controller.text);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('Analyze'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

@@ -2,6 +2,7 @@
 /// Main screen for network security and WiFi protection
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/glass_theme.dart';
@@ -9,7 +10,25 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
+import '../../services/api/orbguard_api_client.dart';
 import '../../widgets/network/network_widgets.dart';
+
+/// Well-known public resolvers with built-in malware/phishing blocking that
+/// users can configure as OS-level Private DNS. These are third-party
+/// services, not operated by OrbGuard.
+const List<({String name, String host, String description})>
+    _privateDnsProviders = [
+  (
+    name: 'Quad9',
+    host: 'dns.quad9.net',
+    description: 'Blocks known malware and phishing domains',
+  ),
+  (
+    name: 'Cloudflare Security',
+    host: 'security.cloudflare-dns.com',
+    description: 'Cloudflare 1.1.1.2 resolver with malware blocking',
+  ),
+];
 
 class NetworkSecurityScreen extends StatefulWidget {
   const NetworkSecurityScreen({super.key});
@@ -20,6 +39,38 @@ class NetworkSecurityScreen extends StatefulWidget {
 
 class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   String _searchQuery = '';
+
+  // Informational OrbVPN server list (GET /api/v1/vpn/servers).
+  List<Map<String, dynamic>>? _vpnServers;
+  bool _isLoadingVpnServers = false;
+  String? _vpnServersError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVpnServers();
+  }
+
+  Future<void> _loadVpnServers() async {
+    setState(() {
+      _isLoadingVpnServers = true;
+      _vpnServersError = null;
+    });
+    try {
+      final servers = await OrbGuardApiClient.instance.getVpnServers();
+      if (!mounted) return;
+      setState(() {
+        _vpnServers = servers;
+        _isLoadingVpnServers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _vpnServersError = 'Failed to load server list: $e';
+        _isLoadingVpnServers = false;
+      });
+    }
+  }
 
   void _onSearchChanged(String query) {
     setState(() {
@@ -223,16 +274,55 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // VPN status card
-          VpnStatusCard(
-            status: provider.vpnStatus,
-            onConnect: () => _showVpnServerSelector(context, provider),
-            onDisconnect: () => provider.disconnectVpn(),
+          // Honest informational card: OrbGuard does not run a VPN tunnel.
+          GlassCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D9FF).withAlpha(40),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: DuotoneIcon('lock', size: 24, color: Color(0xFF00D9FF)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'VPN protection is provided by OrbVPN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'OrbGuard does not run a VPN tunnel itself. To encrypt '
+                        'your traffic and hide your IP address, install and '
+                        'connect with the separate OrbVPN app.',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           // Benefits section
           const Text(
-            'VPN Protection Benefits',
+            'Why use a VPN',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -260,8 +350,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             'Access Global Content',
             'Access content from anywhere in the world',
           ),
-          if (!provider.vpnStatus.isConnected &&
-              !provider.isCurrentNetworkSecure) ...[
+          if (!provider.isCurrentNetworkSecure) ...[
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(16),
@@ -286,7 +375,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                           ),
                         ),
                         Text(
-                          'You\'re on an unsecured network. Enable VPN for protection.',
+                          'You\'re on an unsecured network. Connect through '
+                          'OrbVPN for protection.',
                           style: TextStyle(
                             color: Colors.orange[300],
                             fontSize: 12,
@@ -299,8 +389,123 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          // Informational OrbVPN server list (read-only).
+          const Text(
+            'OrbVPN Server Network',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildVpnServerList(),
         ],
       ),
+    );
+  }
+
+  Widget _buildVpnServerList() {
+    if (_isLoadingVpnServers) {
+      return const GlassCard(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF00D9FF),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_vpnServersError != null) {
+      return GlassCard(
+        child: Column(
+          children: [
+            Text(
+              _vpnServersError!,
+              style: TextStyle(color: Colors.red[300], fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadVpnServers,
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Color(0xFF00D9FF)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final servers = _vpnServers ?? const [];
+    if (servers.isEmpty) {
+      return GlassCard(
+        child: Center(
+          child: Text(
+            'No VPN servers are currently published.',
+            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: servers.map((server) {
+        final name = server['name'] as String? ?? 'Unknown server';
+        final location = server['location'] as String? ??
+            server['region'] as String? ??
+            '';
+        final status = server['status'] as String?;
+        return GlassCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const DuotoneIcon('server', size: 20, color: Color(0xFF00D9FF)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (location.isNotEmpty)
+                      Text(
+                        location,
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (status != null && status.isNotEmpty)
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: status.toLowerCase() == 'online' ||
+                            status.toLowerCase() == 'active'
+                        ? Colors.green
+                        : Colors.grey[500],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -354,21 +559,55 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // DNS protection card
-          DnsProtectionCard(
-            status: provider.dnsStatus,
-            onToggle: () {
-              if (provider.dnsStatus.isEnabled) {
-                provider.disableDnsProtection();
-              } else {
-                _showDnsSettings(context, provider);
-              }
-            },
+          // Honest guidance card: DNS filtering is configured at the OS level.
+          GlassCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D9FF).withAlpha(40),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child:
+                        DuotoneIcon('server', size: 24, color: Color(0xFF00D9FF)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Secure DNS is set up in your device settings',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'OrbGuard does not change your device DNS. You can '
+                        'enable encrypted, threat-blocking DNS at the '
+                        'operating-system level using the steps below.',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
-          // What DNS protection does
           const Text(
-            'How DNS Protection Works',
+            'How to Enable Private DNS',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -381,38 +620,95 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               children: [
                 _buildDnsInfoRow(
                   '1',
-                  'Intercepts DNS Queries',
-                  'When you visit a website, DNS Protection checks the request',
+                  'Android',
+                  'Open Settings > Network & internet > Private DNS, choose '
+                      '"Private DNS provider hostname" and paste a hostname '
+                      'from the list below.',
                 ),
                 _buildDnsInfoRow(
                   '2',
-                  'Blocks Malicious Sites',
-                  'Known malware and phishing domains are blocked automatically',
+                  'iOS / macOS',
+                  'Secure DNS on Apple devices is configured through a DNS '
+                      'configuration profile from your chosen DNS provider.',
                 ),
                 _buildDnsInfoRow(
                   '3',
-                  'Filters Trackers',
-                  'Stops trackers from following you across the web',
+                  'What it does',
+                  'DNS queries are encrypted and known malware or phishing '
+                      'domains are blocked by the resolver before they load.',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          // DNS servers info
-          if (provider.dnsStatus.isEnabled) ...[
-            const Text(
-              'Current DNS Servers',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            'Threat-Blocking DNS Providers',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 12),
-            _buildDnsServerCard('Primary', provider.dnsStatus.primaryDns),
-            if (provider.dnsStatus.secondaryDns != null)
-              _buildDnsServerCard('Secondary', provider.dnsStatus.secondaryDns!),
-          ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Independent public resolvers (not operated by OrbGuard). '
+            'Tap to copy the hostname.',
+            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          ..._privateDnsProviders.map(
+            (p) => _buildDnsProviderCard(p.name, p.host, p.description),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDnsProviderCard(String name, String host, String description) {
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          const DuotoneIcon('server', size: 20, color: Color(0xFF00D9FF)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  host,
+                  style: const TextStyle(
+                    color: Color(0xFF00D9FF),
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18, color: Colors.white70),
+            tooltip: 'Copy hostname',
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: host));
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Copied $host to clipboard')),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -468,38 +764,6 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
     );
   }
 
-  Widget _buildDnsServerCard(String label, String server) {
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          const DuotoneIcon('server', size: 20, color: Color(0xFF00D9FF)),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                server,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatsTab(NetworkProvider provider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -522,14 +786,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildRecommendation(
-                  provider.vpnStatus.isConnected,
-                  'Use VPN on public networks',
+                  provider.isCurrentNetworkSecure,
+                  'Connect to secured networks only',
                   'lock',
-                ),
-                _buildRecommendation(
-                  provider.dnsStatus.isEnabled,
-                  'Enable DNS protection',
-                  'server',
                 ),
                 _buildRecommendation(
                   provider.currentNetwork?.security.isRecommended ?? false,
@@ -679,169 +938,4 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
     );
   }
 
-  void _showVpnServerSelector(BuildContext context, NetworkProvider provider) {
-    final servers = [
-      ('United States', 'us'),
-      ('United Kingdom', 'uk'),
-      ('Germany', 'de'),
-      ('Japan', 'jp'),
-      ('Australia', 'au'),
-      ('Canada', 'ca'),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: GlassTheme.gradientTop,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Select VPN Server',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          ...servers.map((server) => ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2B40),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      server.$2.toUpperCase(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                title: Text(
-                  server.$1,
-                  style: const TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  provider.connectVpn(server.$1);
-                },
-              )),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  void _showDnsSettings(BuildContext context, NetworkProvider provider) {
-    bool malware = true;
-    bool ads = false;
-    bool tracking = true;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: GlassTheme.gradientTop,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text(
-                'DNS Protection Settings',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('Block Malware'),
-                subtitle: const Text('Block known malicious domains'),
-                value: malware,
-                onChanged: (v) => setState(() => malware = v),
-                activeColor: const Color(0xFF00D9FF),
-              ),
-              SwitchListTile(
-                title: const Text('Block Ads'),
-                subtitle: const Text('Block advertising domains'),
-                value: ads,
-                onChanged: (v) => setState(() => ads = v),
-                activeColor: const Color(0xFF00D9FF),
-              ),
-              SwitchListTile(
-                title: const Text('Block Trackers'),
-                subtitle: const Text('Block tracking and analytics'),
-                value: tracking,
-                onChanged: (v) => setState(() => tracking = v),
-                activeColor: const Color(0xFF00D9FF),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    provider.enableDnsProtection(
-                      malwareBlocking: malware,
-                      adBlocking: ads,
-                      trackingBlocking: tracking,
-                    );
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D9FF),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Enable DNS Protection',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

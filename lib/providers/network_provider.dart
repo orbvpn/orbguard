@@ -186,8 +186,6 @@ class NetworkProvider extends ChangeNotifier {
   WifiNetwork? _currentNetwork;
   final List<WifiNetwork> _nearbyNetworks = [];
   final List<NetworkThreat> _threats = [];
-  VpnStatus _vpnStatus = VpnStatus();
-  DnsProtectionStatus _dnsStatus = DnsProtectionStatus();
   NetworkSecurityStats _stats = NetworkSecurityStats();
 
   bool _isLoading = false;
@@ -198,8 +196,6 @@ class NetworkProvider extends ChangeNotifier {
   WifiNetwork? get currentNetwork => _currentNetwork;
   List<WifiNetwork> get nearbyNetworks => List.unmodifiable(_nearbyNetworks);
   List<NetworkThreat> get threats => List.unmodifiable(_threats);
-  VpnStatus get vpnStatus => _vpnStatus;
-  DnsProtectionStatus get dnsStatus => _dnsStatus;
   NetworkSecurityStats get stats => _stats;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
@@ -224,8 +220,6 @@ class NetworkProvider extends ChangeNotifier {
   /// Initialize provider
   Future<void> init() async {
     await refreshNetworkInfo();
-    await refreshDnsStatus();
-    await refreshVpnStatus();
     await loadNetworkThreats();
   }
 
@@ -379,133 +373,10 @@ class NetworkProvider extends ChangeNotifier {
     return WifiSecurityLevel.open;
   }
 
-  /// Refresh VPN status from API
-  Future<void> refreshVpnStatus() async {
-    try {
-      final statusData = await _api.getVpnStatus();
-
-      _vpnStatus = VpnStatus(
-        isConnected: statusData['is_connected'] as bool? ?? false,
-        serverLocation: statusData['server_location'] as String?,
-        serverIp: statusData['server_ip'] as String?,
-        protocol: statusData['protocol'] as String?,
-        connectedAt: statusData['connected_at'] != null
-            ? DateTime.parse(statusData['connected_at'] as String)
-            : null,
-        bytesIn: statusData['bytes_in'] as int?,
-        bytesOut: statusData['bytes_out'] as int?,
-      );
-    } catch (e) {
-      // VPN status failure shouldn't crash the app
-      _vpnStatus = VpnStatus(isConnected: false);
-    }
-    notifyListeners();
-  }
-
-  /// Connect to VPN via API
-  Future<bool> connectVpn(String server) async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final result = await _api.connectVpn(server);
-
-      _vpnStatus = VpnStatus(
-        isConnected: result['success'] as bool? ?? false,
-        serverLocation: result['server_location'] as String? ?? server,
-        serverIp: result['server_ip'] as String?,
-        protocol: result['protocol'] as String?,
-        connectedAt: DateTime.now(),
-      );
-      _isLoading = false;
-      notifyListeners();
-      return _vpnStatus.isConnected;
-    } catch (e) {
-      _error = 'Failed to connect VPN: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Disconnect VPN via API
-  Future<void> disconnectVpn() async {
-    try {
-      await _api.disconnectVpn();
-    } catch (e) {
-      debugPrint('Failed to disconnect VPN: $e');
-    }
-    _vpnStatus = VpnStatus(isConnected: false);
-    notifyListeners();
-  }
-
-  /// Refresh DNS status from API
-  Future<void> refreshDnsStatus() async {
-    try {
-      final statusData = await _api.getDnsStatus();
-
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: statusData['is_enabled'] as bool? ?? false,
-        provider: statusData['provider'] as String? ?? 'Default',
-        primaryDns: statusData['primary_dns'] as String? ?? '',
-        secondaryDns: statusData['secondary_dns'] as String?,
-        isMalwareBlocking: statusData['malware_blocking'] as bool? ?? false,
-        isAdBlocking: statusData['ad_blocking'] as bool? ?? false,
-        isTrackingBlocking: statusData['tracking_blocking'] as bool? ?? false,
-        blockedQueries: statusData['blocked_queries'] as int? ?? 0,
-      );
-    } catch (e) {
-      // DNS status failure shouldn't crash the app
-      _dnsStatus = DnsProtectionStatus();
-    }
-    notifyListeners();
-  }
-
-  /// Enable DNS protection via API
-  Future<void> enableDnsProtection({
-    bool malwareBlocking = true,
-    bool adBlocking = false,
-    bool trackingBlocking = true,
-  }) async {
-    try {
-      final result = await _api.enableDnsProtection(
-        malwareBlocking: malwareBlocking,
-        adBlocking: adBlocking,
-        trackingBlocking: trackingBlocking,
-      );
-
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: true,
-        provider: result['provider'] as String? ?? 'OrbGuard DNS',
-        primaryDns: result['primary_dns'] as String? ?? '',
-        secondaryDns: result['secondary_dns'] as String?,
-        isMalwareBlocking: malwareBlocking,
-        isAdBlocking: adBlocking,
-        isTrackingBlocking: trackingBlocking,
-        blockedQueries: _dnsStatus.blockedQueries,
-      );
-    } catch (e) {
-      _error = 'Failed to enable DNS protection: $e';
-    }
-    notifyListeners();
-  }
-
-  /// Disable DNS protection via API
-  Future<void> disableDnsProtection() async {
-    try {
-      await _api.disableDnsProtection();
-
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: false,
-        provider: 'Default',
-        primaryDns: '',
-        blockedQueries: _dnsStatus.blockedQueries,
-      );
-    } catch (e) {
-      _error = 'Failed to disable DNS protection: $e';
-    }
-    notifyListeners();
-  }
+  // NOTE: device VPN connect/disconnect and DNS enable/disable were removed.
+  // The backend never exposed those endpoints; VPN protection is provided by
+  // the separate OrbVPN app, and secure DNS is configured at the OS level
+  // (Android Private DNS / Apple DNS profiles).
 
   /// Dismiss threat
   void dismissThreat(String id) {
@@ -567,7 +438,7 @@ class NetworkProvider extends ChangeNotifier {
       threatsDetected: _threats.length,
       openNetworksFound: openNetworks.length,
       rogueApsDetected: _threats.where((t) => t.type == 'evil_twin').length,
-      dnsQueriesBlocked: _dnsStatus.blockedQueries,
+      dnsQueriesBlocked: 0,
       maliciousSitesBlocked: 0,
     );
   }

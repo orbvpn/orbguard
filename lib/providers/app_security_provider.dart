@@ -1,7 +1,10 @@
 /// App Security Provider
 /// State management for app security and privacy analysis
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api/orbguard_api_client.dart';
 import '../models/api/url_reputation.dart';
@@ -155,6 +158,11 @@ enum AppFilterOption {
 class AppSecurityProvider extends ChangeNotifier {
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
 
+  /// Native system channel (android/.../MainActivity.kt) exposing the
+  /// on-device package inventory via the "getInstalledApps" method.
+  static const MethodChannel _systemChannel =
+      MethodChannel('com.orb.guard/system');
+
   // State
   final List<AnalyzedApp> _apps = [];
   AppSecurityStats _stats = AppSecurityStats();
@@ -197,47 +205,76 @@ class AppSecurityProvider extends ChangeNotifier {
     await loadApps();
   }
 
-  /// Load installed apps from device
+  /// Load installed apps from the device's native package inventory.
+  ///
+  /// Uses the "getInstalledApps" method on the com.orb.guard/system channel
+  /// (implemented in MainActivity.kt). The response shape is
+  /// { "apps": [{ packageName, appName, versionName, installerPackage,
+  ///   firstInstallTime, lastUpdateTime, permissions, isSystemApp,
+  ///   isUpdatedSystemApp, ... }] }.
+  ///
+  /// Pure (non-updated) system packages are excluded from the audit list;
+  /// user-installed and updated system apps are kept. Analysis is performed
+  /// on demand against the backend via POST /apps/analyze.
   Future<void> loadApps() async {
     _isLoading = true;
     notifyListeners();
 
+    if (!Platform.isAndroid) {
+      _apps.clear();
+      _updateStats();
+      _error =
+          'The installed-app inventory is only available on Android devices.';
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     try {
-      // Get list of installed apps from API (previously submitted/analyzed)
-      final appsData = await _api.getInstalledApps();
+      final result = await _systemChannel
+          .invokeMethod<Map<dynamic, dynamic>>('getInstalledApps');
+      final appsData = (result?['apps'] as List<dynamic>?) ?? [];
 
       _apps.clear();
-      for (final appJson in appsData) {
+      for (final raw in appsData) {
+        if (raw is! Map) continue;
+        final appJson = Map<String, dynamic>.from(raw);
+
+        final isSystemApp = appJson['isSystemApp'] as bool? ?? false;
+        final isUpdatedSystemApp =
+            appJson['isUpdatedSystemApp'] as bool? ?? false;
+        if (isSystemApp && !isUpdatedSystemApp) continue;
+
+        final packageName = appJson['packageName'] as String? ?? '';
+        if (packageName.isEmpty) continue;
+
+        final firstInstall = appJson['firstInstallTime'] as int?;
+        final lastUpdate = appJson['lastUpdateTime'] as int?;
+
         final app = InstalledApp(
-          packageName: appJson['package_name'] as String? ?? '',
-          appName: appJson['app_name'] as String? ?? 'Unknown',
-          version: appJson['version'] as String? ?? '0.0.0',
-          iconPath: appJson['icon_path'] as String?,
-          permissions: (appJson['permissions'] as List<dynamic>?)?.cast<String>() ?? [],
-          installSource: appJson['install_source'] as String? ?? 'unknown',
-          installTime: appJson['install_time'] != null
-              ? DateTime.parse(appJson['install_time'] as String)
-              : DateTime.now(),
-          updateTime: appJson['update_time'] != null
-              ? DateTime.parse(appJson['update_time'] as String)
+          packageName: packageName,
+          appName: appJson['appName'] as String? ?? packageName,
+          version: appJson['versionName'] as String? ?? 'Unknown',
+          permissions:
+              (appJson['permissions'] as List<dynamic>?)?.cast<String>() ?? [],
+          installSource: appJson['installerPackage'] as String? ?? 'unknown',
+          installTime: firstInstall != null
+              ? DateTime.fromMillisecondsSinceEpoch(firstInstall)
+              : DateTime.fromMillisecondsSinceEpoch(0),
+          updateTime: lastUpdate != null
+              ? DateTime.fromMillisecondsSinceEpoch(lastUpdate)
               : null,
-          apkSize: appJson['apk_size'] as int?,
-          detectedLibraries: (appJson['detected_libraries'] as List<dynamic>?)
-              ?.cast<String>(),
         );
 
-        // Check if there's an analysis result
-        AppAnalysisResult? result;
-        if (appJson['analysis_result'] != null) {
-          result = AppAnalysisResult.fromJson(appJson['analysis_result'] as Map<String, dynamic>);
-        }
-
-        _apps.add(AnalyzedApp(app: app, result: result));
+        _apps.add(AnalyzedApp(app: app));
       }
 
+      _error = null;
       _updateStats();
+    } on PlatformException catch (e) {
+      _error = 'Failed to load installed apps: ${e.message ?? e.code}';
     } catch (e) {
-      _error = 'Failed to load apps: $e';
+      _error = 'Failed to load installed apps: $e';
     }
 
     _isLoading = false;

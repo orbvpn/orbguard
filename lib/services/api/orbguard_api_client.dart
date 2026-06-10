@@ -644,17 +644,103 @@ class OrbGuardApiClient {
 
   /// Quick forensic check
   /// POST /api/v1/forensics/quick-check
-  /// NOTE: the backend decodes { "platform": "...", "log_data": "..." }; the
-  /// indicator-list payload kept here for call-site compatibility is ignored
-  /// by the server and needs a coordinated provider-side fix.
-  Future<Map<String, dynamic>> quickForensicCheck(List<Map<String, dynamic>> indicators) async {
+  /// Body: { "platform": "ios"|"android", "log_data": "..." }
+  Future<Map<String, dynamic>> quickForensicCheck(Map<String, dynamic> payload) async {
+    if ((payload['log_data'] as String?)?.isEmpty ?? true) {
+      throw ApiError(
+        message: 'log_data is required for a quick forensic check',
+        code: 'INVALID_ARGUMENT',
+      );
+    }
     try {
-      final response = await _dio.post(ApiEndpoints.forensicsQuickCheck, data: {'indicators': indicators});
+      final response =
+          await _dio.post(ApiEndpoints.forensicsQuickCheck, data: payload);
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
+
+  /// Shared multipart upload helper for forensic artifact uploads.
+  /// Sends FormData: { "file": (multipart file), "device_id": "..." }.
+  /// [onSendProgress] reports real bytes-sent progress from dio.
+  Future<Map<String, dynamic>> _uploadForensicArtifact(
+    String endpoint,
+    String filePath, {
+    String? deviceId,
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
+    final id = deviceId ?? _requiredDeviceId;
+    final file = File(filePath);
+    if (!file.existsSync()) {
+      throw ApiError(
+        message: 'File not found for forensic upload: $filePath',
+        code: 'FILE_NOT_FOUND',
+      );
+    }
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: filePath.split(Platform.pathSeparator).last,
+        ),
+        'device_id': id,
+      });
+      final response = await _dio.post(
+        endpoint,
+        data: formData,
+        onSendProgress: onSendProgress,
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Upload an iOS backup for forensic analysis
+  /// POST /api/v1/forensics/ios/backup/upload (multipart: file + device_id)
+  /// The file must be a ZIP of the backup directory (.zip only).
+  Future<Map<String, dynamic>> uploadIosBackup(
+    String filePath, {
+    String? deviceId,
+    void Function(int sent, int total)? onSendProgress,
+  }) =>
+      _uploadForensicArtifact(
+        ApiEndpoints.forensicsIosBackupUpload,
+        filePath,
+        deviceId: deviceId,
+        onSendProgress: onSendProgress,
+      );
+
+  /// Upload an iOS sysdiagnose archive for forensic analysis
+  /// POST /api/v1/forensics/ios/sysdiagnose/upload (multipart: file + device_id)
+  /// Accepted archive types: .tar.gz, .tgz, .zip.
+  Future<Map<String, dynamic>> uploadSysdiagnose(
+    String filePath, {
+    String? deviceId,
+    void Function(int sent, int total)? onSendProgress,
+  }) =>
+      _uploadForensicArtifact(
+        ApiEndpoints.forensicsIosSysdiagnoseUpload,
+        filePath,
+        deviceId: deviceId,
+        onSendProgress: onSendProgress,
+      );
+
+  /// Upload an Android bugreport for forensic analysis
+  /// POST /api/v1/forensics/android/bugreport/upload (multipart: file + device_id)
+  /// Accepted file types: .zip (bugreport archive) or .txt (raw bugreport).
+  Future<Map<String, dynamic>> uploadAndroidBugreport(
+    String filePath, {
+    String? deviceId,
+    void Function(int sent, int total)? onSendProgress,
+  }) =>
+      _uploadForensicArtifact(
+        ApiEndpoints.forensicsAndroidBugreportUpload,
+        filePath,
+        deviceId: deviceId,
+        onSendProgress: onSendProgress,
+      );
 
   // ============================================
   // PRIVACY
@@ -979,6 +1065,23 @@ class OrbGuardApiClient {
         data: request.toJson(),
       );
       return QrScanResult.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Report a QR scan false positive
+  /// POST /api/v1/qr/report-false-positive
+  /// Body: { "content": "...", "reason"?: "..." }
+  Future<void> reportQrFalsePositive(String content, {String? reason}) async {
+    try {
+      await _dio.post(
+        ApiEndpoints.qrReportFalsePositive,
+        data: {
+          'content': content,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
+      );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1412,7 +1515,8 @@ class OrbGuardApiClient {
   // CORRELATION & GRAPH
   // ============================================
 
-  /// Get correlated indicators
+  /// Get correlated indicators for a single indicator
+  /// GET /api/v1/correlation/indicator/{id}
   Future<CorrelationResult> getCorrelation(String indicatorId) async {
     try {
       final response = await _dio.get(ApiEndpoints.correlation(indicatorId));
@@ -1801,6 +1905,32 @@ class OrbGuardApiClient {
     }
   }
 
+  /// Create intelligence source
+  /// POST /api/v1/sources
+  Future<Map<String, dynamic>> createSource(Map<String, dynamic> source) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.sourcesCreate, data: source);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Update intelligence source
+  /// PATCH /api/v1/sources/{slug}
+  Future<Map<String, dynamic>> updateSource(
+    String slug,
+    Map<String, dynamic> updates,
+  ) async {
+    try {
+      final response =
+          await _dio.patch(ApiEndpoints.sourceUpdate(slug), data: updates);
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
   // ============================================
   // INTEGRATIONS
   // ============================================
@@ -1852,35 +1982,34 @@ class OrbGuardApiClient {
   }
 
   /// Get anomaly detections
-  /// POST /api/v1/ml/anomalies/detect with {} runs filter-based detection over
-  /// recent indicators. Response: { "result": { "scores": [...], ... }, "processed": N }
-  /// Returns the per-indicator anomaly scores.
+  /// GET /api/v1/ml/anomalies — Response: { "anomalies": [...], "count": N }
+  /// Throws [MlModelsNotTrainedError] when the backend answers 409 with
+  /// code "models_not_trained" (anomaly models not trained yet).
   Future<List<Map<String, dynamic>>> getAnomalies() async {
     try {
-      final response = await _dio.post(
-        ApiEndpoints.mlAnomaliesDetect,
-        data: <String, dynamic>{},
-      );
-      final result = response.data['result'];
-      final scores = result is Map<String, dynamic> ? result['scores'] : null;
-      if (scores is! List) {
+      final response = await _dio.get(ApiEndpoints.mlAnomalies);
+      final anomalies = response.data['anomalies'];
+      if (anomalies is! List) {
         throw ApiError(
-          message: 'Unexpected anomaly detection response: '
-              'missing "result.scores" list',
+          message: 'Unexpected anomalies response: missing "anomalies" list',
           code: 'BAD_RESPONSE',
         );
       }
-      return scores.cast<Map<String, dynamic>>();
+      return anomalies.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
+      final error = ApiError.fromDioException(e);
+      if (e.response?.statusCode == 409) {
+        throw MlModelsNotTrainedError(
+          message: error.message,
+          details: error.details,
+        );
+      }
+      throw error;
     }
   }
 
   /// Get ML insights
-  /// GET /api/v1/ml/insights is a backend alias of the ML stats endpoint and
-  /// returns MLServiceStats — it has no "insights" collection. Until the
-  /// backend grows a real insights feed, this surfaces the contract gap
-  /// instead of fabricating an empty result.
+  /// GET /api/v1/ml/insights — Response: { "insights": [...], "count": N }
   Future<List<Map<String, dynamic>>> getMLInsights() async {
     try {
       final response = await _dio.get(ApiEndpoints.mlInsights);
@@ -1888,9 +2017,8 @@ class OrbGuardApiClient {
       if (insights is! List) {
         throw ApiError(
           statusCode: response.statusCode,
-          message: 'ML insights are not provided by this backend: '
-              '/ml/insights returns ML service stats, not insight items',
-          code: 'NOT_AVAILABLE',
+          message: 'Unexpected ML insights response: missing "insights" list',
+          code: 'BAD_RESPONSE',
         );
       }
       return insights.cast<Map<String, dynamic>>();
@@ -1940,40 +2068,56 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get persistence items
+  /// GET /api/v1/desktop/persistence
+  /// Response: { "items": [...], "scanned_at": "..." }
   Future<List<Map<String, dynamic>>> getPersistenceItems() async {
     try {
       final response = await _dio.get(ApiEndpoints.desktopPersistence);
-      return (response.data['items'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final items = response.data['items'];
+      if (items is! List) {
+        throw ApiError(
+          message: 'Unexpected persistence response: missing "items" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return items.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get signed apps
+  /// GET /api/v1/desktop/apps
+  /// Response: { "apps": [...], "scanned_at": "..." }
   Future<List<Map<String, dynamic>>> getSignedApps() async {
     try {
       final response = await _dio.get(ApiEndpoints.desktopApps);
-      return (response.data['apps'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final apps = response.data['apps'];
+      if (apps is! List) {
+        throw ApiError(
+          message: 'Unexpected desktop apps response: missing "apps" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return apps.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get firewall rules
-  /// GET /api/v1/desktop/network/rules — response is a bare JSON array
+  /// GET /api/v1/desktop/firewall — Response: { "rules": [...], ... }
   Future<List<Map<String, dynamic>>> getDesktopFirewallRules() async {
     try {
       final response = await _dio.get(ApiEndpoints.desktopFirewall);
-      final data = response.data;
-      if (data is! List) {
+      final rules = response.data['rules'];
+      if (rules is! List) {
         throw ApiError(
-          message: 'Unexpected firewall rules response: expected a JSON array',
+          message: 'Unexpected firewall rules response: missing "rules" list',
           code: 'BAD_RESPONSE',
         );
       }
-      return data.cast<Map<String, dynamic>>();
+      return rules.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2031,28 +2175,43 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get graph nodes
+  /// GET /api/v1/graph/nodes — Response: { "nodes": [...], "count": N }
   Future<List<Map<String, dynamic>>> getGraphNodes({String? query}) async {
     try {
       final response = await _dio.get(
         ApiEndpoints.graphNodes,
         queryParameters: query != null ? {'query': query} : null,
       );
-      return (response.data['nodes'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final nodes = response.data['nodes'];
+      if (nodes is! List) {
+        throw ApiError(
+          message: 'Unexpected graph nodes response: missing "nodes" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return nodes.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get graph relations
+  /// GET /api/v1/graph/relations — Response: { "relations": [...], "count": N }
   Future<List<Map<String, dynamic>>> getGraphRelations({String? nodeId}) async {
     try {
       final response = await _dio.get(
         ApiEndpoints.graphRelations,
         queryParameters: nodeId != null ? {'node_id': nodeId} : null,
       );
-      return (response.data['relations'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final relations = response.data['relations'];
+      if (relations is! List) {
+        throw ApiError(
+          message:
+              'Unexpected graph relations response: missing "relations" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return relations.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2117,24 +2276,40 @@ class OrbGuardApiClient {
   // CORRELATION
   // ============================================
 
-  /// Get correlation results
-  Future<List<Map<String, dynamic>>> getCorrelationResults({String? query}) async {
+  /// List correlation results
+  /// GET /api/v1/correlation
+  Future<List<Map<String, dynamic>>> getCorrelations({String? query}) async {
     try {
       final response = await _dio.get(
-        '${ApiConfig.apiVersion}/correlation',
+        ApiEndpoints.correlations,
         queryParameters: query != null ? {'query': query} : null,
       );
-      return (response.data['results'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final data = response.data;
+      final results = data is Map<String, dynamic>
+          ? (data['correlations'] ?? data['results'])
+          : null;
+      if (results is! List) {
+        throw ApiError(
+          message: 'Unexpected correlation list response: '
+              'missing "correlations" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return results.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
+  /// Legacy name kept for existing call sites.
+  Future<List<Map<String, dynamic>>> getCorrelationResults({String? query}) =>
+      getCorrelations(query: query);
+
   /// Run correlation analysis
+  /// POST /api/v1/correlation/run
   Future<Map<String, dynamic>> runCorrelation() async {
     try {
-      final response = await _dio.post('${ApiConfig.apiVersion}/correlation/run');
+      final response = await _dio.post(ApiEndpoints.correlationRun);
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -2185,102 +2360,27 @@ class OrbGuardApiClient {
   }
 
   // ============================================
-  // APP SECURITY
+  // NETWORK THREATS
   // ============================================
-
-  /// Get installed apps (from device registry)
-  Future<List<Map<String, dynamic>>> getInstalledApps() async {
-    try {
-      final response = await _dio.get('${ApiConfig.apiVersion}/apps/installed');
-      return (response.data['apps'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  // ============================================
-  // NETWORK / VPN / DNS
-  // ============================================
+  // NOTE: device VPN control (/vpn/status|connect|disconnect) and device DNS
+  // control (/dns/status|enable|disable) were removed: the backend never
+  // exposed them, VPN protection is provided by the separate OrbVPN app, and
+  // DNS protection is configured at the OS level (Private DNS / profiles).
 
   /// Get network threats
+  /// GET /api/v1/network/threats — Response: { "threats": [...], "count": N }
   Future<List<Map<String, dynamic>>> getNetworkThreats() async {
     try {
-      final response = await _dio.get('${ApiConfig.apiVersion}/network/threats');
-      return (response.data['threats'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Get VPN status
-  Future<Map<String, dynamic>> getVpnStatus() async {
-    try {
-      final response = await _dio.get('${ApiConfig.apiVersion}/vpn/status');
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Connect to VPN
-  Future<Map<String, dynamic>> connectVpn(String server) async {
-    try {
-      final response = await _dio.post(
-        '${ApiConfig.apiVersion}/vpn/connect',
-        data: {'server': server},
-      );
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Disconnect from VPN
-  Future<void> disconnectVpn() async {
-    try {
-      await _dio.post('${ApiConfig.apiVersion}/vpn/disconnect');
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Get DNS status
-  Future<Map<String, dynamic>> getDnsStatus() async {
-    try {
-      final response = await _dio.get('${ApiConfig.apiVersion}/dns/status');
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Enable DNS protection
-  Future<Map<String, dynamic>> enableDnsProtection({
-    bool malwareBlocking = true,
-    bool adBlocking = false,
-    bool trackingBlocking = true,
-  }) async {
-    try {
-      final response = await _dio.post(
-        '${ApiConfig.apiVersion}/dns/enable',
-        data: {
-          'malware_blocking': malwareBlocking,
-          'ad_blocking': adBlocking,
-          'tracking_blocking': trackingBlocking,
-        },
-      );
-      return response.data as Map<String, dynamic>? ?? {};
-    } on DioException catch (e) {
-      throw ApiError.fromDioException(e);
-    }
-  }
-
-  /// Disable DNS protection
-  Future<void> disableDnsProtection() async {
-    try {
-      await _dio.post('${ApiConfig.apiVersion}/dns/disable');
+      final response = await _dio.get(ApiEndpoints.networkThreats);
+      final threats = response.data['threats'];
+      if (threats is! List) {
+        throw ApiError(
+          message: 'Unexpected network threats response: '
+              'missing "threats" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return threats.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2291,43 +2391,82 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get known vulnerabilities database
+  /// GET /api/v1/supply-chain/vulnerabilities
   Future<List<Map<String, dynamic>>> getSupplyChainVulnerabilities() async {
     try {
       final response = await _dio.get(
         ApiEndpoints.supplyChainVulnerabilities,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['vulnerabilities'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      final vulnerabilities = response.data['vulnerabilities'];
+      if (vulnerabilities is! List) {
+        throw ApiError(
+          message: 'Unexpected supply-chain vulnerabilities response: '
+              'missing "vulnerabilities" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return vulnerabilities.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
-  /// Check libraries for vulnerabilities
-  Future<Map<String, dynamic>> checkSupplyChainLibraries(
-    List<Map<String, String>> libraries,
+  /// Check packages for vulnerabilities
+  /// POST /api/v1/supply-chain/check
+  /// Body: { "packages": [{ "name", "version", "ecosystem"? }] }
+  /// Response: { "results": [...] }
+  Future<List<Map<String, dynamic>>> checkSupplyChainPackages(
+    List<Map<String, dynamic>> packages,
   ) async {
     try {
       final response = await _dio.post(
         ApiEndpoints.supplyChainCheck,
-        data: {'libraries': libraries},
+        data: {'packages': packages},
       );
-      return response.data as Map<String, dynamic>? ?? {};
+      final results = response.data['results'];
+      if (results is! List) {
+        throw ApiError(
+          message: 'Unexpected supply-chain check response: '
+              'missing "results" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return results.cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
   }
 
   /// Get tracker signatures
+  /// GET /api/v1/supply-chain/trackers
+  /// Response: { "trackers": [...], "count": N } — elements may be plain
+  /// signature strings or objects carrying a signature/package prefix.
   Future<List<String>> getTrackerSignatures() async {
     try {
       final response = await _dio.get(
         ApiEndpoints.supplyChainTrackers,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlLong}),
       );
-      return (response.data['trackers'] as List<dynamic>?)
-          ?.cast<String>() ?? [];
+      final trackers = response.data['trackers'];
+      if (trackers is! List) {
+        throw ApiError(
+          message: 'Unexpected supply-chain trackers response: '
+              'missing "trackers" list',
+          code: 'BAD_RESPONSE',
+        );
+      }
+      return trackers
+          .map((t) {
+            if (t is String) return t;
+            if (t is Map) {
+              final sig = t['signature'] ?? t['package_prefix'] ?? t['name'];
+              if (sig is String) return sig;
+            }
+            return null;
+          })
+          .whereType<String>()
+          .toList();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2591,6 +2730,16 @@ class OrbGuardApiClient {
       throw ApiError.fromDioException(e);
     }
   }
+}
+
+/// Typed 409 state for GET /api/v1/ml/anomalies: the backend's anomaly
+/// models have not been trained yet. Callers can catch this to render a
+/// "models not trained" state instead of a generic error.
+class MlModelsNotTrainedError extends ApiError {
+  MlModelsNotTrainedError({
+    required super.message,
+    super.details,
+  }) : super(statusCode: 409, code: 'models_not_trained');
 }
 
 /// Generic paginated response

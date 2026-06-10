@@ -109,6 +109,10 @@ class ApiEndpoints {
   /// Body: { "content": "...", "content_type": "url" }
   static const String qrScan = '$_v1/qr/scan';
 
+  /// Report QR scan false positive
+  /// POST /api/v1/qr/report-false-positive
+  static const String qrReportFalsePositive = '$_v1/qr/report-false-positive';
+
   /// Batch QR scan
   /// POST /api/v1/qr/scan/batch
   static const String qrScanBatch = '$_v1/qr/scan/batch';
@@ -188,9 +192,12 @@ class ApiEndpoints {
 
   /// Remove trusted access point
   /// DELETE /api/v1/network/rogue-ap/trusted/{id}
-  /// NOTE: not implemented by the backend yet (404) — proper rogue-ap routes
-  /// are planned for a later wave; constant kept for that work.
   static String rogueApTrustedRemove(String id) => '$_v1/network/rogue-ap/trusted/$id';
+
+  /// Get detected network threats
+  /// GET /api/v1/network/threats
+  /// Response: { "threats": [...], "count": N }
+  static const String networkThreats = '$_v1/network/threats';
 
   /// Check DNS configuration
   /// POST /api/v1/network/dns/check
@@ -283,7 +290,8 @@ class ApiEndpoints {
   // ============================================
 
   /// Health check / ping
-  /// GET /api/v1/health
+  /// GET /api/v1/health (backend also serves /health; the /api/v1 alias is
+  /// the canonical client path)
   static const String health = '$_v1/health';
 
   /// Get threat statistics
@@ -330,9 +338,17 @@ class ApiEndpoints {
   // CORRELATION & GRAPH
   // ============================================
 
-  /// Get correlated indicators
-  /// GET /api/v1/correlation/{id}
-  static String correlation(String id) => '$_v1/correlation/$id';
+  /// Get correlated indicators for a single indicator
+  /// GET /api/v1/correlation/indicator/{id}
+  static String correlation(String id) => '$_v1/correlation/indicator/$id';
+
+  /// List correlation results
+  /// GET /api/v1/correlation
+  static const String correlations = '$_v1/correlation';
+
+  /// Run correlation analysis
+  /// POST /api/v1/correlation/run
+  static const String correlationRun = '$_v1/correlation/run';
 
   /// Get related entities from graph
   /// GET /api/v1/graph/related/{id}
@@ -482,6 +498,14 @@ class ApiEndpoints {
   /// GET /api/v1/intel/sources/{id}
   static String intelSource(String id) => '$_v1/intel/sources/$id';
 
+  /// Create intelligence source
+  /// POST /api/v1/sources
+  static const String sourcesCreate = '$_v1/sources';
+
+  /// Update intelligence source
+  /// PATCH /api/v1/sources/{slug}
+  static String sourceUpdate(String slug) => '$_v1/sources/$slug';
+
   // ============================================
   // INTEGRATIONS
   // ============================================
@@ -499,11 +523,14 @@ class ApiEndpoints {
   // ============================================
 
   /// Get ML models
-  /// GET /api/v1/ml/models (returns MLServiceStats: {models_loaded, models: [...], ...})
+  /// GET /api/v1/ml/models
+  /// Response: { "models": [...] }
   static const String mlModels = '$_v1/ml/models';
 
-  /// Get anomaly detections (backend alias of GET /ml/stats — stats shape, no list)
+  /// Get anomaly detections
   /// GET /api/v1/ml/anomalies
+  /// Response: { "anomalies": [...], "count": N }
+  /// Returns 409 with code "models_not_trained" when models are untrained.
   static const String mlAnomalies = '$_v1/ml/anomalies';
 
   /// Run anomaly detection over indicators (ID list or filter; {} = recent indicators)
@@ -516,8 +543,9 @@ class ApiEndpoints {
   /// Body: { "value": "...", "type": "domain" } — "value" is REQUIRED (400 otherwise)
   static const String mlAnalyze = '$_v1/ml/analyze';
 
-  /// Get ML insights (backend alias of GET /ml/stats — stats shape, no insights list)
+  /// Get ML insights
   /// GET /api/v1/ml/insights
+  /// Response: { "insights": [...], "count": N }
   static const String mlInsights = '$_v1/ml/insights';
 
   // ============================================
@@ -542,18 +570,18 @@ class ApiEndpoints {
 
   /// Get persistence items
   /// GET /api/v1/desktop/persistence
-  /// NOTE: not implemented by the backend (404); use POST /desktop/persistence/scan.
+  /// Response: { "items": [...], "scanned_at": "..." }
   static const String desktopPersistence = '$_v1/desktop/persistence';
 
   /// Get signed apps
   /// GET /api/v1/desktop/apps
-  /// NOTE: not implemented by the backend (404); use POST /desktop/codesign/verify-batch.
+  /// Response: { "apps": [...], "scanned_at": "..." }
   static const String desktopApps = '$_v1/desktop/apps';
 
   /// Get firewall rules
   /// GET /api/v1/desktop/firewall
-  /// NOTE: not implemented by the backend (404); live route is /desktop/network/rules.
-  static const String desktopFirewall = '$_v1/desktop/network/rules';
+  /// Response: { "rules": [...], ... }
+  static const String desktopFirewall = '$_v1/desktop/firewall';
 
   /// Scan persistence items
   /// POST /api/v1/desktop/persistence/scan
@@ -673,14 +701,12 @@ class ApiEndpoints {
 
   /// Get graph nodes
   /// GET /api/v1/graph/nodes
-  /// NOTE: not implemented by the backend yet; graph/correlation routes are
-  /// being added in a later wave — constant kept for that work.
+  /// Response: { "nodes": [...], "count": N }
   static const String graphNodes = '$_v1/graph/nodes';
 
   /// Get graph relations
   /// GET /api/v1/graph/relations
-  /// NOTE: not implemented by the backend yet; graph/correlation routes are
-  /// being added in a later wave — constant kept for that work.
+  /// Response: { "relations": [...], "count": N }
   static const String graphRelations = '$_v1/graph/relations';
 
   /// Search graph
@@ -693,15 +719,18 @@ class ApiEndpoints {
 
   /// Get known vulnerabilities
   /// GET /api/v1/supply-chain/vulnerabilities
+  /// Response: { "vulnerabilities": [...], ... }
   static const String supplyChainVulnerabilities = '$_v1/supply-chain/vulnerabilities';
 
-  /// Check library vulnerabilities
+  /// Check package vulnerabilities
   /// POST /api/v1/supply-chain/check
-  /// Body: { "libraries": [{ "name": "...", "version": "..." }] }
+  /// Body: { "packages": [{ "name": "...", "version": "...", "ecosystem": "..."? }] }
+  /// Response: { "results": [...] }
   static const String supplyChainCheck = '$_v1/supply-chain/check';
 
   /// Get tracker signatures
   /// GET /api/v1/supply-chain/trackers
+  /// Response: { "trackers": [...], "count": N }
   static const String supplyChainTrackers = '$_v1/supply-chain/trackers';
 
   // ============================================
@@ -820,6 +849,18 @@ class ApiEndpoints {
   /// Quick forensic check
   /// POST /api/v1/forensics/quick-check
   static const String forensicsQuickCheck = '$_v1/forensics/quick-check';
+
+  /// Upload iOS backup for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/ios/backup/upload
+  static const String forensicsIosBackupUpload = '$_v1/forensics/ios/backup/upload';
+
+  /// Upload iOS sysdiagnose archive for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/ios/sysdiagnose/upload
+  static const String forensicsIosSysdiagnoseUpload = '$_v1/forensics/ios/sysdiagnose/upload';
+
+  /// Upload Android bugreport for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/android/bugreport/upload
+  static const String forensicsAndroidBugreportUpload = '$_v1/forensics/android/bugreport/upload';
 
   // ============================================
   // DIGITAL FOOTPRINT

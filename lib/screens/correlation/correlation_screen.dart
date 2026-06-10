@@ -1,5 +1,13 @@
 /// Correlation Engine Screen
-/// Advanced threat correlation and analysis interface
+/// Advanced threat correlation and analysis interface.
+///
+/// Wire format: GET /correlation returns {results: [CorrelationEvent...],
+/// count} where a CorrelationEvent is {id, type (temporal|infrastructure|
+/// ttp|behavioral|network|campaign), strength (weak|moderate|strong|
+/// very_strong), confidence, description, indicators: [uuid...],
+/// campaign_id?, threat_actor_id?, evidence, created_at}. POST
+/// /correlation/run executes a server-scoped correlation over recent
+/// indicators and returns {run, correlations, statistics}.
 
 import 'package:flutter/material.dart';
 
@@ -23,7 +31,16 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   final List<CorrelationResult> _results = [];
   String _selectedEngine = 'All';
 
-  final List<String> _engines = ['All', 'IOC Matching', 'Behavior Analysis', 'MITRE Mapping', 'Campaign Attribution'];
+  // Mirrors the backend CorrelationType enum (models/correlation.go).
+  final List<String> _engines = [
+    'All',
+    'Temporal',
+    'Infrastructure',
+    'TTP',
+    'Behavioral',
+    'Network',
+    'Campaign',
+  ];
 
   @override
   void initState() {
@@ -116,6 +133,36 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                     ],
                   ),
                 ),
+
+                // Error state (real load failures are shown, not hidden)
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: GlassCard(
+                      tintColor: GlassTheme.errorColor,
+                      child: Row(
+                        children: [
+                          const DuotoneIcon('danger_circle',
+                              color: GlassTheme.errorColor, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: TextStyle(
+                                  color: Colors.white.withAlpha(204),
+                                  fontSize: 12),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const DuotoneIcon('refresh',
+                                color: Colors.white, size: 20),
+                            onPressed: _loadResults,
+                            tooltip: 'Retry',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // Running indicator
                 if (_isCorrelating)
@@ -314,33 +361,41 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     );
   }
 
+  /// Runs a server-scoped correlation (POST /correlation/run), then
+  /// refreshes the persisted results list so the screen reflects exactly
+  /// what the backend stored.
   Future<void> _runCorrelation() async {
     setState(() => _isCorrelating = true);
 
     try {
       final result = await _apiClient.runCorrelation();
 
-      setState(() {
-        _isCorrelating = false;
-        // Add new correlations to results
-        if (result['correlations'] != null) {
-          final newCorrelations = (result['correlations'] as List)
-              .map((json) => CorrelationResult.fromJson(json as Map<String, dynamic>))
-              .toList();
-          for (final correlation in newCorrelations) {
-            if (!_results.any((r) => r.id == correlation.id)) {
-              _results.insert(0, correlation);
-            }
-          }
-        }
-      });
-    } catch (e) {
+      final found = (result['correlations'] is List)
+          ? (result['correlations'] as List).length
+          : 0;
+
+      if (!mounted) return;
       setState(() => _isCorrelating = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Correlation failed: $e'), backgroundColor: GlassTheme.errorColor),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            found == 0
+                ? 'Correlation run complete — no new correlations found'
+                : 'Correlation run complete — $found correlation'
+                    '${found == 1 ? '' : 's'} found',
+          ),
+          backgroundColor: GlassTheme.gradientTop,
+        ),
+      );
+
+      // Refresh from the persisted list (GET /correlation) after the run.
+      await _loadResults();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCorrelating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Correlation failed: $e'), backgroundColor: GlassTheme.errorColor),
+      );
     }
   }
 
@@ -377,21 +432,29 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                 child: Column(
                   children: [
                     _buildDetailRow('Confidence', '${(result.confidence * 100).toInt()}%'),
-                    _buildDetailRow('Linked Entities', '${result.linkedEntities}'),
-                    _buildDetailRow('Timestamp', _formatTime(result.timestamp)),
+                    if (result.strength.isNotEmpty)
+                      _buildDetailRow('Strength',
+                          CorrelationResult._humanStrength(result.strength)),
+                    _buildDetailRow('Correlated Indicators', '${result.linkedEntities}'),
+                    _buildDetailRow('Created', _formatTime(result.timestamp)),
                   ],
                 ),
               ),
               if (result.relatedIndicators.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('Related Indicators', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const Text('Correlated Indicators (IDs)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...result.relatedIndicators.map((indicator) => GlassCard(
                       child: Row(
                         children: [
                           const GlassSvgIconBox(icon: AppIcons.dangerTriangle, color: GlassTheme.errorColor, size: 36),
                           const SizedBox(width: 12),
-                          Text(indicator, style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
+                          Expanded(
+                            child: Text(
+                              indicator,
+                              style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 12),
+                            ),
+                          ),
                         ],
                       ),
                     )),
@@ -418,13 +481,17 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
   Color _getEngineColor(String engine) {
     switch (engine) {
-      case 'IOC Matching':
+      case 'Temporal':
+        return const Color(0xFF2196F3);
+      case 'Infrastructure':
         return GlassTheme.errorColor;
-      case 'Behavior Analysis':
-        return const Color(0xFF9C27B0);
-      case 'MITRE Mapping':
+      case 'TTP':
         return GlassTheme.primaryAccent;
-      case 'Campaign Attribution':
+      case 'Behavioral':
+        return const Color(0xFF9C27B0);
+      case 'Network':
+        return const Color(0xFF4CAF50);
+      case 'Campaign':
         return GlassTheme.warningColor;
       default:
         return Colors.grey;
@@ -433,13 +500,17 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
   String _getEngineIcon(String engine) {
     switch (engine) {
-      case 'IOC Matching':
+      case 'Temporal':
+        return AppIcons.clock;
+      case 'Infrastructure':
         return AppIcons.objectScan;
-      case 'Behavior Analysis':
-        return AppIcons.mlAnalysis;
-      case 'MITRE Mapping':
+      case 'TTP':
         return AppIcons.mitre;
-      case 'Campaign Attribution':
+      case 'Behavioral':
+        return AppIcons.mlAnalysis;
+      case 'Network':
+        return AppIcons.urlProtection;
+      case 'Campaign':
         return AppIcons.campaign;
       default:
         return AppIcons.correlation;
@@ -447,6 +518,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   }
 
   String _formatTime(DateTime time) {
+    if (time.millisecondsSinceEpoch == 0) return 'unknown';
     final diff = DateTime.now().difference(time);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
@@ -455,14 +527,20 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
 }
 
+/// Parsed view of a backend CorrelationEvent
+/// (orbguard.lab internal/domain/models/correlation.go).
 class CorrelationResult {
   final String id;
   final String title;
   final String description;
-  final String engine;
+  final String engine; // humanized CorrelationType
+  final String strength; // weak | moderate | strong | very_strong
   final double confidence;
   final int linkedEntities;
   final DateTime timestamp;
+
+  /// Correlated indicator UUIDs (the backend links events to indicators
+  /// by id, not by raw value).
   final List<String> relatedIndicators;
 
   CorrelationResult({
@@ -470,24 +548,60 @@ class CorrelationResult {
     required this.title,
     required this.description,
     required this.engine,
+    required this.strength,
     required this.confidence,
     required this.linkedEntities,
     required this.timestamp,
     required this.relatedIndicators,
   });
 
+  /// Maps a backend CorrelationType to the engine display name used by the
+  /// filter chips.
+  static String _engineFromType(String? type) {
+    switch (type) {
+      case 'temporal':
+        return 'Temporal';
+      case 'infrastructure':
+        return 'Infrastructure';
+      case 'ttp':
+        return 'TTP';
+      case 'behavioral':
+        return 'Behavioral';
+      case 'network':
+        return 'Network';
+      case 'campaign':
+        return 'Campaign';
+      default:
+        return type ?? 'Unknown';
+    }
+  }
+
+  static String _humanStrength(String strength) =>
+      strength.replaceAll('_', ' ');
+
   factory CorrelationResult.fromJson(Map<String, dynamic> json) {
+    final type = json['type'] as String?;
+    final engine = _engineFromType(type);
+    final strength = json['strength'] as String? ?? '';
+    final indicators = (json['indicators'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const <String>[];
+    final createdRaw = json['created_at'] as String?;
+
     return CorrelationResult(
       id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? 'Correlation',
+      title: strength.isEmpty
+          ? '$engine correlation'
+          : '$engine correlation (${_humanStrength(strength)})',
       description: json['description'] as String? ?? '',
-      engine: json['engine'] as String? ?? 'Unknown',
+      engine: engine,
+      strength: strength,
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
-      linkedEntities: json['linked_entities'] as int? ?? 0,
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String)
-          : DateTime.now(),
-      relatedIndicators: (json['related_indicators'] as List<dynamic>?)?.cast<String>() ?? [],
+      linkedEntities: indicators.length,
+      timestamp: (createdRaw != null ? DateTime.tryParse(createdRaw) : null) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      relatedIndicators: indicators,
     );
   }
 }

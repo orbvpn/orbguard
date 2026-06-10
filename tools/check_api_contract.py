@@ -53,61 +53,14 @@ HTTP_VERBS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 # starts enforcing them.
 # ---------------------------------------------------------------------------
 WAVE4_PENDING = {
-    # --- threat graph: dedicated nodes/relations feeds ---
-    "GET /api/v1/graph/nodes",
-    "GET /api/v1/graph/relations",
-    # --- correlation: run/list + by-id (live route is /correlation/indicator/{id}) ---
-    "GET /api/v1/correlation",
-    "POST /api/v1/correlation/run",
-    "GET /api/v1/correlation/{param}",
-    # --- ML: anomalies/insights/models currently alias GET /ml/stats; kept here
-    #     for when dedicated handlers replace the aliases ---
-    "GET /api/v1/ml/anomalies",
-    "GET /api/v1/ml/insights",
-    "GET /api/v1/ml/models",
-    # --- rogue AP: scan/trusted POST are wifi-audit aliases today; trusted
-    #     DELETE has no route at all ---
-    "POST /api/v1/network/rogue-ap/scan",
-    "DELETE /api/v1/network/rogue-ap/trusted/{param}",
-    # --- network threat feed ---
-    "GET /api/v1/network/threats",
-    # --- supply-chain security (no backend routes yet) ---
-    "GET /api/v1/supply-chain/vulnerabilities",
-    "POST /api/v1/supply-chain/check",
-    "GET /api/v1/supply-chain/trackers",
-    # --- desktop GET caches (live routes are the POST scan endpoints) ---
-    "GET /api/v1/desktop/persistence",
-    "GET /api/v1/desktop/apps",
-    # --- forensics upload variants (backend-only today; reserved) ---
-    "POST /api/v1/forensics/ios/shutdown-log/upload",
-    "POST /api/v1/forensics/android/logcat/upload",
-    # --- vpn/dns device-control endpoints ---
-    "GET /api/v1/vpn/status",
-    "POST /api/v1/vpn/connect",
-    "POST /api/v1/vpn/disconnect",
-    "GET /api/v1/dns/status",
-    "POST /api/v1/dns/enable",
-    "POST /api/v1/dns/disable",
-    # --- intelligence sources write operations ---
-    "POST /api/v1/sources",
-    "PATCH /api/v1/sources/{param}",
-    # --- QR false-positive reporting ---
-    "POST /api/v1/qr/report-false-positive",
-    # --- installed-app registry ---
-    "GET /api/v1/apps/installed",
-    # --- single-indicator lookup (client getIndicator; backend only has list
-    #     + check today) ---
-    "GET /api/v1/indicators/{param}",
-    # --- health ping: the backend registers /health WITHOUT the /api/v1
-    #     prefix; the client pings /api/v1/health. Wave 4 routing: add the
-    #     /api/v1/health alias (found by this gate) ---
-    "GET /api/v1/health",
+    # =======================================================================
+    # Genuinely future work (post-Wave-4): retire the client methods or add
+    # the routes in a later wave.
+    # =======================================================================
     # --- MITRE navigator export: route exists but is POST-only; the unused
-    #     ApiEndpoints.mitreNavigatorExport doc-verb says GET. Wave 4: fix the
-    #     doc verb or add GET ---
+    #     ApiEndpoints.mitreNavigatorExport doc-verb says GET ---
     "GET /api/v1/mitre/navigator/export",
-    # --- enterprise routes flagged 404 in api_config.dart NOTEs (Wave 4 adds
-    #     them or the client methods are retired) ---
+    # --- enterprise routes flagged 404 in api_config.dart NOTEs ---
     "GET /api/v1/enterprise/events",
     "GET /api/v1/enterprise/devices",
     "GET /api/v1/enterprise/compliance/controls",

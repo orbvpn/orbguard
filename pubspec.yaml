@@ -41,6 +41,9 @@ dependencies:
   # QR Scanner
   mobile_scanner: ^5.1.1
 
+  # File selection (forensic artifact uploads)
+  file_picker: ^10.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

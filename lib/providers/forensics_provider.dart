@@ -14,10 +14,10 @@ import '../services/api/orbguard_api_client.dart';
 /// Forensic analysis type
 enum ForensicAnalysisType {
   shutdownLog('Shutdown Log', 'Analyze iOS shutdown.log for Pegasus indicators'),
-  dataUsage('Data Usage', 'Analyze suspicious data usage patterns'),
   backup('Backup Analysis', 'Scan iOS backup for spyware artifacts'),
   sysdiagnose('Sysdiagnose', 'Deep analysis of iOS system diagnostics'),
   logcat('Logcat Analysis', 'Analyze Android logcat for malware'),
+  bugreport('Bugreport Analysis', 'Analyze Android bugreport for malware'),
   fullScan('Full Analysis', 'Comprehensive forensic scan');
 
   final String displayName;
@@ -283,41 +283,64 @@ class ForensicsProvider extends ChangeNotifier {
     );
   }
 
-  /// Analyze iOS backup.
-  /// Backend: POST /forensics/analyze/backup {device_id, backup_path}
-  Future<ForensicAnalysisResult?> analyzeBackup(String backupPath) async {
+  /// Upload an iOS backup archive (.zip of the backup directory) and run the
+  /// server-side backup analyzer on it.
+  /// Backend: POST /forensics/ios/backup/upload (multipart: file + device_id).
+  /// The legacy path-based /forensics/analyze/backup endpoint is service-only
+  /// (403 for app callers) because device-local paths do not exist on the
+  /// server — uploads are the only honest client flow.
+  Future<ForensicAnalysisResult?> uploadIosBackup(String filePath) async {
     return _runAnalysis(
       ForensicAnalysisType.backup,
-      () async => _api.analyzeBackup({
-        'device_id': await _deviceId(),
-        'backup_path': backupPath,
-      }),
+      () async => _api.uploadIosBackup(
+        filePath,
+        deviceId: await _deviceId(),
+        onSendProgress: _onUploadProgress,
+      ),
     );
   }
 
-  /// Analyze data usage patterns.
-  /// Backend: POST /forensics/analyze/data-usage {device_id, db_path}
-  Future<ForensicAnalysisResult?> analyzeDataUsage(
-      Map<String, dynamic> usageData) async {
-    return _runAnalysis(
-      ForensicAnalysisType.dataUsage,
-      () async => _api.analyzeDataUsage({
-        'device_id': await _deviceId(),
-        'db_path': (usageData['db_path'] ?? usageData['path'] ?? '') as String,
-      }),
-    );
-  }
-
-  /// Analyze iOS sysdiagnose.
-  /// Backend: POST /forensics/analyze/sysdiagnose {device_id, archive_path}
-  Future<ForensicAnalysisResult?> analyzeSysdiagnose(String diagPath) async {
+  /// Upload an iOS sysdiagnose archive (.tar.gz/.tgz/.zip) and run the
+  /// server-side sysdiagnose analyzer on it.
+  /// Backend: POST /forensics/ios/sysdiagnose/upload (multipart: file + device_id).
+  Future<ForensicAnalysisResult?> uploadSysdiagnose(String filePath) async {
     return _runAnalysis(
       ForensicAnalysisType.sysdiagnose,
-      () async => _api.analyzeSysdiagnose({
-        'device_id': await _deviceId(),
-        'archive_path': diagPath,
-      }),
+      () async => _api.uploadSysdiagnose(
+        filePath,
+        deviceId: await _deviceId(),
+        onSendProgress: _onUploadProgress,
+      ),
     );
+  }
+
+  /// Upload an Android bugreport (.zip archive or raw .txt) and run the
+  /// server-side bugreport/logcat analyzer on it.
+  /// Backend: POST /forensics/android/bugreport/upload (multipart: file + device_id).
+  Future<ForensicAnalysisResult?> uploadAndroidBugreport(String filePath) async {
+    return _runAnalysis(
+      ForensicAnalysisType.bugreport,
+      () async => _api.uploadAndroidBugreport(
+        filePath,
+        deviceId: await _deviceId(),
+        onSendProgress: _onUploadProgress,
+      ),
+    );
+  }
+
+  /// Real upload progress from dio's onSendProgress. Upload occupies the
+  /// 0–90% band of the progress bar; the final 10% is server-side analysis.
+  void _onUploadProgress(int sent, int total) {
+    if (total <= 0) return;
+    final fraction = sent / total;
+    final newProgress = (fraction * 0.9).clamp(0.0, 0.9);
+    // Throttle: only notify on >=1% movement or completion.
+    if ((newProgress - _progress).abs() < 0.01 && sent != total) return;
+    _progress = newProgress;
+    _currentPhase = sent >= total
+        ? 'Upload complete — analyzing on server...'
+        : 'Uploading... ${(fraction * 100).toStringAsFixed(0)}%';
+    notifyListeners();
   }
 
   /// Analyze Android logcat.
@@ -334,13 +357,13 @@ class ForensicsProvider extends ChangeNotifier {
 
   /// Run full forensic analysis.
   /// Backend: POST /forensics/full-analysis
-  /// {device_id, platform, include_timeline, ...optional artifacts}
+  /// {device_id, platform, include_timeline, ...optional in-band artifacts}.
+  /// Server-side path fields (backup_path, data_usage_path, sysdiagnose_path)
+  /// are service-only on the backend and are intentionally not sent here —
+  /// archive artifacts go through the dedicated upload endpoints instead.
   Future<ForensicAnalysisResult?> runFullAnalysis({
     String? shutdownLog,
     String? logcatData,
-    String? backupPath,
-    String? dataUsagePath,
-    String? sysdiagnosePath,
   }) async {
     return _runAnalysis(
       ForensicAnalysisType.fullScan,
@@ -352,12 +375,6 @@ class ForensicsProvider extends ChangeNotifier {
           'shutdown_log': shutdownLog,
         if (logcatData != null && logcatData.isNotEmpty)
           'logcat_data': logcatData,
-        if (backupPath != null && backupPath.isNotEmpty)
-          'backup_path': backupPath,
-        if (dataUsagePath != null && dataUsagePath.isNotEmpty)
-          'data_usage_path': dataUsagePath,
-        if (sysdiagnosePath != null && sysdiagnosePath.isNotEmpty)
-          'sysdiagnose_path': sysdiagnosePath,
       }),
     );
   }
@@ -384,12 +401,10 @@ class ForensicsProvider extends ChangeNotifier {
     );
 
     try {
-      final response = await _api.quickForensicCheck([
-        {
-          'platform': platform ?? _platformName(),
-          'log_data': logData,
-        }
-      ]);
+      final response = await _api.quickForensicCheck({
+        'platform': platform ?? _platformName(),
+        'log_data': logData,
+      });
 
       if (response['indicators_found'] == null &&
           response['is_suspicious'] == null) {
