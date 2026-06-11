@@ -289,8 +289,10 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 			}
 
 			// Check for suspicious URLs
+			suspiciousURLs := 0
 			for _, url := range entities.URLs {
 				if url.IsSuspicious {
+					suspiciousURLs++
 					result.Indicators = append(result.Indicators, models.ScamIndicator{
 						Type:        "suspicious_url",
 						Description: fmt.Sprintf("Suspicious URL detected: %s", url.Reason),
@@ -298,6 +300,9 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 						Evidence:    url.URL,
 					})
 				}
+			}
+			if suspiciousURLs > 0 {
+				result.RiskScore = maxFloat(result.RiskScore, 0.6)
 			}
 
 			// Check for crypto addresses (suspicious in unsolicited messages)
@@ -308,8 +313,41 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 					Confidence:  0.7,
 					Evidence:    entities.CryptoAddresses[0].Address,
 				})
+				result.RiskScore = maxFloat(result.RiskScore, 0.45)
 			}
 		}
+	}
+
+	// Combine rule-based signals into the risk score. Each signal alone is
+	// only a floor; corroborating signals compound so blatant scams cross the
+	// scam threshold even when the LLM is unavailable.
+	manipulationSeverity := ""
+	if result.Manipulation != nil && result.Manipulation.IsManipulative {
+		manipulationSeverity = strings.ToLower(result.Manipulation.Severity)
+		switch manipulationSeverity {
+		case "high", "critical":
+			result.RiskScore = maxFloat(result.RiskScore, 0.5)
+		case "medium":
+			result.RiskScore = maxFloat(result.RiskScore, 0.35)
+		}
+	}
+	hasSuspiciousURL := false
+	if result.Entities != nil {
+		for _, url := range result.Entities.URLs {
+			if url.IsSuspicious {
+				hasSuspiciousURL = true
+				break
+			}
+		}
+	}
+	if hasSuspiciousURL && (manipulationSeverity == "high" || manipulationSeverity == "critical") {
+		// A deceptive link combined with high-severity psychological
+		// manipulation is the canonical phishing shape.
+		result.RiskScore = maxFloat(result.RiskScore, 0.8)
+	}
+	urgency := strings.ToLower(result.UrgencyLevel)
+	if (urgency == "high" || urgency == "critical") && result.RiskScore >= 0.35 {
+		result.RiskScore = minFloat(result.RiskScore+0.1, 0.95)
 	}
 
 	// LLM analysis for complex cases

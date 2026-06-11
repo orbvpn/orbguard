@@ -597,6 +597,12 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 	}
 
 	if status != http.StatusOK {
+		if strings.Contains(string(body), "content_filter") || strings.Contains(string(body), "ResponsibleAIPolicyViolation") {
+			// Azure's default Responsible-AI filter flags scam/phishing
+			// content being ANALYZED as if it were an attack prompt. This is
+			// a deployment-policy limitation, not a transient error.
+			return nil, fmt.Errorf("%s content filter blocked the analysis prompt (deployment policy; request a Responsible-AI filter exemption for security-analysis use cases or switch llm_provider): %d: %s", providerName, status, string(body))
+		}
 		return nil, fmt.Errorf("%s API error %d: %s", providerName, status, string(body))
 	}
 
