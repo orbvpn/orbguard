@@ -35,10 +35,13 @@ type LLMClient struct {
 	llmDisabledUntil     time.Time
 }
 
-// contentFilterStrikeLimit and contentFilterCooldown govern the breaker.
+// contentFilterStrikeLimit and contentFilterCooldown govern the breaker. The
+// cooldown is short so the LLM path self-heals quickly after a transient
+// slowdown or a deploy; a persistent block (e.g. a content-filter policy) just
+// re-trips it on the next batch of requests.
 const (
 	contentFilterStrikeLimit = 3
-	contentFilterCooldown    = 30 * time.Minute
+	contentFilterCooldown    = 3 * time.Minute
 )
 
 // ErrLLMTemporarilyDisabled is returned while the content-filter breaker is open.
