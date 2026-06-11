@@ -177,3 +177,19 @@ Needs-user (unchanged): rotate HIBP/LeakCheck/IntelX keys; set server env keys (
 - Language detector occasionally misflags short English text (one phishing explanation returned in Portuguese) — minor polish
 - Anti-theft commands polled (no FCM push) — execute on next poll/app-open
 - Store-signed release builds (APK/IPA) + on-device human click-through before submission
+
+## Wave 10 + final gap closure (2026-06-11) — COMPLETE & DEPLOYED (revision 0000057, DB v22)
+- [x] GAP 1 DNS resolver-IP (NAT) — FIXED: canary moved from ACI to an Azure VM (orbguard-dnscanary-vm, 20.74.237.218, uaenorth) with a direct public IP + host networking. Now logs REAL resolver egress IPs (verified live: 8.8.8.8->172.217.x, 1.1.1.1->162.158.x). Cloudflare glue ns1.dnscheck repointed to VM; old ACI deleted; systemd-resolved stub disabled to free :53; container restart=always. SSH locked to admin IP.
+- [x] GAP 2 language detector — FIXED: whole-word stop-word matching + min-length(25)/margin(2) thresholds; short/ambiguous text defaults to English; scam prompt explains in English unless content is clearly non-English. Verified live: English phishing now gets an English explanation. Real pt/es/fa still localized. 6 tests.
+- [x] GAP 3 anti-theft push — BACKEND COMPLETE + DEPLOYED, APP build-safe ready-to-activate: FCM HTTP v1 sender (config-gated no-op without creds), device_push_tokens (migration 022), POST /device/{id}/push-token (live, 200), command creation fires 'command_pending' push. App: DevicePushService (token registration works now; Firebase code guarded behind kFirebaseEnabled=false so app still builds — flutter build apk verified). docs/FCM_SETUP.md has exact activation steps.
+
+### Anti-theft push ACTIVATION (needs user credentials — cannot be done autonomously)
+1. Create Firebase project, register Android app com.orb.guard, download google-services.json -> android/app/.
+2. Add firebase_core+firebase_messaging deps + gms gradle plugin; flip kFirebaseEnabled=true + uncomment marked blocks in push_service.dart (see docs/FCM_SETUP.md).
+3. iOS: needs an APNs .p8 auth key from the Apple Developer account (only owner has it) + real bundle id (currently placeholder com.example.orbguard). Until then iOS uses polling (already works).
+4. Backend: set ORBGUARD_FCM_PROJECT_ID + ORBGUARD_FCM_SERVICE_ACCOUNT_JSON env (migration 022 already applied to prod). Then Android commands deliver in real time.
+NOTE: I attempted to auto-provision a Firebase project (gcloud) but the Google account's org/quota policy blocked it (USER_PROJECT_DENIED); the half-made project was deleted. The console step above takes ~5 min.
+
+### Scam LLM = Azure OpenAI (your tenant): GPT-5.2 deployment 'orbguard-scam', billed to Microsoft Azure Sponsorship sub. Not a third party.
+
+### Only remaining item: store-signed release builds (APK/IPA) + on-device human click-through before submission (per your instruction, excluded).
