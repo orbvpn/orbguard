@@ -150,6 +150,7 @@ class NotificationService {
 
   /// Show threat notification
   Future<void> showThreatNotification(ThreatEvent event) async {
+    if (!_initialized) await init();
     if (!_enabled) return;
     if (!_enabledSeverities.contains(event.severity)) return;
 
@@ -219,6 +220,7 @@ class NotificationService {
     required String breachId,
     SeverityLevel severity = SeverityLevel.high,
   }) async {
+    if (!_initialized) await init();
     if (!_enabled) return;
 
     final channel = NotificationChannels.breach;
@@ -279,6 +281,7 @@ class NotificationService {
     required int threatsFound,
     required int duration,
   }) async {
+    if (!_initialized) await init();
     if (!_enabled) return;
 
     final channel = threatsFound > 0
@@ -334,6 +337,7 @@ class NotificationService {
     required String threatType,
     required SeverityLevel severity,
   }) async {
+    if (!_initialized) await init();
     if (!_enabled) return;
     if (!_enabledSeverities.contains(severity)) return;
 
@@ -395,6 +399,7 @@ class NotificationService {
     required String reason,
     required SeverityLevel severity,
   }) async {
+    if (!_initialized) await init();
     if (!_enabled) return;
 
     final channel = NotificationChannels.urlBlocked;
@@ -447,6 +452,10 @@ class NotificationService {
     NotificationChannel? channel,
   }) async {
     if (!_enabled) return;
+    // Ensure the plugin + Android channels are initialized; init() is
+    // idempotent. Without this, calling show() before init throws a native
+    // NPE because the channel/plugin state isn't set up.
+    if (!_initialized) await init();
 
     final notifChannel = channel ?? NotificationChannels.general;
     final id = _getNextNotificationId();

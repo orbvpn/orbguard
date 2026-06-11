@@ -18,7 +18,9 @@ class ThreatIntelligenceAPI {
   final Dio _dio;
   final String baseUrl;
 
-  // You can use your own API or public threat intelligence feeds
+  // Auth-token key shared with AuthInterceptor (lib/services/api/api_interceptors.dart).
+  static const String _authTokenKey = 'orbguard_auth_token';
+
   ThreatIntelligenceAPI({String? apiUrl, String? apiKey})
     : baseUrl = apiUrl ?? 'https://api.yourdomain.com/threat-intelligence',
       _dio = Dio(
@@ -27,10 +29,30 @@ class ThreatIntelligenceAPI {
           receiveTimeout: const Duration(seconds: 30),
           headers: {
             'Content-Type': 'application/json',
-            if (apiKey != null) 'Authorization': 'Bearer $apiKey',
+            if (apiKey != null && apiKey.isNotEmpty)
+              'Authorization': 'Bearer $apiKey',
           },
         ),
-      );
+      ) {
+    // The intelligence endpoints require device auth. Attach the same bearer
+    // token AuthInterceptor uses (persisted by OrbGuardApiClient on device
+    // registration) so these fetches don't 401 at startup when no explicit
+    // apiKey is supplied. Reads the token per-request so it stays current.
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (options.headers['Authorization'] == null) {
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString(_authTokenKey);
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          }
+          handler.next(options);
+        },
+      ),
+    );
+  }
 
   /// Fetch latest indicators of compromise from multiple sources
   Future<ThreatIntelligenceData> fetchLatestIoCs() async {
