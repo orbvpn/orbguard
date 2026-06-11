@@ -81,6 +81,7 @@ import 'services/api/api_config.dart';
 
 // On-device scan engine
 import 'services/security/device_scan_service.dart';
+import 'services/device_agent/app_lock.dart';
 
 // Global instances
 late ThreatIntelligenceManager threatIntel;
@@ -173,7 +174,7 @@ class AntiSpywareApp extends StatelessWidget {
         builder: (context, child) {
           return GlassGradientBackground(
             isDark: true,
-            child: child ?? const SizedBox.shrink(),
+            child: AppLockGate(child: child ?? const SizedBox.shrink()),
           );
         },
         home: const HomeScreen(),

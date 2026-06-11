@@ -8,12 +8,18 @@
 /// stores the field verbatim) with a SHA-256 hash in image_hash so the
 /// stored image is integrity-verifiable.
 ///
-/// SCOPE NOTE (honest): this app has no app-lock / failed-unlock screen, and
-/// third-party apps cannot hook the OS lock screen's failed-attempt events
-/// without a DeviceAdminReceiver (native work owned by the platform-channel
-/// stream). Selfie capture is therefore COMMAND-TRIGGERED ONLY. If an
-/// app-lock feature lands later, call [captureAndUpload] with
-/// triggerType 'wrong_pin' from its failure handler.
+/// SCOPE NOTE (honest): third-party apps cannot hook the OPERATING-SYSTEM lock
+/// screen's failed-attempt events — on iOS there is no DeviceAdminReceiver
+/// equivalent at all, and on Android the OEM "wrong passcode -> selfie" flow is
+/// not exposed to apps. There are therefore exactly two real triggers:
+///   1. The remote 'take_selfie' command (device_agent.dart), which on iOS is
+///      delivered by HTTP polling — so it runs on the next foreground poll, not
+///      instantly (the app has no push channel for commands; see latency note
+///      in device_agent.dart's take_selfie handler).
+///   2. The IN-APP biometric app-lock (app_lock.dart): N failed unlock attempts
+///      of OrbGuard's own lock call [captureAndUpload] with triggerType
+///      'wrong_pin'. This is the platform-supported "best extent" of the
+///      feature within the app sandbox.
 
 import 'dart:convert';
 import 'dart:developer' as developer;

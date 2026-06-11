@@ -345,6 +345,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
   }
 
   Widget _buildAlertsTab() {
+    final criticalCount = _alerts
+        .where((a) => a.severity.toLowerCase() == 'critical')
+        .length;
+    final forwardedCount = _alerts.where((a) => a.forwarded).length;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -353,16 +358,17 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             _buildStatCard('Total', '${_alerts.length}', GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Critical', _alerts.where((a) => a.severity == 'Critical').length.toString(), GlassTheme.errorColor),
+            _buildStatCard('Critical', '$criticalCount', GlassTheme.errorColor),
             const SizedBox(width: 12),
-            _buildStatCard('Active', _alerts.where((a) => !a.isAcknowledged).length.toString(), GlassTheme.warningColor),
+            _buildStatCard('Forwarded', '$forwardedCount', GlassTheme.successColor),
           ],
         ),
         const SizedBox(height: 24),
 
         const GlassSectionHeader(title: 'SIEM Alerts'),
         if (_alerts.isEmpty)
-          _buildEmptyState('No Alerts', 'SIEM alerts will appear here')
+          _buildEmptyState('No Alerts',
+              'No security events have flowed through the SIEM event path yet')
         else
           ..._alerts.map((alert) => _buildAlertCard(alert)),
       ],
@@ -385,34 +391,71 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         severityColor = GlassTheme.successColor;
     }
 
+    final String forwardLabel;
+    final Color forwardColor;
+    if (alert.forwarded) {
+      forwardLabel = 'Forwarded';
+      forwardColor = GlassTheme.successColor;
+    } else if (alert.forwardError != null) {
+      forwardLabel = 'Failed';
+      forwardColor = GlassTheme.errorColor;
+    } else {
+      forwardLabel = 'Pending';
+      forwardColor = GlassTheme.warningColor;
+    }
+
     return GlassCard(
-      tintColor: alert.isAcknowledged ? null : severityColor,
-      child: Row(
+      tintColor: alert.forwardError != null ? severityColor : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GlassSvgIconBox(icon: 'bell_bing', color: severityColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(alert.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                Text(alert.source, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
-                const SizedBox(height: 4),
-                Text(alert.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              GlassBadge(text: alert.severity, color: severityColor, fontSize: 10),
-              const SizedBox(height: 4),
-              Text(_formatTime(alert.timestamp), style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+              GlassSvgIconBox(icon: 'bell_bing', color: severityColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(alert.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    if (alert.source.isNotEmpty)
+                      Text(alert.source, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    if (alert.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(alert.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  GlassBadge(text: _capitalize(alert.severity), color: severityColor, fontSize: 10),
+                  const SizedBox(height: 4),
+                  GlassBadge(text: forwardLabel, color: forwardColor, fontSize: 10),
+                  const SizedBox(height: 4),
+                  Text(_formatTime(alert.createdAt), style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                ],
+              ),
             ],
           ),
+          if (alert.forwardError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Forward error: ${alert.forwardError}',
+              style: TextStyle(color: GlassTheme.errorColor.withAlpha(204), fontSize: 11),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1);
   }
 
   Widget _buildEmptyState(String title, String subtitle) {
@@ -658,36 +701,47 @@ class EventForwarder {
   }
 }
 
+/// A persisted SIEM alert from GET /siem/alerts. Mirrors the server shape
+/// exactly: {id, integration_id, severity, title, description, source,
+/// created_at, forwarded, forward_error}.
 class SiemAlert {
   final String id;
+  final String? integrationId;
+  final String severity;
   final String title;
   final String description;
   final String source;
-  final String severity;
-  final DateTime timestamp;
-  bool isAcknowledged;
+  final DateTime createdAt;
+  final bool forwarded;
+  final String? forwardError;
 
   SiemAlert({
     required this.id,
+    required this.integrationId,
+    required this.severity,
     required this.title,
     required this.description,
     required this.source,
-    required this.severity,
-    required this.timestamp,
-    required this.isAcknowledged,
+    required this.createdAt,
+    required this.forwarded,
+    required this.forwardError,
   });
 
   factory SiemAlert.fromJson(Map<String, dynamic> json) {
+    final forwardError = json['forward_error']?.toString();
     return SiemAlert(
       id: json['id']?.toString() ?? '',
+      integrationId: json['integration_id']?.toString(),
+      severity: json['severity'] as String? ?? 'info',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       source: json['source'] as String? ?? '',
-      severity: json['severity'] as String? ?? 'Low',
-      timestamp: json['timestamp'] != null
-          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      isAcknowledged: json['is_acknowledged'] as bool? ?? json['isAcknowledged'] as bool? ?? false,
+      forwarded: json['forwarded'] as bool? ?? false,
+      forwardError:
+          (forwardError == null || forwardError.isEmpty) ? null : forwardError,
     );
   }
 }

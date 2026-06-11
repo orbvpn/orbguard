@@ -1719,10 +1719,24 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Get SIEM alerts
-  Future<List<Map<String, dynamic>>> getSiemAlerts() async {
+  /// Get the persisted SIEM alert feed.
+  ///
+  /// The server returns `{alerts: [{id, integration_id, severity, title,
+  /// description, source, created_at, forwarded, forward_error}], count}`.
+  /// Supports optional [limit] (server default 100, max 500) and [severity]
+  /// filters.
+  Future<List<Map<String, dynamic>>> getSiemAlerts({
+    int? limit,
+    String? severity,
+  }) async {
     try {
-      final response = await _dio.get(ApiEndpoints.siemAlerts);
+      final response = await _dio.get(
+        ApiEndpoints.siemAlerts,
+        queryParameters: {
+          if (limit != null) 'limit': limit,
+          if (severity != null && severity.isNotEmpty) 'severity': severity,
+        },
+      );
       return (response.data['alerts'] as List<dynamic>?)
           ?.cast<Map<String, dynamic>>() ?? [];
     } on DioException catch (e) {

@@ -32,5 +32,7 @@
 	<string>Location access is required by macOS to read WiFi network names (SSID/BSSID) for network security analysis.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Location access is required by macOS to read WiFi network names (SSID/BSSID) for network security analysis.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Required for thief selfie capture in anti-theft mode.</string>
 </dict>
 </plist>

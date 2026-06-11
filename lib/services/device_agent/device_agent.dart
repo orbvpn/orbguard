@@ -490,9 +490,17 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
 
         case 'take_selfie':
           if (!foreground) {
-            // Camera capture needs the app process in the foreground;
-            // leave the command pending so the next foreground poll runs it
+            // Camera capture needs the app process in the foreground; leave
+            // the command pending so the next foreground poll runs it
             // (commands expire server-side if that never happens).
+            //
+            // LATENCY (honest): this client has NO push channel for commands
+            // — they are HTTP-polled (60s foreground timer + poll-on-resume;
+            // Android adds a 15-min WorkManager cycle, iOS has no background
+            // scheduling here). So a remote selfie is captured the next time
+            // the app is foregrounded, NOT instantly. The genuinely prompt
+            // path on iOS is the in-app biometric lock (app_lock.dart), whose
+            // failed-unlock attempts capture a selfie while the app is open.
             outcome = 'deferred';
             detail = 'selfie deferred to next foreground poll '
                 '(camera unavailable in background isolate)';

@@ -51,6 +51,10 @@ dependencies:
   audioplayers: ^6.1.0
   sim_card_info: ^1.0.2
   url_launcher: ^6.3.0
+  # Biometric app-lock — failed unlock attempts trigger a thief selfie.
+  # On iOS this is the platform-supported "best extent" for the selfie
+  # feature (the OS lock screen exposes no failed-attempt hooks to apps).
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
