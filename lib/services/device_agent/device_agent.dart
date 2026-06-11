@@ -1,26 +1,26 @@
-/// Device Agent — the on-device anti-theft executor.
-///
-/// Responsibilities (Wave 5, W5.3):
-///  * Periodic + on-demand location reporting (geolocator) honoring the
-///    user's enable_remote_locate setting, battery-conscious via
-///    significant-change filtering and a configurable interval.
-///  * Remote-command polling (GET /device/{id}/commands/pending) on a
-///    foreground timer and on app resume, with honest execution + ack
-///    (POST /device/{id}/commands/{command_id}/ack) for every supported
-///    command. Commands that need privileges this app does not hold are
-///    acked FAILED with the true reason — never silently "executed".
-///  * SIM-change monitoring and reporting (POST /device/{id}/sim).
-///  * Thief-selfie capture on the take_selfie command
-///    (POST /device/{id}/selfie).
-///
-/// BACKGROUND EXECUTION (documented limitation): a Dart foreground timer
-/// dies with the app. True background polling uses the workmanager plugin:
-/// on Android a 15-minute periodic task is registered (WorkManager's
-/// platform minimum) running [deviceAgentBackgroundDispatcher] in a
-/// headless isolate. On iOS, BGTaskScheduler registration requires native
-/// AppDelegate/Info.plist wiring owned by the platform-channel stream, so
-/// background polling is reported as unavailable there — foreground timer +
-/// resume polling still work.
+// Device Agent — the on-device anti-theft executor.
+//
+// Responsibilities (Wave 5, W5.3):
+//  * Periodic + on-demand location reporting (geolocator) honoring the
+//    user's enable_remote_locate setting, battery-conscious via
+//    significant-change filtering and a configurable interval.
+//  * Remote-command polling (GET /device/{id}/commands/pending) on a
+//    foreground timer and on app resume, with honest execution + ack
+//    (POST /device/{id}/commands/{command_id}/ack) for every supported
+//    command. Commands that need privileges this app does not hold are
+//    acked FAILED with the true reason — never silently "executed".
+//  * SIM-change monitoring and reporting (POST /device/{id}/sim).
+//  * Thief-selfie capture on the take_selfie command
+//    (POST /device/{id}/selfie).
+//
+// BACKGROUND EXECUTION (documented limitation): a Dart foreground timer
+// dies with the app. True background polling uses the workmanager plugin:
+// on Android a 15-minute periodic task is registered (WorkManager's
+// platform minimum) running [deviceAgentBackgroundDispatcher] in a
+// headless isolate. On iOS, BGTaskScheduler registration requires native
+// AppDelegate/Info.plist wiring owned by the platform-channel stream, so
+// background polling is reported as unavailable there — foreground timer +
+// resume polling still work.
 
 import 'dart:async';
 import 'dart:convert';

@@ -17,8 +17,8 @@ library;
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:OrbGuard/models/api/threat_indicator.dart';
-import 'package:OrbGuard/models/api/url_reputation.dart';
+import 'package:orbguard/models/api/threat_indicator.dart';
+import 'package:orbguard/models/api/url_reputation.dart';
 
 /// A phishing hit from the threat-intel database.
 const _phishingCheckJson = '''

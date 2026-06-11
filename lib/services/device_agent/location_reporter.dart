@@ -1,13 +1,13 @@
-/// Location Reporter
-/// Reads real GPS fixes via geolocator and converts them to the exact
-/// models.Location JSON shape the backend persists
-/// (POST /api/v1/device/{device_id}/location):
-///   { latitude, longitude, accuracy_meters, altitude, speed, bearing,
-///     provider, timestamp }
-///
-/// When location genuinely cannot be obtained (permission denied, services
-/// off, timeout with no cached fix) an explicit unavailable result with the
-/// reason is returned — never a fabricated coordinate.
+// Location Reporter
+// Reads real GPS fixes via geolocator and converts them to the exact
+// models.Location JSON shape the backend persists
+// (POST /api/v1/device/{device_id}/location):
+//   { latitude, longitude, accuracy_meters, altitude, speed, bearing,
+//     provider, timestamp }
+//
+// When location genuinely cannot be obtained (permission denied, services
+// off, timeout with no cached fix) an explicit unavailable result with the
+// reason is returned — never a fabricated coordinate.
 
 import 'dart:async';
 import 'dart:developer' as developer;

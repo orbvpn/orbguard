@@ -1,19 +1,19 @@
-/// Device Agent API
-/// Thin, contract-exact wrapper over [OrbGuardApiClient]'s generic HTTP
-/// helpers for the device-agent endpoints that have no dedicated client
-/// method yet (see notes in Wave 5 handoff):
-///
-///   GET  /api/v1/device/{device_id}/commands/pending
-///   POST /api/v1/device/{device_id}/commands/{command_id}/ack
-///   POST /api/v1/device/{device_id}/location
-///   POST /api/v1/device/{device_id}/sim
-///   GET  /api/v1/device/{device_id}/sim
-///   POST /api/v1/device/{device_id}/selfie
-///   GET  /api/v1/device/{device_id}/selfies
-///   GET  /api/v1/device/{device_id}/settings
-///
-/// Shapes mirror orbguard.lab internal/api/handlers/device_security.go and
-/// internal/domain/models/device_security.go exactly.
+// Device Agent API
+// Thin, contract-exact wrapper over [OrbGuardApiClient]'s generic HTTP
+// helpers for the device-agent endpoints that have no dedicated client
+// method yet (see notes in Wave 5 handoff):
+//
+//   GET  /api/v1/device/{device_id}/commands/pending
+//   POST /api/v1/device/{device_id}/commands/{command_id}/ack
+//   POST /api/v1/device/{device_id}/location
+//   POST /api/v1/device/{device_id}/sim
+//   GET  /api/v1/device/{device_id}/sim
+//   POST /api/v1/device/{device_id}/selfie
+//   GET  /api/v1/device/{device_id}/selfies
+//   GET  /api/v1/device/{device_id}/settings
+//
+// Shapes mirror orbguard.lab internal/api/handlers/device_security.go and
+// internal/domain/models/device_security.go exactly.
 
 import '../api/api_config.dart';
 import '../api/orbguard_api_client.dart';

@@ -1813,6 +1813,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 children: [
                   Text(
                     item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -1821,6 +1823,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   const SizedBox(height: 4),
                   Text(
                     item.type,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withAlpha(179),
                       fontSize: 12,

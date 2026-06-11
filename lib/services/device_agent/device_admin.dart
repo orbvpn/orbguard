@@ -1,10 +1,10 @@
-/// Device Admin Bridge
-/// Lock and wipe remote commands need OS device-administrator privileges
-/// (Android DevicePolicyManager / iOS MDM). The native side of that wiring
-/// is owned by the platform-channel work stream — this bridge only *talks*
-/// to it over a MethodChannel and reports an explicit, honest unavailable
-/// state when the native handler is not present or the privilege has not
-/// been granted. It never fakes success.
+// Device Admin Bridge
+// Lock and wipe remote commands need OS device-administrator privileges
+// (Android DevicePolicyManager / iOS MDM). The native side of that wiring
+// is owned by the platform-channel work stream — this bridge only *talks*
+// to it over a MethodChannel and reports an explicit, honest unavailable
+// state when the native handler is not present or the privilege has not
+// been granted. It never fakes success.
 
 import 'dart:developer' as developer;
 import 'dart:io';

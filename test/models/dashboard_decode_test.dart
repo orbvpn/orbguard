@@ -17,8 +17,8 @@ library;
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:OrbGuard/models/api/threat_indicator.dart';
-import 'package:OrbGuard/models/api/threat_stats.dart';
+import 'package:orbguard/models/api/threat_indicator.dart';
+import 'package:orbguard/models/api/threat_stats.dart';
 
 /// Full payload for a device-authenticated request with every section
 /// present. Values follow the backend's computation rules:

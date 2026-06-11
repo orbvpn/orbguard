@@ -1,9 +1,9 @@
-/// Device Ringer
-/// Plays a loud warble alarm in response to a remote "ring" command. The
-/// tone is synthesized in-memory as a 16-bit mono WAV (no bundled asset
-/// required) and looped at full player volume through the Android ALARM
-/// audio usage / iOS playback category so it sounds even when media volume
-/// behaviors differ.
+// Device Ringer
+// Plays a loud warble alarm in response to a remote "ring" command. The
+// tone is synthesized in-memory as a 16-bit mono WAV (no bundled asset
+// required) and looped at full player volume through the Android ALARM
+// audio usage / iOS playback category so it sounds even when media volume
+// behaviors differ.
 
 import 'dart:async';
 import 'dart:developer' as developer;

@@ -1,5 +1,5 @@
-/// Settings Screen
-/// Main settings and configuration screen
+// Settings Screen
+// Main settings and configuration screen
 
 import 'dart:io';
 
@@ -487,7 +487,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: isWarning ? Colors.orange : const Color(0xFF00D9FF),
+        activeThumbColor: isWarning ? Colors.orange : const Color(0xFF00D9FF),
       ),
     );
   }
@@ -656,7 +656,7 @@ class NotificationSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -868,7 +868,7 @@ class PrivacySettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1033,7 +1033,7 @@ class ScanSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1168,7 +1168,7 @@ class VpnSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1437,7 +1437,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1614,7 +1614,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
         subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }

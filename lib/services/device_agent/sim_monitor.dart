@@ -1,18 +1,18 @@
-/// SIM Monitor
-/// Reads the active SIM subscriptions (Android only — iOS does not expose
-/// SIM identity to third-party apps at all; CTCarrier has returned dummy
-/// values since iOS 16) and reports them to the backend in the
-/// models.SIMInfo shape (POST /api/v1/device/{device_id}/sim takes a JSON
-/// array).
-///
-/// HONESTY NOTE ON ICCID: since Android 10, SubscriptionInfo.getIccId()
-/// requires READ_PRIVILEGED_PHONE_STATE, which is not grantable to normal
-/// apps. The real ICCID is therefore *unavailable* to this client. For SIM
-/// *change detection* — the actual purpose of this feature — we send a
-/// stable subscription fingerprint in the "iccid" field with an explicit
-/// "sub:" prefix so it can never be mistaken for a real ICCID. The backend
-/// compares the field for equality, so change/swap detection works exactly
-/// the same.
+// SIM Monitor
+// Reads the active SIM subscriptions (Android only — iOS does not expose
+// SIM identity to third-party apps at all; CTCarrier has returned dummy
+// values since iOS 16) and reports them to the backend in the
+// models.SIMInfo shape (POST /api/v1/device/{device_id}/sim takes a JSON
+// array).
+//
+// HONESTY NOTE ON ICCID: since Android 10, SubscriptionInfo.getIccId()
+// requires READ_PRIVILEGED_PHONE_STATE, which is not grantable to normal
+// apps. The real ICCID is therefore *unavailable* to this client. For SIM
+// *change detection* — the actual purpose of this feature — we send a
+// stable subscription fingerprint in the "iccid" field with an explicit
+// "sub:" prefix so it can never be mistaken for a real ICCID. The backend
+// compares the field for equality, so change/swap detection works exactly
+// the same.
 
 import 'dart:developer' as developer;
 import 'dart:io';

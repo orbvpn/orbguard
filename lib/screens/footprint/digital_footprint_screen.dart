@@ -1,5 +1,5 @@
-/// Digital Footprint Screen
-/// Data broker removal and personal data exposure tracking interface
+// Digital Footprint Screen
+// Data broker removal and personal data exposure tracking interface
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -112,7 +112,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           const SizedBox(height: 8),
           Text(
             'Enter your information to find where your data is being sold',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
           ),
           const SizedBox(height: 16),
 
@@ -187,7 +187,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
             const SizedBox(height: 8),
             Text(
               'Scanning ${(provider.scanProgress * 100).toInt()}%...',
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -262,7 +262,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                       : score >= 50
                           ? 'Your data is moderately exposed'
                           : 'Your data is highly exposed',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                 ),
               ],
             ),
@@ -283,7 +283,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
+            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
           ],
         ),
       ),
@@ -302,7 +302,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
         ),
         const SizedBox(height: 6),
         GlassContainer(
@@ -313,7 +313,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
               prefixIcon: Padding(
                 padding: const EdgeInsets.all(12),
                 child: DuotoneIcon(svgIcon, size: 20, color: Colors.white54),
@@ -384,7 +384,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                     ),
                     Text(
                       broker.website,
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                     ),
                   ],
                 ),
@@ -423,7 +423,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: GlassTheme.errorColor.withOpacity(0.2),
+                    color: GlassTheme.errorColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -443,7 +443,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -515,7 +515,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 ),
                 Text(
                   '${request.daysPending} days pending',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                 ),
               ],
             ),
@@ -535,7 +535,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
+          DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -544,7 +544,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -646,7 +646,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 const SizedBox(height: 20),
                 Text(
                   broker.description!,
-                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                 ),
               ],
               const SizedBox(height: 20),
@@ -715,7 +715,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.6))),
           Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
         ],
       ),

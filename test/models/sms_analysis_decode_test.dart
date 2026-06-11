@@ -20,8 +20,8 @@ library;
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:OrbGuard/models/api/sms_analysis.dart';
-import 'package:OrbGuard/models/api/threat_indicator.dart';
+import 'package:orbguard/models/api/sms_analysis.dart';
+import 'package:orbguard/models/api/threat_indicator.dart';
 
 /// A smishing detection with every section the analyzer can emit.
 const _threatAnalysisJson = '''
