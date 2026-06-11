@@ -138,3 +138,19 @@ ALL 78 ITEMS COMPLETE. Final gate: go build/vet/test clean; flutter analyze 0 er
 Documented non-critical remainders (file:line in audit raw): /siem/alerts alias returns stats (honest empty tab); admin.go report approve/reject TODO persistence (route unused by app); YARA parse/submit stubs (routes unused by app); inert placeholder IOC hashes (cannot match real files); MDM/SIEM configs in-memory; a few dead-but-honest unrouted services.
 
 Needs-user (unchanged): rotate HIBP/LeakCheck/IntelX keys; set server env keys (ANTHROPIC/OPENAI, GOOGLE_SAFE_BROWSING, VIRUSTOTAL, ORBGUARD_ADMIN_TOKEN); run goose migrations 005-018 on production DB before deploy.
+
+## Wave 8 + Production Deployment (2026-06-11) — COMPLETE
+- [x] W8.1 Real SIEM alert feed (migration 019, persisted per-integration with forward outcomes; GET /siem/alerts real; APP alerts tab consumes it)
+- [x] W8.2 MDM/SIEM integration configs persisted (enterprise_integrations table, load at boot, write-only credentials)
+- [x] W8.3 Admin report review real (threat_reports status transitions; approval promotes indicator source=community)
+- [x] W8.4 YARA: real parse validation via live engine; validated submissions persisted (migration 020) + admin review + dynamic engine load; parser hex-string bug fixed
+- [x] W8.5 LLM providers: deepseek + azure-openai (shared OpenAI-compatible path, 10 httptest tests); provider-aware max_completion_tokens; adaptive unsupported_parameter retry; content-filter + timeout circuit breaker (30min cooldown); 12s per-call budget; parallel intent/entity analysis
+- [x] W8.6 Scam rule-based scoring: suspicious URLs/crypto/manipulation/urgency now drive risk score (phishing => is_scam critical 0.9 even without LLM; verified live)
+- [x] W8.7 iOS thief-selfie best extent: biometric app-lock (AppLockGate) with 3-failed-attempts selfie; wired at app root; macOS camera entitlements
+- [x] W8.8 CI gates: LAB deploy.yml test job (go vet/test) gating deploy; APP ci.yml (analyze errors-only + tests + conditional contract gate)
+- [x] DEPLOY: prod DB migrated 001-020 (goose; 1.1M indicators preserved; legacy schema drift reconciled); env vars set (admin token, HIBP/LeakCheck/IntelX, scam detector azure-openai); image built (az acr build) + deployed (revision orbguard-lab--0000051); live smoke tests green (health, auth enforcement, device registration->token lifecycle, SIEM feed, scam verdicts phishing-critical/benign-clean)
+
+### Production notes
+- ORBGUARD_ADMIN_TOKEN value: orbguard.lab/.env.production.local (gitignored)
+- Azure OpenAI content filter blocks scam-content prompts (jailbreak detection); circuit breaker keeps requests fast on rule-based path. To enable LLM verdicts: request Microsoft Responsible-AI filter exemption for security-analysis use case, OR set ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER=deepseek + ORBGUARD_DEEPSEEK_API_KEY (cheap, no filter; data goes to China-based provider), OR use Claude (ORBGUARD_CLAUDE_API_KEY).
+- External feed maintenance (pre-existing): GreyNoise v2 endpoint deprecated (410), Koodous/AbuseIPDB rate-limited on free tier.
