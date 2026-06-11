@@ -129,15 +129,20 @@ func DefaultModelForProvider(provider string) string {
 // NewLLMClient creates a new LLM client
 func NewLLMClient(cfg LLMConfig, log *logger.Logger) *LLMClient {
 	if cfg.Timeout == 0 {
-		// Scam analysis runs up to three LLM calls per request behind an
-		// ingress that resets slow responses; keep individual calls short.
-		cfg.Timeout = 12 * time.Second
+		// Scam analysis runs intent + entity (parallel) plus an optional deep
+		// pass per request behind an ingress that resets slow responses. The
+		// budget must cover a cross-region hop plus generation; paired with the
+		// capped MaxTokens below this keeps interactive requests responsive.
+		cfg.Timeout = 18 * time.Second
 	}
 	if cfg.Temperature == 0 {
 		cfg.Temperature = 0.3 // Low temperature for factual analysis
 	}
 	if cfg.MaxTokens == 0 {
-		cfg.MaxTokens = 4096
+		// Scam analyses return compact structured JSON; a large ceiling only
+		// lets a verbose model run long enough to blow the timeout. 1024 tokens
+		// comfortably holds every analysis schema while keeping latency low.
+		cfg.MaxTokens = 1024
 	}
 	if cfg.AzureOpenAIAPIVersion == "" {
 		cfg.AzureOpenAIAPIVersion = "2024-02-15-preview"
