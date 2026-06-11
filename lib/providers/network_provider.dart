@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +134,49 @@ class DnsCanaryResolution {
   bool get succeeded => lookupError == null && resolvedIps.isNotEmpty;
 }
 
+/// What the backend's authoritative canary DNS server observed for the leak
+/// check token this device resolved: the egress IP of whichever recursive
+/// resolver actually performed the device's lookup.
+class DnsLeakObservation {
+  /// Source IP of the first canary query seen at the authoritative server.
+  final String observedResolverIp;
+
+  /// Every distinct resolver egress IP observed for the token.
+  final List<String> observedResolverIps;
+
+  /// True when an observed IP exactly equals the device's configured
+  /// resolver. Public resolvers (1.1.1.1, 8.8.8.8) legitimately egress from
+  /// provider ranges that differ from their anycast address, so `false` is
+  /// informational, not proof of a leak by itself.
+  final bool matchesConfiguredResolver;
+
+  /// ASN of the observed resolver, when the backend recorded one.
+  final int? resolverAsn;
+
+  DnsLeakObservation({
+    required this.observedResolverIp,
+    required this.observedResolverIps,
+    required this.matchesConfiguredResolver,
+    this.resolverAsn,
+  });
+
+  static DnsLeakObservation? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final observed = json['observed_resolver_ip'] as String?;
+    if (observed == null || observed.isEmpty) return null;
+    return DnsLeakObservation(
+      observedResolverIp: observed,
+      observedResolverIps:
+          (json['observed_resolver_ips'] as List<dynamic>? ?? const [])
+              .map((e) => e.toString())
+              .toList(growable: false),
+      matchesConfiguredResolver:
+          json['matches_configured_resolver'] as bool? ?? false,
+      resolverAsn: (json['resolver_asn'] as num?)?.toInt(),
+    );
+  }
+}
+
 /// Result of a DNS security check (client-side canary resolution verified by
 /// the backend against known-good answer sets and threat intelligence).
 class DnsCheckResult {
@@ -146,10 +190,17 @@ class DnsCheckResult {
   /// "check never ran".
   final String hijackCheckStatus;
 
-  /// Backend status of the leak check. Leak detection requires a controlled
-  /// canary domain the backend can verify; none is deployed, so this is
-  /// always an explicit "unavailable: ..." status — never a fabricated result.
+  /// Backend status of the leak check. When the backend advertises a
+  /// controlled canary zone (GET /network/dns/leak-config) this device
+  /// resolves a random {token}.{zone} and the backend reports
+  /// "performed: ..." (query observed at its authoritative server) or
+  /// "not_observed: ...". When no canary zone is deployed the status stays
+  /// an explicit "unavailable: ..." — never a fabricated result.
   final String leakCheckStatus;
+
+  /// Authoritative-server observation when [leakCheckPerformed]; null
+  /// otherwise.
+  final DnsLeakObservation? leakObservation;
 
   final String? hijackDescription;
   final double? hijackConfidence;
@@ -167,6 +218,7 @@ class DnsCheckResult {
     this.providerName,
     required this.hijackCheckStatus,
     required this.leakCheckStatus,
+    this.leakObservation,
     this.hijackDescription,
     this.hijackConfidence,
     this.issues = const [],
@@ -177,6 +229,8 @@ class DnsCheckResult {
 
   bool get hijackCheckPerformed => hijackCheckStatus.startsWith('performed');
   bool get leakCheckUnavailable => leakCheckStatus.startsWith('unavailable');
+  bool get leakCheckPerformed => leakCheckStatus.startsWith('performed');
+  bool get leakCheckNotObserved => leakCheckStatus.startsWith('not_observed');
 }
 
 /// Network security stats. Every field is derived from real scan/check
@@ -455,11 +509,43 @@ class NetworkProvider extends ChangeNotifier {
   /// answer sets the backend can verify:
   ///   one.one.one.one -> 1.1.1.1 / 1.0.0.1 (+IPv6), operated by Cloudflare
   ///   dns.google      -> 8.8.8.8 / 8.8.4.4 (+IPv6), operated by Google
-  /// A randomized-subdomain LEAK canary would additionally require a domain
-  /// whose authoritative resolver logs the backend controls; none is
-  /// deployed, so the backend reports the leak check as explicitly
-  /// unavailable (surfaced via [DnsCheckResult.leakCheckStatus]).
   static const List<String> _dnsCanaries = ['one.one.one.one', 'dns.google'];
+
+  /// Controlled leak-check canary zone advertised by the backend
+  /// (GET /network/dns/leak-config). Cached for the provider's lifetime once
+  /// fetched successfully; null while unknown, '' when the backend reports
+  /// leak detection unavailable.
+  String? _leakCanaryZone;
+
+  /// Fetch (and cache) the leak-check canary zone. Failures are tolerated:
+  /// the DNS check still runs, with the leak check reported by the backend
+  /// as not performed.
+  Future<String?> _getLeakCanaryZone() async {
+    if (_leakCanaryZone != null) return _leakCanaryZone;
+    try {
+      final config = await _api.get<Map<String, dynamic>>(
+        ApiEndpoints.networkDnsLeakConfig,
+      );
+      final available = config['leak_check_available'] as bool? ?? false;
+      final zone = config['canary_zone'] as String? ?? '';
+      _leakCanaryZone = available ? zone : '';
+    } catch (e) {
+      // Leave null so the next check retries the fetch.
+      debugPrint('DNS check: leak canary config unavailable: $e');
+    }
+    final zone = _leakCanaryZone;
+    return (zone == null || zone.isEmpty) ? null : zone;
+  }
+
+  /// Generate a crypto-secure random leak canary token: 32 lowercase hex
+  /// characters (128 bits), a single valid DNS label.
+  static String _generateLeakCanaryToken() {
+    final rng = Random.secure();
+    const hex = '0123456789abcdef';
+    return String.fromCharCodes(
+      List.generate(32, (_) => hex.codeUnitAt(rng.nextInt(16))),
+    );
+  }
 
   /// Run a DNS hijack check: resolve canary domains through this device's
   /// LOCAL resolver and submit the answers to the backend, which compares
@@ -536,7 +622,30 @@ class NetworkProvider extends ChangeNotifier {
         return;
       }
 
-      // 3. Submit the client-side measurements for verification.
+      // 3. Real leak check: when the backend advertises a controlled canary
+      // zone, resolve a crypto-random {token}.{zone} through the LOCAL
+      // resolver. The answer does not matter and lookup failure is tolerated
+      // — what counts is which resolver IP contacts the backend's
+      // authoritative canary server for the token. The token is submitted
+      // either way: the absence of any query at the authoritative server is
+      // itself signal (surfaced as "not_observed").
+      String? leakCanaryToken;
+      final leakZone = await _getLeakCanaryZone();
+      if (leakZone != null) {
+        leakCanaryToken = _generateLeakCanaryToken();
+        try {
+          await InternetAddress.lookup('$leakCanaryToken.$leakZone')
+              .timeout(const Duration(seconds: 8));
+        } on SocketException catch (e) {
+          debugPrint(
+              'DNS check: leak canary lookup failed (token still submitted): ${e.message}');
+        } on TimeoutException {
+          debugPrint(
+              'DNS check: leak canary lookup timed out (token still submitted)');
+        }
+      }
+
+      // 4. Submit the client-side measurements for verification.
       final response = await _api.post<Map<String, dynamic>>(
         ApiEndpoints.networkDnsCheck,
         data: {
@@ -544,6 +653,7 @@ class NetworkProvider extends ChangeNotifier {
               resolverHint == null ? '' : resolverHint.split(',').first,
           'check_hijack': true,
           'check_leaks': true,
+          if (leakCanaryToken != null) 'leak_canary_token': leakCanaryToken,
           'client_resolutions': [
             for (final r in successful)
               {
@@ -555,7 +665,7 @@ class NetworkProvider extends ChangeNotifier {
         },
       );
 
-      // 4. Parse the verified result.
+      // 5. Parse the verified result.
       final issues = <String>[];
       for (final issue
           in (response['security_issues'] as List<dynamic>? ?? const [])) {
@@ -568,6 +678,13 @@ class NetworkProvider extends ChangeNotifier {
       final hijackDetails =
           response['hijack_details'] as Map<String, dynamic>?;
 
+      // The check response also advertises the canary zone; refresh the
+      // cache so a zone enabled after the leak-config fetch is picked up.
+      final advertisedZone = response['leak_canary_zone'] as String?;
+      if (advertisedZone != null && advertisedZone.isNotEmpty) {
+        _leakCanaryZone = advertisedZone;
+      }
+
       _dnsCheckResult = DnsCheckResult(
         isHijacked: response['is_hijacked'] as bool? ?? false,
         isSecure: response['is_secure'] as bool? ?? false,
@@ -576,6 +693,8 @@ class NetworkProvider extends ChangeNotifier {
         hijackCheckStatus:
             response['hijack_check_status'] as String? ?? 'unknown',
         leakCheckStatus: response['leak_check_status'] as String? ?? 'unknown',
+        leakObservation: DnsLeakObservation.fromJson(
+            response['leak_observation'] as Map<String, dynamic>?),
         hijackDescription: hijackDetails?['description'] as String?,
         hijackConfidence: (hijackDetails?['confidence'] as num?)?.toDouble(),
         issues: issues,

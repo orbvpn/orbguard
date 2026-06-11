@@ -203,6 +203,11 @@ class ApiEndpoints {
   /// POST /api/v1/network/dns/check
   static const String networkDnsCheck = '$_v1/network/dns/check';
 
+  /// DNS leak-check canary configuration
+  /// GET /api/v1/network/dns/leak-config
+  /// Response: { "leak_check_available": bool, "canary_zone": "..." }
+  static const String networkDnsLeakConfig = '$_v1/network/dns/leak-config';
+
   /// Get VPN recommendations
   /// POST /api/v1/network/vpn/recommend
   static const String networkVpnRecommend = '$_v1/network/vpn/recommend';
