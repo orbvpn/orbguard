@@ -23,14 +23,32 @@ Firebase project: **orb-guard** (project #568666805173). App id (both platforms)
 ### iOS (code/config complete)
 - Bundle id set to `com.orb.guard` (was placeholder); `GoogleService-Info.plist` added to the Runner target in Xcode; `aps-environment` entitlement + `remote-notification` background mode present.
 
-## REMAINING — iOS only (needs your Apple Developer account; no one else can do this)
-iOS push delivery needs an APNs key Apple only issues to the account owner:
-1. Apple Developer → Certificates, IDs & Profiles → Keys → **create an APNs Auth Key (.p8)**, note the Key ID + Team ID.
-2. Firebase console → Project **orb-guard** → Project Settings → Cloud Messaging → **Apple app config** → upload the `.p8` (with Key ID + Team ID).
-3. Ensure the App ID `com.orb.guard` has **Push Notifications** capability enabled (Xcode automatic signing does this on first build with the entitlement present).
-4. Build/run on a real iOS device (push doesn't work in the simulator).
+## REMAINING — iOS: one Console upload (≈60s)
 
-Until step 1–4, **iOS falls back to polling** (already implemented and working). Android is fully live.
+GOOD NEWS: you can reuse the **OrbVPN APNs Auth Key** — APNs `.p8` keys are TEAM-WIDE,
+and OrbVPN (`com.orb.vpn`) + OrbGuard (`com.orb.guard`) are on the **same Apple team `33T4RDL646`**
+(Orb Global Ltd). OrbVPN already uses FCM, so its APNs key relays push for OrbGuard too.
+
+The key is: **`~/Downloads/AuthKey_ZRV7WVGX9B.p8`**
+  - Key ID: **ZRV7WVGX9B**   (the other 4 `.p8` files in ~/.private_keys are App Store Connect API keys)
+  - Team ID: **33T4RDL646**
+  - (Verify in Apple Developer → Keys: the key whose service is "Apple Push Notifications service (APNs)".)
+
+Upload it to the OrbGuard Firebase project (Firebase has NO API for this — Console only):
+1. https://console.firebase.google.com → project **orb-guard** → ⚙ Project Settings → **Cloud Messaging** tab.
+2. Under **Apple app configuration** (app `com.orb.guard`) → **APNs Authentication Key** → **Upload**.
+3. Pick `AuthKey_ZRV7WVGX9B.p8`, enter Key ID `ZRV7WVGX9B` and Team ID `33T4RDL646`. Save.
+4. Confirm the App ID `com.orb.guard` has the **Push Notifications** capability (Apple Developer → Identifiers,
+   or Xcode automatic signing adds it on first build since the `aps-environment` entitlement is set).
+5. Build/run on a REAL iOS device (push never works in the simulator).
+
+That's it — after the upload, iOS gets real-time push. Until then iOS uses polling (already working).
+
+ALTERNATIVE (not needed): the provided `aps.cer` is an OrbGuard-specific push CERTIFICATE for
+`com.orb.guard`. Firebase also accepts a `.p12` (cert + private key), but the `.p8` above is the
+modern, non-expiring, team-wide method and is strictly better — use it.
+
+Android is fully live (token registers, commands wake the device).
 
 ## Verify it end-to-end (real device)
 Run the app on an Android device → it registers its FCM token (`push token registered` in backend logs).
