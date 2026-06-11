@@ -1,4 +1,8 @@
-# FCM Push — Activation Status
+# FCM Push — ACTIVATED (Android + iOS)
+
+> iOS APNs Auth Key (ZRV7WVGX9B, team 33T4RDL646) uploaded to the orb-guard Firebase
+> project on 2026-06-11. Both platforms are now fully configured for real-time push.
+> Final delivery test requires a real iOS device (build + run + issue a remote command).
 
 **Anti-theft real-time push is ACTIVATED for Android and code-complete for iOS.** When a remote
 command (locate/lock/wipe/ring/selfie) is issued, the backend sends a high-priority FCM data push
