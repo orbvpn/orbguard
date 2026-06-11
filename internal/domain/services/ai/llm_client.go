@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,6 +51,17 @@ func (c *LLMClient) breakerOpen() bool {
 }
 
 func (c *LLMClient) recordContentFilter() {
+	c.recordStrike("content filter blocked repeated analysis prompts; pausing LLM calls (request a Responsible-AI filter exemption or switch llm_provider)")
+}
+
+// recordTimeout counts provider timeouts toward the same breaker: a
+// deployment that cannot answer within the per-call budget degrades every
+// request identically to one that rejects them.
+func (c *LLMClient) recordTimeout() {
+	c.recordStrike("provider repeatedly exceeded the per-call timeout; pausing LLM calls (deployment too slow for interactive analysis)")
+}
+
+func (c *LLMClient) recordStrike(reason string) {
 	c.breakerMu.Lock()
 	defer c.breakerMu.Unlock()
 	c.contentFilterStrikes++
@@ -59,7 +72,7 @@ func (c *LLMClient) recordContentFilter() {
 			c.logger.Warn().
 				Str("provider", c.config.Provider).
 				Dur("cooldown", contentFilterCooldown).
-				Msg("content filter blocked repeated analysis prompts; pausing LLM calls (request a Responsible-AI filter exemption or switch llm_provider)")
+				Msg(reason)
 		}
 	}
 }
@@ -623,6 +636,9 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 
 	status, body, err := doRequest(reqBody)
 	if err != nil {
+		if isTimeoutErr(err) {
+			c.recordTimeout()
+		}
 		return nil, err
 	}
 	if status == http.StatusBadRequest && strings.Contains(string(body), "unsupported_parameter") {
@@ -773,4 +789,19 @@ func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string)
 
 func isJPEG(data []byte) bool {
 	return len(data) >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF
+}
+
+// isTimeoutErr reports whether an HTTP client error was a timeout/deadline.
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	return strings.Contains(err.Error(), "Client.Timeout exceeded")
 }
