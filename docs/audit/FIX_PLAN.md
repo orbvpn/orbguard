@@ -154,3 +154,26 @@ Needs-user (unchanged): rotate HIBP/LeakCheck/IntelX keys; set server env keys (
 - ORBGUARD_ADMIN_TOKEN value: orbguard.lab/.env.production.local (gitignored)
 - Azure OpenAI content filter blocks scam-content prompts (jailbreak detection); circuit breaker keeps requests fast on rule-based path. To enable LLM verdicts: request Microsoft Responsible-AI filter exemption for security-analysis use case, OR set ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER=deepseek + ORBGUARD_DEEPSEEK_API_KEY (cheap, no filter; data goes to China-based provider), OR use Claude (ORBGUARD_CLAUDE_API_KEY).
 - External feed maintenance (pre-existing): GreyNoise v2 endpoint deprecated (410), Koodous/AbuseIPDB rate-limited on free tier.
+
+
+## Wave 9 + High-Quality Production (2026-06-11) — COMPLETE & DEPLOYED
+- [x] SCAM LLM (high quality, live): GPT-5.2 via Azure deployment 'orbguard-scam' with a CUSTOM RAI policy 'orbguard-security' (jailbreak/prompt-shield set to annotate not block — solves the content-filter that blocked scam-content analysis; hate/sexual/violence/self-harm still block at High). reasoning_effort=low + MaxTokens 1024 = 3-14s, reliable. Live-verified: phishing->phishing/critical, gift-card->prize_winning/critical, 'Hi mom'->impersonation/critical (all with accurate explanations), benign->clean. Adaptive retry handles GPT-5.x temperature(=1)/unsupported_value; circuit breaker (3 strikes, 3-min self-heal cooldown) counts content-filter AND timeout; rule-based path stays instant+correct when LLM degraded.
+- [x] DeepSeek + Azure-OpenAI providers wired (set ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER=deepseek + ORBGUARD_DEEPSEEK_API_KEY to switch). No 'DeepSeek v4' exists — V3.x is latest; competitive quality, ~10-20x cheaper, but data egresses to a China-based provider (weigh for a privacy product).
+- [x] SPEECH (gap 3, live): Azure transcription provider (deployment 'orbguard-transcribe' = gpt-4o-transcribe) — speech=true at startup, no OpenAI key needed.
+- [x] THREAT FEEDS (gap 5, live): GreyNoise v2->v3 (410 fixed, verified 10k indicators); rate-limit-aware backoff persisted to next_fetch (AbuseIPDB/Koodous 429 no longer hammered/log-spammed); Spamhaus -> drop_v4.json/asndrop.json; all connectors live-probed.
+- [x] DNS LEAK (gap 4, live): authoritative canary server (cmd/dnscanary) on ACI 20.233.231.176, zone dnscheck.craftdeskblog.com delegated via Cloudflare (NS + glue). Real hijack+leak detection verified end-to-end (token resolved through public resolver -> logged -> observed). NOTE: ACI NATs the source IP (observed_resolver_ip shows 10.92.x), so resolver-IP identification is degraded; the detection (query observed vs intercepted) is fully functional. Upgrade path: host canary on a VM with a direct (non-NAT) public IP for true resolver-egress capture.
+- [x] CI gates added (Wave 8): backend deploy gated on go vet/test; Flutter CI.
+- [x] All migrations 001-021 on prod DB; backend live (revision 0000056); branches pushed to origin.
+
+### Azure infra provisioned this session (orbx-production-rg / orbvpn-openai, eastus2)
+- RAI policy 'orbguard-security' (security-analysis filter exemption)
+- deployment 'orbguard-scam' = gpt-5.2 (scam LLM)
+- deployment 'orbguard-transcribe' = gpt-4o-transcribe (speech)
+- ACI 'orbguard-dnscanary' (RG ORB) = DNS canary, public IP 20.233.231.176
+- Cloudflare craftdeskblog.com: NS dnscheck -> ns1.dnscheck + glue A -> 20.233.231.176
+
+### Remaining (lower priority, honest)
+- DNS resolver-IP identification degraded by ACI NAT (detection works; see upgrade path above)
+- Language detector occasionally misflags short English text (one phishing explanation returned in Portuguese) — minor polish
+- Anti-theft commands polled (no FCM push) — execute on next poll/app-open
+- Store-signed release builds (APK/IPA) + on-device human click-through before submission
