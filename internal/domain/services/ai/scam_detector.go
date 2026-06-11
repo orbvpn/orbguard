@@ -226,10 +226,37 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 		}
 	}
 
-	// Intent classification
+	// Intent classification and entity extraction are independent LLM-backed
+	// analyses; run them concurrently to halve worst-case latency (ingress
+	// resets slow responses).
+	var (
+		intentResult *MessageIntent
+		entityResult *models.ExtractedEntities
+		analysisWG   sync.WaitGroup
+	)
 	if d.intentClassifier != nil {
-		intent, err := d.intentClassifier.ClassifyIntent(ctx, content, req.ContentType)
-		if err == nil {
+		analysisWG.Add(1)
+		go func() {
+			defer analysisWG.Done()
+			if intent, err := d.intentClassifier.ClassifyIntent(ctx, content, req.ContentType); err == nil {
+				intentResult = intent
+			}
+		}()
+	}
+	if d.entityExtractor != nil {
+		analysisWG.Add(1)
+		go func() {
+			defer analysisWG.Done()
+			if entities, err := d.entityExtractor.ExtractFromRequest(ctx, req); err == nil {
+				entityResult = entities
+			}
+		}()
+	}
+	analysisWG.Wait()
+
+	if intentResult != nil {
+		intent := intentResult
+		{
 			result.Intent = &models.IntentAnalysis{
 				PrimaryIntent: string(intent.PrimaryIntent),
 				Confidence:    intent.Confidence,
@@ -264,9 +291,9 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 	}
 
 	// Entity extraction
-	if d.entityExtractor != nil {
-		entities, err := d.entityExtractor.ExtractFromRequest(ctx, req)
-		if err == nil && entities != nil {
+	if entityResult != nil {
+		entities := entityResult
+		{
 			result.Entities = entities
 
 			// Check phone numbers for reputation

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"orbguard-lab/internal/domain/models"
@@ -21,6 +22,52 @@ type LLMClient struct {
 	httpClient   *http.Client
 	logger       *logger.Logger
 	config       LLMConfig
+
+	// Content-filter circuit breaker: some deployments (Azure default
+	// Responsible-AI policy) reject scam/phishing content under analysis as
+	// if it were an attack prompt. After repeated rejections the LLM path is
+	// paused so requests stay fast on the rule-based engines instead of
+	// burning latency on calls that will be blocked.
+	breakerMu            sync.Mutex
+	contentFilterStrikes int
+	llmDisabledUntil     time.Time
+}
+
+// contentFilterStrikeLimit and contentFilterCooldown govern the breaker.
+const (
+	contentFilterStrikeLimit = 3
+	contentFilterCooldown    = 30 * time.Minute
+)
+
+// ErrLLMTemporarilyDisabled is returned while the content-filter breaker is open.
+var ErrLLMTemporarilyDisabled = fmt.Errorf("llm temporarily disabled: deployment content filter repeatedly blocked analysis prompts")
+
+func (c *LLMClient) breakerOpen() bool {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	return time.Now().Before(c.llmDisabledUntil)
+}
+
+func (c *LLMClient) recordContentFilter() {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	c.contentFilterStrikes++
+	if c.contentFilterStrikes >= contentFilterStrikeLimit {
+		c.llmDisabledUntil = time.Now().Add(contentFilterCooldown)
+		c.contentFilterStrikes = 0
+		if c.logger != nil {
+			c.logger.Warn().
+				Str("provider", c.config.Provider).
+				Dur("cooldown", contentFilterCooldown).
+				Msg("content filter blocked repeated analysis prompts; pausing LLM calls (request a Responsible-AI filter exemption or switch llm_provider)")
+		}
+	}
+}
+
+func (c *LLMClient) recordLLMSuccess() {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	c.contentFilterStrikes = 0
 }
 
 // LLMConfig holds LLM client configuration
@@ -64,7 +111,9 @@ func DefaultModelForProvider(provider string) string {
 // NewLLMClient creates a new LLM client
 func NewLLMClient(cfg LLMConfig, log *logger.Logger) *LLMClient {
 	if cfg.Timeout == 0 {
-		cfg.Timeout = 60 * time.Second
+		// Scam analysis runs up to three LLM calls per request behind an
+		// ingress that resets slow responses; keep individual calls short.
+		cfg.Timeout = 12 * time.Second
 	}
 	if cfg.Temperature == 0 {
 		cfg.Temperature = 0.3 // Low temperature for factual analysis
@@ -184,6 +233,10 @@ func (c *LLMClient) AnalyzeForScam(ctx context.Context, req *models.ScamAnalysis
 		}
 
 		messages[0].Content = append(messages[0].Content, imageContent)
+	}
+
+	if c.breakerOpen() {
+		return nil, ErrLLMTemporarilyDisabled
 	}
 
 	// Make the API call
@@ -601,10 +654,12 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 			// Azure's default Responsible-AI filter flags scam/phishing
 			// content being ANALYZED as if it were an attack prompt. This is
 			// a deployment-policy limitation, not a transient error.
+			c.recordContentFilter()
 			return nil, fmt.Errorf("%s content filter blocked the analysis prompt (deployment policy; request a Responsible-AI filter exemption for security-analysis use cases or switch llm_provider): %d: %s", providerName, status, string(body))
 		}
 		return nil, fmt.Errorf("%s API error %d: %s", providerName, status, string(body))
 	}
+	c.recordLLMSuccess()
 
 	// Parse OpenAI response
 	var openAIResp struct {
@@ -684,6 +739,9 @@ func NewTextMessage(role, text string) Message {
 
 // Chat sends a chat message and returns the response
 func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string) (string, error) {
+	if c.breakerOpen() {
+		return "", ErrLLMTemporarilyDisabled
+	}
 	if system == "" {
 		system = c.config.SystemPrompt
 	}
