@@ -1,5 +1,5 @@
-/// Device Security Screen
-/// Anti-theft features: locate, lock, wipe, ring, SIM monitoring
+// Device Security Screen
+// Anti-theft features: locate, lock, wipe, ring, SIM monitoring
 
 import 'dart:convert';
 
@@ -377,6 +377,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Expanded(
                 child: Text(
                   message.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -590,6 +592,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Expanded(
                 child: Text(
                   'Affects ${vuln.affectedVersions} · CVSS ${vuln.cvssScore.toStringAsFixed(1)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                 ),
               ),
@@ -801,7 +805,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: color,
+            activeThumbColor: color,
           ),
         ],
       ),

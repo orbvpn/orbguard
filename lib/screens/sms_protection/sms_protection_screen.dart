@@ -1,7 +1,6 @@
 /// SMS Protection Screen
 /// Main screen for SMS/smishing protection
-
-library sms_protection_screen;
+library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -431,7 +430,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Color(result.threatLevel.color).withOpacity(0.1),
+                color: Color(result.threatLevel.color).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -445,6 +444,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                   Expanded(
                     child: Text(
                       result.recommendation!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.grey[300],
                         fontSize: 13,
@@ -471,8 +472,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 .map((t) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: ThreatDetailCard(threat: t),
-                    ))
-                .toList(),
+                    )),
           ],
 
           // Detected intents
@@ -494,7 +494,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
+                    color: Colors.orange.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -525,8 +525,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 .map((url) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: UrlAnalysisCard(url: url),
-                    ))
-                .toList(),
+                    )),
           ],
 
           // Sender analysis
@@ -555,7 +554,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.2),
+                    color: Colors.grey.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -805,6 +804,8 @@ class _StatusRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.grey[400],
               fontSize: 14,
@@ -814,7 +815,7 @@ class _StatusRow extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.2),
+            color: statusColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -872,6 +873,8 @@ class _InboxBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.grey[300],
                 fontSize: 13,
@@ -910,7 +913,7 @@ class _ThreatListItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Color(message.threatLevel.color).withOpacity(0.1),
+          color: Color(message.threatLevel.color).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -919,7 +922,7 @@ class _ThreatListItem extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: Color(message.threatLevel.color).withOpacity(0.2),
+                color: Color(message.threatLevel.color).withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -936,7 +939,7 @@ class _ThreatListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    message.sender,
+                    message.sender, maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
@@ -944,7 +947,7 @@ class _ThreatListItem extends StatelessWidget {
                   ),
                   Text(
                     message.analysisResult?.threats.first.type.displayName ??
-                        'Unknown threat',
+                        'Unknown threat', maxLines: 2, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.grey[500],
                       fontSize: 11,

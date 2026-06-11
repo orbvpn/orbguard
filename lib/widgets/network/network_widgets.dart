@@ -1,5 +1,5 @@
-/// Network Widgets
-/// Reusable widgets for network security screens
+// Network Widgets
+// Reusable widgets for network security screens
 
 import 'package:flutter/material.dart';
 
@@ -304,6 +304,8 @@ class NetworkThreatCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         threat.severity.toUpperCase(),
@@ -312,6 +314,8 @@ class NetworkThreatCard extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -463,25 +467,31 @@ class NetworkStatsCard extends StatelessWidget {
         children: [
           DuotoneIcon(icon, color: color, size: 20),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -579,6 +589,8 @@ class CurrentNetworkCard extends StatelessWidget {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     WifiSecurityBadge(security: network!.security),
@@ -645,6 +657,8 @@ class CurrentNetworkCard extends StatelessWidget {
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         Text(
           label,
@@ -652,6 +666,8 @@ class CurrentNetworkCard extends StatelessWidget {
             color: Colors.grey[500],
             fontSize: 10,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

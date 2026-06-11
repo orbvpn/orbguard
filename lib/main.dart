@@ -83,6 +83,10 @@ import 'services/api/api_config.dart';
 import 'services/security/device_scan_service.dart';
 import 'services/device_agent/app_lock.dart';
 
+// Firebase Cloud Messaging (anti-theft push wake-ups)
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/device_agent/push_service.dart';
+
 // Global instances
 late ThreatIntelligenceManager threatIntel;
 late AdvancedDetectionManager advancedDetection;
@@ -90,6 +94,20 @@ late SpecialPermissionsManager specialPermissions;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Register the FCM background/terminated-state handler before runApp so a
+  // remote anti-theft command (locate/lock/wipe/ring/selfie) wakes the device
+  // even when the app is not foregrounded. DevicePushService.init() (called
+  // once the device is registered) handles foreground messages + token
+  // registration. Guarded so a missing/invalid Firebase config never blocks
+  // app startup — the device agent still works via HTTP polling.
+  if (kFirebaseEnabled) {
+    try {
+      FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
+    } catch (_) {
+      // Firebase not configured for this build — polling remains the fallback.
+    }
+  }
 
   // Initialize OrbGuard API Client first
   await OrbGuardApiClient.instance.init(

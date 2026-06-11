@@ -55,6 +55,8 @@ dependencies:
   # On iOS this is the platform-supported "best extent" for the selfie
   # feature (the OS lock screen exposes no failed-attempt hooks to apps).
   local_auth: ^2.3.0
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
 
 dev_dependencies:
   flutter_test:

@@ -267,7 +267,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      accessDescription,
+                      accessDescription, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: Colors.grey[400]),
                     ),
                   ],
@@ -318,14 +318,14 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Detection Capability',
+                        'Detection Capability', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        status,
+                        status, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: color, fontSize: 14),
                       ),
                     ],
@@ -480,7 +480,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         color: const Color(0xFF1D1E33),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -494,7 +494,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -504,6 +504,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                   const Expanded(
                     child: Text(
                       'Grant essential permissions to enable scanning',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13),
                     ),
                   ),

@@ -1,6 +1,6 @@
 /// URL Widgets
 /// Reusable widgets for URL/web protection screens
-library url_widgets;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -387,6 +387,8 @@ class UrlHistoryItem extends StatelessWidget {
                       color: Colors.grey[500],
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -595,6 +597,8 @@ class UrlStatsCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'URL scanning & phishing protection',
@@ -602,6 +606,8 @@ class UrlStatsCard extends StatelessWidget {
                         color: Colors.grey,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -690,6 +696,8 @@ class _StatItem extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
@@ -698,6 +706,8 @@ class _StatItem extends StatelessWidget {
               color: Colors.grey[500],
               fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -869,6 +879,8 @@ class _InfoRow extends StatelessWidget {
               value,
               style: const TextStyle(fontSize: 13),
               textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -938,6 +950,8 @@ class _SslSection extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (ssl.issuer != null)
                   Text(
@@ -946,6 +960,8 @@ class _SslSection extends StatelessWidget {
                       color: Colors.grey[400],
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -987,13 +1003,19 @@ class UrlListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: const DuotoneIcon(AppIcons.globus, color: Colors.grey),
-      title: Text(entry.domain),
+      title: Text(
+        entry.domain,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Text(
         'Added ${_formatDate(entry.addedAt)}',
         style: TextStyle(
           color: Colors.grey[500],
           fontSize: 12,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: IconButton(
         icon: const DuotoneIcon(AppIcons.minusCircle, color: Colors.red),

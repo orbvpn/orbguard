@@ -1,6 +1,10 @@
-/// Device Push Service — the (currently inert) push-notification seam for the
-/// anti-theft device agent.
+/// Device Push Service — FCM/APNs push-notification wake-up for the anti-theft
+/// device agent.
 ///
+/// @docImport 'device_agent.dart';
+library;
+
+/// WHY THIS EXISTS:
 /// WHY THIS EXISTS NOW, BUILD-SAFE:
 /// The device agent (device_agent.dart) has NO push channel today — remote
 /// commands are HTTP-polled (60s foreground timer + poll-on-resume; Android
@@ -33,9 +37,9 @@
 import 'dart:developer' as developer;
 import 'dart:io';
 
-// --- FIREBASE BLOCK: imports (uncomment on activation, step 3) ---
-// import 'package:firebase_core/firebase_core.dart';
-// import 'package:firebase_messaging/firebase_messaging.dart';
+// --- FIREBASE BLOCK: imports ---
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 // --- END FIREBASE BLOCK: imports ---
 
 import '../api/orbguard_api_client.dart';
@@ -45,7 +49,7 @@ import 'device_agent.dart';
 /// until the Firebase dependencies + config files are added (see file header
 /// and docs/FCM_SETUP.md). While `false`, [DevicePushService.init] is a
 /// logged no-op and the app falls back to the existing HTTP polling.
-const bool kFirebaseEnabled = false;
+const bool kFirebaseEnabled = true;
 
 /// On-device push abstraction for the anti-theft agent. Singleton so the app
 /// init path and any future native message handlers share one instance.
@@ -158,59 +162,54 @@ class DevicePushService {
       return;
     }
 
-    // --- FIREBASE BLOCK (uncomment on activation, step 3) ---
-    //
-    // await Firebase.initializeApp();
-    // final messaging = FirebaseMessaging.instance;
-    //
-    // // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
-    // await messaging.requestPermission(alert: true, badge: true, sound: true);
-    //
-    // // iOS: ensure an APNs token exists before asking for the FCM token,
-    // // otherwise getToken() can return null on a cold start.
-    // if (Platform.isIOS) {
-    //   await messaging.getAPNSToken();
-    // }
-    //
-    // // Register the current token, then keep it fresh on rotation.
-    // final token = await messaging.getToken();
-    // if (token != null) {
-    //   await registerToken(token);
-    // }
-    // messaging.onTokenRefresh.listen(registerToken);
-    //
-    // // Foreground data pushes wake the agent immediately.
-    // FirebaseMessaging.onMessage.listen((message) {
-    //   onPushReceived(message.data);
-    // });
-    //
-    // // Tapping a notification that opened the app also triggers a poll.
-    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    //   onPushReceived(message.data);
-    // });
-    //
-    // // Background/terminated data messages are handled by the top-level
-    // // handler registered in main() (see docs/FCM_SETUP.md):
-    // //   FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
-    //
+    // --- FIREBASE BLOCK ---
+    await Firebase.initializeApp();
+    final messaging = FirebaseMessaging.instance;
+
+    // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+    // iOS: ensure an APNs token exists before asking for the FCM token,
+    // otherwise getToken() can return null on a cold start.
+    if (Platform.isIOS) {
+      await messaging.getAPNSToken();
+    }
+
+    // Register the current token, then keep it fresh on rotation.
+    final token = await messaging.getToken();
+    if (token != null) {
+      await registerToken(token);
+    }
+    messaging.onTokenRefresh.listen(registerToken);
+
+    // Foreground data pushes wake the agent immediately.
+    FirebaseMessaging.onMessage.listen((message) {
+      onPushReceived(message.data);
+    });
+
+    // Tapping a notification that opened the app also triggers a poll.
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      onPushReceived(message.data);
+    });
+
+    // Background/terminated data messages are handled by the top-level
+    // handler registered in main() (orbGuardFirebaseBackgroundHandler).
     // --- END FIREBASE BLOCK ---
 
     developer.log('Firebase messaging initialized', name: _logName);
   }
 }
 
-// --- FIREBASE BLOCK: background handler (uncomment on activation, step 3) ---
-//
-// /// Top-level background/terminated-state FCM handler. Must be a top-level
-// /// function annotated with @pragma('vm:entry-point') so it survives
-// /// tree-shaking and can run in the headless isolate. Register it in main():
-// ///   FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
-// @pragma('vm:entry-point')
-// Future<void> orbGuardFirebaseBackgroundHandler(RemoteMessage message) async {
-//   await Firebase.initializeApp();
-//   // In the background isolate there is no provider tree; run one headless
-//   // agent cycle directly (re-reads device id + policy from prefs).
-//   await DeviceAgent.runHeadlessCycle();
-// }
-//
+// --- FIREBASE BLOCK: background handler ---
+/// Top-level background/terminated-state FCM handler. Must be a top-level
+/// function annotated with @pragma('vm:entry-point') so it survives
+/// tree-shaking and can run in the headless isolate. Registered in main():
+///   FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
+@pragma('vm:entry-point')
+Future<void> orbGuardFirebaseBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  // In the background isolate there is no provider tree; run one headless
+  // agent cycle directly (re-reads device id + policy from prefs).
+  await DeviceAgent.runHeadlessCycle();
+}
 // --- END FIREBASE BLOCK: background handler ---

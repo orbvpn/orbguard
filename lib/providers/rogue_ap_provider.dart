@@ -1,5 +1,5 @@
-/// Rogue AP Detection Provider
-/// State management for detecting rogue access points and WiFi threats
+// Rogue AP Detection Provider
+// State management for detecting rogue access points and WiFi threats
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

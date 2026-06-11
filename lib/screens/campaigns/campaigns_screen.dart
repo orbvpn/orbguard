@@ -1,5 +1,5 @@
-/// Campaigns Screen
-/// Active threat campaign tracking and intelligence interface
+// Campaigns Screen
+// Active threat campaign tracking and intelligence interface
 
 import 'package:flutter/material.dart';
 
@@ -219,6 +219,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                   children: [
                     Text(
                       campaign.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -237,9 +239,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                        Text(
-                          campaign.objective ?? 'Unknown',
-                          style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                        Flexible(
+                          child: Text(
+                            campaign.objective ?? 'Unknown',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -416,6 +422,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                       children: [
                         Text(
                           campaign.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,

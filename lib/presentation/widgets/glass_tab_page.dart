@@ -275,6 +275,8 @@ class GlassTabPageState extends State<GlassTabPage>
                           const SizedBox(height: 3),
                           Text(
                             tab.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight:

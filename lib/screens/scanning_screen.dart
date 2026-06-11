@@ -254,10 +254,10 @@ class _ScanningScreenState extends State<ScanningScreen>
                       shape: BoxShape.circle,
                       gradient: SweepGradient(
                         colors: [
-                          Colors.cyan.withOpacity(0),
-                          Colors.cyan.withOpacity(0.3),
-                          Colors.cyan.withOpacity(0.8),
-                          Colors.cyan.withOpacity(0),
+                          Colors.cyan.withValues(alpha: 0),
+                          Colors.cyan.withValues(alpha: 0.3),
+                          Colors.cyan.withValues(alpha: 0.8),
+                          Colors.cyan.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -274,7 +274,7 @@ class _ScanningScreenState extends State<ScanningScreen>
             child: CircularProgressIndicator(
               value: _scanFailed ? 0 : _overallProgress,
               strokeWidth: 4,
-              backgroundColor: Colors.grey.withOpacity(0.2),
+              backgroundColor: Colors.grey.withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
             ),
           ),
@@ -294,13 +294,13 @@ class _ScanningScreenState extends State<ScanningScreen>
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        _accentColor.withOpacity(0.4),
-                        _accentColor.withOpacity(0.1),
+                        _accentColor.withValues(alpha: 0.4),
+                        _accentColor.withValues(alpha: 0.1),
                       ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: _accentColor.withOpacity(0.3),
+                        color: _accentColor.withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 10,
                       ),
@@ -386,7 +386,7 @@ class _ScanningScreenState extends State<ScanningScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.1),
+                color: Colors.redAccent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -415,7 +415,7 @@ class _ScanningScreenState extends State<ScanningScreen>
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
+          color: Colors.green.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(

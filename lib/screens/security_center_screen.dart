@@ -271,7 +271,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Security Status',
+                        'Security Status', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -280,7 +280,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _getStatusText(score),
+                        _getStatusText(score), maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -343,6 +343,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                             _threatCount > 0
                                 ? 'Security threats detected. Tap to review.'
                                 : 'Your device needs attention. Review settings.',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.red,
                               fontWeight: FontWeight.w500,
@@ -518,6 +520,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 Expanded(
                   child: Text(
                     'Threat Intelligence',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -707,6 +711,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 Expanded(
                   child: Text(
                     'Active Protections',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -796,14 +802,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
                 Text(
-                  subtitle,
+                  subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.white54 : Colors.black45,
@@ -854,6 +860,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 Expanded(
                   child: Text(
                     'Recent Activity',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -954,7 +962,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: isAlert ? Colors.red : (isDark ? Colors.white : Colors.black),

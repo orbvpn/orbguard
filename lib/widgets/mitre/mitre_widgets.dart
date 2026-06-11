@@ -1,6 +1,6 @@
 /// MITRE ATT&CK Widgets
 /// Widgets for displaying MITRE ATT&CK techniques
-library mitre_widgets;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -199,6 +199,8 @@ class TacticColumn extends StatelessWidget {
                     fontSize: 11,
                   ),
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -300,6 +302,8 @@ class TechniqueDetailCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (onClose != null)
@@ -343,6 +347,8 @@ class TechniqueDetailCard extends StatelessWidget {
                             color: Colors.red[200],
                             fontSize: 10,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -565,6 +571,8 @@ class MitreStatsCard extends StatelessWidget {
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
@@ -572,6 +580,8 @@ class MitreStatsCard extends StatelessWidget {
                 color: Colors.white54,
                 fontSize: 11,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

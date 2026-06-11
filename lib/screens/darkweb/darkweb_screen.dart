@@ -1,5 +1,5 @@
-/// Dark Web Monitoring Screen
-/// Main screen for dark web monitoring and breach alerts
+// Dark Web Monitoring Screen
+// Main screen for dark web monitoring and breach alerts
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -670,6 +670,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                       children: [
                         Text(
                           breach.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -678,6 +680,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                         ),
                         Text(
                           breach.domain,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.grey[400],
                             fontSize: 14,
@@ -908,6 +912,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                       children: [
                         Text(
                           'Breaches for ${asset.displayValue}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

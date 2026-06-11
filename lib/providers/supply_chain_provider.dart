@@ -1,5 +1,5 @@
-/// Supply Chain Provider
-/// State management for supply chain vulnerability monitoring
+// Supply Chain Provider
+// State management for supply chain vulnerability monitoring
 
 import 'package:flutter/foundation.dart';
 

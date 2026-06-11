@@ -1,5 +1,5 @@
-/// Notification Channels
-/// Android notification channel definitions for OrbGuard
+// Notification Channels
+// Android notification channel definitions for OrbGuard
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 

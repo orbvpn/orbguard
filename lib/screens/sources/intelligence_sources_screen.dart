@@ -257,11 +257,11 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      source.name,
+                      source.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      source.type.toUpperCase(),
+                      source.type.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                     ),
                   ],
@@ -656,6 +656,8 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
                   Expanded(
                     child: Text(
                       _error!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: GlassTheme.errorColor, fontSize: 12),
                     ),

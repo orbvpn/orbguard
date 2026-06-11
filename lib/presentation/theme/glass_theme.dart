@@ -281,10 +281,10 @@ class GlassTheme {
     double opacity = 0.15,
   }) {
     return BoxDecoration(
-      color: tintColor.withOpacity(opacity),
+      color: tintColor.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: tintColor.withOpacity(0.3),
+        color: tintColor.withValues(alpha: 0.3),
         width: borderWidth,
       ),
     );

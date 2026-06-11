@@ -8,6 +8,7 @@
 /// campaign_id?, threat_actor_id?, evidence, created_at}. POST
 /// /correlation/run executes a server-scoped correlation over recent
 /// indicators and returns {run, correlations, statistics}.
+library;
 
 import 'package:flutter/material.dart';
 
@@ -254,10 +255,14 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                   children: [
                     Text(
                       result.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       result.engine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: _getEngineColor(result.engine), fontSize: 11),
                     ),
                   ],
@@ -452,6 +457,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                           Expanded(
                             child: Text(
                               indicator,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 12),
                             ),
                           ),
@@ -473,7 +480,15 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );

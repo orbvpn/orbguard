@@ -1,5 +1,5 @@
-/// Realtime Provider
-/// Flutter state management for real-time threat stream
+// Realtime Provider
+// Flutter state management for real-time threat stream
 
 import 'dart:async';
 

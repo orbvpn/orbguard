@@ -1,5 +1,5 @@
-/// Network Firewall Provider
-/// State management for network firewall and connection monitoring
+// Network Firewall Provider
+// State management for network firewall and connection monitoring
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -10,7 +10,7 @@ class NetworkFirewallProvider extends ChangeNotifier {
   final NetworkFirewallService _service = NetworkFirewallService();
 
   // State
-  List<NetworkConnection> _connections = [];
+  final List<NetworkConnection> _connections = [];
   List<FirewallRule> _rules = [];
   List<AppNetworkProfile> _appProfiles = [];
   FirewallStats _stats = FirewallStats();

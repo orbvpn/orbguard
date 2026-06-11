@@ -1,9 +1,9 @@
-/// Glass Container Widgets - iOS 26 Liquid Glass Design
-/// Reusable glass-effect container widgets
-///
-/// Note: Core glass widgets (GlassContainer, GlassCircleButton, GlassPillContainer,
-/// GlassGradientBackground) are defined in glass_theme.dart.
-/// This file contains additional specialized glass widgets.
+// Glass Container Widgets - iOS 26 Liquid Glass Design
+// Reusable glass-effect container widgets
+//
+// Note: Core glass widgets (GlassContainer, GlassCircleButton, GlassPillContainer,
+// GlassGradientBackground) are defined in glass_theme.dart.
+// This file contains additional specialized glass widgets.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -35,8 +35,6 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     Widget card = GlassContainer(
       padding: padding ?? const EdgeInsets.all(16),
       margin: margin ?? const EdgeInsets.only(bottom: 12),
@@ -92,6 +90,8 @@ class GlassBadge extends StatelessWidget {
           ],
           Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: badgeColor,
               fontSize: fontSize ?? 12,
@@ -226,6 +226,8 @@ class GlassListTile extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: actualIsDark ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w500,
@@ -235,6 +237,8 @@ class GlassListTile extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: actualIsDark ? Colors.white54 : Colors.black45,
                       fontSize: 13,
@@ -278,13 +282,17 @@ class GlassSectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: actualIsDark ? Colors.white38 : Colors.black38,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+          Flexible(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: actualIsDark ? Colors.white38 : Colors.black38,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
           if (trailing != null) trailing!,

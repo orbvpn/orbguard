@@ -1,5 +1,5 @@
-/// Supply Chain Monitor Screen
-/// Monitors app dependencies for vulnerabilities and trackers
+// Supply Chain Monitor Screen
+// Monitors app dependencies for vulnerabilities and trackers
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -144,6 +144,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Expanded(
                         child: Text(
                           provider.scanStatus,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white70),
                         ),
                       ),
@@ -190,6 +192,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 child: Text(
                   '${alerts.length} critical vulnerability '
                   'alert${alerts.length == 1 ? '' : 's'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: GlassTheme.errorColor,
                     fontSize: 15,
@@ -221,7 +225,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                         DuotoneIcon(
                           'alt_arrow_right',
                           size: 16,
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                         ),
                       ],
                     ),
@@ -234,7 +238,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               child: Text(
                 '+${alerts.length - 3} more in the CVEs tab',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
               ),
@@ -258,7 +262,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   color: (hasIssues ? GlassTheme.errorColor : GlassTheme.successColor)
-                      .withOpacity(0.2),
+                      .withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: DuotoneIcon(
@@ -275,7 +279,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     Text(
                       hasIssues
                           ? '${provider.totalVulnerabilities} Vulnerabilities Found'
-                          : 'No Vulnerabilities',
+                          : 'No Vulnerabilities', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: hasIssues ? GlassTheme.errorColor : GlassTheme.successColor,
                         fontSize: 18,
@@ -284,9 +288,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${provider.totalAppsScanned} apps scanned',
+                      '${provider.totalAppsScanned} apps scanned', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 13,
                       ),
                     ),
@@ -326,9 +330,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -344,7 +348,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 11,
               ),
             ),
@@ -387,9 +391,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: severityColor.withOpacity(0.2),
+                  color: severityColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: severityColor.withOpacity(0.3)),
+                  border: Border.all(color: severityColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   vuln.cveId,
@@ -404,7 +408,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: severityColor.withOpacity(0.2),
+                  color: severityColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -435,22 +439,22 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              DuotoneIcon('danger_triangle', size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('danger_triangle', size: 14, color: Colors.white.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Text(
                 vuln.severity,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
               ),
               const SizedBox(width: 16),
-              DuotoneIcon('refresh', size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('refresh', size: 14, color: Colors.white.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Text(
                 'Affected: ${vuln.affectedVersions}',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
               ),
@@ -461,7 +465,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: GlassTheme.successColor.withOpacity(0.1),
+                color: GlassTheme.successColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -535,7 +539,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: GlassTheme.warningColor.withOpacity(0.2),
+                      color: GlassTheme.warningColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -567,7 +571,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: GlassTheme.warningColor.withOpacity(0.2),
+              color: GlassTheme.warningColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const DuotoneIcon(
@@ -582,7 +586,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  lib.name,
+                  lib.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -590,9 +594,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 ),
                 if (lib.vendor != null)
                   Text(
-                    lib.vendor!,
+                    lib.vendor!, maxLines: 2, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -603,7 +607,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: Color(SupplyChainProvider.getRiskColor(lib.riskLevel))
-                  .withOpacity(0.2),
+                  .withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -646,7 +650,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: GlassTheme.primaryAccent.withOpacity(0.2),
+              color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -667,7 +671,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     subtitle: lib.vendor != null
                         ? Text(
                             lib.vendor!,
-                            style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                           )
                         : null,
                     trailing: Row(
@@ -679,7 +683,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: GlassTheme.warningColor.withOpacity(0.2),
+                              color: GlassTheme.warningColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -714,7 +718,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+          DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -727,7 +731,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withOpacity(0.5)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -772,7 +776,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _getSeverityColor(vuln.cvssScore).withOpacity(0.2),
+                      color: _getSeverityColor(vuln.cvssScore).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -799,7 +803,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Text(
                         vuln.severity,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -821,7 +825,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Text(
                 vuln.description,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -841,9 +845,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: GlassTheme.errorColor.withOpacity(0.1),
+                    color: GlassTheme.errorColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: GlassTheme.errorColor.withOpacity(0.3)),
+                    border: Border.all(color: GlassTheme.errorColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -856,6 +860,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Expanded(
                         child: Text(
                           vuln.exploitAvailable!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: GlassTheme.errorColor,
                             fontSize: 13,
@@ -885,14 +891,14 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                           DuotoneIcon(
                             'link',
                             size: 14,
-                            color: GlassTheme.primaryAccent.withOpacity(0.7),
+                            color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               ref,
                               style: TextStyle(
-                                color: GlassTheme.primaryAccent.withOpacity(0.7),
+                                color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
                                 fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -920,7 +926,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 13,
               ),
             ),
@@ -928,6 +934,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           Expanded(
             child: Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,

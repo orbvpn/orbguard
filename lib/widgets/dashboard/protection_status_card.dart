@@ -1,8 +1,5 @@
-/// Protection Status Card Widget
-/// Displays device protection status and feature overview
-
-import 'dart:math' as math;
-import 'dart:ui';
+// Protection Status Card Widget
+// Displays device protection status and feature overview
 
 import 'package:flutter/material.dart';
 
@@ -98,6 +95,8 @@ class ProtectionStatusCard extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: statusColor,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
         // Last scan info
@@ -189,8 +188,8 @@ class _ProtectionScoreCircle extends StatelessWidget {
             child: CircularProgressIndicator(
               value: 1,
               strokeWidth: 8,
-              backgroundColor: Colors.grey.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation(Colors.grey.withOpacity(0.1)),
+              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation(Colors.grey.withValues(alpha: 0.1)),
             ),
           ),
           // Progress circle
@@ -269,9 +268,9 @@ class _FeatureStatusChip extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.5)),
+            border: Border.all(color: color.withValues(alpha: 0.5)),
           ),
           child: DuotoneIcon(
             feature.icon,
@@ -286,6 +285,8 @@ class _FeatureStatusChip extends StatelessWidget {
             fontSize: 10,
             color: color,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -330,9 +331,9 @@ class ProtectionStatusIndicator extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.5)),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -400,8 +401,8 @@ class DeviceHealthCard extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: (health?.isHealthy ?? true)
-                ? Colors.green.withOpacity(0.2)
-                : Colors.orange.withOpacity(0.2),
+                ? Colors.green.withValues(alpha: 0.2)
+                : Colors.orange.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: DuotoneIcon(
@@ -424,7 +425,7 @@ class DeviceHealthCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: _getGradeColor(health!.grade).withOpacity(0.2),
+              color: _getGradeColor(health!.grade).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -456,7 +457,7 @@ class DeviceHealthCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -508,11 +509,15 @@ class DeviceHealthCard extends StatelessWidget {
             color: passed ? Colors.green : Colors.red,
           ),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: passed ? Colors.grey[300] : Colors.red[300],
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: passed ? Colors.grey[300] : Colors.red[300],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

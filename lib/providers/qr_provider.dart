@@ -1,6 +1,6 @@
 /// QR Provider
 /// State management for QR code scanning features
-library qr_provider;
+library;
 
 import 'dart:async';
 import 'dart:convert';

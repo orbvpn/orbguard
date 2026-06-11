@@ -1,5 +1,5 @@
-/// Threat Hunting Provider
-/// State management for proactive threat detection and investigation
+// Threat Hunting Provider
+// State management for proactive threat detection and investigation
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -13,7 +13,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
 
   // State
   List<ThreatHunt> _availableHunts = [];
-  Map<String, HuntResult> _huntResults = {};
+  final Map<String, HuntResult> _huntResults = {};
   List<InvestigationCase> _cases = [];
   Map<String, dynamic> _stats = {};
 

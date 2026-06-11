@@ -1,5 +1,5 @@
-/// App Security Widgets
-/// Reusable widgets for app security screens
+// App Security Widgets
+// Reusable widgets for app security screens
 
 import 'package:flutter/material.dart';
 
@@ -374,6 +374,8 @@ class PermissionChip extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -382,6 +384,8 @@ class PermissionChip extends StatelessWidget {
                       color: Colors.grey[500],
                       fontSize: 11,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -507,6 +511,8 @@ class TrackerCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (tracker.company != null)
                     Text(
@@ -515,6 +521,8 @@ class TrackerCard extends StatelessWidget {
                         color: Colors.grey[500],
                         fontSize: 11,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -695,6 +703,8 @@ class AppSecurityStatsCard extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 label,
@@ -702,6 +712,8 @@ class AppSecurityStatsCard extends StatelessWidget {
                   color: Colors.grey[500],
                   fontSize: 11,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

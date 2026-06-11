@@ -1,5 +1,5 @@
-/// Playbooks Screen
-/// Automated response playbooks interface
+// Playbooks Screen
+// Automated response playbooks interface
 
 import 'package:flutter/material.dart';
 
@@ -19,7 +19,6 @@ class PlaybooksScreen extends StatefulWidget {
 class _PlaybooksScreenState extends State<PlaybooksScreen> {
   final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
-  String? _error;
   final List<Playbook> _playbooks = [];
   final List<PlaybookExecution> _executions = [];
 
@@ -32,7 +31,6 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
-      _error = null;
     });
 
     try {
@@ -51,7 +49,6 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load playbooks: $e';
         _isLoading = false;
       });
     }
@@ -167,15 +164,15 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(playbook.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('${playbook.steps.length} steps', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(playbook.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('${playbook.steps.length} steps', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
                   ],
                 ),
               ),
               Switch(
                 value: playbook.isEnabled,
                 onChanged: (v) => setState(() => playbook.isEnabled = v),
-                activeColor: GlassTheme.successColor,
+                activeThumbColor: GlassTheme.successColor,
               ),
             ],
           ),
@@ -247,9 +244,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(execution.playbookName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(execution.playbookName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     Text(
-                      execution.triggeredBy,
+                      execution.triggeredBy, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                     ),
                   ],
@@ -402,8 +399,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(step.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                Text(step.action, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                Text(step.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(step.action, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
               ],
             ),
           ),

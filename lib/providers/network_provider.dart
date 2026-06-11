@@ -1,5 +1,5 @@
-/// Network Provider
-/// State management for network security features
+// Network Provider
+// State management for network security features
 
 import 'dart:async';
 import 'dart:io';

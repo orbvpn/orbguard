@@ -1,12 +1,12 @@
-/// Threat Hunting Service
-///
-/// Proactive threat detection and investigation:
-/// - Hypothesis-driven hunting
-/// - IOC sweeping across device
-/// - MITRE ATT&CK-based detection rules
-/// - Automated hunt queries
-/// - Threat investigation workflows
-/// - Evidence collection and correlation
+// Threat Hunting Service
+//
+// Proactive threat detection and investigation:
+// - Hypothesis-driven hunting
+// - IOC sweeping across device
+// - MITRE ATT&CK-based detection rules
+// - Automated hunt queries
+// - Threat investigation workflows
+// - Evidence collection and correlation
 
 import 'dart:async';
 import 'dart:convert';

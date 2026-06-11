@@ -1,12 +1,12 @@
-/// Supply Chain Monitoring Service
-///
-/// Monitors app dependencies and third-party libraries for security vulnerabilities:
-/// - Installed app SDK/library detection
-/// - Known vulnerability database (CVE) lookup
-/// - Third-party tracker detection
-/// - Malicious SDK detection
-/// - App update security analysis
-/// - Dependency risk scoring
+// Supply Chain Monitoring Service
+//
+// Monitors app dependencies and third-party libraries for security vulnerabilities:
+// - Installed app SDK/library detection
+// - Known vulnerability database (CVE) lookup
+// - Third-party tracker detection
+// - Malicious SDK detection
+// - App update security analysis
+// - Dependency risk scoring
 
 import 'dart:async';
 import 'dart:io' show Platform;

@@ -1,7 +1,6 @@
 /// SMS Detail Screen
 /// Detailed view of a single SMS message with threat analysis
-
-library sms_detail_screen;
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -386,7 +385,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatDateTime(_message.timestamp),
+                  _formatDateTime(_message.timestamp), maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 13,
@@ -580,6 +579,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 Expanded(
                   child: Text(
                     analysis.recommendation!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.grey[300],
                       fontSize: 14,
@@ -604,6 +605,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                   const Expanded(
                     child: Text(
                       'This message should be blocked',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.red,
                         fontWeight: FontWeight.w600,

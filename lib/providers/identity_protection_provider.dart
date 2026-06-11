@@ -1,13 +1,13 @@
-/// Identity Protection Provider
-/// State management for identity theft protection and monitoring.
-///
-/// Honesty notes:
-/// - Email assets are scanned against live backend services (dark-web
-///   breach corpus + digital footprint scanner). Other asset types have no
-///   live data source and surface an explicit "Unavailable" status.
-/// - Credit freeze state is self-reported by the user after they act on
-///   the bureau's official freeze page; OrbGuard never claims to have
-///   frozen credit itself.
+// Identity Protection Provider
+// State management for identity theft protection and monitoring.
+//
+// Honesty notes:
+// - Email assets are scanned against live backend services (dark-web
+//   breach corpus + digital footprint scanner). Other asset types have no
+//   live data source and surface an explicit "Unavailable" status.
+// - Credit freeze state is self-reported by the user after they act on
+//   the bureau's official freeze page; OrbGuard never claims to have
+//   frozen credit itself.
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';

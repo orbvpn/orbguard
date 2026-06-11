@@ -1,5 +1,5 @@
-/// OrbGuard Lab API Client
-/// Main client for communicating with the threat intelligence backend
+// OrbGuard Lab API Client
+// Main client for communicating with the threat intelligence backend
 
 import 'dart:async';
 import 'dart:convert';
@@ -347,7 +347,7 @@ class OrbGuardApiClient {
 
   /// Send device command (lock, wipe, ring, etc.)
   /// POST /api/v1/device/{device_id}/command
-  /// Body: models.RemoteCommand — { "type": "...", "payload": "<json string>" }
+  /// Body: models.RemoteCommand — { "type": "...", "payload": "`<json string>`" }
   Future<bool> sendDeviceCommand(String command, {Map<String, dynamic>? data}) async {
     try {
       await _dio.post(

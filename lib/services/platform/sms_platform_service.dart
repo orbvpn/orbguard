@@ -8,7 +8,7 @@
 /// every inbox-related call on non-Android platforms surfaces an explicit
 /// [SmsPlatformUnavailableException] instead of pretending to return an
 /// empty-but-clean result.
-library sms_platform_service;
+library;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';

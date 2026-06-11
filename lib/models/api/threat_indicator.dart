@@ -1,5 +1,5 @@
-/// Threat Indicator Models
-/// Models for threat indicators from OrbGuard Lab API
+// Threat Indicator Models
+// Models for threat indicators from OrbGuard Lab API
 
 /// Types of threat indicators
 enum IndicatorType {

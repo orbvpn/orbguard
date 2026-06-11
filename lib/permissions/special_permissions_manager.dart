@@ -38,7 +38,7 @@ class SpecialPermissionsManager {
       final result = await platform.invokeMethod('checkUsageStatsPermission');
       return result['hasPermission'] ?? false;
     } catch (e) {
-      print('Error checking usage stats permission: $e');
+      debugPrint('Error checking usage stats permission: $e');
       return false;
     }
   }
@@ -52,7 +52,7 @@ class SpecialPermissionsManager {
           await platform.invokeMethod('checkAccessibilityPermission');
       return result['hasPermission'] ?? false;
     } catch (e) {
-      print('Error checking accessibility permission: $e');
+      debugPrint('Error checking accessibility permission: $e');
       return false;
     }
   }
@@ -68,7 +68,7 @@ class SpecialPermissionsManager {
       // Check again after returning
       return await checkUsageStatsPermission();
     } catch (e) {
-      print('Error requesting usage stats permission: $e');
+      debugPrint('Error requesting usage stats permission: $e');
       return false;
     }
   }
@@ -82,7 +82,7 @@ class SpecialPermissionsManager {
       await Future.delayed(const Duration(seconds: 1));
       return await checkAccessibilityPermission();
     } catch (e) {
-      print('Error requesting accessibility permission: $e');
+      debugPrint('Error requesting accessibility permission: $e');
       return false;
     }
   }
@@ -160,7 +160,7 @@ class SpecialPermissionsManager {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
@@ -350,9 +350,9 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,8 +408,8 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isGranted
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.orange.withOpacity(0.2),
+                        ? Colors.green.withValues(alpha: 0.2)
+                        : Colors.orange.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DuotoneIcon(

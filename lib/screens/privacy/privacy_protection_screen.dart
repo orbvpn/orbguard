@@ -1,5 +1,5 @@
-/// Privacy Protection Screen
-/// Camera/microphone monitoring, clipboard protection, and tracker blocking
+// Privacy Protection Screen
+// Camera/microphone monitoring, clipboard protection, and tracker blocking
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -171,6 +171,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                       Expanded(
                         child: Text(
                           issue,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white70, fontSize: 13),
                         ),
                       ),
@@ -195,6 +197,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                       Expanded(
                         child: Text(
                           rec,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white70, fontSize: 13),
                         ),
                       ),
@@ -261,7 +265,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                       ? 'Your privacy is well protected'
                       : score >= 50
                           ? 'Some privacy improvements needed'
-                          : 'Your privacy needs attention',
+                          : 'Your privacy needs attention', maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
                 ),
                 if (audit.riskLevel != null) ...[
@@ -293,6 +297,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               const Expanded(
                 child: Text(
                   'Privacy Audit Not Available',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -334,9 +340,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                 Text(
-                  subtitle,
+                  subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                 ),
               ],
@@ -345,7 +351,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: GlassTheme.primaryAccent,
+            activeThumbColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -473,11 +479,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  event.appName,
+                  event.appName, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  event.isBackground ? 'Background access' : 'Foreground access',
+                  event.isBackground ? 'Background access' : 'Foreground access', maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: color, fontSize: 12),
                 ),
               ],
@@ -521,11 +527,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${provider.blockedTrackers.length} Trackers Blocked',
+                      '${provider.blockedTrackers.length} Trackers Blocked', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      'Out of ${provider.trackers.length} known trackers',
+                      'Out of ${provider.trackers.length} known trackers', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
                     ),
                   ],
@@ -563,11 +569,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tracker.name,
+                  tracker.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  tracker.company,
+                  tracker.company, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                 ),
               ],
@@ -576,7 +582,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           Switch(
             value: tracker.isBlocked,
             onChanged: (_) => provider.toggleTrackerBlocking(tracker.id),
-            activeColor: GlassTheme.successColor,
+            activeThumbColor: GlassTheme.successColor,
           ),
         ],
       ),

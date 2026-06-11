@@ -1,10 +1,10 @@
-/// SMS Analysis Models
-/// Models for SMS/smishing analysis from OrbGuard Lab API.
-///
-/// Wire formats in this file mirror the live backend handlers:
-/// - orbguard.lab/internal/api/handlers/sms.go (+ models/sms.go)
-/// - orbguard.lab/internal/api/handlers/qr_security.go (+ models/qr_security.go)
-/// - orbguard.lab/internal/api/handlers/darkweb.go (+ models/darkweb.go)
+// SMS Analysis Models
+// Models for SMS/smishing analysis from OrbGuard Lab API.
+//
+// Wire formats in this file mirror the live backend handlers:
+// - orbguard.lab/internal/api/handlers/sms.go (+ models/sms.go)
+// - orbguard.lab/internal/api/handlers/qr_security.go (+ models/qr_security.go)
+// - orbguard.lab/internal/api/handlers/darkweb.go (+ models/darkweb.go)
 
 import 'threat_indicator.dart';
 

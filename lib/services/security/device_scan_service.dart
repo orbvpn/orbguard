@@ -1,18 +1,18 @@
-/// Device Scan Service
-///
-/// Shared on-device threat scan used by the dashboard and the home screen.
-/// It drives the exact same native scan flow as `lib/main.dart`'s
-/// `_performScan` (the `com.orb.guard/system` MethodChannel methods plus the
-/// advanced Dart detection modules) and reports real per-stage progress.
-///
-/// Honesty contract:
-/// - Progress callbacks are emitted only when a stage genuinely starts or
-///   finishes; there are no timers or random counters.
-/// - When the native scan channel is not registered on this build, the scan
-///   throws [DeviceScanUnavailableException] instead of returning an empty
-///   "all clear" result.
-/// - Per-stage failures are recorded and surfaced in the progress stream;
-///   they never silently become "0 threats".
+// Device Scan Service
+//
+// Shared on-device threat scan used by the dashboard and the home screen.
+// It drives the exact same native scan flow as `lib/main.dart`'s
+// `_performScan` (the `com.orb.guard/system` MethodChannel methods plus the
+// advanced Dart detection modules) and reports real per-stage progress.
+//
+// Honesty contract:
+// - Progress callbacks are emitted only when a stage genuinely starts or
+//   finishes; there are no timers or random counters.
+// - When the native scan channel is not registered on this build, the scan
+//   throws [DeviceScanUnavailableException] instead of returning an empty
+//   "all clear" result.
+// - Per-stage failures are recorded and surfaced in the progress stream;
+//   they never silently become "0 threats".
 
 import 'dart:async';
 

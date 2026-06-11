@@ -486,8 +486,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13)),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13)),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
                 ],
               ),
             ),
@@ -543,7 +543,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  result.value,
+                  result.value, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                 ),
                 Row(
@@ -637,7 +637,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _getTypeDisplayName(indicator.type),
+                          _getTypeDisplayName(indicator.type), maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: GlassTheme.primaryAccent, fontSize: 14),
                         ),
                         const SizedBox(height: 4),

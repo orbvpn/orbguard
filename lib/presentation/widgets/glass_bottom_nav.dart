@@ -125,6 +125,8 @@ class GlassBottomNavBar extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(
                               item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: isSelected

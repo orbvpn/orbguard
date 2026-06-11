@@ -3,14 +3,16 @@
 
 import 'dart:async';
 import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class EnhancedBehavioralDetector {
   static const platform = MethodChannel('com.orb.guard/system');
 
   // Baseline thresholds for anomaly detection
-  static const double ANOMALY_THRESHOLD = 2.0; // Standard deviations
-  static const int MIN_BASELINE_SAMPLES = 20;
+  static const double _anomalyThreshold = 2.0; // Standard deviations
+  static const int _minBaselineSamples = 20;
 
   // Baseline data
   final Map<String, BaselineMetrics> _appBaselines = {};
@@ -19,14 +21,14 @@ class EnhancedBehavioralDetector {
 
   /// Establish baseline from historical usage data
   Future<void> establishBaseline() async {
-    print('[Behavioral] Establishing baseline from historical data...');
+    debugPrint('[Behavioral] Establishing baseline from historical data...');
 
     try {
       // Get usage data for last 7 days
       final usageStats = await _getUsageStats(hours: 24 * 7);
 
       if (usageStats.isEmpty) {
-        print(
+        debugPrint(
             '[Behavioral] No usage data available. Ensure Usage Stats permission is granted.');
         return;
       }
@@ -47,16 +49,16 @@ class EnhancedBehavioralDetector {
 
       // Calculate baselines
       for (final entry in _historicalData.entries) {
-        if (entry.value.length >= MIN_BASELINE_SAMPLES) {
+        if (entry.value.length >= _minBaselineSamples) {
           _appBaselines[entry.key] = _calculateBaseline(entry.value);
         }
       }
 
       _baselineEstablished = true;
-      print(
+      debugPrint(
           '[Behavioral] Baseline established for ${_appBaselines.length} apps');
     } catch (e) {
-      print('[Behavioral] Error establishing baseline: $e');
+      debugPrint('[Behavioral] Error establishing baseline: $e');
     }
   }
 
@@ -81,7 +83,7 @@ class EnhancedBehavioralDetector {
     final threats = <Map<String, dynamic>>[];
 
     if (!_baselineEstablished) {
-      print(
+      debugPrint(
           '[Behavioral] Baseline not established. Run establishBaseline() first.');
       return threats;
     }
@@ -105,7 +107,7 @@ class EnhancedBehavioralDetector {
         final deviation =
             (currentHours - baseline.mean).abs() / baseline.stdDev;
 
-        if (deviation > ANOMALY_THRESHOLD) {
+        if (deviation > _anomalyThreshold) {
           final percentChange =
               ((currentHours - baseline.mean) / baseline.mean * 100).round();
 
@@ -146,7 +148,7 @@ class EnhancedBehavioralDetector {
       // Detect unusual network usage patterns
       threats.addAll(await _detectNetworkAnomalies());
     } catch (e) {
-      print('[Behavioral] Error detecting anomalies: $e');
+      debugPrint('[Behavioral] Error detecting anomalies: $e');
     }
 
     return threats;
@@ -192,7 +194,7 @@ class EnhancedBehavioralDetector {
         }
       }
     } catch (e) {
-      print('[Behavioral] Error detecting background abuse: $e');
+      debugPrint('[Behavioral] Error detecting background abuse: $e');
     }
 
     return threats;
@@ -234,7 +236,7 @@ class EnhancedBehavioralDetector {
         }
       }
     } catch (e) {
-      print('[Behavioral] Error detecting network anomalies: $e');
+      debugPrint('[Behavioral] Error detecting network anomalies: $e');
     }
 
     return threats;
@@ -252,7 +254,7 @@ class EnhancedBehavioralDetector {
 
       return stats.map((s) => Map<String, dynamic>.from(s)).toList();
     } catch (e) {
-      print('[Behavioral] Error getting usage stats: $e');
+      debugPrint('[Behavioral] Error getting usage stats: $e');
       return [];
     }
   }
@@ -270,7 +272,7 @@ class EnhancedBehavioralDetector {
 
       return stats.map((s) => Map<String, dynamic>.from(s)).toList();
     } catch (e) {
-      print('[Behavioral] Error getting network stats: $e');
+      debugPrint('[Behavioral] Error getting network stats: $e');
       return [];
     }
   }

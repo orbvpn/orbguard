@@ -153,6 +153,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                   children: [
                     Text(
                       policy.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -328,6 +330,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                   Expanded(
                     child: Text(
                       policy.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,

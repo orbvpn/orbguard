@@ -163,6 +163,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   children: [
                     Text(
                       actor.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -355,6 +357,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                       children: [
                         Text(
                           actor.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,

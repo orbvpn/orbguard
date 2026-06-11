@@ -1,9 +1,9 @@
-/// Forensics Provider
-/// State management for forensic analysis (Pegasus/spyware detection)
-///
-/// Request/response shapes mirror the live backend handlers in
-/// orbguard.lab/internal/api/handlers/forensics.go and the
-/// ForensicResult / QuickCheckResult models.
+// Forensics Provider
+// State management for forensic analysis (Pegasus/spyware detection)
+//
+// Request/response shapes mirror the live backend handlers in
+// orbguard.lab/internal/api/handlers/forensics.go and the
+// ForensicResult / QuickCheckResult models.
 
 import 'dart:io' show Platform;
 

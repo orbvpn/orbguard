@@ -1,7 +1,6 @@
-/// Network Firewall Screen
-/// Network connection monitoring and blocking
+// Network Firewall Screen
+// Network connection monitoring and blocking
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -150,7 +149,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                 color: (provider.isEnabled
                         ? GlassTheme.successColor
                         : Colors.grey)
-                    .withOpacity(0.2),
+                    .withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
@@ -167,7 +166,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    provider.isEnabled ? 'Firewall Active' : 'Firewall Disabled',
+                    provider.isEnabled ? 'Firewall Active' : 'Firewall Disabled', maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: provider.isEnabled
                           ? GlassTheme.successColor
@@ -180,9 +179,9 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                   Text(
                     provider.isEnabled
                         ? 'Monitoring network connections'
-                        : 'Tap shield icon to enable',
+                        : 'Tap shield icon to enable', maxLines: 2, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   ),
@@ -192,7 +191,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
             Switch(
               value: provider.isEnabled,
               onChanged: (_) => provider.toggle(),
-              activeColor: GlassTheme.successColor,
+              activeThumbColor: GlassTheme.successColor,
             ),
           ],
         ),
@@ -248,7 +247,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 11,
               ),
             ),
@@ -286,7 +285,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.2),
+              color: statusColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -320,7 +319,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     Text(
                       conn.appName ?? conn.appId,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 11,
                       ),
                     ),
@@ -328,7 +327,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     Text(
                       ':${conn.remotePort}',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -343,7 +342,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.2),
+                  color: statusColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -359,7 +358,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               Text(
                 '${conn.timestamp.hour.toString().padLeft(2, '0')}:${conn.timestamp.minute.toString().padLeft(2, '0')}',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
+                  color: Colors.white.withValues(alpha: 0.4),
                   fontSize: 10,
                 ),
               ),
@@ -399,7 +398,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: GlassTheme.errorColor.withOpacity(0.2),
+                  color: GlassTheme.errorColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Center(
@@ -416,16 +415,16 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      alert.blockReason?.displayName ?? 'Connection Blocked',
+                      alert.blockReason?.displayName ?? 'Connection Blocked', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: GlassTheme.errorColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      alert.appName ?? alert.appId,
+                      alert.appName ?? alert.appId, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -435,7 +434,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               Text(
                 _formatTime(alert.timestamp),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
+                  color: Colors.white.withValues(alpha: 0.4),
                   fontSize: 11,
                 ),
               ),
@@ -445,7 +444,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -455,9 +454,9 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Destination',
+                        'Destination', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
+                          color: Colors.white.withValues(alpha: 0.4),
                           fontSize: 10,
                         ),
                       ),
@@ -479,7 +478,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     Text(
                       'Port',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 10,
                       ),
                     ),
@@ -606,7 +605,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               color: (rule.action == RuleAction.block
                       ? GlassTheme.errorColor
                       : GlassTheme.successColor)
-                  .withOpacity(0.2),
+                  .withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -625,7 +624,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  rule.name,
+                  rule.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -636,13 +635,13 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(
                         rule.type.displayName,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 9,
                         ),
                       ),
@@ -652,7 +651,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                       child: Text(
                         rule.pattern,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 11,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -666,13 +665,13 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           Switch(
             value: rule.isEnabled,
             onChanged: (enabled) => provider.toggleRule(rule.id, enabled),
-            activeColor: GlassTheme.primaryAccent,
+            activeThumbColor: GlassTheme.primaryAccent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           IconButton(
             icon: DuotoneIcon(
               'trash_bin_minimalistic',
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
               size: 20,
             ),
             onPressed: () => provider.removeRule(rule.id),
@@ -715,7 +714,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               color: (profile.isAllowed
                       ? GlassTheme.primaryAccent
                       : GlassTheme.errorColor)
-                  .withOpacity(0.2),
+                  .withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Center(
@@ -732,7 +731,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.appName,
+                  profile.appName, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -743,7 +742,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     Text(
                       '${profile.connectionCount} connections',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 11,
                       ),
                     ),
@@ -765,7 +764,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           PopupMenuButton<String>(
             icon: DuotoneIcon(
               'menu_dots',
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               size: 20,
             ),
             color: GlassTheme.gradientTop,
@@ -820,12 +819,12 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          DuotoneIcon(icon, size: 64, color: Colors.white.withOpacity(0.2)),
+          DuotoneIcon(icon, size: 64, color: Colors.white.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -833,7 +832,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withOpacity(0.4)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -900,7 +899,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                   ),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -1027,7 +1026,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: GlassTheme.primaryAccent.withOpacity(0.2),
+                      color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Center(
@@ -1044,7 +1043,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          profile.appName,
+                          profile.appName, maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -1052,9 +1051,9 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                           ),
                         ),
                         Text(
-                          profile.appId,
+                          profile.appId, maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 12,
                           ),
                         ),
@@ -1088,7 +1087,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
                         child: Text(
                           domain,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 13,
                           ),
                         ),
@@ -1112,7 +1111,7 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 13,
               ),
             ),
@@ -1120,6 +1119,8 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           Expanded(
             child: Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,

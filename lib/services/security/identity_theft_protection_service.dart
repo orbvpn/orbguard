@@ -1,18 +1,18 @@
-/// Identity Theft Protection Service
-///
-/// Honest identity monitoring built on live backend capabilities:
-/// - Email exposure monitoring via the dark-web breach service
-///   (POST /darkweb/check/email)
-/// - Data-broker / public-record exposure via the digital footprint
-///   scanner (POST /footprint/scan)
-/// - Credit freeze guidance via the bureaus' OFFICIAL freeze pages
-///   (OrbGuard cannot freeze credit on a user's behalf; freeze state is
-///   recorded locally as user-declared / self-reported only)
-/// - Identity recovery checklists (local, user-managed)
-///
-/// Asset types without a live monitoring source (SSN, credit cards, bank
-/// accounts, ...) are stored locally and explicitly surfaced with the
-/// `unavailable` status — they are never presented as "monitored".
+// Identity Theft Protection Service
+//
+// Honest identity monitoring built on live backend capabilities:
+// - Email exposure monitoring via the dark-web breach service
+//   (POST /darkweb/check/email)
+// - Data-broker / public-record exposure via the digital footprint
+//   scanner (POST /footprint/scan)
+// - Credit freeze guidance via the bureaus' OFFICIAL freeze pages
+//   (OrbGuard cannot freeze credit on a user's behalf; freeze state is
+//   recorded locally as user-declared / self-reported only)
+// - Identity recovery checklists (local, user-managed)
+//
+// Asset types without a live monitoring source (SSN, credit cards, bank
+// accounts, ...) are stored locally and explicitly surfaced with the
+// `unavailable` status — they are never presented as "monitored".
 
 import 'dart:async';
 import 'dart:convert';

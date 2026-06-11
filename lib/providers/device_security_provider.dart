@@ -1,11 +1,11 @@
-/// Device Security Provider
-/// State management for anti-theft features: locate, lock, wipe, ring,
-/// SIM monitoring, thief selfies and the on-device agent lifecycle.
-///
-/// All parsing matches the orbguard.lab contracts exactly
-/// (internal/domain/models/device_security.go). There are no fabricated
-/// defaults: when the backend cannot be reached the provider surfaces the
-/// error instead of pretending the device scored 100/100.
+// Device Security Provider
+// State management for anti-theft features: locate, lock, wipe, ring,
+// SIM monitoring, thief selfies and the on-device agent lifecycle.
+//
+// All parsing matches the orbguard.lab contracts exactly
+// (internal/domain/models/device_security.go). There are no fabricated
+// defaults: when the backend cannot be reached the provider surfaces the
+// error instead of pretending the device scored 100/100.
 
 import 'dart:async';
 import 'dart:developer' as developer;

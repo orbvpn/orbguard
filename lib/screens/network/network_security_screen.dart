@@ -1,5 +1,5 @@
-/// Network Security Screen
-/// Main screen for network security and WiFi protection
+// Network Security Screen
+// Main screen for network security and WiFi protection
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -296,7 +296,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'VPN protection is provided by OrbVPN',
+                        'VPN protection is provided by OrbVPN', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -307,7 +307,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       Text(
                         'OrbGuard does not run a VPN tunnel itself. To encrypt '
                         'your traffic and hide your IP address, install and '
-                        'connect with the separate OrbVPN app.',
+                        'connect with the separate OrbVPN app.', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.grey[400],
                           fontSize: 12,
@@ -368,7 +368,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'VPN Recommended',
+                          'VPN Recommended', maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.orange,
                             fontWeight: FontWeight.bold,
@@ -377,6 +377,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                         Text(
                           'You\'re on an unsecured network. Connect through '
                           'OrbVPN for protection.',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.orange[300],
                             fontSize: 12,
@@ -473,7 +475,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      name, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
@@ -481,7 +483,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     ),
                     if (location.isNotEmpty)
                       Text(
-                        location,
+                        location, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.grey[500],
                           fontSize: 12,
@@ -532,14 +534,14 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
                 Text(
-                  description,
+                  description, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 12,
@@ -582,7 +584,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Secure DNS is set up in your device settings',
+                        'Secure DNS is set up in your device settings', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -593,7 +595,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       Text(
                         'OrbGuard does not change your device DNS. You can '
                         'enable encrypted, threat-blocking DNS at the '
-                        'operating-system level using the steps below.',
+                        'operating-system level using the steps below.', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.grey[400],
                           fontSize: 12,
@@ -661,6 +663,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                   Expanded(
                     child: Text(
                       provider.dnsCheckError!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.red[300], fontSize: 12),
                     ),
                   ),
@@ -772,7 +776,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                           ? 'Hijack check not performed'
                           : result.isHijacked
                               ? 'DNS hijacking detected'
-                              : 'No DNS hijacking detected',
+                              : 'No DNS hijacking detected', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: hijackColor,
                         fontWeight: FontWeight.bold,
@@ -783,7 +787,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       !result.hijackCheckPerformed
                           ? statusDetail(result.hijackCheckStatus)
                           : result.hijackDescription ??
-                              statusDetail(result.hijackCheckStatus),
+                              statusDetail(result.hijackCheckStatus), maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     ),
                   ],
@@ -820,6 +824,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       Expanded(
                         child: Text(
                           issue,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               color: Colors.orange[300], fontSize: 12),
                         ),
@@ -847,6 +853,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                         ? 'DNS leak check unavailable: '
                             '${statusDetail(result.leakCheckStatus)}'
                         : 'Leak check: ${result.leakCheckStatus}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.grey[500], fontSize: 11),
                   ),
                 ),
@@ -911,14 +919,14 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  name, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
                 Text(
-                  host,
+                  host, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF00D9FF),
                     fontSize: 13,
@@ -926,7 +934,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                   ),
                 ),
                 Text(
-                  description,
+                  description, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.grey[500], fontSize: 11),
                 ),
               ],
@@ -977,14 +985,14 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
                 Text(
-                  description,
+                  description, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 12,
@@ -1131,6 +1139,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     Expanded(
                       child: Text(
                         'This network is not secure. Avoid transmitting sensitive data.',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.red[300],
                           fontSize: 12,

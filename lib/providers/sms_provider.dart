@@ -5,7 +5,7 @@
 /// consumes only this provider. Blocked senders, protection settings and the
 /// per-message analysis history are persisted with [SharedPreferences]
 /// (the app-wide local persistence pattern, see settings_provider.dart).
-library sms_provider;
+library;
 
 import 'dart:convert';
 

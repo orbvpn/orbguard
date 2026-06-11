@@ -1,12 +1,12 @@
-/// URL Reputation Models
-/// Models for URL/web protection from OrbGuard Lab API
-///
-/// Wire formats in this file mirror the live Go backend:
-/// - POST /url/check            -> models.URLCheckResponse
-/// - GET  /url/reputation/{d}   -> models.URLReputation (DNS/TLS/RDAP enriched)
-/// - POST /url/report           -> 201 {id, status, created_at, message}
-/// - POST /apps/analyze         -> models.AppAnalysisResult (nested analyses)
-/// - POST /network/wifi/audit   -> models.WiFiAuditResult
+// URL Reputation Models
+// Models for URL/web protection from OrbGuard Lab API
+//
+// Wire formats in this file mirror the live Go backend:
+// - POST /url/check            -> models.URLCheckResponse
+// - GET  /url/reputation/{d}   -> models.URLReputation (DNS/TLS/RDAP enriched)
+// - POST /url/report           -> 201 {id, status, created_at, message}
+// - POST /apps/analyze         -> models.AppAnalysisResult (nested analyses)
+// - POST /network/wifi/audit   -> models.WiFiAuditResult
 
 import 'threat_indicator.dart';
 

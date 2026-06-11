@@ -1,5 +1,5 @@
-/// Identity Protection Screen
-/// Monitor and protect against identity theft
+// Identity Protection Screen
+// Monitor and protect against identity theft
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -183,7 +183,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         Text(
                           '$score/100',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -207,7 +207,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     Text(
                       _getScoreDescription(score),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 14,
                       ),
                     ),
@@ -254,7 +254,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: 11,
           ),
         ),
@@ -312,7 +312,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
                 textAlign: TextAlign.center,
@@ -365,7 +365,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               'bureau\'s official freeze page, then record your status '
               'here — it is stored as self-reported and is not verified.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 12,
               ),
             ),
@@ -388,7 +388,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       decoration: BoxDecoration(
                         color: Color(IdentityProtectionProvider.getBureauColor(
                                 bureau))
-                            .withOpacity(0.2),
+                            .withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -407,6 +407,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         children: [
                           Text(
                             bureau.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w500,
@@ -416,6 +418,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                             isFrozen
                                 ? 'Frozen (self-reported)'
                                 : 'Not frozen (self-reported)',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: isFrozen
                                   ? GlassTheme.successColor
@@ -493,7 +497,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: GlassTheme.primaryAccent.withOpacity(0.2),
+            color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Center(
@@ -555,12 +559,16 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     color: GlassTheme.primaryAccent,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    entry.key.displayName,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      entry.key.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -584,7 +592,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.2),
+            color: statusColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Center(
@@ -621,7 +629,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     : asset.status.displayName,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
@@ -631,7 +639,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: GlassTheme.errorColor.withOpacity(0.2),
+                  color: GlassTheme.errorColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -719,7 +727,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: severityColor.withOpacity(0.2),
+                    color: severityColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
@@ -737,6 +745,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     children: [
                       Text(
                         alert.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: alert.isResolved ? Colors.white54 : Colors.white,
                           fontWeight: FontWeight.bold,
@@ -744,8 +754,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       ),
                       Text(
                         alert.type.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -778,7 +790,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
             Text(
               alert.description,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),
@@ -807,8 +819,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         Expanded(
                           child: Text(
                             action,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                           ),
@@ -854,7 +868,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -867,7 +881,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
               textAlign: TextAlign.center,
             ),
             if (action != null) ...[
@@ -1011,7 +1025,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   'on this device (masked and hashed) and are shown as '
                   '"Unavailable" until a live data source exists for them.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 14,
                   ),
                 ),
@@ -1040,7 +1054,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       selected: isSelected,
                       selectedColor: GlassTheme.primaryAccent,
                       backgroundColor:
-                          GlassTheme.primaryAccent.withOpacity(0.2),
+                          GlassTheme.primaryAccent.withValues(alpha: 0.2),
                       labelStyle: TextStyle(
                         color: isSelected
                             ? Colors.white
@@ -1136,7 +1150,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         ),
         content: Text(
           'Stop monitoring ${asset.maskedValue}?',
-          style: TextStyle(color: Colors.white.withOpacity(0.8)),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
         ),
         actions: [
           TextButton(

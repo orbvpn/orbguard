@@ -167,10 +167,10 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: isClean
-              ? [Colors.green.withOpacity(0.3), const Color(0xFF0A0E21)]
+              ? [Colors.green.withValues(alpha: 0.3), const Color(0xFF0A0E21)]
               : critical > 0
-                  ? [Colors.red.withOpacity(0.3), const Color(0xFF0A0E21)]
-                  : [Colors.orange.withOpacity(0.3), const Color(0xFF0A0E21)],
+                  ? [Colors.red.withValues(alpha: 0.3), const Color(0xFF0A0E21)]
+                  : [Colors.orange.withValues(alpha: 0.3), const Color(0xFF0A0E21)],
         ),
       ),
       child: SafeArea(
@@ -185,17 +185,17 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isClean
-                    ? Colors.green.withOpacity(0.2)
+                    ? Colors.green.withValues(alpha: 0.2)
                     : critical > 0
-                        ? Colors.red.withOpacity(0.2)
-                        : Colors.orange.withOpacity(0.2),
+                        ? Colors.red.withValues(alpha: 0.2)
+                        : Colors.orange.withValues(alpha: 0.2),
                 boxShadow: [
                   BoxShadow(
                     color: isClean
-                        ? Colors.green.withOpacity(0.3)
+                        ? Colors.green.withValues(alpha: 0.3)
                         : critical > 0
-                            ? Colors.red.withOpacity(0.3)
-                            : Colors.orange.withOpacity(0.3),
+                            ? Colors.red.withValues(alpha: 0.3)
+                            : Colors.orange.withValues(alpha: 0.3),
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -268,7 +268,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
         color: const Color(0xFF1D1E33),
         borderRadius: BorderRadius.circular(12),
         border: count > 0
-            ? Border.all(color: color.withOpacity(0.5), width: 1)
+            ? Border.all(color: color.withValues(alpha: 0.5), width: 1)
             : null,
       ),
       child: Column(
@@ -332,14 +332,14 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           DuotoneIcon(icon, size: 20, color: Colors.cyan),
           const SizedBox(height: 8),
           Text(
-            value,
+            value, maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
-            label,
+            label, maxLines: 2, overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 10,
               color: Colors.grey[500],
@@ -356,7 +356,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1D1E33),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -365,7 +365,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.green.withOpacity(0.2),
+              color: Colors.green.withValues(alpha: 0.2),
             ),
             child: const DuotoneIcon('check_circle', size: 32, color: Colors.green),
           ),
@@ -417,7 +417,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -469,7 +469,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -492,7 +492,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1D1E33),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -503,7 +503,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: DuotoneIcon(
@@ -535,7 +535,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -559,9 +559,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,6 +571,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                     Expanded(
                       child: Text(
                         threat.metadata['consequence'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, color: Colors.orange),
                       ),
                     ),
@@ -584,9 +586,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.cyan.withOpacity(0.1),
+                  color: Colors.cyan.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.cyan.withOpacity(0.3)),
+                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,6 +598,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                     Expanded(
                       child: Text(
                         threat.metadata['recommendation'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, color: Colors.cyan),
                       ),
                     ),
@@ -687,9 +691,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.withOpacity(0.15),
+        color: Colors.blueGrey.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blueGrey.withOpacity(0.4)),
+        border: Border.all(color: Colors.blueGrey.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,6 +703,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           Expanded(
             child: Text(
               text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: Colors.grey[400]),
             ),
           ),
@@ -726,6 +732,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           Expanded(
             child: Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12),
             ),
           ),
@@ -1090,6 +1098,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               child: Text(
                 'Could not remove "${threat.name}": $reason '
                 'Manual removal is required.',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

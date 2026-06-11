@@ -1,5 +1,5 @@
-/// Executive Protection Provider
-/// State management for BEC and CEO fraud detection
+// Executive Protection Provider
+// State management for BEC and CEO fraud detection
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -11,7 +11,7 @@ class ExecutiveProtectionProvider extends ChangeNotifier {
 
   // State
   List<ExecutiveProfile> _executives = [];
-  List<ImpersonationResult> _alerts = [];
+  final List<ImpersonationResult> _alerts = [];
   Map<String, dynamic> _stats = {};
 
   // Loading states

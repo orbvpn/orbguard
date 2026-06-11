@@ -32,25 +32,25 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
 
     try {
       final result = await platform.invokeMethod('checkAccessLevel');
-      print('[AccessLevel] Result: $result');
+      debugPrint('[AccessLevel] Result: $result');
       setState(() {
         _currentLevel = result['level'] ?? 'STANDARD';
         _description = result['description'] ?? '';
         _capabilities = List<String>.from(result['capabilities'] ?? []);
       });
-      print('[AccessLevel] Set level to: $_currentLevel');
+      debugPrint('[AccessLevel] Set level to: $_currentLevel');
     } catch (e) {
-      print('[AccessLevel] Error checking access: $e');
+      debugPrint('[AccessLevel] Error checking access: $e');
     } finally {
       setState(() => _isChecking = false);
     }
   }
 
   Future<void> _setupElevatedAccess() async {
-    print('[AccessLevel] Tapped Enable Shell Access');
+    debugPrint('[AccessLevel] Tapped Enable Shell Access');
     try {
       final result = await platform.invokeMethod('getSetupInstructions');
-      print('[AccessLevel] Got instructions: $result');
+      debugPrint('[AccessLevel] Got instructions: $result');
       final instructions = result as Map<dynamic, dynamic>;
 
       if (!mounted) return;
@@ -258,7 +258,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.green),
                     ),
@@ -354,7 +354,6 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
   List<String> get _benefits =>
       List<String>.from(widget.instructions['benefits'] ?? []);
   String get _persistence => widget.instructions['persistence'] ?? '';
-  String get _scriptPath => widget.instructions['scriptPath'] ?? '';
 
   Future<void> _verifyAccess() async {
     setState(() => _isVerifying = true);
@@ -413,7 +412,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
           children: [
             // Benefits Card
             Card(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -455,7 +454,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
 
               return Card(
                 color: isActive
-                    ? const Color(0xFF00D9FF).withOpacity(0.1)
+                    ? const Color(0xFF00D9FF).withValues(alpha: 0.1)
                     : const Color(0xFF1D1E33),
                 margin: const EdgeInsets.only(bottom: 16),
                 child: InkWell(
@@ -491,6 +490,8 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                             Expanded(
                               child: Text(
                                 step.split('\n').first,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -538,7 +539,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.orange),
               ),

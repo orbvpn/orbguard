@@ -468,10 +468,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               children: [
                 Text(
                   item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   item.type,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                 ),
                 const SizedBox(height: 4),
@@ -505,7 +509,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           GlassSvgIconBox(icon: icon, color: enabled ? GlassTheme.primaryAccent : Colors.grey, size: 36),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
           ),
           DuotoneIcon(
             enabled ? 'check_circle' : 'close_circle',
@@ -716,15 +720,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               children: [
                 Text(
                   app.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
                 if (app.isSigned && app.developer.isNotEmpty)
                   Text(
                     app.developer,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                   ),
                 Text(
                   app.bundleId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10, fontFamily: 'monospace'),
                 ),
               ],
@@ -1083,7 +1093,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(rule.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(rule.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 Row(
                   children: [
                     GlassBadge(
@@ -2177,7 +2187,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         GlassBadge(
                           text: item.isSuspicious ? 'Suspicious' : 'Safe',

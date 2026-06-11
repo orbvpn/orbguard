@@ -1,5 +1,5 @@
-/// Forensics Screen
-/// iOS/Android forensic analysis for Pegasus/spyware detection
+// Forensics Screen
+// iOS/Android forensic analysis for Pegasus/spyware detection
 
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -430,10 +430,14 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             children: [
               Text(
                 finding.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
               Text(
                 finding.category,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.grey[500], fontSize: 12),
               ),
             ],
@@ -902,16 +906,22 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      finding.category,
-                                      style: TextStyle(
-                                          color: Colors.grey[500], fontSize: 12),
+                                    Flexible(
+                                      child: Text(
+                                        finding.category,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: Colors.grey[500], fontSize: 12),
+                                      ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
                                   finding.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,

@@ -1,5 +1,5 @@
-/// Dashboard Screen
-/// Main dashboard with real-time threat intelligence and protection status
+// Dashboard Screen
+// Main dashboard with real-time threat intelligence and protection status
 
 import 'package:flutter/material.dart';
 
@@ -253,9 +253,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: bannerColor.withOpacity(0.1),
+          color: bannerColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: bannerColor.withOpacity(0.3)),
+          border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -264,6 +264,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             Expanded(
               child: Text(
                 message,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
                   color: bannerColor,

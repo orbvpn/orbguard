@@ -1,12 +1,12 @@
-/// Executive Impersonation Protection Service
-///
-/// Detects and prevents Business Email Compromise (BEC) and CEO fraud attacks:
-/// - Executive contact identification and monitoring
-/// - Sender spoofing detection (display name vs email mismatch)
-/// - Domain lookalike detection (typosquatting)
-/// - Urgency/pressure language analysis
-/// - Wire transfer/payment request detection
-/// - AI-powered impersonation scoring
+// Executive Impersonation Protection Service
+//
+// Detects and prevents Business Email Compromise (BEC) and CEO fraud attacks:
+// - Executive contact identification and monitoring
+// - Sender spoofing detection (display name vs email mismatch)
+// - Domain lookalike detection (typosquatting)
+// - Urgency/pressure language analysis
+// - Wire transfer/payment request detection
+// - AI-powered impersonation scoring
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -483,14 +483,6 @@ class ExecutiveProtectionService {
     if (distance <= 2 && distance > 0) {
       return true;
     }
-
-    // Check for common substitutions
-    final patterns = [
-      // Character swaps: google -> gooogle, amazzon
-      RegExp(r'(.)\1'),
-      // Missing/extra characters
-      // Domain suffix changes: .com -> .co, .net
-    ];
 
     // Check for subdomain tricks: company.com vs company.com.attacker.com
     if (suspicious.contains(legitimate) || legitimate.contains(suspicious)) {

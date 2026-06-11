@@ -1,5 +1,5 @@
-/// Webhooks Screen
-/// Webhook configuration and management interface
+// Webhooks Screen
+// Webhook configuration and management interface
 
 import 'package:flutter/material.dart';
 
@@ -106,7 +106,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
 
   String _formatSentCount(int count) {
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+    if (count >= 1000) return (count / 1000).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
     return count.toString();
   }
 
@@ -142,15 +142,15 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(webhook.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(webhook.type, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(webhook.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(webhook.type, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
                   ],
                 ),
               ),
               Switch(
                 value: webhook.isEnabled,
                 onChanged: (v) => setState(() => webhook.isEnabled = v),
-                activeColor: GlassTheme.successColor,
+                activeThumbColor: GlassTheme.successColor,
               ),
             ],
           ),

@@ -1,5 +1,5 @@
-/// Dark Web Provider
-/// State management for dark web monitoring and breach alerts
+// Dark Web Provider
+// State management for dark web monitoring and breach alerts
 
 import 'dart:async';
 import 'dart:convert';

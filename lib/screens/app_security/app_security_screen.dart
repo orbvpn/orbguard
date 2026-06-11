@@ -1,5 +1,5 @@
-/// App Security Screen
-/// Main screen for app security analysis and privacy audit
+// App Security Screen
+// Main screen for app security analysis and privacy audit
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -252,6 +252,8 @@ class _AppsTab extends StatelessWidget {
                       children: [
                         Text(
                           app.app.appName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
@@ -705,6 +707,8 @@ class _RisksTab extends StatelessWidget {
                       children: [
                         Text(
                           app.app.appName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,

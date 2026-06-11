@@ -1,5 +1,5 @@
-/// Connection Indicator Widget
-/// Real-time WebSocket connection status indicator
+// Connection Indicator Widget
+// Real-time WebSocket connection status indicator
 
 import 'package:flutter/material.dart';
 
@@ -36,7 +36,7 @@ class ConnectionIndicator extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: _getColor().withOpacity(0.2),
+          color: _getColor().withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -65,9 +65,9 @@ class ConnectionIndicator extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _getColor().withOpacity(0.2),
+          color: _getColor().withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _getColor().withOpacity(0.3)),
+          border: Border.all(color: _getColor().withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -116,7 +116,7 @@ class ConnectionIndicator extends StatelessWidget {
         boxShadow: state == WebSocketState.connected
             ? [
                 BoxShadow(
-                  color: _getColor().withOpacity(0.5),
+                  color: _getColor().withValues(alpha: 0.5),
                   blurRadius: 6,
                   spreadRadius: 1,
                 ),
@@ -218,7 +218,7 @@ class _PulsingDotState extends State<_PulsingDot>
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(_animation.value),
+            color: widget.color.withValues(alpha: _animation.value),
             shape: BoxShape.circle,
           ),
         );
@@ -263,7 +263,7 @@ class ConnectionHealthCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _getStateColor().withOpacity(0.2),
+            color: _getStateColor().withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: DuotoneIcon(
@@ -291,6 +291,8 @@ class ConnectionHealthCard extends StatelessWidget {
                   fontSize: 13,
                   color: _getStateColor(),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -352,12 +354,16 @@ class ConnectionHealthCard extends StatelessWidget {
             color: Colors.grey[500],
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: valueColor,
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: valueColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

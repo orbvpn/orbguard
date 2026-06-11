@@ -1,5 +1,5 @@
-/// Threat Statistics Models
-/// Models for statistics and dashboard data from OrbGuard Lab API
+// Threat Statistics Models
+// Models for statistics and dashboard data from OrbGuard Lab API
 
 import 'threat_indicator.dart';
 

@@ -1,6 +1,6 @@
 /// URL Provider
 /// State management for URL/web protection features
-library url_provider;
+library;
 
 import 'dart:convert';
 

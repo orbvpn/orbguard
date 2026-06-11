@@ -7,6 +7,7 @@
 /// internal/infrastructure/graph/explore.go NodeView/RelationView). Both
 /// answer 503 when the deployment has no Neo4j — surfaced as an explicit
 /// error state, never an empty fake graph.
+library;
 
 import 'dart:math' as math;
 
@@ -416,6 +417,8 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                       children: [
                         Text(
                           node.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,

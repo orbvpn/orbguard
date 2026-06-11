@@ -1,6 +1,6 @@
 /// QR Widgets
 /// Reusable widgets for QR code scanning screens
-library qr_widgets;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -53,6 +53,8 @@ class QrResultCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -428,6 +430,8 @@ class QrHistoryItem extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -436,6 +440,8 @@ class QrHistoryItem extends StatelessWidget {
                       color: Colors.grey[500],
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -538,6 +544,8 @@ class QrStatsCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'Quishing & malicious QR protection',
@@ -545,6 +553,8 @@ class QrStatsCard extends StatelessWidget {
                         color: Colors.grey,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -600,6 +610,8 @@ class _StatItem extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
@@ -608,6 +620,8 @@ class _StatItem extends StatelessWidget {
               color: Colors.grey[500],
               fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

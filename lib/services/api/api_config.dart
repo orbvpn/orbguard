@@ -1,5 +1,5 @@
-/// OrbGuard Lab API Configuration
-/// Endpoints and configuration for communicating with the threat intelligence backend
+// OrbGuard Lab API Configuration
+// Endpoints and configuration for communicating with the threat intelligence backend
 
 class ApiConfig {
   /// Base URL for OrbGuard Lab API
@@ -764,7 +764,7 @@ class ApiEndpoints {
   /// device-agent with a high-priority data push instead of waiting for the
   /// next HTTP poll.
   /// POST /api/v1/device/{device_id}/push-token
-  /// Body: { "token": "<fcm/apns token>", "platform": "android"|"ios" }
+  /// Body: { "token": "`<fcm/apns token>`", "platform": "android"|"ios" }
   ///
   /// ACTIVATION: the backend handler + migration 022 (device push_token column
   /// already exists; 022 adds the route wiring + FCM sender config) ship with

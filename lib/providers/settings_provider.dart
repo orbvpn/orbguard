@@ -1,5 +1,5 @@
-/// Settings Provider
-/// State management for app settings and configuration
+// Settings Provider
+// State management for app settings and configuration
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,12 +1,11 @@
-/// Glass App Bar - iOS 26 Liquid Glass Design
-/// Frosted glass-effect app bar widget matching OrbX design
-///
-/// Features:
-/// - Round back button on LEFT
-/// - Title in pill-shaped container on RIGHT
-/// - Tap feedback animation (scale + opacity)
+// Glass App Bar - iOS 26 Liquid Glass Design
+// Frosted glass-effect app bar widget matching OrbX design
+//
+// Features:
+// - Round back button on LEFT
+// - Title in pill-shaped container on RIGHT
+// - Tap feedback animation (scale + opacity)
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -100,6 +99,8 @@ class GlassHeader extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -230,6 +231,8 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     if (title != null) {
       return Text(
         title!,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: textColor,
           fontSize: 18,
@@ -544,6 +547,8 @@ class GlassPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -643,6 +648,8 @@ class GlassBottomNav extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             item.label!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: iconColor,
                               fontSize: 10,

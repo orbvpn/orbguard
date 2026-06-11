@@ -584,7 +584,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                 Text(
                   subtitle,
                   style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
@@ -717,7 +717,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           GlassDuotoneIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(type, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            child: Text(type, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
           ),
           Text(
             count.toString(),

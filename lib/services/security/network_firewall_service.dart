@@ -1,12 +1,12 @@
-/// Network Firewall Service
-///
-/// Network-level attack blocking and monitoring:
-/// - Outbound connection monitoring
-/// - Malicious domain blocking
-/// - IP reputation checking
-/// - Traffic analysis
-/// - Per-app network rules
-/// - Connection alerts
+// Network Firewall Service
+//
+// Network-level attack blocking and monitoring:
+// - Outbound connection monitoring
+// - Malicious domain blocking
+// - IP reputation checking
+// - Traffic analysis
+// - Per-app network rules
+// - Connection alerts
 
 import 'dart:async';
 import 'dart:convert';

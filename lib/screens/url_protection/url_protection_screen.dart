@@ -1,7 +1,6 @@
 /// URL Protection Screen
 /// Main screen for URL/web protection
-
-library url_protection_screen;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -584,6 +583,8 @@ class _StatusRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.grey[400],
               fontSize: 14,

@@ -248,8 +248,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(server.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(server.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(server.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(server.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                   ],
                 ),
               ),
@@ -353,7 +353,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(collection.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(collection.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     Text(collection.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
@@ -452,7 +452,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(obj.name ?? obj.id, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(obj.name ?? obj.id, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 Row(
                   children: [
                     GlassBadge(text: obj.type, color: _getStixTypeColor(obj.type), fontSize: 10),
@@ -525,7 +525,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(server.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(server.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: 'TAXII ${server.version}', color: GlassTheme.primaryAccent),
                       ],
                     ),
@@ -580,7 +580,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(obj.name ?? 'STIX Object', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(obj.name ?? 'STIX Object', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       GlassBadge(text: obj.type, color: _getStixTypeColor(obj.type)),
                     ],
                   ),

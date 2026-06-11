@@ -318,9 +318,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     Text(
-                      model.version.isEmpty ? model.type : '${model.type} • v${model.version}',
+                      model.version.isEmpty ? model.type : '${model.type} • v${model.version}', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
                     ),
                   ],
@@ -425,6 +425,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
               const Expanded(
                 child: Text(
                   'Anomaly Model Not Trained',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -483,8 +485,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(anomaly.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(anomaly.model, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(anomaly.model, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
                   ],
                 ),
               ),
@@ -596,9 +598,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(insight, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
+                Text(insight, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
               ],
             ),
           ),
@@ -696,7 +698,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(anomaly.title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         GlassBadge(text: anomaly.severity.toUpperCase(), color: severityColor),
                       ],
                     ),

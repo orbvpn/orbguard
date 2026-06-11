@@ -201,9 +201,13 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(framework.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                     Text(framework.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                   ],
                 ),
@@ -300,8 +304,12 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(report.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 Text(report.framework.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                 const SizedBox(height: 4),
                 Row(

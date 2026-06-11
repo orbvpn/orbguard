@@ -1,5 +1,5 @@
-/// Dark Web Widgets
-/// Reusable widgets for dark web monitoring screens
+// Dark Web Widgets
+// Reusable widgets for dark web monitoring screens
 
 import 'package:flutter/material.dart';
 
@@ -147,6 +147,8 @@ class BreachCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         breach.domain,
@@ -154,6 +156,8 @@ class BreachCard extends StatelessWidget {
                           color: Colors.grey[500],
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -383,6 +387,8 @@ class BreachAlertCard extends StatelessWidget {
                                 color:
                                     alert.isRead ? Colors.grey[400] : Colors.white,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           SeverityBadge(
@@ -396,6 +402,8 @@ class BreachAlertCard extends StatelessWidget {
                           color: Colors.grey[500],
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -547,6 +555,8 @@ class MonitoredAssetCard extends StatelessWidget {
                       fontSize: 15,
                       color: asset.isMonitoring ? Colors.white : Colors.grey,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (asset.lastChecked != null) ...[
                     const SizedBox(height: 4),
@@ -556,6 +566,8 @@ class MonitoredAssetCard extends StatelessWidget {
                         color: Colors.grey[600],
                         fontSize: 11,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -807,6 +819,8 @@ class DarkWebStatsCard extends StatelessWidget {
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 label,
@@ -814,6 +828,8 @@ class DarkWebStatsCard extends StatelessWidget {
                   color: Colors.grey[500],
                   fontSize: 12,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -1097,6 +1113,8 @@ class BreachCheckResultCard extends StatelessWidget {
               color: Colors.grey[400],
               fontSize: 14,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (isBreached) ...[
             const SizedBox(height: 8),

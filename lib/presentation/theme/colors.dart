@@ -200,15 +200,15 @@ class AppColors {
 
   /// Get color with opacity
   static Color withOpacity(Color color, double opacity) {
-    return color.withOpacity(opacity);
+    return color.withValues(alpha: opacity);
   }
 
   /// Semi-transparent overlay
-  static Color get overlay => Colors.black.withOpacity(0.5);
+  static Color get overlay => Colors.black.withValues(alpha: 0.5);
 
   /// Light overlay
-  static Color get overlayLight => Colors.black.withOpacity(0.2);
+  static Color get overlayLight => Colors.black.withValues(alpha: 0.2);
 
   /// Dark overlay
-  static Color get overlayDark => Colors.black.withOpacity(0.7);
+  static Color get overlayDark => Colors.black.withValues(alpha: 0.7);
 }

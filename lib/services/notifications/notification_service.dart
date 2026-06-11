@@ -1,5 +1,5 @@
-/// Notification Service
-/// Core service for local and push notifications
+// Notification Service
+// Core service for local and push notifications
 
 import 'dart:async';
 import 'dart:convert';

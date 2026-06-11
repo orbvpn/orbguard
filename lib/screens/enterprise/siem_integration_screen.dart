@@ -225,8 +225,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connection.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(connection.type, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(connection.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(connection.type, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                   ],
                 ),
               ),
@@ -312,8 +312,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(forwarder.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('To: ${forwarder.destination}', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(forwarder.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('To: ${forwarder.destination}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                   ],
                 ),
               ),
@@ -417,9 +417,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(alert.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(alert.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     if (alert.source.isNotEmpty)
-                      Text(alert.source, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                      Text(alert.source, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
                     if (alert.description.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(alert.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -542,7 +542,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(connection.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(connection.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: connection.type, color: GlassTheme.primaryAccent),
                       ],
                     ),

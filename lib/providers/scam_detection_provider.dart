@@ -1,13 +1,13 @@
-/// Scam Detection Provider
-/// State management for AI-powered scam analysis
-///
-/// Wire format (source of truth: orbguard.lab):
-/// - POST /scam/analyze       -> models.ScamAnalysisResult (scam_analysis.go)
-/// - GET  /scam/patterns      -> {version, last_updated, scam_types: [...], risk_indicators: [...]}
-/// - POST /scam/report        -> {content, content_type, scam_type, phone_number?, url?, description?}
-/// - GET  /scam/phone/{number} -> {phone_number, reputation_score, is_scam,
-///                                 is_suspicious, risk_score, scam_type,
-///                                 severity, explanation, indicators}
+// Scam Detection Provider
+// State management for AI-powered scam analysis
+//
+// Wire format (source of truth: orbguard.lab):
+// - POST /scam/analyze       -> models.ScamAnalysisResult (scam_analysis.go)
+// - GET  /scam/patterns      -> {version, last_updated, scam_types: [...], risk_indicators: [...]}
+// - POST /scam/report        -> {content, content_type, scam_type, phone_number?, url?, description?}
+// - GET  /scam/phone/{number} -> {phone_number, reputation_score, is_scam,
+//                                 is_suspicious, risk_score, scam_type,
+//                                 severity, explanation, indicators}
 
 import 'package:flutter/foundation.dart';
 import '../services/api/api_interceptors.dart' show ApiError;

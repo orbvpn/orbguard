@@ -241,11 +241,13 @@ class PermissionManager {
 
     // If permanently denied, show settings dialog
     if (status.isPermanentlyDenied) {
+      if (!context.mounted) return status;
       await _showSettingsDialog(context, title, explanation);
       return status;
     }
 
     // Show rationale dialog
+    if (!context.mounted) return status;
     final shouldRequest = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -270,7 +272,7 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -334,7 +336,7 @@ class PermissionManager {
       await platform.invokeMethod('requestStoragePermission');
       return true;
     } catch (e) {
-      print('Error requesting storage permission: $e');
+      debugPrint('Error requesting storage permission: $e');
       return false;
     }
   }
@@ -382,7 +384,7 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -418,7 +420,7 @@ class PermissionManager {
         await platform.invokeMethod('openUsageStatsSettings');
         return true;
       } catch (e) {
-        print('Error opening usage stats settings: $e');
+        debugPrint('Error opening usage stats settings: $e');
         return false;
       }
     }
@@ -444,7 +446,7 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -480,7 +482,7 @@ class PermissionManager {
         await platform.invokeMethod('openAccessibilitySettings');
         return true;
       } catch (e) {
-        print('Error opening accessibility settings: $e');
+        debugPrint('Error opening accessibility settings: $e');
         return false;
       }
     }

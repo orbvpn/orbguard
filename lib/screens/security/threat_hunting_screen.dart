@@ -1,5 +1,5 @@
-/// Threat Hunting Screen
-/// Proactive threat detection and investigation dashboard
+// Threat Hunting Screen
+// Proactive threat detection and investigation dashboard
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -218,16 +218,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hunt?.name ?? 'Running Hunt',
+                      hunt?.name ?? 'Running Hunt', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      progress.phase,
+                      progress.phase, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -307,7 +307,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 11,
               ),
             ),
@@ -412,7 +412,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.2),
+                      color: typeColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -429,7 +429,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          hunt.name,
+                          hunt.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -438,7 +438,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          hunt.type.displayName,
+                          hunt.type.displayName, maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: typeColor,
                             fontSize: 12,
@@ -454,7 +454,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: badgeColor.withOpacity(0.2),
+                        color: badgeColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -472,7 +472,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Text(
                 hunt.description,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 13,
                 ),
               ),
@@ -487,7 +487,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -568,7 +568,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: severityColor.withOpacity(0.2),
+                    color: severityColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
@@ -585,16 +585,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        finding.ruleName,
+                        finding.ruleName, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        finding.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').trim(),
+                        finding.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').trim(), maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -625,7 +625,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               finding.description,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),
@@ -643,6 +643,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   Expanded(
                     child: Text(
                       finding.evidence,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -663,7 +665,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: GlassTheme.primaryAccent.withOpacity(0.2),
+                        color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -692,8 +694,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         Expanded(
                           child: Text(
                             r,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                           ),
@@ -743,7 +747,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
+                    color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
@@ -760,16 +764,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        caseItem.title,
+                        caseItem.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        '${caseItem.relatedFindings.length} related findings',
+                        '${caseItem.relatedFindings.length} related findings', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -782,7 +786,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
+                    color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -800,7 +804,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               caseItem.description,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 13,
               ),
             ),
@@ -810,13 +814,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 DuotoneIcon(
                   'clock_circle',
                   size: 14,
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'Opened ${_formatDate(caseItem.createdAt)}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -879,7 +883,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: GlassTheme.primaryAccent.withOpacity(0.2),
+                    color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -895,7 +899,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 Text(
                   '${hunts.length} hunt(s)',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -905,7 +909,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               _getMitreDescription(techniqueId),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 13,
               ),
             ),
@@ -919,7 +923,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -949,7 +953,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -962,7 +966,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1088,7 +1092,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.2),
+                      color: typeColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
@@ -1105,7 +1109,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          hunt.name,
+                          hunt.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
@@ -1113,7 +1117,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           ),
                         ),
                         Text(
-                          hunt.type.displayName,
+                          hunt.type.displayName, maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: typeColor),
                         ),
                       ],
@@ -1125,7 +1129,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Text(
                 hunt.description,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 14,
                 ),
               ),
@@ -1180,16 +1184,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                rule.name,
+                                rule.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                               Text(
-                                'Type: ${rule.type.name}',
+                                'Type: ${rule.type.name}', maxLines: 2, overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   fontSize: 11,
                                 ),
                               ),
@@ -1267,7 +1271,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  rule?.name ?? entry.key,
+                                  rule?.name ?? entry.key, maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w500,
@@ -1275,9 +1279,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  entry.value,
+                                  entry.value, maxLines: 2, overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Colors.white.withValues(alpha: 0.6),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -1656,6 +1660,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(node.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -1904,10 +1910,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     Text(
                         _isRunningCorrelation
                             ? 'Running Correlation...'
-                            : 'Run Correlation',
+                            : 'Run Correlation', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold)),
-                    const Text('Correlate recent indicators across engines',
+                    const Text('Correlate recent indicators across engines', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: Colors.white54, fontSize: 12)),
                   ],
                 ),
@@ -1978,7 +1984,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${event.engine} correlation',
+                    Text('${event.engine} correlation', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold)),
                     if (event.description.isNotEmpty)
@@ -2097,9 +2103,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('ML Engine', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('ML Engine', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text('${models.where((m) => m.isActive).length} active models', style: TextStyle(color: Colors.white.withAlpha(153))),
+                    Text('${models.where((m) => m.isActive).length} active models', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(153))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -2182,8 +2188,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(model.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(model.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -2251,7 +2257,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(model.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: model.type, color: GlassTheme.primaryAccent),
                       ],
                     ),

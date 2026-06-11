@@ -1,5 +1,5 @@
-/// Social Media Monitor Provider
-/// State management for social media security monitoring
+// Social Media Monitor Provider
+// State management for social media security monitoring
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';

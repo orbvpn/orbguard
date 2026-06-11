@@ -1,5 +1,5 @@
-/// Campaign and Threat Actor Models
-/// Models for campaigns and threat actors from OrbGuard Lab API
+// Campaign and Threat Actor Models
+// Models for campaigns and threat actors from OrbGuard Lab API
 
 import 'threat_indicator.dart';
 

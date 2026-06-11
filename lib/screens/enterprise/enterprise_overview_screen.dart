@@ -314,8 +314,24 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withAlpha(153)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );

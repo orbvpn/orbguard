@@ -1,14 +1,14 @@
-/// Breach Monitoring Service
-///
-/// All breach lookups are proxied through the OrbGuard Lab backend
-/// (`/api/v1/darkweb/*`) so that no third-party API credentials (HIBP,
-/// LeakCheck, Intelligence X) ever ship inside the client binary. The
-/// backend owns provider selection, credentials, rate limiting, and
-/// result aggregation.
-///
-/// Password checks remain privacy-preserving: the password is hashed
-/// with SHA-1 on-device and only the first five characters of the hash
-/// (k-anonymity prefix) are sent to the backend.
+// Breach Monitoring Service
+//
+// All breach lookups are proxied through the OrbGuard Lab backend
+// (`/api/v1/darkweb/*`) so that no third-party API credentials (HIBP,
+// LeakCheck, Intelligence X) ever ship inside the client binary. The
+// backend owns provider selection, credentials, rate limiting, and
+// result aggregation.
+//
+// Password checks remain privacy-preserving: the password is hashed
+// with SHA-1 on-device and only the first five characters of the hash
+// (k-anonymity prefix) are sent to the backend.
 
 import 'dart:async';
 import 'dart:convert';

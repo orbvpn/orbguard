@@ -1,5 +1,5 @@
-/// Privacy Provider
-/// State management for privacy protection: camera/mic monitoring, clipboard, trackers
+// Privacy Provider
+// State management for privacy protection: camera/mic monitoring, clipboard, trackers
 
 import 'dart:io';
 

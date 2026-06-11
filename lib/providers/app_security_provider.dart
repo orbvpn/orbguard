@@ -1,5 +1,5 @@
-/// App Security Provider
-/// State management for app security and privacy analysis
+// App Security Provider
+// State management for app security and privacy analysis
 
 import 'dart:io';
 

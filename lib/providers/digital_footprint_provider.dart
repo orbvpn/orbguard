@@ -1,9 +1,9 @@
-/// Digital Footprint Provider
-/// State management for data broker removal and personal data exposure tracking
-///
-/// Request/response shapes mirror the live backend in
-/// orbguard.lab/internal/api/handlers/footprint.go and the
-/// DigitalFootprint / DataBroker / RemovalRequest models.
+// Digital Footprint Provider
+// State management for data broker removal and personal data exposure tracking
+//
+// Request/response shapes mirror the live backend in
+// orbguard.lab/internal/api/handlers/footprint.go and the
+// DigitalFootprint / DataBroker / RemovalRequest models.
 
 import 'package:flutter/foundation.dart';
 import '../services/api/orbguard_api_client.dart';

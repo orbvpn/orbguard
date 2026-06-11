@@ -1,5 +1,5 @@
-/// Rogue AP Detection Screen
-/// Detects and monitors rogue access points and WiFi threats
+// Rogue AP Detection Screen
+// Detects and monitors rogue access points and WiFi threats
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -151,6 +151,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               Expanded(
                 child: Text(
                   provider.scanStatus,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -190,7 +192,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Color(ap.threatLevel.color).withOpacity(0.2),
+              color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -222,7 +224,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Color(ap.threatLevel.color).withOpacity(0.2),
+                        color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -238,9 +240,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${ap.security.displayName} • Channel ${ap.channel} • ${RogueAPProvider.getSignalDescription(ap.signalStrength)}',
+                  '${ap.security.displayName} • Channel ${ap.channel} • ${RogueAPProvider.getSignalDescription(ap.signalStrength)}', maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -306,7 +308,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 11,
               ),
             ),
@@ -425,7 +427,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Color(ap.threatLevel.color).withOpacity(0.2),
+                  color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Stack(
@@ -490,7 +492,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         Text(
                           'Ch ${ap.channel}',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -498,7 +500,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         Text(
                           '${ap.signalStrength} dBm',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -516,7 +518,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Color(ap.threatLevel.color).withOpacity(0.2),
+                              color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -539,7 +541,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Color(ap.threatLevel.color).withOpacity(0.2),
+                  color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -572,7 +574,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Color(ap.threatLevel.color).withOpacity(0.2),
+                    color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -591,7 +593,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid,
+                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -599,9 +601,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         ),
                       ),
                       Text(
-                        ap.bssid,
+                        ap.bssid, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -653,16 +655,16 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              threat.displayName,
+                              threat.displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              threat.description,
+                              threat.description, maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 fontSize: 12,
                               ),
                             ),
@@ -703,7 +705,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: GlassTheme.primaryAccent.withOpacity(0.2),
+            color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Center(
@@ -724,7 +726,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         subtitle: Text(
           'Added ${_formatDate(ap.addedAt)}',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontSize: 12,
           ),
         ),
@@ -748,7 +750,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -785,7 +787,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -798,7 +800,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -881,7 +883,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Color(ap.threatLevel.color).withOpacity(0.2),
+                    color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -898,7 +900,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid,
+                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -906,9 +908,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         ),
                       ),
                       Text(
-                        ap.bssid,
+                        ap.bssid, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 14,
                         ),
                       ),
@@ -947,7 +949,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Color(ap.threatLevel.color).withOpacity(0.2),
+                      color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -1011,7 +1013,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
           ),
           Text(
             value,
@@ -1098,16 +1100,16 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  subtitle,
+                  subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -1117,7 +1119,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: GlassTheme.primaryAccent,
+            activeThumbColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -1139,7 +1141,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         ),
         content: Text(
           'Remove "${ap.ssid}" from your trusted networks?',
-          style: TextStyle(color: Colors.white.withOpacity(0.8)),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
         ),
         actions: [
           TextButton(

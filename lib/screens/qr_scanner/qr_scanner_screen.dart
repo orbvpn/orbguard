@@ -1,5 +1,5 @@
-/// QR Scanner Screen
-/// Main screen for QR code scanning and security analysis
+// QR Scanner Screen
+// Main screen for QR code scanning and security analysis
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

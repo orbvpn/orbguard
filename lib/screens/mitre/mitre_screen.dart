@@ -1,6 +1,6 @@
 /// MITRE ATT&CK Screen
 /// Displays MITRE ATT&CK matrix for mobile threats
-library mitre_screen;
+library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -285,14 +285,14 @@ class _DetectionsTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Threat Techniques Detected',
+                          'Threat Techniques Detected', maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          '${detections.length} MITRE ATT&CK techniques found',
+                          '${detections.length} MITRE ATT&CK techniques found', maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.red[200],
                             fontSize: 12,
@@ -486,14 +486,14 @@ class _DetectionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Source: ${detection.source}',
+                  'Source: ${detection.source}', maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey[400],
                     fontSize: 11,
                   ),
                 ),
                 Text(
-                  'Confidence: ${(detection.confidence * 100).toInt()}%',
+                  'Confidence: ${(detection.confidence * 100).toInt()}%', maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 10,
