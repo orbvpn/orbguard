@@ -531,39 +531,73 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 
 	reqBody := map[string]interface{}{
 		"model":       c.config.Model,
-		"max_tokens":  c.config.MaxTokens,
 		"temperature": c.config.Temperature,
 		"messages":    openAIMessages,
 	}
+	// OpenAI and Azure OpenAI replaced max_tokens with max_completion_tokens
+	// (newer model families reject the legacy parameter outright). DeepSeek's
+	// OpenAI-compatible API still uses max_tokens.
+	if strings.EqualFold(providerName, "deepseek") {
+		reqBody["max_tokens"] = c.config.MaxTokens
+	} else {
+		reqBody["max_completion_tokens"] = c.config.MaxTokens
+	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	doRequest := func(payload map[string]interface{}) (int, []byte, error) {
+		jsonBody, err := json.Marshal(payload)
+		if err != nil {
+			return 0, nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return 0, nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return 0, nil, err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return resp.StatusCode, nil, err
+		}
+		return resp.StatusCode, body, nil
+	}
+
+	status, body, err := doRequest(reqBody)
 	if err != nil {
 		return nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return nil, err
+	if status == http.StatusBadRequest && strings.Contains(string(body), "unsupported_parameter") {
+		// Some deployments reject parameters the family normally accepts
+		// (e.g. reasoning models reject custom temperature, legacy models
+		// reject max_completion_tokens). Adapt once and retry.
+		retryBody := make(map[string]interface{}, len(reqBody))
+		for k, v := range reqBody {
+			retryBody[k] = v
+		}
+		if strings.Contains(string(body), "temperature") {
+			delete(retryBody, "temperature")
+		}
+		if strings.Contains(string(body), "max_completion_tokens") {
+			delete(retryBody, "max_completion_tokens")
+			retryBody["max_tokens"] = c.config.MaxTokens
+		} else if strings.Contains(string(body), "max_tokens") {
+			delete(retryBody, "max_tokens")
+			retryBody["max_completion_tokens"] = c.config.MaxTokens
+		}
+		status, body, err = doRequest(retryBody)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s API error %d: %s", providerName, resp.StatusCode, string(body))
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("%s API error %d: %s", providerName, status, string(body))
 	}
 
 	// Parse OpenAI response

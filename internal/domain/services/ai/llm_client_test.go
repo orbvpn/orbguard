@@ -69,13 +69,20 @@ func testMessages() []Message {
 // assertOpenAIBodyShape verifies the shared OpenAI-compatible request body:
 // model, max_tokens, temperature, and a system message followed by the user
 // message with structured content parts.
-func assertOpenAIBodyShape(t *testing.T, body map[string]interface{}, wantModel string) {
+func assertOpenAIBodyShape(t *testing.T, body map[string]interface{}, wantModel string, tokenParam string) {
 	t.Helper()
 	if got := body["model"]; got != wantModel {
 		t.Errorf("body model = %v, want %s", got, wantModel)
 	}
-	if _, ok := body["max_tokens"].(float64); !ok {
-		t.Errorf("body max_tokens missing or not a number: %v", body["max_tokens"])
+	if _, ok := body[tokenParam].(float64); !ok {
+		t.Errorf("body %s missing or not a number: %v", tokenParam, body[tokenParam])
+	}
+	other := "max_tokens"
+	if tokenParam == "max_tokens" {
+		other = "max_completion_tokens"
+	}
+	if _, present := body[other]; present {
+		t.Errorf("body must not contain %s when %s is used", other, tokenParam)
 	}
 	if _, ok := body["temperature"].(float64); !ok {
 		t.Errorf("body temperature missing or not a number: %v", body["temperature"])
@@ -145,7 +152,7 @@ func TestCallOpenAIRequestConstruction(t *testing.T) {
 		t.Errorf("Content-Type = %q, want application/json", got)
 	}
 	// gpt-4-turbo is the default model for the openai provider.
-	assertOpenAIBodyShape(t, captured.Body, "gpt-4-turbo")
+	assertOpenAIBodyShape(t, captured.Body, "gpt-4-turbo", "max_completion_tokens")
 }
 
 func TestCallDeepSeekRequestConstruction(t *testing.T) {
@@ -173,7 +180,7 @@ func TestCallDeepSeekRequestConstruction(t *testing.T) {
 		t.Errorf("Authorization header = %q, want Bearer sk-deepseek-test", got)
 	}
 	// deepseek-chat is the default model for the deepseek provider.
-	assertOpenAIBodyShape(t, captured.Body, "deepseek-chat")
+	assertOpenAIBodyShape(t, captured.Body, "deepseek-chat", "max_tokens")
 }
 
 func TestCallAzureOpenAIRequestConstruction(t *testing.T) {
@@ -208,7 +215,7 @@ func TestCallAzureOpenAIRequestConstruction(t *testing.T) {
 		t.Errorf("Authorization header = %q, want empty for azure-openai", got)
 	}
 	// With no explicit model, the deployment name is reported as the model.
-	assertOpenAIBodyShape(t, captured.Body, "gpt-4o-prod")
+	assertOpenAIBodyShape(t, captured.Body, "gpt-4o-prod", "max_completion_tokens")
 }
 
 func TestCallAzureOpenAICustomAPIVersionAndModel(t *testing.T) {
