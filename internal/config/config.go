@@ -81,10 +81,19 @@ type ScamDetectorConfig struct {
 	EnableVision     bool    `mapstructure:"enable_vision"`
 	EnableSpeech     bool    `mapstructure:"enable_speech"`
 	LLMProvider      string  `mapstructure:"llm_provider"`
+	LLMBaseURL       string  `mapstructure:"llm_base_url"`
+	LLMModel         string  `mapstructure:"llm_model"`
 	ClaudeAPIKey     string  `mapstructure:"claude_api_key"`
 	OpenAIAPIKey     string  `mapstructure:"openai_api_key"`
+	DeepSeekAPIKey   string  `mapstructure:"deepseek_api_key"`
 	ScamThreshold    float64 `mapstructure:"scam_threshold"`
 	SuspiciousThresh float64 `mapstructure:"suspicious_threshold"`
+
+	// Azure OpenAI (used only when llm_provider == "azure-openai")
+	AzureOpenAIEndpoint   string `mapstructure:"azure_openai_endpoint"`
+	AzureOpenAIKey        string `mapstructure:"azure_openai_key"`
+	AzureOpenAIDeployment string `mapstructure:"azure_openai_deployment"`
+	AzureOpenAIAPIVersion string `mapstructure:"azure_openai_api_version"`
 }
 
 type AppConfig struct {
@@ -359,8 +368,15 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("scam_detector.enable_vision", "ORBGUARD_SCAM_DETECTOR_ENABLE_VISION")
 	v.BindEnv("scam_detector.enable_speech", "ORBGUARD_SCAM_DETECTOR_ENABLE_SPEECH")
 	v.BindEnv("scam_detector.llm_provider", "ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER")
+	v.BindEnv("scam_detector.llm_base_url", "ORBGUARD_SCAM_DETECTOR_LLM_BASE_URL")
+	v.BindEnv("scam_detector.llm_model", "ORBGUARD_SCAM_DETECTOR_LLM_MODEL")
 	v.BindEnv("scam_detector.claude_api_key", "ORBGUARD_CLAUDE_API_KEY")
 	v.BindEnv("scam_detector.openai_api_key", "ORBGUARD_OPENAI_API_KEY")
+	v.BindEnv("scam_detector.deepseek_api_key", "ORBGUARD_DEEPSEEK_API_KEY")
+	v.BindEnv("scam_detector.azure_openai_endpoint", "ORBGUARD_AZURE_OPENAI_ENDPOINT")
+	v.BindEnv("scam_detector.azure_openai_key", "ORBGUARD_AZURE_OPENAI_KEY")
+	v.BindEnv("scam_detector.azure_openai_deployment", "ORBGUARD_AZURE_OPENAI_DEPLOYMENT")
+	v.BindEnv("scam_detector.azure_openai_api_version", "ORBGUARD_AZURE_OPENAI_API_VERSION")
 
 	// Defaults for sections that may be absent from older config files.
 	// PatternDB and PhoneRep are local databases with no external dependency,
@@ -372,6 +388,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("scam_detector.enable_vision", true)
 	v.SetDefault("scam_detector.enable_speech", true)
 	v.SetDefault("scam_detector.llm_provider", "claude")
+	v.SetDefault("scam_detector.azure_openai_api_version", "2024-02-15-preview")
 	v.SetDefault("scam_detector.scam_threshold", 0.7)
 	v.SetDefault("scam_detector.suspicious_threshold", 0.4)
 	v.SetDefault("hibp.enabled", true)

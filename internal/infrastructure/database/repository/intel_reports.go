@@ -163,6 +163,17 @@ func (r *ThreatReportRepository) ListByStatus(ctx context.Context, status string
 	return reports, total, nil
 }
 
+// CountByStatus returns the number of reports with the given status.
+func (r *ThreatReportRepository) CountByStatus(ctx context.Context, status string) (int64, error) {
+	var count int64
+	if err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM threat_reports WHERE status = $1`, status,
+	).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count threat reports by status: %w", err)
+	}
+	return count, nil
+}
+
 // ListByReporter returns reports submitted by the given user and/or device,
 // newest first, plus the total count.
 func (r *ThreatReportRepository) ListByReporter(ctx context.Context, userID, deviceID string, limit, offset int) ([]*ThreatReport, int64, error) {

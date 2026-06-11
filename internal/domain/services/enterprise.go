@@ -54,10 +54,13 @@ type MDMService struct {
 	cache   *cache.RedisCache
 	logger  *logger.Logger
 
-	// In-memory config store (in production, use database)
+	// In-memory working set, backed by intRepo when a database is available.
 	configs map[uuid.UUID]*models.MDMIntegrationConfig
 	devices map[uuid.UUID]*models.MDMDevice
 	mu      sync.RWMutex
+
+	// intRepo persists integration configs (orbguard_lab.enterprise_integrations).
+	intRepo *repository.EnterpriseIntegrationRepository
 
 	// HTTP client for MDM API calls
 	httpClient *http.Client
@@ -65,28 +68,84 @@ type MDMService struct {
 
 // NewMDMService creates a new MDM service
 func NewMDMService(repos *repository.Repositories, cache *cache.RedisCache, log *logger.Logger) *MDMService {
-	return &MDMService{
+	svc := &MDMService{
 		repos:   repos,
 		cache:   cache,
 		logger:  log.WithComponent("mdm"),
 		configs: make(map[uuid.UUID]*models.MDMIntegrationConfig),
 		devices: make(map[uuid.UUID]*models.MDMDevice),
+		intRepo: repository.NewEnterpriseIntegrationRepositoryFromRepos(repos),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
+
+	svc.loadIntegrations()
+
+	return svc
 }
 
-// CreateIntegration creates a new MDM integration
-func (s *MDMService) CreateIntegration(ctx context.Context, config *models.MDMIntegrationConfig) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// loadIntegrations populates the in-memory config set from the database at
+// boot so MDM integrations survive restarts.
+func (s *MDMService) loadIntegrations() {
+	if s.intRepo == nil {
+		s.logger.Warn().Msg("no database available: MDM integrations are in-memory only")
+		return
+	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stored, err := s.intRepo.ListMDM(ctx)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to load MDM integrations")
+		return
+	}
+
+	s.mu.Lock()
+	for _, config := range stored {
+		s.configs[config.ID] = config
+	}
+	s.mu.Unlock()
+
+	s.logger.Info().Int("count", len(stored)).Msg("loaded MDM integrations")
+}
+
+// persistMDMConfig writes an integration config to the database when
+// persistence is configured. A copy of the config is taken under the read
+// lock so concurrent mutations cannot tear the persisted document.
+func (s *MDMService) persistMDMConfig(config *models.MDMIntegrationConfig) error {
+	if s.intRepo == nil {
+		return nil
+	}
+
+	s.mu.RLock()
+	snapshot := *config
+	s.mu.RUnlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return s.intRepo.UpsertMDM(ctx, &snapshot)
+}
+
+// CreateIntegration creates a new MDM integration. When persistence is
+// configured the config must be stored before it becomes visible: a failed
+// write fails the request instead of leaving a phantom in-memory integration.
+func (s *MDMService) CreateIntegration(ctx context.Context, config *models.MDMIntegrationConfig) error {
 	config.ID = uuid.New()
 	config.CreatedAt = time.Now()
 	config.UpdatedAt = time.Now()
 
+	if s.intRepo != nil {
+		if err := s.intRepo.UpsertMDM(ctx, config); err != nil {
+			s.logger.Error().Err(err).Str("name", config.Name).Msg("failed to persist MDM integration")
+			return fmt.Errorf("persist MDM integration: %w", err)
+		}
+	}
+
+	s.mu.Lock()
 	s.configs[config.ID] = config
+	s.mu.Unlock()
 
 	s.logger.Info().
 		Str("id", config.ID.String()).
@@ -124,24 +183,46 @@ func (s *MDMService) ListIntegrations() []*models.MDMIntegrationConfig {
 // UpdateIntegration updates an MDM integration
 func (s *MDMService) UpdateIntegration(ctx context.Context, config *models.MDMIntegrationConfig) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.configs[config.ID]; !ok {
+	existing, ok := s.configs[config.ID]
+	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("integration not found: %s", config.ID)
 	}
-
+	config.CreatedAt = existing.CreatedAt
 	config.UpdatedAt = time.Now()
+	s.mu.Unlock()
+
+	if s.intRepo != nil {
+		if err := s.intRepo.UpsertMDM(ctx, config); err != nil {
+			s.logger.Error().Err(err).Str("id", config.ID.String()).Msg("failed to persist MDM integration update")
+			return fmt.Errorf("persist MDM integration: %w", err)
+		}
+	}
+
+	s.mu.Lock()
 	s.configs[config.ID] = config
+	s.mu.Unlock()
 	return nil
 }
 
-// DeleteIntegration deletes an MDM integration
+// DeleteIntegration deletes an MDM integration. The persisted row is removed
+// first; a failed delete fails the request so the database and memory never
+// diverge silently.
 func (s *MDMService) DeleteIntegration(id uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.configs[id]; !ok {
 		return fmt.Errorf("integration not found: %s", id)
+	}
+
+	if s.intRepo != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.intRepo.Delete(ctx, id); err != nil {
+			s.logger.Error().Err(err).Str("id", id.String()).Msg("failed to delete persisted MDM integration")
+			return fmt.Errorf("delete persisted MDM integration: %w", err)
+		}
 	}
 
 	delete(s.configs, id)
@@ -186,7 +267,15 @@ func (s *MDMService) SyncDevices(ctx context.Context, configID uuid.UUID) error 
 		config.LastSyncError = ""
 		config.DevicesSynced = deviceCount
 	}
+	config.UpdatedAt = now
 	s.mu.Unlock()
+
+	// Persist the sync outcome so it survives restarts. The sync result is
+	// the primary outcome; a persistence failure is logged loudly but does
+	// not mask it.
+	if err := s.persistMDMConfig(config); err != nil {
+		s.logger.Error().Err(err).Str("id", config.ID.String()).Msg("failed to persist MDM sync status")
+	}
 
 	return syncErr
 }
@@ -1136,15 +1225,29 @@ func (s *ZeroTrustService) GetZeroTrustStats() map[string]interface{} {
 // SIEM Service
 // ============================================================================
 
+// queuedSIEMEvent is an event waiting to be flushed to one integration,
+// paired with the ID of its persisted siem_alerts row so the forward outcome
+// can be recorded after the delivery attempt.
+type queuedSIEMEvent struct {
+	event   models.SIEMEvent
+	alertID uuid.UUID
+}
+
 // SIEMService handles SIEM integrations
 type SIEMService struct {
 	repos   *repository.Repositories
 	cache   *cache.RedisCache
 	logger  *logger.Logger
 
+	// In-memory working set, backed by intRepo when a database is available.
 	configs     map[uuid.UUID]*models.SIEMIntegrationConfig
-	eventQueues map[uuid.UUID][]models.SIEMEvent
+	eventQueues map[uuid.UUID][]queuedSIEMEvent
 	mu          sync.RWMutex
+
+	// intRepo persists integration configs (orbguard_lab.enterprise_integrations);
+	// alertRepo persists the real alert feed (orbguard_lab.siem_alerts).
+	intRepo   *repository.EnterpriseIntegrationRepository
+	alertRepo *repository.SIEMAlertRepository
 
 	httpClient *http.Client
 
@@ -1160,14 +1263,45 @@ func NewSIEMService(repos *repository.Repositories, cache *cache.RedisCache, log
 		cache:       cache,
 		logger:      log.WithComponent("siem"),
 		configs:     make(map[uuid.UUID]*models.SIEMIntegrationConfig),
-		eventQueues: make(map[uuid.UUID][]models.SIEMEvent),
+		eventQueues: make(map[uuid.UUID][]queuedSIEMEvent),
+		intRepo:     repository.NewEnterpriseIntegrationRepositoryFromRepos(repos),
+		alertRepo:   repository.NewSIEMAlertRepositoryFromRepos(repos),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		stopCh: make(chan struct{}),
 	}
 
+	svc.loadIntegrations()
+
 	return svc
+}
+
+// loadIntegrations populates the in-memory config set from the database at
+// boot so SIEM integrations survive restarts.
+func (s *SIEMService) loadIntegrations() {
+	if s.intRepo == nil {
+		s.logger.Warn().Msg("no database available: SIEM integrations are in-memory only")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stored, err := s.intRepo.ListSIEM(ctx)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to load SIEM integrations")
+		return
+	}
+
+	s.mu.Lock()
+	for _, config := range stored {
+		s.configs[config.ID] = config
+		s.eventQueues[config.ID] = make([]queuedSIEMEvent, 0)
+	}
+	s.mu.Unlock()
+
+	s.logger.Info().Int("count", len(stored)).Msg("loaded SIEM integrations")
 }
 
 // Start starts the SIEM service background processing
@@ -1196,8 +1330,10 @@ func (s *SIEMService) Stop() {
 
 // CreateIntegration creates a SIEM integration. Providers without a real
 // event sender are rejected at creation time so events are never queued into
-// an integration that can't deliver them.
-func (s *SIEMService) CreateIntegration(config *models.SIEMIntegrationConfig) error {
+// an integration that can't deliver them. When persistence is configured the
+// config must be stored before it becomes visible: a failed write fails the
+// request instead of leaving a phantom in-memory integration.
+func (s *SIEMService) CreateIntegration(ctx context.Context, config *models.SIEMIntegrationConfig) error {
 	switch config.Provider {
 	case models.SIEMProviderSplunk, models.SIEMProviderElastic,
 		models.SIEMProviderSentinel, models.SIEMProviderWebhook:
@@ -1205,9 +1341,6 @@ func (s *SIEMService) CreateIntegration(config *models.SIEMIntegrationConfig) er
 	default:
 		return fmt.Errorf("%w: no event sender exists for SIEM provider %q; supported providers are splunk, elastic, sentinel, webhook", ErrIntegrationNotImplemented, config.Provider)
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	config.ID = uuid.New()
 	config.CreatedAt = time.Now()
@@ -1220,8 +1353,17 @@ func (s *SIEMService) CreateIntegration(config *models.SIEMIntegrationConfig) er
 		config.FlushInterval = 10 * time.Second
 	}
 
+	if s.intRepo != nil {
+		if err := s.intRepo.UpsertSIEM(ctx, config); err != nil {
+			s.logger.Error().Err(err).Str("name", config.Name).Msg("failed to persist SIEM integration")
+			return fmt.Errorf("persist SIEM integration: %w", err)
+		}
+	}
+
+	s.mu.Lock()
 	s.configs[config.ID] = config
-	s.eventQueues[config.ID] = make([]models.SIEMEvent, 0)
+	s.eventQueues[config.ID] = make([]queuedSIEMEvent, 0)
+	s.mu.Unlock()
 
 	s.logger.Info().
 		Str("id", config.ID.String()).
@@ -1272,7 +1414,9 @@ func (s *SIEMService) ListIntegrations() []*models.SIEMIntegrationConfig {
 	return result
 }
 
-// DeleteIntegration deletes a SIEM integration
+// DeleteIntegration deletes a SIEM integration. The persisted row is removed
+// first; a failed delete fails the request so the database and memory never
+// diverge silently.
 func (s *SIEMService) DeleteIntegration(id uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1281,39 +1425,137 @@ func (s *SIEMService) DeleteIntegration(id uuid.UUID) error {
 		return fmt.Errorf("integration not found: %s", id)
 	}
 
+	if s.intRepo != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.intRepo.Delete(ctx, id); err != nil {
+			s.logger.Error().Err(err).Str("id", id.String()).Msg("failed to delete persisted SIEM integration")
+			return fmt.Errorf("delete persisted SIEM integration: %w", err)
+		}
+	}
+
 	delete(s.configs, id)
 	delete(s.eventQueues, id)
 	return nil
 }
 
-// SendEvent queues an event for sending to SIEM
-func (s *SIEMService) SendEvent(ctx context.Context, event *models.SIEMEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// siemAlertTitle derives a human-readable alert title from the most specific
+// non-empty event field.
+func siemAlertTitle(event *models.SIEMEvent) string {
+	for _, candidate := range []string{event.ThreatName, event.Message, event.Action, event.EventType} {
+		if candidate != "" {
+			return candidate
+		}
+	}
+	return "security event"
+}
 
+// SendEvent persists an event into the alert feed and queues it for delivery
+// to every matching enabled integration. One siem_alerts row is written per
+// target integration (or a single row with no integration when nothing
+// matched) BEFORE queueing, so the feed never loses an event that the flush
+// loop later forwards. A persistence failure is returned to the caller — the
+// event is then neither recorded nor queued.
+func (s *SIEMService) SendEvent(ctx context.Context, event *models.SIEMEvent) error {
+	if event.ID == "" {
+		event.ID = uuid.New().String()
+	}
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+
+	severity := event.Severity
+	if severity == "" {
+		severity = models.SeverityInfo
+	}
+
+	// Resolve target integrations under the read lock.
+	s.mu.RLock()
+	targets := make([]uuid.UUID, 0, len(s.configs))
 	for id, config := range s.configs {
 		if !config.Enabled {
 			continue
 		}
-
-		// Check if event type is enabled
 		if !s.eventTypeEnabled(config, event.EventType) {
 			continue
 		}
-
-		// Check severity filter
 		if !s.severityAllowed(config.MinSeverity, event.Severity) {
 			continue
 		}
+		targets = append(targets, id)
+	}
+	s.mu.RUnlock()
 
-		// Add to queue
-		s.eventQueues[id] = append(s.eventQueues[id], *event)
+	// Build the alert rows: one per target, or a single unrouted row when no
+	// enabled integration matched (so the event is still on the record).
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal siem event: %w", err)
+	}
 
-		// Flush if queue is full
-		if len(s.eventQueues[id]) >= config.BatchSize {
-			go s.flushQueue(ctx, id)
+	now := time.Now()
+	alerts := make([]*models.SIEMAlert, 0, len(targets))
+	if len(targets) == 0 {
+		alerts = append(alerts, &models.SIEMAlert{
+			ID:          uuid.New(),
+			Severity:    severity,
+			Title:       siemAlertTitle(event),
+			Description: event.Message,
+			Source:      event.Source,
+			Payload:     payload,
+			CreatedAt:   now,
+		})
+	} else {
+		for _, target := range targets {
+			integrationID := target
+			alerts = append(alerts, &models.SIEMAlert{
+				ID:            uuid.New(),
+				IntegrationID: &integrationID,
+				Severity:      severity,
+				Title:         siemAlertTitle(event),
+				Description:   event.Message,
+				Source:        event.Source,
+				Payload:       payload,
+				CreatedAt:     now,
+			})
 		}
 	}
+
+	if s.alertRepo != nil {
+		for _, alert := range alerts {
+			if err := s.alertRepo.Insert(ctx, alert); err != nil {
+				s.logger.Error().Err(err).Str("event_id", event.ID).Msg("failed to persist siem alert")
+				return fmt.Errorf("persist siem alert: %w", err)
+			}
+		}
+	} else {
+		s.logger.Warn().Str("event_id", event.ID).Msg("siem alert not persisted: database not configured")
+	}
+
+	// Queue per-integration copies for delivery, carrying the alert row IDs
+	// so flush can record each forward outcome.
+	s.mu.Lock()
+	for i, target := range targets {
+		config, ok := s.configs[target]
+		if !ok {
+			// Integration deleted between resolution and queueing; the alert
+			// row honestly remains forwarded=false.
+			continue
+		}
+
+		s.eventQueues[target] = append(s.eventQueues[target], queuedSIEMEvent{
+			event:   *event,
+			alertID: alerts[i].ID,
+		})
+
+		// Flush if queue is full
+		if len(s.eventQueues[target]) >= config.BatchSize {
+			go s.flushQueue(ctx, target)
+		}
+	}
+	s.mu.Unlock()
+
+	return nil
 }
 
 func (s *SIEMService) eventTypeEnabled(config *models.SIEMIntegrationConfig, eventType string) bool {
@@ -1354,19 +1596,26 @@ func (s *SIEMService) flushAllQueues(ctx context.Context) {
 
 func (s *SIEMService) flushQueue(ctx context.Context, configID uuid.UUID) {
 	s.mu.Lock()
-	events := s.eventQueues[configID]
-	if len(events) == 0 {
+	queued := s.eventQueues[configID]
+	if len(queued) == 0 {
 		s.mu.Unlock()
 		return
 	}
 
 	// Clear queue
-	s.eventQueues[configID] = make([]models.SIEMEvent, 0)
+	s.eventQueues[configID] = make([]queuedSIEMEvent, 0)
 	config := s.configs[configID]
 	s.mu.Unlock()
 
 	if config == nil {
 		return
+	}
+
+	events := make([]models.SIEMEvent, len(queued))
+	alertIDs := make([]uuid.UUID, len(queued))
+	for i, q := range queued {
+		events[i] = q.event
+		alertIDs[i] = q.alertID
 	}
 
 	// Send events
@@ -1382,6 +1631,21 @@ func (s *SIEMService) flushQueue(ctx context.Context, configID uuid.UUID) {
 		err = s.sendToWebhook(ctx, config, events)
 	default:
 		err = fmt.Errorf("%w: no event sender exists for SIEM provider %q", ErrIntegrationNotImplemented, config.Provider)
+	}
+
+	// Record the forward outcome on the persisted alert rows. A background
+	// context is used because the triggering request may already be gone.
+	if s.alertRepo != nil {
+		outcome := ""
+		if err != nil {
+			outcome = err.Error()
+		}
+		octx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if uerr := s.alertRepo.SetForwardOutcome(octx, alertIDs, outcome); uerr != nil {
+			s.logger.Error().Err(uerr).Str("integration_id", configID.String()).
+				Int("alerts", len(alertIDs)).Msg("failed to record siem alert forward outcome")
+		}
+		cancel()
 	}
 
 	// Update status
@@ -1584,6 +1848,16 @@ func (s *SIEMService) sendToWebhook(ctx context.Context, config *models.SIEMInte
 
 	s.logger.Debug().Int("count", len(events)).Msg("sent events to webhook")
 	return nil
+}
+
+// ListAlerts returns the most recent persisted SIEM alerts, newest first,
+// optionally filtered by severity. When no database is configured the feed
+// honestly reports itself unavailable instead of returning an empty list.
+func (s *SIEMService) ListAlerts(ctx context.Context, limit int, severity string) ([]*models.SIEMAlert, error) {
+	if s.alertRepo == nil {
+		return nil, fmt.Errorf("%w: the SIEM alert feed requires database persistence, which is not configured", ErrIntegrationNotConfigured)
+	}
+	return s.alertRepo.List(ctx, limit, severity)
 }
 
 // GetSIEMStats returns SIEM statistics
@@ -2181,5 +2455,7 @@ func (s *EnterpriseService) LogAuditEvent(ctx context.Context, log *models.Audit
 		Message:    log.Details,
 	}
 
-	s.SIEM.SendEvent(ctx, event)
+	if err := s.SIEM.SendEvent(ctx, event); err != nil {
+		s.logger.Error().Err(err).Str("action", log.Action).Msg("failed to record audit event in siem alert feed")
+	}
 }

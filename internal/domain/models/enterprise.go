@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -443,6 +444,31 @@ type SIEMEventBatch struct {
 	ConfigID    uuid.UUID   `json:"config_id"`
 	Events      []SIEMEvent `json:"events"`
 	CreatedAt   time.Time   `json:"created_at"`
+}
+
+// SIEMAlert is the persisted record of a security event that flowed through
+// the SIEM event path, together with the outcome of its forward attempt.
+// One row exists per (event, target integration); events that matched no
+// enabled integration are stored with a nil IntegrationID so nothing is
+// silently dropped.
+type SIEMAlert struct {
+	ID            uuid.UUID  `json:"id"`
+	IntegrationID *uuid.UUID `json:"integration_id,omitempty"`
+	Severity      Severity   `json:"severity"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description"`
+	Source        string     `json:"source"`
+
+	// Payload holds the full original SIEMEvent document. It is persisted
+	// for forensics but never echoed in the alert feed.
+	Payload json.RawMessage `json:"-"`
+
+	// Forward outcome: Forwarded is true once the event was delivered to the
+	// target integration; ForwardError records the last delivery failure.
+	Forwarded    bool   `json:"forwarded"`
+	ForwardError string `json:"forward_error,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // ============================================================================

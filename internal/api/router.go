@@ -577,6 +577,7 @@ func (r *Router) Setup() http.Handler {
 				siem.Get("/integrations/{id}", r.handlers.Enterprise.GetSIEMIntegration)
 				siem.Delete("/integrations/{id}", r.handlers.Enterprise.DeleteSIEMIntegration)
 				siem.Post("/events", r.handlers.Enterprise.SendSIEMEvent)
+				siem.Get("/alerts", r.handlers.Enterprise.GetSIEMAlerts)
 				siem.Get("/stats", r.handlers.Enterprise.GetSIEMStats)
 			})
 
@@ -753,7 +754,7 @@ func (r *Router) Setup() http.Handler {
 		// /api/v1/siem/* -> /api/v1/enterprise/siem/*
 		api.Get("/siem/connections", r.handlers.Enterprise.ListSIEMIntegrations)
 		api.Get("/siem/forwarders", r.handlers.Enterprise.ListSIEMIntegrations) // alias
-		api.Get("/siem/alerts", r.handlers.Enterprise.GetSIEMStats)
+		api.Get("/siem/alerts", r.handlers.Enterprise.GetSIEMAlerts)
 
 		// /api/v1/vpn/* -> /api/v1/orbnet/*
 		api.Get("/vpn/servers", r.handlers.OrbNet.ListServers)
@@ -785,6 +786,11 @@ func (r *Router) Setup() http.Handler {
 			admin.Get("/reports/{id}", r.handlers.Admin.GetReport)
 			admin.Post("/reports/{id}/approve", r.handlers.Admin.ApproveReport)
 			admin.Post("/reports/{id}/reject", r.handlers.Admin.RejectReport)
+
+			// Community YARA rule submission review
+			admin.Get("/yara/submissions", r.handlers.YARA.ListSubmissions)
+			admin.Post("/yara/submissions/{id}/approve", r.handlers.YARA.ApproveSubmission)
+			admin.Post("/yara/submissions/{id}/reject", r.handlers.YARA.RejectSubmission)
 
 			// Stats
 			admin.Get("/stats/detailed", r.handlers.Admin.DetailedStats)

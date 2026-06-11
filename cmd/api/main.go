@@ -288,6 +288,7 @@ func main() {
 		Bool("vision", scamConfig.EnableVision).
 		Bool("speech", scamConfig.EnableSpeech).
 		Str("llm_provider", scamConfig.LLMProvider).
+		Str("llm_model", scamConfig.LLMModel).
 		Msg("AI scam detection service initialized")
 
 	// Initialize forensics service (Pegasus/Spyware detection)
@@ -502,32 +503,67 @@ func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDete
 
 	hasClaude := sc.ClaudeAPIKey != ""
 	hasOpenAI := sc.OpenAIAPIKey != ""
-	hasLLMKey := hasClaude || hasOpenAI
+	hasDeepSeek := sc.DeepSeekAPIKey != ""
+	hasAzure := sc.AzureOpenAIEndpoint != "" && sc.AzureOpenAIKey != "" && sc.AzureOpenAIDeployment != ""
+
+	// providerReady reports whether the credentials required by a given LLM
+	// provider are configured.
+	providerReady := func(p string) bool {
+		switch p {
+		case "claude":
+			return hasClaude
+		case "openai":
+			return hasOpenAI
+		case "deepseek":
+			return hasDeepSeek
+		case "azure-openai":
+			return hasAzure
+		default:
+			return false
+		}
+	}
+	providerPriority := []string{"claude", "openai", "deepseek", "azure-openai"}
 
 	provider := sc.LLMProvider
-	switch {
-	case provider == "claude" && !hasClaude && hasOpenAI:
-		log.Warn().Msg("scam detector: llm_provider=claude but only OpenAI key configured, switching provider to openai")
-		provider = "openai"
-	case provider == "openai" && !hasOpenAI && hasClaude:
-		log.Warn().Msg("scam detector: llm_provider=openai but only Claude key configured, switching provider to claude")
+	if !providerReady(provider) {
+		for _, p := range providerPriority {
+			if providerReady(p) {
+				if provider != "" {
+					log.Warn().
+						Str("configured_provider", provider).
+						Str("selected_provider", p).
+						Msg("scam detector: configured llm_provider has no credentials, switching to a provider with credentials")
+				}
+				provider = p
+				break
+			}
+		}
+	}
+	if provider == "" {
 		provider = "claude"
-	case provider == "":
-		if hasOpenAI && !hasClaude {
-			provider = "openai"
+	}
+
+	enableLLM := sc.EnableLLM && providerReady(provider)
+	if sc.EnableLLM && !enableLLM {
+		log.Warn().Msg("scam detector LLM analysis disabled: no LLM credentials configured (set ORBGUARD_CLAUDE_API_KEY, ORBGUARD_OPENAI_API_KEY, ORBGUARD_DEEPSEEK_API_KEY, or ORBGUARD_AZURE_OPENAI_ENDPOINT + ORBGUARD_AZURE_OPENAI_KEY + ORBGUARD_AZURE_OPENAI_DEPLOYMENT)")
+	}
+
+	// Effective model used for the selected provider (deployment implies the
+	// model on Azure).
+	model := sc.LLMModel
+	if model == "" {
+		if provider == "azure-openai" {
+			model = sc.AzureOpenAIDeployment
 		} else {
-			provider = "claude"
+			model = ai.DefaultModelForProvider(provider)
 		}
 	}
 
-	enableLLM := sc.EnableLLM && hasLLMKey
-	if sc.EnableLLM && !hasLLMKey {
-		log.Warn().Msg("scam detector LLM analysis disabled: no Claude or OpenAI API key configured (set ORBGUARD_CLAUDE_API_KEY or ORBGUARD_OPENAI_API_KEY)")
-	}
-
-	enableVision := sc.EnableVision && enableLLM
+	enableVision := sc.EnableVision && enableLLM && provider != "deepseek"
 	if sc.EnableVision && !enableLLM {
 		log.Warn().Msg("scam detector vision analysis disabled: requires an LLM API key")
+	} else if sc.EnableVision && provider == "deepseek" {
+		log.Warn().Msg("scam detector vision analysis disabled: deepseek chat models do not support image input")
 	}
 
 	enableSpeech := sc.EnableSpeech && hasOpenAI
@@ -536,16 +572,23 @@ func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDete
 	}
 
 	return ai.ScamDetectorConfig{
-		ClaudeAPIKey:     sc.ClaudeAPIKey,
-		OpenAIAPIKey:     sc.OpenAIAPIKey,
-		LLMProvider:      provider,
-		EnableLLM:        enableLLM,
-		EnablePatternDB:  sc.EnablePatternDB,
-		EnablePhoneRep:   sc.EnablePhoneRep,
-		EnableVision:     enableVision,
-		EnableSpeech:     enableSpeech,
-		ScamThreshold:    sc.ScamThreshold,
-		SuspiciousThresh: sc.SuspiciousThresh,
+		ClaudeAPIKey:          sc.ClaudeAPIKey,
+		OpenAIAPIKey:          sc.OpenAIAPIKey,
+		DeepSeekAPIKey:        sc.DeepSeekAPIKey,
+		LLMProvider:           provider,
+		LLMBaseURL:            sc.LLMBaseURL,
+		LLMModel:              model,
+		AzureOpenAIEndpoint:   sc.AzureOpenAIEndpoint,
+		AzureOpenAIKey:        sc.AzureOpenAIKey,
+		AzureOpenAIDeployment: sc.AzureOpenAIDeployment,
+		AzureOpenAIAPIVersion: sc.AzureOpenAIAPIVersion,
+		EnableLLM:             enableLLM,
+		EnablePatternDB:       sc.EnablePatternDB,
+		EnablePhoneRep:        sc.EnablePhoneRep,
+		EnableVision:          enableVision,
+		EnableSpeech:          enableSpeech,
+		ScamThreshold:         sc.ScamThreshold,
+		SuspiciousThresh:      sc.SuspiciousThresh,
 	}
 }
 

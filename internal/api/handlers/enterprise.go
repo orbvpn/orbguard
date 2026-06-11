@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -357,7 +358,7 @@ func (h *EnterpriseHandler) CreateSIEMIntegration(w http.ResponseWriter, r *http
 	config.Token = req.Token
 	config.Password = req.Password
 
-	if err := h.enterprise.SIEM.CreateIntegration(&config); err != nil {
+	if err := h.enterprise.SIEM.CreateIntegration(r.Context(), &config); err != nil {
 		h.respondServiceError(w, err)
 		return
 	}
@@ -426,7 +427,11 @@ func (h *EnterpriseHandler) SendSIEMEvent(w http.ResponseWriter, r *http.Request
 		event.Timestamp = time.Now()
 	}
 
-	h.enterprise.SIEM.SendEvent(r.Context(), &event)
+	if err := h.enterprise.SIEM.SendEvent(r.Context(), &event); err != nil {
+		h.logger.Error().Err(err).Str("event_id", event.ID).Msg("failed to record siem event")
+		h.respondServiceError(w, err)
+		return
+	}
 
 	h.respondJSON(w, http.StatusAccepted, map[string]string{
 		"status":   "queued",
@@ -438,6 +443,42 @@ func (h *EnterpriseHandler) SendSIEMEvent(w http.ResponseWriter, r *http.Request
 func (h *EnterpriseHandler) GetSIEMStats(w http.ResponseWriter, r *http.Request) {
 	stats := h.enterprise.SIEM.GetSIEMStats()
 	h.respondJSON(w, http.StatusOK, stats)
+}
+
+// GetSIEMAlerts handles GET /api/v1/siem/alerts and
+// GET /api/v1/enterprise/siem/alerts.
+//
+// Serves the REAL persisted alert feed (orbguard_lab.siem_alerts): every
+// security event that flowed through the SIEM event path together with its
+// forward-attempt outcome. Supports ?limit= (default 100, max 500) and
+// ?severity= filters. Responds 503 when the feed's persistence is not
+// configured instead of fabricating an empty list.
+func (h *EnterpriseHandler) GetSIEMAlerts(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			h.respondError(w, http.StatusBadRequest, "limit must be a positive integer")
+			return
+		}
+		limit = parsed
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	severity := r.URL.Query().Get("severity")
+
+	alerts, err := h.enterprise.SIEM.ListAlerts(r.Context(), limit, severity)
+	if err != nil {
+		h.respondServiceError(w, err)
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"alerts": alerts,
+		"count":  len(alerts),
+	})
 }
 
 // ============================================================================

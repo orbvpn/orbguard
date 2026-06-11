@@ -8,14 +8,21 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
+	yaradet "orbguard-lab/internal/detection/yara"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
 // YARAHandler handles YARA-related HTTP requests
 type YARAHandler struct {
 	yaraService *services.YARAService
+	// parser is the same rule parser/compiler used by the live scan path;
+	// ParseRule and SubmitRule validate through it so results are real.
+	parser      *yaradet.Loader
+	submissions *repository.YARASubmissionRepository
 	logger      *logger.Logger
 }
 
@@ -23,8 +30,16 @@ type YARAHandler struct {
 func NewYARAHandler(yaraService *services.YARAService, log *logger.Logger) *YARAHandler {
 	return &YARAHandler{
 		yaraService: yaraService,
+		parser:      yaradet.NewLoader(log),
 		logger:      log.WithComponent("yara-handler"),
 	}
+}
+
+// WithRepositories wires the database-backed submission store. When the
+// repositories are unavailable, submission endpoints return an explicit 503.
+func (h *YARAHandler) WithRepositories(repos *repository.Repositories) *YARAHandler {
+	h.submissions = repository.NewYARASubmissionRepositoryFromRepos(repos)
+	return h
 }
 
 // respondJSON sends a JSON response
@@ -328,12 +343,27 @@ func (h *YARAHandler) ParseRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement full YARA parsing
-	// For now, return a simple validation response
-	h.respondJSON(w, http.StatusOK, ParseRuleResponse{
-		Valid:   true,
-		Message: "rule syntax appears valid",
-	})
+	// Validate using the same parser and pattern compiler the live
+	// /yara/scan path uses (internal/detection/yara), so a rule that
+	// validates here is guaranteed to load into the engine.
+	validation := h.parser.ValidateSource(req.RuleContent)
+
+	resp := ParseRuleResponse{
+		Valid:    validation.Valid,
+		Errors:   validation.Errors,
+		Warnings: validation.Warnings,
+		Rules:    validation.Rules,
+	}
+	if validation.Valid {
+		resp.Message = "rule parsed and compiled successfully"
+	} else {
+		resp.Message = "rule validation failed"
+		if len(validation.Errors) > 0 {
+			resp.Error = validation.Errors[0]
+		}
+	}
+
+	h.respondJSON(w, http.StatusOK, resp)
 }
 
 // ParseRuleRequest represents a request to parse a rule
@@ -343,9 +373,14 @@ type ParseRuleRequest struct {
 
 // ParseRuleResponse represents the response from parsing a rule
 type ParseRuleResponse struct {
-	Valid   bool   `json:"valid"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Valid    bool                   `json:"valid"`
+	Message  string                 `json:"message,omitempty"`
+	Errors   []string               `json:"errors,omitempty"`
+	Warnings []string               `json:"warnings,omitempty"`
+	Rules    []yaradet.RuleMetadata `json:"rules,omitempty"`
+	// Error carries the first error for backwards compatibility with
+	// clients that read a single error string.
+	Error string `json:"error,omitempty"`
 }
 
 // ReloadRules reloads all YARA rules
@@ -439,17 +474,240 @@ func (h *YARAHandler) SubmitRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set defaults
-	submission.ID = uuid.New()
-	submission.Status = models.SubmissionStatusPending
+	if h.submissions == nil {
+		h.logger.Error().Str("path", r.URL.Path).
+			Msg("yara submission repository not configured; submission endpoint unavailable")
+		h.respondError(w, http.StatusServiceUnavailable, "rule submission storage is not configured")
+		return
+	}
 
-	// TODO: Store in database for review
-	h.logger.Info().Str("name", submission.Name).Msg("received rule submission")
+	// Validate first with the real parser/compiler; invalid rules are
+	// rejected immediately with the actual parse errors and not stored.
+	validation := h.parser.ValidateSource(submission.RawRule)
+	if !validation.Valid {
+		h.respondJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"error":    "rule validation failed",
+			"errors":   validation.Errors,
+			"warnings": validation.Warnings,
+		})
+		return
+	}
 
-	h.respondJSON(w, http.StatusCreated, map[string]string{
+	validationJSON, err := json.Marshal(validation)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("failed to encode validation result")
+		h.respondError(w, http.StatusInternalServerError, "failed to encode validation result")
+		return
+	}
+
+	// Submitter identity from the auth context (user or device token).
+	submittedBy := middleware.GetUserID(r.Context())
+	if submittedBy == "" {
+		submittedBy = middleware.GetDeviceID(r.Context())
+	}
+
+	stored, err := h.submissions.Create(r.Context(), submission.Name, submission.RawRule, submittedBy, validationJSON)
+	if err != nil {
+		h.logger.Error().Err(err).Str("name", submission.Name).Msg("failed to store rule submission")
+		h.respondError(w, http.StatusInternalServerError, "failed to store rule submission")
+		return
+	}
+
+	h.logger.Info().
+		Str("submission_id", stored.ID.String()).
+		Str("name", submission.Name).
+		Int("rules", len(validation.Rules)).
+		Msg("stored rule submission for review")
+
+	h.respondJSON(w, http.StatusCreated, map[string]any{
 		"status":        "pending",
+		"submission_id": stored.ID.String(),
+		"message":       "rule validated and submitted for review",
+		"warnings":      validation.Warnings,
+	})
+}
+
+// submissionStoreAvailable returns true when the submission repository is
+// wired; otherwise it writes an explicit 503 and logs the gap.
+func (h *YARAHandler) submissionStoreAvailable(w http.ResponseWriter, r *http.Request) bool {
+	if h.submissions == nil {
+		h.logger.Error().Str("path", r.URL.Path).
+			Msg("yara submission repository not configured; admin submission endpoint unavailable")
+		h.respondError(w, http.StatusServiceUnavailable, "rule submission storage is not configured")
+		return false
+	}
+	return true
+}
+
+// ListSubmissions handles GET /api/v1/admin/yara/submissions
+// Lists community rule submissions filtered by status (default: pending).
+func (h *YARAHandler) ListSubmissions(w http.ResponseWriter, r *http.Request) {
+	if !h.submissionStoreAvailable(w, r) {
+		return
+	}
+
+	status := r.URL.Query().Get("status")
+	if status == "" {
+		status = string(models.SubmissionStatusPending)
+	}
+	switch models.SubmissionStatus(status) {
+	case models.SubmissionStatusPending, models.SubmissionStatusApproved, models.SubmissionStatusRejected:
+	default:
+		h.respondError(w, http.StatusBadRequest, "invalid status: must be one of pending, approved, rejected")
+		return
+	}
+
+	limit, offset := parsePagination(r, 50, 200)
+
+	submissions, total, err := h.submissions.ListByStatus(r.Context(), status, limit, offset)
+	if err != nil {
+		h.logger.Error().Err(err).Str("status", status).Msg("failed to list rule submissions")
+		h.respondError(w, http.StatusInternalServerError, "failed to list submissions")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]any{
+		"data":   submissions,
+		"total":  total,
+		"status": status,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// loadPendingSubmission fetches a submission and verifies it is still
+// pending. It writes the error response itself and returns nil on failure.
+func (h *YARAHandler) loadPendingSubmission(w http.ResponseWriter, r *http.Request) *repository.YARASubmission {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid submission id")
+		return nil
+	}
+
+	submission, err := h.submissions.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error().Err(err).Str("submission_id", id.String()).Msg("failed to load rule submission")
+		h.respondError(w, http.StatusInternalServerError, "failed to load submission")
+		return nil
+	}
+	if submission == nil {
+		h.respondError(w, http.StatusNotFound, "submission not found")
+		return nil
+	}
+	if submission.Status != string(models.SubmissionStatusPending) {
+		h.respondError(w, http.StatusConflict, "submission has already been reviewed (status: "+submission.Status+")")
+		return nil
+	}
+	return submission
+}
+
+// ApproveSubmission handles POST /api/v1/admin/yara/submissions/{id}/approve
+// Re-validates the stored rule text, loads the rule(s) into the live engine
+// via the service's dynamic-load path (YARAService.AddRule), and marks the
+// submission approved.
+//
+// NOTE: the engine load is per-process. Approved rules persist in
+// orbguard_lab.yara_submissions but are not automatically re-loaded into the
+// engine after a restart; the response states this explicitly.
+func (h *YARAHandler) ApproveSubmission(w http.ResponseWriter, r *http.Request) {
+	if !h.submissionStoreAvailable(w, r) {
+		return
+	}
+
+	submission := h.loadPendingSubmission(w, r)
+	if submission == nil {
+		return
+	}
+
+	var body struct {
+		Notes string `json:"notes,omitempty"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+
+	// Re-parse the stored text; this also guards against rules that were
+	// valid at submission time but fail under a newer compiler.
+	rules, err := h.parser.ParseRules(submission.RuleText)
+	if err != nil || len(rules) == 0 {
+		h.logger.Error().Err(err).Str("submission_id", submission.ID.String()).
+			Msg("stored submission no longer parses; cannot approve")
+		h.respondError(w, http.StatusUnprocessableEntity, "stored rule text no longer parses; cannot approve")
+		return
+	}
+
+	loaded := make([]string, 0, len(rules))
+	for _, rule := range rules {
+		if rule.ID == uuid.Nil {
+			rule.ID = uuid.New()
+		}
+		if err := h.yaraService.AddRule(rule); err != nil {
+			h.logger.Error().Err(err).
+				Str("submission_id", submission.ID.String()).
+				Str("rule", rule.Name).
+				Msg("failed to load approved rule into live engine")
+			h.respondError(w, http.StatusUnprocessableEntity, "rule failed engine validation: "+err.Error())
+			return
+		}
+		loaded = append(loaded, rule.Name)
+	}
+
+	reviewer := adminIdentity(r.Context())
+	if err := h.submissions.UpdateStatus(r.Context(), submission.ID, string(models.SubmissionStatusApproved), reviewer, body.Notes); err != nil {
+		h.logger.Error().Err(err).Str("submission_id", submission.ID.String()).Msg("failed to mark submission approved")
+		h.respondError(w, http.StatusInternalServerError, "failed to update submission status")
+		return
+	}
+
+	h.logger.Info().
+		Str("submission_id", submission.ID.String()).
+		Strs("rules", loaded).
+		Str("reviewer", reviewer).
+		Msg("submission approved; rules loaded into live engine")
+
+	h.respondJSON(w, http.StatusOK, map[string]any{
+		"success":       true,
 		"submission_id": submission.ID.String(),
-		"message":       "rule submitted for review",
+		"rules_loaded":  loaded,
+		"message": "submission approved; rule(s) loaded into the live engine of this instance. " +
+			"Approved rules are persisted but are not automatically re-loaded after a process restart.",
+	})
+}
+
+// RejectSubmission handles POST /api/v1/admin/yara/submissions/{id}/reject
+func (h *YARAHandler) RejectSubmission(w http.ResponseWriter, r *http.Request) {
+	if !h.submissionStoreAvailable(w, r) {
+		return
+	}
+
+	submission := h.loadPendingSubmission(w, r)
+	if submission == nil {
+		return
+	}
+
+	var body struct {
+		Notes string `json:"notes,omitempty"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+
+	reviewer := adminIdentity(r.Context())
+	if err := h.submissions.UpdateStatus(r.Context(), submission.ID, string(models.SubmissionStatusRejected), reviewer, body.Notes); err != nil {
+		h.logger.Error().Err(err).Str("submission_id", submission.ID.String()).Msg("failed to mark submission rejected")
+		h.respondError(w, http.StatusInternalServerError, "failed to update submission status")
+		return
+	}
+
+	h.logger.Info().
+		Str("submission_id", submission.ID.String()).
+		Str("reviewer", reviewer).
+		Msg("submission rejected")
+
+	h.respondJSON(w, http.StatusOK, map[string]any{
+		"success":       true,
+		"submission_id": submission.ID.String(),
+		"message":       "submission rejected",
 	})
 }
 

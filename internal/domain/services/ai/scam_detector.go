@@ -36,7 +36,16 @@ type ScamDetectorConfig struct {
 	// LLM settings
 	ClaudeAPIKey     string
 	OpenAIAPIKey     string
-	LLMProvider      string // "claude" or "openai"
+	DeepSeekAPIKey   string
+	LLMProvider      string // "claude", "openai", "deepseek" or "azure-openai"
+	LLMBaseURL       string // optional override of the provider's API base URL
+	LLMModel         string // optional override of the provider's default model
+
+	// Azure OpenAI settings (used only when LLMProvider == "azure-openai")
+	AzureOpenAIEndpoint   string
+	AzureOpenAIKey        string
+	AzureOpenAIDeployment string
+	AzureOpenAIAPIVersion string
 
 	// Feature flags
 	EnableVision     bool
@@ -90,9 +99,16 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 	// Initialize components
 	if config.EnableLLM {
 		llmConfig := LLMConfig{
-			ClaudeAPIKey: config.ClaudeAPIKey,
-			OpenAIAPIKey: config.OpenAIAPIKey,
-			Provider:     config.LLMProvider,
+			ClaudeAPIKey:          config.ClaudeAPIKey,
+			OpenAIAPIKey:          config.OpenAIAPIKey,
+			DeepSeekAPIKey:        config.DeepSeekAPIKey,
+			Provider:              config.LLMProvider,
+			BaseURL:               config.LLMBaseURL,
+			Model:                 config.LLMModel,
+			AzureOpenAIEndpoint:   config.AzureOpenAIEndpoint,
+			AzureOpenAIKey:        config.AzureOpenAIKey,
+			AzureOpenAIDeployment: config.AzureOpenAIDeployment,
+			AzureOpenAIAPIVersion: config.AzureOpenAIAPIVersion,
 		}
 		detector.llmClient = NewLLMClient(llmConfig, log)
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -24,15 +25,40 @@ type LLMClient struct {
 
 // LLMConfig holds LLM client configuration
 type LLMConfig struct {
-	Provider       string  // claude, openai
+	Provider       string  // claude, openai, deepseek, azure-openai
 	ClaudeAPIKey   string
 	OpenAIAPIKey   string
-	Model          string  // claude-3-sonnet-20240229, gpt-4-turbo, etc.
+	DeepSeekAPIKey string
+	// Azure OpenAI settings (used only when Provider == "azure-openai").
+	AzureOpenAIEndpoint   string // e.g. https://my-resource.openai.azure.com
+	AzureOpenAIKey        string
+	AzureOpenAIDeployment string
+	AzureOpenAIAPIVersion string // defaults to 2024-02-15-preview
+	// BaseURL overrides the provider's default API base URL
+	// (claude, openai and deepseek paths; Azure uses AzureOpenAIEndpoint).
+	BaseURL        string
+	Model          string  // claude-3-sonnet-20240229, gpt-4-turbo, deepseek-chat, etc.
 	Temperature    float64
 	MaxTokens      int
 	VisionEnabled  bool
 	SystemPrompt   string
 	Timeout        time.Duration
+}
+
+// DefaultModelForProvider returns the default model used when no explicit
+// model is configured for the given provider. For azure-openai the model is
+// implied by the deployment, so there is no provider-level default.
+func DefaultModelForProvider(provider string) string {
+	switch provider {
+	case "claude":
+		return "claude-3-sonnet-20240229"
+	case "deepseek":
+		return "deepseek-chat"
+	case "azure-openai":
+		return ""
+	default:
+		return "gpt-4-turbo"
+	}
 }
 
 // NewLLMClient creates a new LLM client
@@ -46,11 +72,15 @@ func NewLLMClient(cfg LLMConfig, log *logger.Logger) *LLMClient {
 	if cfg.MaxTokens == 0 {
 		cfg.MaxTokens = 4096
 	}
+	if cfg.AzureOpenAIAPIVersion == "" {
+		cfg.AzureOpenAIAPIVersion = "2024-02-15-preview"
+	}
 	if cfg.Model == "" {
-		if cfg.Provider == "claude" {
-			cfg.Model = "claude-3-sonnet-20240229"
-		} else {
-			cfg.Model = "gpt-4-turbo"
+		cfg.Model = DefaultModelForProvider(cfg.Provider)
+		if cfg.Provider == "azure-openai" {
+			// Azure selects the model via the deployment; record it so
+			// analysis results report which model was used.
+			cfg.Model = cfg.AzureOpenAIDeployment
 		}
 	}
 
@@ -165,6 +195,10 @@ func (c *LLMClient) AnalyzeForScam(ctx context.Context, req *models.ScamAnalysis
 		response, err = c.callClaude(ctx, systemPrompt, messages)
 	case "openai":
 		response, err = c.callOpenAI(ctx, systemPrompt, messages)
+	case "deepseek":
+		response, err = c.callDeepSeek(ctx, systemPrompt, messages)
+	case "azure-openai":
+		response, err = c.callAzureOpenAI(ctx, systemPrompt, messages)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", c.config.Provider)
 	}
@@ -306,7 +340,11 @@ func (c *LLMClient) buildScamAnalysisPrompt(req *models.ScamAnalysisRequest) str
 
 // callClaude makes a request to Claude API
 func (c *LLMClient) callClaude(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
-	url := "https://api.anthropic.com/v1/messages"
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.anthropic.com"
+	}
+	url := strings.TrimRight(base, "/") + "/v1/messages"
 
 	// Convert messages to Claude format
 	claudeMessages := make([]map[string]interface{}, len(messages))
@@ -412,10 +450,50 @@ func (c *LLMClient) callClaude(ctx context.Context, system string, messages []Me
 	}, nil
 }
 
-// callOpenAI makes a request to OpenAI API
+// callOpenAI makes a request to the OpenAI API.
 func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
-	url := "https://api.openai.com/v1/chat/completions"
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.openai.com/v1"
+	}
+	url := strings.TrimRight(base, "/") + "/chat/completions"
+	headers := map[string]string{"Authorization": "Bearer " + c.config.OpenAIAPIKey}
+	return c.callOpenAICompatible(ctx, system, messages, url, headers, "OpenAI")
+}
 
+// callDeepSeek makes a request to the DeepSeek API, which is OpenAI-compatible.
+func (c *LLMClient) callDeepSeek(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.deepseek.com"
+	}
+	url := strings.TrimRight(base, "/") + "/chat/completions"
+	headers := map[string]string{"Authorization": "Bearer " + c.config.DeepSeekAPIKey}
+	return c.callOpenAICompatible(ctx, system, messages, url, headers, "DeepSeek")
+}
+
+// callAzureOpenAI makes a request to an Azure OpenAI deployment. Azure uses
+// the OpenAI-shaped request/response body but authenticates with an "api-key"
+// header (not Bearer) and addresses the model via the deployment in the URL.
+func (c *LLMClient) callAzureOpenAI(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
+	if c.config.AzureOpenAIEndpoint == "" || c.config.AzureOpenAIDeployment == "" {
+		return nil, fmt.Errorf("azure-openai provider requires endpoint and deployment to be configured")
+	}
+	endpoint := strings.TrimRight(c.config.AzureOpenAIEndpoint, "/")
+	requestURL := fmt.Sprintf(
+		"%s/openai/deployments/%s/chat/completions?api-version=%s",
+		endpoint,
+		url.PathEscape(c.config.AzureOpenAIDeployment),
+		url.QueryEscape(c.config.AzureOpenAIAPIVersion),
+	)
+	headers := map[string]string{"api-key": c.config.AzureOpenAIKey}
+	return c.callOpenAICompatible(ctx, system, messages, requestURL, headers, "Azure OpenAI")
+}
+
+// callOpenAICompatible makes a chat-completions request to any
+// OpenAI-compatible endpoint (OpenAI, DeepSeek, Azure OpenAI) with
+// provider-specific URL and auth headers.
+func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, messages []Message, requestURL string, headers map[string]string, providerName string) (*CompletionResponse, error) {
 	// Convert messages to OpenAI format
 	openAIMessages := []map[string]interface{}{
 		{
@@ -463,13 +541,15 @@ func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Me
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.config.OpenAIAPIKey)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -483,7 +563,7 @@ func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Me
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OpenAI API error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%s API error %d: %s", providerName, resp.StatusCode, string(body))
 	}
 
 	// Parse OpenAI response
@@ -505,7 +585,7 @@ func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Me
 	}
 
 	if len(openAIResp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from OpenAI")
+		return nil, fmt.Errorf("no response from %s", providerName)
 	}
 
 	return &CompletionResponse{
@@ -576,6 +656,10 @@ func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string)
 		response, err = c.callClaude(ctx, system, messages)
 	case "openai":
 		response, err = c.callOpenAI(ctx, system, messages)
+	case "deepseek":
+		response, err = c.callDeepSeek(ctx, system, messages)
+	case "azure-openai":
+		response, err = c.callAzureOpenAI(ctx, system, messages)
 	default:
 		return "", fmt.Errorf("unsupported provider: %s", c.config.Provider)
 	}
