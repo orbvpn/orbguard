@@ -652,31 +652,40 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 		}
 		return nil, err
 	}
-	if status == http.StatusBadRequest &&
-		(strings.Contains(string(body), "unsupported_parameter") || strings.Contains(string(body), "reasoning_effort")) {
-		// Some deployments reject parameters the family normally accepts
-		// (e.g. reasoning models reject custom temperature, non-reasoning
-		// models reject reasoning_effort, legacy models reject
-		// max_completion_tokens). Adapt once and retry.
+	// Some deployments reject parameters the family normally accepts: reasoning
+	// models (GPT-5.x) require the default temperature, non-reasoning models
+	// reject reasoning_effort, legacy models reject max_completion_tokens.
+	// Adapt to whichever parameter the 400 names and retry, up to a few times
+	// so multiple offending parameters are stripped in sequence.
+	for attempt := 0; attempt < 3 && status == http.StatusBadRequest && isAdjustableParamError(string(body)); attempt++ {
 		retryBody := make(map[string]interface{}, len(reqBody))
 		for k, v := range reqBody {
 			retryBody[k] = v
 		}
-		if strings.Contains(string(body), "temperature") {
-			delete(retryBody, "temperature")
+		bodyStr := string(body)
+		if strings.Contains(bodyStr, "temperature") {
+			// Reasoning models accept only the default (1); send that
+			// explicitly rather than dropping it so deployments that require
+			// the field present still succeed.
+			retryBody["temperature"] = 1
 		}
-		if strings.Contains(string(body), "reasoning_effort") {
+		if strings.Contains(bodyStr, "reasoning_effort") {
 			delete(retryBody, "reasoning_effort")
 		}
-		if strings.Contains(string(body), "max_completion_tokens") {
+		if strings.Contains(bodyStr, "max_completion_tokens") {
 			delete(retryBody, "max_completion_tokens")
 			retryBody["max_tokens"] = c.config.MaxTokens
-		} else if strings.Contains(string(body), "max_tokens") {
+		} else if strings.Contains(bodyStr, "max_tokens") {
 			delete(retryBody, "max_tokens")
 			retryBody["max_completion_tokens"] = c.config.MaxTokens
 		}
+		// Carry the adapted body forward so the next iteration keeps the fix.
+		reqBody = retryBody
 		status, body, err = doRequest(retryBody)
 		if err != nil {
+			if isTimeoutErr(err) {
+				c.recordTimeout()
+			}
 			return nil, err
 		}
 	}
@@ -820,4 +829,18 @@ func isTimeoutErr(err error) bool {
 		return true
 	}
 	return strings.Contains(err.Error(), "Client.Timeout exceeded")
+}
+
+// isAdjustableParamError reports whether a 400 body names a request parameter
+// we know how to adapt (temperature, reasoning_effort, max_tokens family).
+func isAdjustableParamError(body string) bool {
+	if !strings.Contains(body, "unsupported_parameter") &&
+		!strings.Contains(body, "unsupported_value") &&
+		!strings.Contains(body, "invalid_request_error") {
+		return false
+	}
+	return strings.Contains(body, "temperature") ||
+		strings.Contains(body, "reasoning_effort") ||
+		strings.Contains(body, "max_completion_tokens") ||
+		strings.Contains(body, "max_tokens")
 }
