@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"orbguard-lab/internal/dnscanary"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/internal/infrastructure/database/repository"
@@ -46,6 +47,18 @@ type NetworkSecurityService struct {
 	logger           *logger.Logger
 	gatewayBaselines map[string]gatewayBaseline // L1: "deviceID|gatewayIP" -> baseline (L2 persisted in Redis)
 	gatewaysMu       sync.RWMutex
+
+	// DNS leak-check canary (set once at startup via ConfigureDNSLeakCanary;
+	// both stay zero-valued when no canary zone is deployed, in which case
+	// the leak check is reported explicitly unavailable).
+	dnsLeakCanaryZone  string
+	dnsLeakCanaryStore DNSCanaryQueryStore
+}
+
+// DNSCanaryQueryStore looks up canary queries observed by the authoritative
+// canary DNS server (cmd/dnscanary). Implemented by *dnscanary.Store.
+type DNSCanaryQueryStore interface {
+	LookupToken(ctx context.Context, token string) ([]dnscanary.ObservedQuery, error)
 }
 
 // NewNetworkSecurityService creates a new network security service
@@ -56,6 +69,26 @@ func NewNetworkSecurityService(repos *repository.Repositories, cache *cache.Redi
 		logger:           log.WithComponent("network-security"),
 		gatewayBaselines: make(map[string]gatewayBaseline),
 	}
+}
+
+// ConfigureDNSLeakCanary enables real DNS leak detection against a
+// controlled canary zone. zone is the NS-delegated domain served by the
+// authoritative responder in cmd/dnscanary; store reads the query log that
+// responder writes. Must be called during startup wiring, before the service
+// handles requests.
+func (s *NetworkSecurityService) ConfigureDNSLeakCanary(zone string, store DNSCanaryQueryStore) {
+	s.dnsLeakCanaryZone = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(zone)), ".")
+	s.dnsLeakCanaryStore = store
+}
+
+// DNSLeakCanaryZone returns the configured canary zone ("" when leak
+// detection is unavailable). Clients resolve {token}.{zone} through their
+// local resolver before submitting the token to CheckDNS.
+func (s *NetworkSecurityService) DNSLeakCanaryZone() string {
+	if s.dnsLeakCanaryStore == nil {
+		return ""
+	}
+	return s.dnsLeakCanaryZone
 }
 
 func gatewayBaselineCacheKey(deviceID, gatewayIP string) string {
@@ -487,20 +520,65 @@ type DNSCheckOutcome struct {
 	// "performed: ...", "not_performed: ..." or "not_requested".
 	HijackCheckStatus string
 	// LeakCheckStatus describes the leak check state. Leak detection requires
-	// a controlled canary domain (randomized subdomain whose authoritative
-	// queries we can observe); none is deployed, so when requested this is
-	// always dnsLeakCheckUnavailable rather than a fabricated result.
+	// a controlled canary zone (randomized subdomain whose authoritative
+	// queries we observe via cmd/dnscanary). When no zone is configured the
+	// status is dnsLeakCheckUnavailable rather than a fabricated result;
+	// when configured it is "performed: ...", "not_observed: ..." or
+	// "not_performed: ...".
 	LeakCheckStatus string
+	// LeakObservation carries the authoritative-server observation when
+	// LeakCheckStatus is "performed: ..."; nil otherwise.
+	LeakObservation *DNSLeakObservation
+}
+
+// DNSLeakObservation is what the authoritative canary server actually saw
+// for the client's random token: the egress IP of whichever recursive
+// resolver really performed the device's lookup.
+type DNSLeakObservation struct {
+	// Token is the client-generated random label that was resolved.
+	Token string `json:"token"`
+	// CanaryZone is the controlled zone the token was resolved under.
+	CanaryZone string `json:"canary_zone"`
+	// ObservedResolverIP is the source IP of the first query observed at the
+	// authoritative server — the resolver that actually handled the lookup.
+	ObservedResolverIP string `json:"observed_resolver_ip"`
+	// ObservedResolverIPs lists every distinct resolver source IP observed
+	// (resolver farms may retry from multiple egress addresses).
+	ObservedResolverIPs []string `json:"observed_resolver_ips"`
+	// ResolverASN is the autonomous system of ObservedResolverIP when the
+	// canary recorded one; nil otherwise — never guessed.
+	ResolverASN *int `json:"resolver_asn,omitempty"`
+	// MatchesConfiguredResolver is true when an observed resolver IP exactly
+	// equals the device's configured resolver (current_dns / resolver_hint).
+	// NOTE: public resolvers (1.1.1.1, 8.8.8.8) legitimately egress from
+	// provider-owned ranges that differ from their anycast service address,
+	// so false here is informational, not proof of a leak by itself.
+	MatchesConfiguredResolver bool `json:"matches_configured_resolver"`
+	// QueryCount is how many canary queries were observed for the token.
+	QueryCount int `json:"query_count"`
+	// FirstQueryAt is when the first query reached the authoritative server.
+	FirstQueryAt time.Time `json:"first_query_at"`
 }
 
 const (
 	dnsCheckNotRequested = "not_requested"
-	// dnsLeakCheckUnavailable is returned whenever a leak check is requested:
-	// honest leak detection needs a randomized-subdomain canary under a domain
-	// whose authoritative resolver logs the backend controls. No such domain
-	// exists in this deployment, so the check is reported unavailable instead
-	// of being faked from provider capabilities.
+	// dnsLeakCheckUnavailable is returned when a leak check is requested but
+	// no controlled canary zone is configured: honest leak detection needs a
+	// randomized-subdomain canary under a domain whose authoritative resolver
+	// logs the backend controls (dns_canary.zone / ORBGUARD_DNS_CANARY_ZONE,
+	// served by cmd/dnscanary). Without it the check is reported unavailable
+	// instead of being faked from provider capabilities.
 	dnsLeakCheckUnavailable = "unavailable: leak detection requires a controlled canary domain, which is not deployed"
+
+	// dnsLeakLookupMaxWait bounds how long CheckDNS waits for the client's
+	// canary query to appear in the authoritative query log. The client
+	// resolves the token BEFORE submitting it, so the observation normally
+	// already exists on the first lookup; the retry window only covers
+	// stragglers (slow resolver chains, async log insert). Kept under the
+	// HTTP server write timeout.
+	dnsLeakLookupMaxWait = 8 * time.Second
+	// dnsLeakLookupRetryEvery is the polling interval within the wait window.
+	dnsLeakLookupRetryEvery = 2 * time.Second
 )
 
 // dnsCanaryAnswerSets maps verifiable canary hostnames to their published,
@@ -539,7 +617,11 @@ func dnsCanaryExpected(known map[string]bool) string {
 // CheckDNS performs a DNS security check. Hijack detection is driven entirely
 // by client-submitted canary resolutions (resolved on the device through its
 // local resolver) compared against known-good answer sets and threat intel.
-func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCheckRequest, clientResolutions []ClientCanaryResolution) (*DNSCheckOutcome, error) {
+// Leak detection is driven by leakCanaryToken: the client generates a random
+// token, resolves {token}.{canary zone} through its local resolver, and the
+// backend reports which resolver IP the authoritative canary server actually
+// observed for that token ("" = client performed no canary resolution).
+func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCheckRequest, clientResolutions []ClientCanaryResolution, leakCanaryToken string) (*DNSCheckOutcome, error) {
 	result := &models.DNSCheckResult{
 		ID:              uuid.New(),
 		CurrentDNS:      req.CurrentDNS,
@@ -594,12 +676,12 @@ func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCh
 		outcome.HijackCheckStatus = s.verifyClientCanaryResolutions(ctx, result, clientResolutions)
 	}
 
-	// Leak detection cannot be performed honestly without a controlled canary
-	// domain; report it unavailable instead of inferring a "leak" from
-	// provider capabilities (which proves nothing about actual query paths).
+	// Leak detection: look the client's canary token up in the authoritative
+	// canary server's query log. Without a configured canary zone the check
+	// is reported unavailable instead of inferring a "leak" from provider
+	// capabilities (which proves nothing about actual query paths).
 	if req.CheckLeaks {
-		outcome.LeakCheckStatus = dnsLeakCheckUnavailable
-		s.logger.Info().Msg("DNS leak check requested but unavailable: no controlled canary domain deployed")
+		outcome.LeakCheckStatus, outcome.LeakObservation = s.performDNSLeakCheck(ctx, req, clientResolutions, leakCanaryToken)
 	}
 
 	// Generate recommendations
@@ -610,10 +692,124 @@ func (s *NetworkSecurityService) CheckDNS(ctx context.Context, req *models.DNSCh
 		Bool("is_secure", result.IsSecure).
 		Bool("is_hijacked", result.IsHijacked).
 		Str("hijack_check", outcome.HijackCheckStatus).
+		Str("leak_check", outcome.LeakCheckStatus).
 		Int("client_resolutions", len(clientResolutions)).
 		Msg("DNS check completed")
 
 	return outcome, nil
+}
+
+// performDNSLeakCheck resolves the leak-check outcome from the authoritative
+// canary query log. Returns the status string and, when a query was
+// observed, the observation details.
+func (s *NetworkSecurityService) performDNSLeakCheck(ctx context.Context, req *models.DNSCheckRequest, clientResolutions []ClientCanaryResolution, token string) (string, *DNSLeakObservation) {
+	if s.dnsLeakCanaryZone == "" || s.dnsLeakCanaryStore == nil {
+		s.logger.Info().Msg("DNS leak check requested but unavailable: no controlled canary zone configured")
+		return dnsLeakCheckUnavailable, nil
+	}
+
+	token = strings.ToLower(strings.TrimSpace(token))
+	if token == "" {
+		return "not_performed: client did not submit a leak canary token (resolve {token}." + s.dnsLeakCanaryZone + " and pass it as leak_canary_token)", nil
+	}
+	if !dnscanary.ValidToken(token) {
+		s.logger.Warn().Str("token", token).Msg("DNS leak check: invalid canary token format")
+		return "not_performed: leak canary token has an invalid format", nil
+	}
+
+	queries, err := s.lookupCanaryQueriesWithRetry(ctx, token)
+	if err != nil {
+		s.logger.Error().Err(err).Str("token", token).Msg("DNS leak check: canary query log lookup failed")
+		return "not_performed: canary query log lookup failed", nil
+	}
+	if len(queries) == 0 {
+		// The device resolved the token (or tried to) but no query ever
+		// reached the authoritative server. That itself is signal: the
+		// resolver path either failed, served a forged answer without
+		// recursing, or is blocked from reaching the canary.
+		return fmt.Sprintf("not_observed: no query for the canary token reached the authoritative canary server within %s", dnsLeakLookupMaxWait), nil
+	}
+
+	// Distinct resolver egress IPs, first-seen order.
+	seen := make(map[string]bool, len(queries))
+	distinct := make([]string, 0, len(queries))
+	for _, q := range queries {
+		if !seen[q.ResolverIP] {
+			seen[q.ResolverIP] = true
+			distinct = append(distinct, q.ResolverIP)
+		}
+	}
+
+	// The device's expected resolver addresses: the configured resolver plus
+	// any resolver hints submitted with the hijack canaries.
+	expected := make(map[string]bool)
+	if ip := net.ParseIP(strings.TrimSpace(req.CurrentDNS)); ip != nil {
+		expected[ip.String()] = true
+	}
+	for _, res := range clientResolutions {
+		for _, hint := range strings.Split(res.ResolverHint, ",") {
+			if ip := net.ParseIP(strings.TrimSpace(hint)); ip != nil {
+				expected[ip.String()] = true
+			}
+		}
+	}
+	matches := false
+	for _, ip := range distinct {
+		if expected[ip] {
+			matches = true
+			break
+		}
+	}
+
+	obs := &DNSLeakObservation{
+		Token:                     token,
+		CanaryZone:                s.dnsLeakCanaryZone,
+		ObservedResolverIP:        queries[0].ResolverIP,
+		ObservedResolverIPs:       distinct,
+		ResolverASN:               queries[0].ResolverASN,
+		MatchesConfiguredResolver: matches,
+		QueryCount:                len(queries),
+		FirstQueryAt:              queries[0].QueriedAt,
+	}
+
+	s.logger.Info().
+		Str("token", token).
+		Str("observed_resolver_ip", obs.ObservedResolverIP).
+		Int("query_count", obs.QueryCount).
+		Bool("matches_configured_resolver", matches).
+		Msg("DNS leak check: canary query observed")
+
+	return fmt.Sprintf("performed: canary query observed at authoritative server from %d resolver IP(s)", len(distinct)), obs
+}
+
+// lookupCanaryQueriesWithRetry polls the canary query log until queries for
+// the token appear or the wait window elapses. The client resolves the token
+// before submitting it, so the first lookup normally succeeds immediately;
+// the window only covers slow resolver chains and the canary's async insert.
+func (s *NetworkSecurityService) lookupCanaryQueriesWithRetry(ctx context.Context, token string) ([]dnscanary.ObservedQuery, error) {
+	deadline := time.Now().Add(dnsLeakLookupMaxWait)
+	for {
+		queries, err := s.dnsLeakCanaryStore.LookupToken(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+		if len(queries) > 0 {
+			return queries, nil
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, nil
+		}
+		wait := dnsLeakLookupRetryEvery
+		if wait > remaining {
+			wait = remaining
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
 }
 
 // verifyClientCanaryResolutions compares the canary answers the CLIENT's local

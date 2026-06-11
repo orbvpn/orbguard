@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -94,6 +95,18 @@ func (a *AggregatorRepositoryAdapter) UpdateSourceAfterSuccess(ctx context.Conte
 // UpdateSourceAfterError updates source after failed fetch
 func (a *AggregatorRepositoryAdapter) UpdateSourceAfterError(ctx context.Context, sourceID uuid.UUID, errMsg string) error {
 	return a.sources.UpdateAfterError(ctx, sourceID, errMsg)
+}
+
+// UpdateSourceRateLimited defers a source's next fetch to honor a provider
+// rate limit, without escalating error_count/status
+func (a *AggregatorRepositoryAdapter) UpdateSourceRateLimited(ctx context.Context, sourceID uuid.UUID, nextFetch time.Time, errMsg string) error {
+	return a.sources.UpdateAfterRateLimit(ctx, sourceID, nextFetch, errMsg)
+}
+
+// UpdateSourcePlanLimited marks a source as errored due to an API plan
+// limitation, with a long backoff
+func (a *AggregatorRepositoryAdapter) UpdateSourcePlanLimited(ctx context.Context, sourceID uuid.UUID, errMsg string) error {
+	return a.sources.MarkPlanLimited(ctx, sourceID, errMsg)
 }
 
 // UpdateHistoryRepository handles update history operations

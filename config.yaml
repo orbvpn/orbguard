@@ -138,7 +138,9 @@ sources:
   # IP Reputation
   abuseipdb:
     enabled: true
-    update_interval: 1h
+    # Free tier allows only 5 blacklist requests/day — 6h = 4 requests/day
+    # (the connector also enforces a 6h minimum regardless of this value)
+    update_interval: 6h
     api_key: ""  # Set via ORBGUARD_SOURCES_ABUSEIPDB_API_KEY env
 
   greynoise:
@@ -161,7 +163,9 @@ sources:
 
   koodous:
     enabled: true
-    update_interval: 6h
+    # Koodous free-tier throttling locks the API for 8+ hours once exhausted;
+    # 12h keeps us safely inside the quota
+    update_interval: 12h
     api_key: ""  # Set via ORBGUARD_SOURCES_KOODOUS_API_KEY env
 
   # General
@@ -261,10 +265,11 @@ scam_detector:
   enable_phone_rep: true    # local phone reputation database
   enable_llm: true          # effective only when a Claude/OpenAI API key is set
   enable_vision: true       # requires an LLM API key
-  enable_speech: true       # requires an OpenAI API key (transcription)
+  enable_speech: true       # requires an OpenAI API key or an Azure OpenAI transcribe deployment
   llm_provider: claude      # claude, openai, deepseek or azure-openai
   llm_base_url: ""          # optional API base URL override (ORBGUARD_SCAM_DETECTOR_LLM_BASE_URL)
   llm_model: ""             # optional model override (ORBGUARD_SCAM_DETECTOR_LLM_MODEL)
+  llm_reasoning_effort: "low"  # reasoning_effort for OpenAI/Azure reasoning models (ORBGUARD_SCAM_DETECTOR_LLM_REASONING_EFFORT); "" omits
   claude_api_key: ""        # Set via ORBGUARD_CLAUDE_API_KEY env
   openai_api_key: ""        # Set via ORBGUARD_OPENAI_API_KEY env
   deepseek_api_key: ""      # Set via ORBGUARD_DEEPSEEK_API_KEY env
@@ -272,5 +277,13 @@ scam_detector:
   azure_openai_key: ""      # Set via ORBGUARD_AZURE_OPENAI_KEY env
   azure_openai_deployment: ""              # Set via ORBGUARD_AZURE_OPENAI_DEPLOYMENT env
   azure_openai_api_version: "2024-02-15-preview"  # ORBGUARD_AZURE_OPENAI_API_VERSION
+  azure_openai_transcribe_deployment: ""   # audio transcription deployment, e.g. gpt-4o-transcribe (ORBGUARD_AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT)
   scam_threshold: 0.7
   suspicious_threshold: 0.4
+
+# DNS leak-check canary. zone is the controlled, NS-delegated domain served
+# by the authoritative responder in cmd/dnscanary (e.g. dnscheck.example.com).
+# When empty, POST /network/dns/check reports the leak check as explicitly
+# unavailable instead of fabricating a result.
+dns_canary:
+  zone: ""  # Set via ORBGUARD_DNS_CANARY_ZONE env

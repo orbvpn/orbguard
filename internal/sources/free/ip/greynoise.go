@@ -17,9 +17,13 @@ import (
 )
 
 const (
-	greyNoiseGNQLURL      = "https://api.greynoise.io/v2/experimental/gnql" // Enterprise only
-	greyNoiseCommunityURL = "https://api.greynoise.io/v3/community"         // Free tier
+	// GreyNoise API v3 GNQL endpoint. The v2 endpoint
+	// (/v2/experimental/gnql) was deprecated and now returns HTTP 410.
+	greyNoiseGNQLURL = "https://api.greynoise.io/v3/gnql"
+	// GreyNoise Community lookup endpoint (free tier, single IP).
+	greyNoiseCommunityURL = "https://api.greynoise.io/v3/community"
 	greyNoiseSlug         = "greynoise"
+	greyNoiseName         = "GreyNoise"
 )
 
 // GreyNoiseConnector fetches malicious IPs from GreyNoise
@@ -35,12 +39,14 @@ func NewGreyNoiseConnector(log *logger.Logger) *GreyNoiseConnector {
 	return &GreyNoiseConnector{
 		BaseConnector: sources.NewBaseConnector(
 			greyNoiseSlug,
-			"GreyNoise",
+			greyNoiseName,
 			models.SourceCategoryIPRep,
 			models.SourceTypeAPI,
 		),
 		client: &http.Client{
-			Timeout: 60 * time.Second,
+			// v3 GNQL responses stream slowly from the provider
+			// (~90s measured for a 10k-result quick query)
+			Timeout: 180 * time.Second,
 		},
 		logger: log.WithComponent("greynoise"),
 	}
@@ -55,39 +61,59 @@ func (c *GreyNoiseConnector) Configure(cfg sources.ConnectorConfig) error {
 	return nil
 }
 
-// greyNoiseResponse represents the GNQL API response
-type greyNoiseResponse struct {
-	Complete bool              `json:"complete"`
-	Count    int               `json:"count"`
-	Data     []greyNoiseEntry  `json:"data"`
-	Message  string            `json:"message"`
-	Query    string            `json:"query"`
-	Scroll   string            `json:"scroll"`
+// greyNoiseV3Response represents the v3 GNQL API response.
+// Shape: {"data": [...], "request_metadata": {...}}
+type greyNoiseV3Response struct {
+	Data            []greyNoiseV3Entry `json:"data"`
+	RequestMetadata struct {
+		Scroll   string `json:"scroll"`
+		Message  string `json:"message"`
+		Query    string `json:"query"`
+		Complete bool   `json:"complete"`
+		Count    int    `json:"count"`
+	} `json:"request_metadata"`
 }
 
-type greyNoiseEntry struct {
-	IP               string   `json:"ip"`
-	Seen             bool     `json:"seen"`
-	Classification   string   `json:"classification"`
-	FirstSeen        string   `json:"first_seen"`
-	LastSeen         string   `json:"last_seen"`
-	ActorName        string   `json:"actor"`
-	Tags             []string `json:"tags"`
-	CVE              []string `json:"cve"`
-	Bot              bool     `json:"bot"`
-	VPN              bool     `json:"vpn"`
-	VPNService       string   `json:"vpn_service"`
-	Metadata         greyNoiseMetadata `json:"metadata"`
+type greyNoiseV3Entry struct {
+	IP                          string `json:"ip"`
+	BusinessServiceIntelligence struct {
+		Found      bool   `json:"found"`
+		Category   string `json:"category"`
+		Name       string `json:"name"`
+		TrustLevel string `json:"trust_level"`
+	} `json:"business_service_intelligence"`
+	InternetScannerIntelligence struct {
+		Found          bool             `json:"found"`
+		FirstSeen      string           `json:"first_seen"`
+		LastSeen       string           `json:"last_seen"`
+		Classification string           `json:"classification"`
+		Actor          string           `json:"actor"`
+		Spoofable      bool             `json:"spoofable"`
+		CVEs           []string         `json:"cves"`
+		VPN            bool             `json:"vpn"`
+		VPNService     string           `json:"vpn_service"`
+		Tor            bool             `json:"tor"`
+		Tags           []greyNoiseV3Tag `json:"tags"`
+		Metadata       struct {
+			ASN               string `json:"asn"`
+			SourceCountry     string `json:"source_country"`
+			SourceCountryCode string `json:"source_country_code"`
+			SourceCity        string `json:"source_city"`
+			Organization      string `json:"organization"`
+			Category          string `json:"category"`
+			OS                string `json:"os"`
+			RDNS              string `json:"rdns"`
+		} `json:"metadata"`
+	} `json:"internet_scanner_intelligence"`
 }
 
-type greyNoiseMetadata struct {
-	ASN          string `json:"asn"`
-	City         string `json:"city"`
-	Country      string `json:"country"`
-	CountryCode  string `json:"country_code"`
-	Organization string `json:"organization"`
-	OS           string `json:"os"`
-	RDNS         string `json:"rdns"`
+type greyNoiseV3Tag struct {
+	Slug           string   `json:"slug"`
+	Name           string   `json:"name"`
+	Category       string   `json:"category"`
+	Intention      string   `json:"intention"`
+	CVEs           []string `json:"cves"`
+	RecommendBlock bool     `json:"recommend_block"`
 }
 
 // CommunityLookupResult represents a single IP lookup from the Community API
@@ -128,7 +154,13 @@ func (c *GreyNoiseConnector) LookupIP(ctx context.Context, ipAddr string) (*Comm
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	// The Community API returns 404 with a valid JSON body when the IP has
+	// not been observed scanning the internet — that is a legitimate
+	// "not noise" answer, not an error.
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, sources.NewRateLimitError(greyNoiseName, resp, body, time.Hour)
+		}
 		return nil, fmt.Errorf("GreyNoise returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -140,11 +172,11 @@ func (c *GreyNoiseConnector) LookupIP(ctx context.Context, ipAddr string) (*Comm
 	return &result, nil
 }
 
-// Fetch retrieves malicious IPs from GreyNoise using GNQL
-// This method automatically detects API tier:
-// - Enterprise API: Full GNQL bulk queries supported
-// - Community API: Gracefully skips bulk fetch (use LookupIP for single IP checks)
-// When you upgrade to Enterprise, bulk fetching will automatically start working.
+// Fetch retrieves malicious IPs from GreyNoise using the v3 GNQL endpoint.
+// If the configured API key's plan does not include GNQL queries, the
+// provider returns 401/403 and this connector reports an honest
+// PlanLimitError so the source is marked accordingly (single IP lookups via
+// LookupIP remain available on the Community API).
 func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResult, error) {
 	start := time.Now()
 
@@ -162,6 +194,18 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 		return result, err
 	}
 
+	// Honor an active rate-limit backoff window without hammering the API
+	// or spamming logs (logged once per window).
+	if remaining, first := c.BackoffRemaining(); remaining > 0 {
+		if first {
+			c.logger.Warn().Dur("remaining", remaining).Msg("GreyNoise in rate-limit backoff, skipping fetch")
+		}
+		err := &sources.RateLimitError{Provider: greyNoiseName, Wait: remaining, Repeat: !first}
+		result.Error = err
+		result.Duration = time.Since(start)
+		return result, err
+	}
+
 	// Query for malicious IPs seen in the last 7 days
 	query := "classification:malicious last_seen:7d"
 
@@ -175,13 +219,17 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 	req.Header.Set("key", c.apiKey)
 	req.Header.Set("Accept", "application/json")
 
-	// Query params
+	// Query params. quick=true returns minimal records (ip +
+	// classification) — full records are ~13KB each in v3 (structured tag
+	// objects), which makes a 10k-result page >100MB and untransferable;
+	// quick mode keeps it at ~1.6MB (measured live).
 	q := req.URL.Query()
 	q.Set("query", query)
 	q.Set("size", "10000")
+	q.Set("quick", "true")
 	req.URL.RawQuery = q.Encode()
 
-	c.logger.Info().Str("query", query).Msg("fetching GreyNoise malicious IPs")
+	c.logger.Info().Str("query", query).Msg("fetching GreyNoise malicious IPs (v3 GNQL)")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -190,67 +238,110 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		// Handle 401/403 gracefully for Community API users - not an error, just no bulk access
-		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			c.logger.Info().
-				Msg("GreyNoise GNQL requires Enterprise API - bulk fetch skipped. Single IP lookups via LookupIP() still available.")
-			result.Success = true
-			result.Duration = time.Since(start)
-			return result, nil // Return success with 0 indicators
-		}
-		err = fmt.Errorf("GreyNoise returned status %d: %s", resp.StatusCode, string(body))
-		result.Error = err
-		return result, err
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		result.Error = err
 		return result, err
 	}
 
-	var apiResp greyNoiseResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		result.Error = fmt.Errorf("failed to parse response: %w", err)
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden:
+			// Honest plan-limitation reporting: the key works for Community
+			// lookups but the plan does not include GNQL bulk queries.
+			plErr := &sources.PlanLimitError{
+				Provider: greyNoiseName,
+				Message: fmt.Sprintf(
+					"GNQL bulk queries not available on the current API plan (HTTP %d). Single IP lookups via the Community API remain available.",
+					resp.StatusCode,
+				),
+			}
+			c.logger.Warn().Int("status", resp.StatusCode).Msg(plErr.Message)
+			result.Error = plErr
+			result.Duration = time.Since(start)
+			return result, plErr
+		case http.StatusTooManyRequests:
+			rlErr := sources.NewRateLimitError(greyNoiseName, resp, body, time.Hour)
+			c.SetBackoff(rlErr.Wait)
+			result.Error = rlErr
+			result.Duration = time.Since(start)
+			return result, rlErr
+		case http.StatusGone:
+			err = fmt.Errorf("GreyNoise endpoint deprecated (HTTP 410): %s — connector needs migration to the current API version", string(body))
+		default:
+			err = fmt.Errorf("GreyNoise returned status %d: %s", resp.StatusCode, string(body))
+		}
+		result.Error = err
 		return result, err
 	}
 
-	c.logger.Info().Int("count", apiResp.Count).Msg("parsing GreyNoise entries")
+	var apiResp greyNoiseV3Response
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		result.Error = fmt.Errorf("failed to parse response: %w", err)
+		return result, result.Error
+	}
+
+	c.logger.Info().
+		Int("total_matches", apiResp.RequestMetadata.Count).
+		Int("returned", len(apiResp.Data)).
+		Msg("parsing GreyNoise entries")
 
 	for _, entry := range apiResp.Data {
 		if entry.IP == "" {
 			continue
 		}
+		scanner := entry.InternetScannerIntelligence
+		if !scanner.Found {
+			continue
+		}
 
 		// Parse dates
 		var firstSeen, lastSeen *time.Time
-		if t, err := time.Parse("2006-01-02", entry.FirstSeen); err == nil {
+		if t, err := time.Parse("2006-01-02", scanner.FirstSeen); err == nil {
 			firstSeen = &t
 		}
-		if t, err := time.Parse("2006-01-02", entry.LastSeen); err == nil {
+		if t, err := time.Parse("2006-01-02", scanner.LastSeen); err == nil {
 			lastSeen = &t
+		}
+
+		// Collect tag names and CVEs (v3 tags are structured objects;
+		// CVEs may appear both at the entry level and per tag)
+		tagNames := make([]string, 0, len(scanner.Tags))
+		cveSet := make(map[string]struct{})
+		for _, cve := range scanner.CVEs {
+			cveSet[cve] = struct{}{}
+		}
+		for _, t := range scanner.Tags {
+			if t.Name != "" {
+				tagNames = append(tagNames, t.Name)
+			}
+			for _, cve := range t.CVEs {
+				cveSet[cve] = struct{}{}
+			}
+		}
+		cves := make([]string, 0, len(cveSet))
+		for cve := range cveSet {
+			cves = append(cves, cve)
 		}
 
 		// Build tags
 		tags := []string{"greynoise", "scanner"}
-		tags = append(tags, entry.Tags...)
-		if entry.Bot {
-			tags = append(tags, "bot")
+		tags = append(tags, tagNames...)
+		if scanner.Tor {
+			tags = append(tags, "tor")
 		}
-		if entry.Metadata.CountryCode != "" {
-			tags = append(tags, strings.ToLower(entry.Metadata.CountryCode))
+		if scanner.Metadata.SourceCountryCode != "" {
+			tags = append(tags, strings.ToLower(scanner.Metadata.SourceCountryCode))
 		}
-		if entry.ActorName != "" {
-			tags = append(tags, strings.ToLower(strings.ReplaceAll(entry.ActorName, " ", "-")))
+		if scanner.Actor != "" && scanner.Actor != "unknown" {
+			tags = append(tags, strings.ToLower(strings.ReplaceAll(scanner.Actor, " ", "-")))
 		}
 
 		// Determine severity based on classification and CVEs
 		severity := models.SeverityMedium
-		if entry.Classification == "malicious" {
+		if scanner.Classification == "malicious" {
 			severity = models.SeverityHigh
-			if len(entry.CVE) > 0 {
+			if len(cves) > 0 {
 				severity = models.SeverityCritical
 			}
 		}
@@ -259,12 +350,12 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 		confidence := 0.85
 
 		// Build description
-		desc := fmt.Sprintf("GreyNoise: %s", entry.Classification)
-		if entry.ActorName != "" {
-			desc += fmt.Sprintf(" (Actor: %s)", entry.ActorName)
+		desc := fmt.Sprintf("GreyNoise: %s", scanner.Classification)
+		if scanner.Actor != "" && scanner.Actor != "unknown" {
+			desc += fmt.Sprintf(" (Actor: %s)", scanner.Actor)
 		}
-		if len(entry.CVE) > 0 {
-			desc += fmt.Sprintf(" [CVEs: %s]", strings.Join(entry.CVE, ", "))
+		if len(cves) > 0 {
+			desc += fmt.Sprintf(" [CVEs: %s]", strings.Join(cves, ", "))
 		}
 
 		result.RawIndicators = append(result.RawIndicators, models.RawIndicator{
@@ -280,18 +371,19 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 			SourceName:  c.Name(),
 			RawData: map[string]any{
 				"ip":             entry.IP,
-				"classification": entry.Classification,
-				"actor":          entry.ActorName,
-				"tags":           entry.Tags,
-				"cve":            entry.CVE,
-				"bot":            entry.Bot,
-				"vpn":            entry.VPN,
-				"vpn_service":    entry.VPNService,
-				"asn":            entry.Metadata.ASN,
-				"country":        entry.Metadata.Country,
-				"organization":   entry.Metadata.Organization,
-				"os":             entry.Metadata.OS,
-				"rdns":           entry.Metadata.RDNS,
+				"classification": scanner.Classification,
+				"actor":          scanner.Actor,
+				"tags":           tagNames,
+				"cve":            cves,
+				"spoofable":      scanner.Spoofable,
+				"vpn":            scanner.VPN,
+				"vpn_service":    scanner.VPNService,
+				"tor":            scanner.Tor,
+				"asn":            scanner.Metadata.ASN,
+				"country":        scanner.Metadata.SourceCountry,
+				"organization":   scanner.Metadata.Organization,
+				"os":             scanner.Metadata.OS,
+				"rdns":           scanner.Metadata.RDNS,
 			},
 		})
 	}
@@ -301,7 +393,7 @@ func (c *GreyNoiseConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 	result.Duration = time.Since(start)
 
 	c.logger.Info().
-		Int("count", apiResp.Count).
+		Int("total_matches", apiResp.RequestMetadata.Count).
 		Int("indicators", len(result.RawIndicators)).
 		Dur("duration", result.Duration).
 		Msg("GreyNoise fetch completed")

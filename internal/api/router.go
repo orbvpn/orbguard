@@ -248,6 +248,7 @@ func (r *Router) Setup() http.Handler {
 
 			// DNS protection
 			net.Post("/dns/check", r.handlers.NetworkSecurity.CheckDNS)
+			net.Get("/dns/leak-config", r.handlers.NetworkSecurity.GetDNSLeakConfig)
 			net.Get("/dns/providers", r.handlers.NetworkSecurity.GetDNSProviders)
 			net.Get("/dns/providers/{ip}", r.handlers.NetworkSecurity.GetDNSProvider)
 			net.Post("/dns/configure", r.handlers.NetworkSecurity.ConfigureDNS)

@@ -15,6 +15,7 @@ import (
 	"orbguard-lab/internal/api"
 	"orbguard-lab/internal/api/handlers"
 	"orbguard-lab/internal/config"
+	"orbguard-lab/internal/dnscanary"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/domain/services/ai"
 	"orbguard-lab/internal/domain/services/desktop_security"
@@ -198,6 +199,17 @@ func main() {
 
 	// Initialize network security service
 	networkSecurity := services.NewNetworkSecurityService(repos, redisCache, log)
+	// Real DNS leak detection: requires the controlled canary zone served by
+	// cmd/dnscanary plus the shared query log in Postgres. Without both, the
+	// leak check stays explicitly "unavailable".
+	if cfg.DNSCanary.Zone != "" {
+		if db != nil {
+			networkSecurity.ConfigureDNSLeakCanary(cfg.DNSCanary.Zone, dnscanary.NewStore(db.Pool()))
+			log.Info().Str("zone", cfg.DNSCanary.Zone).Msg("DNS leak-check canary enabled")
+		} else {
+			log.Warn().Str("zone", cfg.DNSCanary.Zone).Msg("DNS leak-check canary zone configured but no database available; leak check stays unavailable")
+		}
+	}
 	log.Info().Msg("network security service initialized")
 
 	// Initialize YARA scanning service
@@ -281,14 +293,24 @@ func main() {
 	// Initialize AI-powered scam detection service
 	scamConfig := buildScamDetectorConfig(cfg, log)
 	scamDetector := ai.NewScamDetector(log, scamConfig)
+	speechProvider := "disabled"
+	if scamConfig.EnableSpeech {
+		if scamConfig.AzureOpenAIEndpoint != "" && scamConfig.AzureOpenAIKey != "" && scamConfig.AzureOpenAITranscribeDeployment != "" {
+			speechProvider = "azure-openai:" + scamConfig.AzureOpenAITranscribeDeployment
+		} else {
+			speechProvider = "openai:whisper-1"
+		}
+	}
 	log.Info().
 		Bool("llm", scamConfig.EnableLLM).
 		Bool("pattern_db", scamConfig.EnablePatternDB).
 		Bool("phone_reputation", scamConfig.EnablePhoneRep).
 		Bool("vision", scamConfig.EnableVision).
 		Bool("speech", scamConfig.EnableSpeech).
+		Str("speech_provider", speechProvider).
 		Str("llm_provider", scamConfig.LLMProvider).
 		Str("llm_model", scamConfig.LLMModel).
+		Str("llm_reasoning_effort", scamConfig.LLMReasoningEffort).
 		Msg("AI scam detection service initialized")
 
 	// Initialize forensics service (Pegasus/Spyware detection)
@@ -566,9 +588,13 @@ func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDete
 		log.Warn().Msg("scam detector vision analysis disabled: deepseek chat models do not support image input")
 	}
 
-	enableSpeech := sc.EnableSpeech && hasOpenAI
-	if sc.EnableSpeech && !hasOpenAI {
-		log.Warn().Msg("scam detector speech analysis disabled: requires an OpenAI API key (set ORBGUARD_OPENAI_API_KEY)")
+	// Speech needs a transcription provider: either an Azure OpenAI
+	// transcribe deployment (e.g. gpt-4o-transcribe) or an OpenAI API key
+	// (Whisper).
+	hasAzureTranscribe := sc.AzureOpenAIEndpoint != "" && sc.AzureOpenAIKey != "" && sc.AzureOpenAITranscribeDeployment != ""
+	enableSpeech := sc.EnableSpeech && (hasOpenAI || hasAzureTranscribe)
+	if sc.EnableSpeech && !enableSpeech {
+		log.Warn().Msg("scam detector speech analysis disabled: requires an OpenAI API key (set ORBGUARD_OPENAI_API_KEY) or an Azure OpenAI transcribe deployment (set ORBGUARD_AZURE_OPENAI_ENDPOINT + ORBGUARD_AZURE_OPENAI_KEY + ORBGUARD_AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT)")
 	}
 
 	return ai.ScamDetectorConfig{
@@ -578,10 +604,13 @@ func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDete
 		LLMProvider:           provider,
 		LLMBaseURL:            sc.LLMBaseURL,
 		LLMModel:              model,
+		LLMReasoningEffort:    sc.LLMReasoningEffort,
 		AzureOpenAIEndpoint:   sc.AzureOpenAIEndpoint,
 		AzureOpenAIKey:        sc.AzureOpenAIKey,
 		AzureOpenAIDeployment: sc.AzureOpenAIDeployment,
 		AzureOpenAIAPIVersion: sc.AzureOpenAIAPIVersion,
+
+		AzureOpenAITranscribeDeployment: sc.AzureOpenAITranscribeDeployment,
 		EnableLLM:             enableLLM,
 		EnablePatternDB:       sc.EnablePatternDB,
 		EnablePhoneRep:        sc.EnablePhoneRep,

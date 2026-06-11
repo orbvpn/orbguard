@@ -247,6 +247,138 @@ func TestCallAzureOpenAICustomAPIVersionAndModel(t *testing.T) {
 	}
 }
 
+func TestReasoningEffortSentForAzureOpenAI(t *testing.T) {
+	var captured capturedRequest
+	server := newOpenAIShapedServer(t, &captured)
+	defer server.Close()
+
+	client := NewLLMClient(LLMConfig{
+		Provider:              "azure-openai",
+		AzureOpenAIEndpoint:   server.URL,
+		AzureOpenAIKey:        "azure-test-key",
+		AzureOpenAIDeployment: "orbguard-scam",
+		ReasoningEffort:       "low",
+	}, logger.NewDevelopment())
+
+	resp, err := client.callAzureOpenAI(context.Background(), "system prompt", testMessages())
+	assertOpenAIResponseParsed(t, resp, err)
+
+	if got := captured.Body["reasoning_effort"]; got != "low" {
+		t.Errorf("body reasoning_effort = %v, want low", got)
+	}
+}
+
+func TestReasoningEffortSentForOpenAI(t *testing.T) {
+	var captured capturedRequest
+	server := newOpenAIShapedServer(t, &captured)
+	defer server.Close()
+
+	client := NewLLMClient(LLMConfig{
+		Provider:        "openai",
+		OpenAIAPIKey:    "sk-openai-test",
+		BaseURL:         server.URL + "/v1",
+		ReasoningEffort: "medium",
+	}, logger.NewDevelopment())
+
+	resp, err := client.callOpenAI(context.Background(), "system prompt", testMessages())
+	assertOpenAIResponseParsed(t, resp, err)
+
+	if got := captured.Body["reasoning_effort"]; got != "medium" {
+		t.Errorf("body reasoning_effort = %v, want medium", got)
+	}
+}
+
+func TestReasoningEffortNotSentForDeepSeek(t *testing.T) {
+	var captured capturedRequest
+	server := newOpenAIShapedServer(t, &captured)
+	defer server.Close()
+
+	client := NewLLMClient(LLMConfig{
+		Provider:        "deepseek",
+		DeepSeekAPIKey:  "sk-deepseek-test",
+		BaseURL:         server.URL,
+		ReasoningEffort: "low",
+	}, logger.NewDevelopment())
+
+	resp, err := client.callDeepSeek(context.Background(), "system prompt", testMessages())
+	assertOpenAIResponseParsed(t, resp, err)
+
+	if _, present := captured.Body["reasoning_effort"]; present {
+		t.Errorf("body must not contain reasoning_effort for deepseek, got %v", captured.Body["reasoning_effort"])
+	}
+}
+
+func TestReasoningEffortOmittedWhenUnset(t *testing.T) {
+	var captured capturedRequest
+	server := newOpenAIShapedServer(t, &captured)
+	defer server.Close()
+
+	client := NewLLMClient(LLMConfig{
+		Provider:              "azure-openai",
+		AzureOpenAIEndpoint:   server.URL,
+		AzureOpenAIKey:        "azure-test-key",
+		AzureOpenAIDeployment: "orbguard-scam",
+	}, logger.NewDevelopment())
+
+	resp, err := client.callAzureOpenAI(context.Background(), "system prompt", testMessages())
+	assertOpenAIResponseParsed(t, resp, err)
+
+	if _, present := captured.Body["reasoning_effort"]; present {
+		t.Errorf("body must not contain reasoning_effort when not configured, got %v", captured.Body["reasoning_effort"])
+	}
+}
+
+func TestReasoningEffortStripRetry(t *testing.T) {
+	var bodies []map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
+		bodies = append(bodies, body)
+		w.Header().Set("Content-Type", "application/json")
+		if len(bodies) == 1 {
+			// First call: deployment rejects reasoning_effort.
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error": {"code": "unsupported_parameter", "message": "Unsupported parameter: 'reasoning_effort' is not supported with this model.", "param": "reasoning_effort", "type": "invalid_request_error"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{
+			"choices": [{"message": {"content": "openai-shaped reply"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 11, "completion_tokens": 7}
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewLLMClient(LLMConfig{
+		Provider:              "azure-openai",
+		AzureOpenAIEndpoint:   server.URL,
+		AzureOpenAIKey:        "azure-test-key",
+		AzureOpenAIDeployment: "orbguard-scam",
+		ReasoningEffort:       "low",
+	}, logger.NewDevelopment())
+
+	resp, err := client.callAzureOpenAI(context.Background(), "system prompt", testMessages())
+	assertOpenAIResponseParsed(t, resp, err)
+
+	if len(bodies) != 2 {
+		t.Fatalf("got %d requests, want 2 (initial + strip-retry)", len(bodies))
+	}
+	if got := bodies[0]["reasoning_effort"]; got != "low" {
+		t.Errorf("first request reasoning_effort = %v, want low", got)
+	}
+	if _, present := bodies[1]["reasoning_effort"]; present {
+		t.Errorf("retry request must not contain reasoning_effort, got %v", bodies[1]["reasoning_effort"])
+	}
+	// The retry keeps the rest of the body intact.
+	if _, ok := bodies[1]["max_completion_tokens"].(float64); !ok {
+		t.Errorf("retry request max_completion_tokens missing: %v", bodies[1]["max_completion_tokens"])
+	}
+	if _, ok := bodies[1]["temperature"].(float64); !ok {
+		t.Errorf("retry request temperature missing: %v", bodies[1]["temperature"])
+	}
+}
+
 func TestCallAzureOpenAIMissingConfig(t *testing.T) {
 	client := NewLLMClient(LLMConfig{
 		Provider:       "azure-openai",

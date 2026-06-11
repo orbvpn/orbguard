@@ -18,6 +18,12 @@ import (
 const (
 	abuseIPDBAPIURL = "https://api.abuseipdb.com/api/v2/blacklist"
 	abuseIPDBSlug   = "abuseipdb"
+	abuseIPDBName   = "AbuseIPDB"
+
+	// The AbuseIPDB free tier allows only 5 blacklist requests per day.
+	// Enforce a minimum update interval so we never burn the daily quota
+	// (4 requests/day at 6h leaves headroom for manual/diagnostic calls).
+	abuseIPDBMinInterval = 6 * time.Hour
 )
 
 // AbuseIPDBConnector fetches malicious IPs from AbuseIPDB
@@ -46,6 +52,15 @@ func NewAbuseIPDBConnector(log *logger.Logger) *AbuseIPDBConnector {
 
 // Configure configures the connector with the given config
 func (c *AbuseIPDBConnector) Configure(cfg sources.ConnectorConfig) error {
+	// Clamp the update interval to respect the free-tier daily limit of
+	// 5 blacklist requests, regardless of what the config file says.
+	if cfg.UpdateInterval < abuseIPDBMinInterval {
+		c.logger.Debug().
+			Dur("configured", cfg.UpdateInterval).
+			Dur("clamped_to", abuseIPDBMinInterval).
+			Msg("AbuseIPDB update interval raised to respect free-tier daily limit")
+		cfg.UpdateInterval = abuseIPDBMinInterval
+	}
 	if err := c.BaseConnector.Configure(cfg); err != nil {
 		return err
 	}
@@ -83,6 +98,18 @@ func (c *AbuseIPDBConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 		return result, err
 	}
 
+	// Honor an active rate-limit backoff window (e.g. daily quota exhausted)
+	// without hammering the API or spamming logs (logged once per window).
+	if remaining, first := c.BackoffRemaining(); remaining > 0 {
+		if first {
+			c.logger.Warn().Dur("remaining", remaining).Msg("AbuseIPDB in rate-limit backoff, skipping fetch")
+		}
+		err := &sources.RateLimitError{Provider: abuseIPDBName, Wait: remaining, Repeat: !first}
+		result.Error = err
+		result.Duration = time.Since(start)
+		return result, err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", abuseIPDBAPIURL, nil)
 	if err != nil {
 		result.Error = err
@@ -110,6 +137,15 @@ func (c *AbuseIPDBConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == http.StatusTooManyRequests {
+			// Free tier: 5 blacklist requests/day. Parse Retry-After and
+			// back off until the quota resets instead of retrying each cycle.
+			rlErr := sources.NewRateLimitError(abuseIPDBName, resp, body, abuseIPDBMinInterval)
+			c.SetBackoff(rlErr.Wait)
+			result.Error = rlErr
+			result.Duration = time.Since(start)
+			return result, rlErr
+		}
 		err = fmt.Errorf("AbuseIPDB returned status %d: %s", resp.StatusCode, string(body))
 		result.Error = err
 		return result, err

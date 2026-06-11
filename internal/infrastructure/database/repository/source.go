@@ -253,6 +253,51 @@ func (r *SourceRepository) UpdateAfterError(ctx context.Context, id uuid.UUID, e
 	return nil
 }
 
+// UpdateAfterRateLimit defers a source's next fetch to honor a provider
+// rate limit (e.g. HTTP 429 Retry-After). Unlike UpdateAfterError this does
+// not escalate error_count or status: being throttled is an expected
+// operating condition, not a source failure.
+func (r *SourceRepository) UpdateAfterRateLimit(ctx context.Context, id uuid.UUID, nextFetch time.Time, errMsg string) error {
+	query := `
+		UPDATE sources SET
+			last_fetched = NOW(),
+			next_fetch = $2,
+			last_error = $3,
+			updated_at = NOW()
+		WHERE id = $1`
+
+	_, err := r.pool.Exec(ctx, query, id, nextFetch, errMsg)
+	if err != nil {
+		return fmt.Errorf("failed to update source after rate limit: %w", err)
+	}
+
+	return nil
+}
+
+// MarkPlanLimited marks a source as errored because the configured API
+// key's plan does not allow the requested capability (HTTP 401/403 on a
+// higher-tier endpoint). The status is set to 'error' immediately with an
+// honest explanation in last_error, and the next fetch is pushed out at
+// least 24 hours so the endpoint is not hammered.
+func (r *SourceRepository) MarkPlanLimited(ctx context.Context, id uuid.UUID, errMsg string) error {
+	query := `
+		UPDATE sources SET
+			last_fetched = NOW(),
+			next_fetch = NOW() + GREATEST(update_interval, interval '24 hours'),
+			last_error = $2,
+			error_count = error_count + 1,
+			status = 'error',
+			updated_at = NOW()
+		WHERE id = $1`
+
+	_, err := r.pool.Exec(ctx, query, id, errMsg)
+	if err != nil {
+		return fmt.Errorf("failed to mark source plan limited: %w", err)
+	}
+
+	return nil
+}
+
 // SetStatus sets the status of a source
 func (r *SourceRepository) SetStatus(ctx context.Context, id uuid.UUID, status models.SourceStatus) error {
 	query := `UPDATE sources SET status = $2, updated_at = NOW() WHERE id = $1`

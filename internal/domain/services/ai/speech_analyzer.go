@@ -7,7 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -30,14 +33,30 @@ type SpeechAnalyzerConfig struct {
 	OpenAIAPIKey    string
 	WhisperEndpoint string // For self-hosted Whisper
 
-	// Provider preference
-	Provider string // "openai", "whisper"
+	// Azure OpenAI transcription. Used when endpoint, key and transcribe
+	// deployment are all configured; the deployment implies the model so no
+	// model form field is sent.
+	AzureOpenAIEndpoint             string
+	AzureOpenAIKey                  string
+	AzureOpenAITranscribeDeployment string
+	// AzureOpenAIAPIVersion overrides the audio API version. Empty uses
+	// defaultAzureTranscribeAPIVersion (transcription deployments such as
+	// gpt-4o-transcribe require a newer api-version than chat completions).
+	AzureOpenAIAPIVersion string
+
+	// Provider preference: "openai", "whisper", "azure-openai". Empty selects
+	// automatically (Azure when fully configured, else OpenAI key).
+	Provider string
 
 	// Analysis settings
 	MaxAudioDuration time.Duration
 	MaxAudioSize     int64
 	EnableTranscript bool
 }
+
+// defaultAzureTranscribeAPIVersion is the minimum Azure OpenAI API version
+// that supports gpt-4o-transcribe audio transcription deployments.
+const defaultAzureTranscribeAPIVersion = "2025-03-01-preview"
 
 // SpeechAnalysisResult contains the result of voice message analysis
 type SpeechAnalysisResult struct {
@@ -183,12 +202,119 @@ func (s *SpeechAnalyzer) transcribeAudio(ctx context.Context, audioData []byte, 
 		return s.transcribeWithOpenAI(ctx, audioData, mimeType)
 	case "whisper":
 		return s.transcribeWithWhisper(ctx, audioData, mimeType)
+	case "azure-openai":
+		return s.transcribeWithAzureOpenAI(ctx, audioData, mimeType)
 	default:
-		// Default to OpenAI if key is available
+		// Automatic selection: prefer Azure OpenAI when a transcribe
+		// deployment is fully configured, fall back to the OpenAI API key.
+		if s.azureTranscribeConfigured() {
+			return s.transcribeWithAzureOpenAI(ctx, audioData, mimeType)
+		}
 		if s.config.OpenAIAPIKey != "" {
 			return s.transcribeWithOpenAI(ctx, audioData, mimeType)
 		}
 		return "", "", 0, fmt.Errorf("no speech-to-text provider configured")
+	}
+}
+
+// azureTranscribeConfigured reports whether all credentials required for
+// Azure OpenAI transcription are present.
+func (s *SpeechAnalyzer) azureTranscribeConfigured() bool {
+	return s.config.AzureOpenAIEndpoint != "" &&
+		s.config.AzureOpenAIKey != "" &&
+		s.config.AzureOpenAITranscribeDeployment != ""
+}
+
+// transcribeWithAzureOpenAI uses an Azure OpenAI audio transcription
+// deployment (e.g. gpt-4o-transcribe). Azure authenticates with the api-key
+// header and selects the model via the deployment in the URL, so the
+// multipart form carries only the audio file and response_format.
+func (s *SpeechAnalyzer) transcribeWithAzureOpenAI(ctx context.Context, audioData []byte, mimeType string) (string, string, float64, error) {
+	if !s.azureTranscribeConfigured() {
+		return "", "", 0, fmt.Errorf("azure-openai transcription requires endpoint, key and transcribe deployment to be configured")
+	}
+
+	apiVersion := s.config.AzureOpenAIAPIVersion
+	if apiVersion == "" {
+		apiVersion = defaultAzureTranscribeAPIVersion
+	}
+	endpoint := strings.TrimRight(s.config.AzureOpenAIEndpoint, "/")
+	requestURL := fmt.Sprintf(
+		"%s/openai/deployments/%s/audio/transcriptions?api-version=%s",
+		endpoint,
+		url.PathEscape(s.config.AzureOpenAITranscribeDeployment),
+		url.QueryEscape(apiVersion),
+	)
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	fileHeader := make(textproto.MIMEHeader)
+	fileHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, audioFilenameForMimeType(mimeType)))
+	fileHeader.Set("Content-Type", mimeType)
+	filePart, err := writer.CreatePart(fileHeader)
+	if err != nil {
+		return "", "", 0, err
+	}
+	if _, err := filePart.Write(audioData); err != nil {
+		return "", "", 0, err
+	}
+	// The deployment implies the model, so no "model" field is sent.
+	// gpt-4o-transcribe supports "json" (not "verbose_json").
+	if err := writer.WriteField("response_format", "json"); err != nil {
+		return "", "", 0, err
+	}
+	if err := writer.Close(); err != nil {
+		return "", "", 0, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", requestURL, &buf)
+	if err != nil {
+		return "", "", 0, err
+	}
+	req.Header.Set("api-key", s.config.AzureOpenAIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", "", 0, fmt.Errorf("Azure OpenAI transcription error: %s - %s", resp.Status, string(body))
+	}
+
+	var result struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", 0, err
+	}
+
+	// The json response format carries only the transcript text (no language
+	// or per-segment confidence). Confidence mirrors the OpenAI Whisper path;
+	// language is detected downstream from the transcript itself.
+	return result.Text, "", 0.9, nil
+}
+
+// audioFilenameForMimeType returns a filename whose extension matches the
+// audio MIME type, since some transcription backends sniff the extension.
+func audioFilenameForMimeType(mimeType string) string {
+	switch mimeType {
+	case "audio/wav":
+		return "audio.wav"
+	case "audio/m4a":
+		return "audio.m4a"
+	case "audio/ogg":
+		return "audio.ogg"
+	case "audio/webm":
+		return "audio.webm"
+	case "audio/flac":
+		return "audio.flac"
+	default:
+		return "audio.mp3"
 	}
 }
 

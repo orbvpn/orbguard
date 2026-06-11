@@ -134,6 +134,12 @@ func (h *NetworkSecurityHandler) GetWiFiSecurityInfo(w http.ResponseWriter, r *h
 type dnsCheckRequestBody struct {
 	models.DNSCheckRequest
 	ClientResolutions []services.ClientCanaryResolution `json:"client_resolutions,omitempty"`
+	// LeakCanaryToken is the random token the CLIENT generated and resolved
+	// as {token}.{canary zone} through its local resolver before this call
+	// (zone discovery: GET /api/v1/network/dns/leak-config). The backend
+	// looks the token up in the authoritative canary server's query log to
+	// see which resolver IP actually performed the device's lookup.
+	LeakCanaryToken string `json:"leak_canary_token,omitempty"`
 }
 
 // dnsCheckResponse extends the DNS check result with explicit statuses so a
@@ -142,6 +148,12 @@ type dnsCheckResponse struct {
 	*models.DNSCheckResult
 	HijackCheckStatus string `json:"hijack_check_status"`
 	LeakCheckStatus   string `json:"leak_check_status"`
+	// LeakObservation is set when LeakCheckStatus is "performed: ...".
+	LeakObservation *services.DNSLeakObservation `json:"leak_observation,omitempty"`
+	// LeakCanaryZone echoes the configured canary zone ("" when leak
+	// detection is unavailable) so clients also discover it from check
+	// responses, not only from GET /network/dns/leak-config.
+	LeakCanaryZone string `json:"leak_canary_zone,omitempty"`
 }
 
 // CheckDNS handles POST /api/v1/network/dns/check
@@ -157,7 +169,7 @@ func (h *NetworkSecurityHandler) CheckDNS(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	outcome, err := h.service.CheckDNS(r.Context(), &req.DNSCheckRequest, req.ClientResolutions)
+	outcome, err := h.service.CheckDNS(r.Context(), &req.DNSCheckRequest, req.ClientResolutions, req.LeakCanaryToken)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to check DNS")
 		h.respondError(w, http.StatusInternalServerError, "failed to check DNS")
@@ -188,6 +200,24 @@ func (h *NetworkSecurityHandler) CheckDNS(w http.ResponseWriter, r *http.Request
 		DNSCheckResult:    result,
 		HijackCheckStatus: outcome.HijackCheckStatus,
 		LeakCheckStatus:   outcome.LeakCheckStatus,
+		LeakObservation:   outcome.LeakObservation,
+		LeakCanaryZone:    h.service.DNSLeakCanaryZone(),
+	})
+}
+
+// GetDNSLeakConfig handles GET /api/v1/network/dns/leak-config.
+//
+// It tells the client whether real DNS leak detection is available and, if
+// so, which controlled canary zone to use. The client then generates a
+// crypto-random token, resolves {token}.{canary_zone} through its LOCAL
+// resolver, and submits the token as leak_canary_token in
+// POST /network/dns/check; the backend reports which resolver IP the
+// authoritative canary server actually observed for that token.
+func (h *NetworkSecurityHandler) GetDNSLeakConfig(w http.ResponseWriter, r *http.Request) {
+	zone := h.service.DNSLeakCanaryZone()
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"leak_check_available": zone != "",
+		"canary_zone":          zone,
 	})
 }
 
@@ -510,13 +540,16 @@ func (h *NetworkSecurityHandler) FullNetworkAudit(w http.ResponseWriter, r *http
 
 	// Run DNS check (hijack detection driven by client-resolved canaries)
 	if req.DNS != nil {
-		dnsOutcome, err := h.service.CheckDNS(r.Context(), &req.DNS.DNSCheckRequest, req.DNS.ClientResolutions)
+		dnsOutcome, err := h.service.CheckDNS(r.Context(), &req.DNS.DNSCheckRequest, req.DNS.ClientResolutions, req.DNS.LeakCanaryToken)
 		if err != nil {
 			h.logger.Warn().Err(err).Msg("DNS check failed")
 		} else {
 			result["dns"] = dnsOutcome.Result
 			result["dns_hijack_check_status"] = dnsOutcome.HijackCheckStatus
 			result["dns_leak_check_status"] = dnsOutcome.LeakCheckStatus
+			if dnsOutcome.LeakObservation != nil {
+				result["dns_leak_observation"] = dnsOutcome.LeakObservation
+			}
 		}
 	}
 

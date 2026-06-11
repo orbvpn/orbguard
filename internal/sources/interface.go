@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"orbguard-lab/internal/domain/models"
@@ -60,6 +61,12 @@ type BaseConnector struct {
 	category       models.SourceCategory
 	sourceType     models.SourceType
 	config         ConnectorConfig
+
+	// Rate-limit backoff state (in-memory; the DB-side next_fetch is the
+	// durable counterpart, persisted by the aggregator).
+	backoffMu     sync.Mutex
+	backoffUntil  time.Time
+	backoffLogged bool
 }
 
 // NewBaseConnector creates a new base connector
@@ -107,4 +114,31 @@ func (c *BaseConnector) Configure(cfg ConnectorConfig) error {
 // Config returns the current configuration
 func (c *BaseConnector) Config() ConnectorConfig {
 	return c.config
+}
+
+// SetBackoff records that the provider rate-limited us and fetches should be
+// skipped for the given duration. The caller is expected to surface the
+// triggering 429 once itself (a non-repeat RateLimitError), so all
+// subsequent skips within this window are treated as quiet repeats.
+func (c *BaseConnector) SetBackoff(d time.Duration) {
+	c.backoffMu.Lock()
+	defer c.backoffMu.Unlock()
+	c.backoffUntil = time.Now().Add(d)
+	c.backoffLogged = true
+}
+
+// BackoffRemaining returns how long the current rate-limit backoff window
+// still has to run (zero when not in backoff), plus whether this is the
+// first time the caller observes this window (used to log exactly once per
+// backoff window instead of every cycle).
+func (c *BaseConnector) BackoffRemaining() (remaining time.Duration, firstObservation bool) {
+	c.backoffMu.Lock()
+	defer c.backoffMu.Unlock()
+	remaining = time.Until(c.backoffUntil)
+	if remaining <= 0 {
+		return 0, false
+	}
+	firstObservation = !c.backoffLogged
+	c.backoffLogged = true
+	return remaining, firstObservation
 }

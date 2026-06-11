@@ -32,6 +32,15 @@ type Config struct {
 	IntelX       IntelXConfig       `mapstructure:"intelx"`
 	SafeBrowsing SafeBrowsingConfig `mapstructure:"safe_browsing"`
 	ScamDetector ScamDetectorConfig `mapstructure:"scam_detector"`
+	DNSCanary    DNSCanaryConfig    `mapstructure:"dns_canary"`
+}
+
+// DNSCanaryConfig holds the DNS leak-check canary settings. Zone is the
+// controlled, NS-delegated domain served by cmd/dnscanary (e.g.
+// "dnscheck.example.com"). When empty, the API reports the DNS leak check as
+// explicitly unavailable instead of fabricating a result.
+type DNSCanaryConfig struct {
+	Zone string `mapstructure:"zone"`
 }
 
 // HIBPConfig holds Have I Been Pwned API configuration
@@ -83,6 +92,10 @@ type ScamDetectorConfig struct {
 	LLMProvider      string  `mapstructure:"llm_provider"`
 	LLMBaseURL       string  `mapstructure:"llm_base_url"`
 	LLMModel         string  `mapstructure:"llm_model"`
+	// LLMReasoningEffort is sent as reasoning_effort to reasoning-capable
+	// OpenAI/Azure OpenAI deployments (GPT-5.x, o-series); classification at
+	// "low" effort is fast and high quality. Empty omits the parameter.
+	LLMReasoningEffort string `mapstructure:"llm_reasoning_effort"`
 	ClaudeAPIKey     string  `mapstructure:"claude_api_key"`
 	OpenAIAPIKey     string  `mapstructure:"openai_api_key"`
 	DeepSeekAPIKey   string  `mapstructure:"deepseek_api_key"`
@@ -94,6 +107,10 @@ type ScamDetectorConfig struct {
 	AzureOpenAIKey        string `mapstructure:"azure_openai_key"`
 	AzureOpenAIDeployment string `mapstructure:"azure_openai_deployment"`
 	AzureOpenAIAPIVersion string `mapstructure:"azure_openai_api_version"`
+	// AzureOpenAITranscribeDeployment enables Azure OpenAI audio transcription
+	// (e.g. gpt-4o-transcribe) for speech analysis; works together with
+	// azure_openai_endpoint and azure_openai_key.
+	AzureOpenAITranscribeDeployment string `mapstructure:"azure_openai_transcribe_deployment"`
 }
 
 type AppConfig struct {
@@ -370,6 +387,7 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("scam_detector.llm_provider", "ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER")
 	v.BindEnv("scam_detector.llm_base_url", "ORBGUARD_SCAM_DETECTOR_LLM_BASE_URL")
 	v.BindEnv("scam_detector.llm_model", "ORBGUARD_SCAM_DETECTOR_LLM_MODEL")
+	v.BindEnv("scam_detector.llm_reasoning_effort", "ORBGUARD_SCAM_DETECTOR_LLM_REASONING_EFFORT")
 	v.BindEnv("scam_detector.claude_api_key", "ORBGUARD_CLAUDE_API_KEY")
 	v.BindEnv("scam_detector.openai_api_key", "ORBGUARD_OPENAI_API_KEY")
 	v.BindEnv("scam_detector.deepseek_api_key", "ORBGUARD_DEEPSEEK_API_KEY")
@@ -377,6 +395,11 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("scam_detector.azure_openai_key", "ORBGUARD_AZURE_OPENAI_KEY")
 	v.BindEnv("scam_detector.azure_openai_deployment", "ORBGUARD_AZURE_OPENAI_DEPLOYMENT")
 	v.BindEnv("scam_detector.azure_openai_api_version", "ORBGUARD_AZURE_OPENAI_API_VERSION")
+	v.BindEnv("scam_detector.azure_openai_transcribe_deployment", "ORBGUARD_AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT")
+
+	// DNS leak-check canary zone (served by cmd/dnscanary; empty = leak
+	// check reported unavailable)
+	v.BindEnv("dns_canary.zone", "ORBGUARD_DNS_CANARY_ZONE")
 
 	// Defaults for sections that may be absent from older config files.
 	// PatternDB and PhoneRep are local databases with no external dependency,
@@ -388,6 +411,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("scam_detector.enable_vision", true)
 	v.SetDefault("scam_detector.enable_speech", true)
 	v.SetDefault("scam_detector.llm_provider", "claude")
+	v.SetDefault("scam_detector.llm_reasoning_effort", "low")
 	v.SetDefault("scam_detector.azure_openai_api_version", "2024-02-15-preview")
 	v.SetDefault("scam_detector.scam_threshold", 0.7)
 	v.SetDefault("scam_detector.suspicious_threshold", 0.4)
@@ -395,6 +419,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("leakcheck.enabled", true)
 	v.SetDefault("intelx.enabled", true)
 	v.SetDefault("intelx.base_url", "https://2.intelx.io")
+	v.SetDefault("dns_canary.zone", "")
 
 	// Source API keys
 	v.BindEnv("sources.threatfox.api_key", "ORBGUARD_THREATFOX_API_KEY")

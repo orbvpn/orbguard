@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -57,6 +58,30 @@ type IndicatorRepository interface {
 
 	// UpdateSourceAfterError updates source after failed fetch
 	UpdateSourceAfterError(ctx context.Context, sourceID uuid.UUID, errMsg string) error
+
+	// UpdateSourceRateLimited pushes a source's next_fetch out to honor a
+	// provider rate limit, without escalating error_count/status
+	UpdateSourceRateLimited(ctx context.Context, sourceID uuid.UUID, nextFetch time.Time, errMsg string) error
+
+	// UpdateSourcePlanLimited marks a source as errored because the
+	// configured API plan does not allow the capability, with a long backoff
+	UpdateSourcePlanLimited(ctx context.Context, sourceID uuid.UUID, errMsg string) error
+}
+
+// rateLimitedError is implemented by connector errors carrying a provider
+// Retry-After hint (see internal/sources.RateLimitError).
+type rateLimitedError interface {
+	error
+	RetryAfter() time.Duration
+	IsRepeat() bool
+}
+
+// planLimitedError is implemented by connector errors indicating the API
+// plan does not include the requested capability (see
+// internal/sources.PlanLimitError).
+type planLimitedError interface {
+	error
+	IsPlanLimit() bool
 }
 
 // EventPublisher defines the interface for publishing threat events
@@ -348,6 +373,36 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// Provider rate limit: persist next_fetch to honor the provider's
+		// Retry-After hint instead of retrying every cycle. This is not a
+		// source failure, so error_count/status are not escalated and we
+		// log once per backoff window (repeats are logged at debug).
+		var rle rateLimitedError
+		if errors.As(err, &rle) {
+			next := time.Now().Add(rle.RetryAfter())
+			if a.repository != nil {
+				_ = a.repository.UpdateSourceRateLimited(ctx, source.ID, next, err.Error())
+			}
+			if rle.IsRepeat() {
+				log.Debug().Time("next_fetch", next).Msg("source still rate limited, fetch deferred")
+			} else {
+				log.Warn().Time("next_fetch", next).Str("reason", err.Error()).Msg("source rate limited by provider, deferring next fetch")
+			}
+			return nil
+		}
+
+		// Plan limitation (401/403 on an endpoint above the key's tier):
+		// persistent condition — mark the source errored with an honest
+		// explanation and a long backoff instead of hammering the endpoint.
+		var ple planLimitedError
+		if errors.As(err, &ple) {
+			if a.repository != nil {
+				_ = a.repository.UpdateSourcePlanLimited(ctx, source.ID, err.Error())
+			}
+			log.Warn().Err(err).Msg("source unavailable due to API plan limitation")
+			return nil
+		}
+
 		log.Error().Err(err).Msg("fetch failed")
 
 		// Update source with error
@@ -473,6 +528,24 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// Rate limits and plan limitations are expected operating
+		// conditions, not failures: log appropriately (once per backoff
+		// window) and do not propagate as an error.
+		var rle rateLimitedError
+		if errors.As(err, &rle) {
+			if rle.IsRepeat() {
+				log.Debug().Dur("retry_after", rle.RetryAfter()).Msg("source still rate limited, fetch deferred")
+			} else {
+				log.Warn().Dur("retry_after", rle.RetryAfter()).Str("reason", err.Error()).Msg("source rate limited by provider, deferring next fetch")
+			}
+			return nil
+		}
+		var ple planLimitedError
+		if errors.As(err, &ple) {
+			log.Warn().Err(err).Msg("source unavailable due to API plan limitation")
+			return nil
+		}
+
 		log.Error().Err(err).Msg("fetch failed")
 		return err
 	}

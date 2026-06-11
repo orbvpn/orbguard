@@ -98,6 +98,11 @@ type LLMConfig struct {
 	// (claude, openai and deepseek paths; Azure uses AzureOpenAIEndpoint).
 	BaseURL        string
 	Model          string  // claude-3-sonnet-20240229, gpt-4-turbo, deepseek-chat, etc.
+	// ReasoningEffort, when non-empty, is sent as the "reasoning_effort"
+	// chat-completions parameter for reasoning-capable OpenAI/Azure OpenAI
+	// deployments (GPT-5.x, o-series). Empty omits the parameter. It is never
+	// sent to DeepSeek or Claude.
+	ReasoningEffort string
 	Temperature    float64
 	MaxTokens      int
 	VisionEnabled  bool
@@ -608,6 +613,12 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 	} else {
 		reqBody["max_completion_tokens"] = c.config.MaxTokens
 	}
+	// reasoning_effort is only understood by OpenAI and Azure OpenAI
+	// reasoning-capable deployments; DeepSeek rejects unknown parameters.
+	if c.config.ReasoningEffort != "" &&
+		(strings.EqualFold(providerName, "openai") || strings.EqualFold(providerName, "azure openai")) {
+		reqBody["reasoning_effort"] = c.config.ReasoningEffort
+	}
 
 	doRequest := func(payload map[string]interface{}) (int, []byte, error) {
 		jsonBody, err := json.Marshal(payload)
@@ -641,16 +652,21 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 		}
 		return nil, err
 	}
-	if status == http.StatusBadRequest && strings.Contains(string(body), "unsupported_parameter") {
+	if status == http.StatusBadRequest &&
+		(strings.Contains(string(body), "unsupported_parameter") || strings.Contains(string(body), "reasoning_effort")) {
 		// Some deployments reject parameters the family normally accepts
-		// (e.g. reasoning models reject custom temperature, legacy models
-		// reject max_completion_tokens). Adapt once and retry.
+		// (e.g. reasoning models reject custom temperature, non-reasoning
+		// models reject reasoning_effort, legacy models reject
+		// max_completion_tokens). Adapt once and retry.
 		retryBody := make(map[string]interface{}, len(reqBody))
 		for k, v := range reqBody {
 			retryBody[k] = v
 		}
 		if strings.Contains(string(body), "temperature") {
 			delete(retryBody, "temperature")
+		}
+		if strings.Contains(string(body), "reasoning_effort") {
+			delete(retryBody, "reasoning_effort")
 		}
 		if strings.Contains(string(body), "max_completion_tokens") {
 			delete(retryBody, "max_completion_tokens")

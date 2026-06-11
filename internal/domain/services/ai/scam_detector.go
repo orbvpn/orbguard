@@ -40,12 +40,19 @@ type ScamDetectorConfig struct {
 	LLMProvider      string // "claude", "openai", "deepseek" or "azure-openai"
 	LLMBaseURL       string // optional override of the provider's API base URL
 	LLMModel         string // optional override of the provider's default model
+	// LLMReasoningEffort is passed as reasoning_effort to reasoning-capable
+	// OpenAI/Azure OpenAI deployments (GPT-5.x, o-series). Empty omits it.
+	LLMReasoningEffort string
 
 	// Azure OpenAI settings (used only when LLMProvider == "azure-openai")
 	AzureOpenAIEndpoint   string
 	AzureOpenAIKey        string
 	AzureOpenAIDeployment string
 	AzureOpenAIAPIVersion string
+	// AzureOpenAITranscribeDeployment enables Azure OpenAI audio transcription
+	// (e.g. gpt-4o-transcribe) for speech analysis when set together with the
+	// Azure endpoint and key.
+	AzureOpenAITranscribeDeployment string
 
 	// Feature flags
 	EnableVision     bool
@@ -105,6 +112,7 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 			Provider:              config.LLMProvider,
 			BaseURL:               config.LLMBaseURL,
 			Model:                 config.LLMModel,
+			ReasoningEffort:       config.LLMReasoningEffort,
 			AzureOpenAIEndpoint:   config.AzureOpenAIEndpoint,
 			AzureOpenAIKey:        config.AzureOpenAIKey,
 			AzureOpenAIDeployment: config.AzureOpenAIDeployment,
@@ -127,10 +135,17 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 	}
 
 	if config.EnableSpeech && detector.llmClient != nil {
+		// Provider is left empty so the analyzer selects automatically:
+		// Azure OpenAI when a transcribe deployment is fully configured,
+		// otherwise the OpenAI API key. The Azure chat api-version is NOT
+		// passed through: audio transcription deployments require a newer
+		// api-version, which the analyzer defaults itself.
 		speechConfig := SpeechAnalyzerConfig{
-			OpenAIAPIKey:     config.OpenAIAPIKey,
-			Provider:         "openai",
-			EnableTranscript: true,
+			OpenAIAPIKey:                    config.OpenAIAPIKey,
+			AzureOpenAIEndpoint:             config.AzureOpenAIEndpoint,
+			AzureOpenAIKey:                  config.AzureOpenAIKey,
+			AzureOpenAITranscribeDeployment: config.AzureOpenAITranscribeDeployment,
+			EnableTranscript:                true,
 		}
 		detector.speechAnalyzer = NewSpeechAnalyzer(log, detector.llmClient, speechConfig)
 	}
