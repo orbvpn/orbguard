@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -154,7 +155,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
             ),
@@ -170,7 +171,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
 
   Widget _buildFrameworksTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         const GlassSectionHeader(title: 'Supported Frameworks'),
         ..._frameworks.map((framework) => _buildFrameworkCard(framework)),
@@ -203,18 +204,24 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                     Text(framework.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
                     Text(framework.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                        style: TextStyle(
+                            color: context.colors.onSurfaceVariant,
+                            fontSize: 12)),
                   ],
                 ),
               ),
               GlassBadge(
                 text: reportable ? 'Assessable' : 'Reference only',
-                color: reportable ? GlassTheme.successColor : Colors.grey,
+                color: reportable
+                    ? GlassTheme.successColor
+                    : context.colors.onSurfaceVariant,
                 fontSize: 10,
               ),
             ],
@@ -247,9 +254,10 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
 
   Widget _buildReportsTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         GlassCard(
+          margin: EdgeInsets.zero,
           onTap: _isGenerating ? null : () => _showGenerateReportDialog(context),
           child: Row(
             children: [
@@ -260,20 +268,27 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(_isGenerating ? 'Generating…' : 'Generate New Report',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    const Text('Assess GDPR, SOC 2 or CIS controls',
-                        style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.bold)),
+                    Text('Assess GDPR, SOC 2 or CIS controls',
+                        style: TextStyle(
+                            color: context.colors.onSurfaceVariant,
+                            fontSize: 12)),
                   ],
                 ),
               ),
               if (_isGenerating)
-                const SizedBox(
+                SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: context.colors.onSurface),
                 )
               else
-                const DuotoneIcon('alt_arrow_right', color: Colors.white38, size: 24),
+                DuotoneIcon('alt_arrow_right',
+                    color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+                    size: 24),
             ],
           ),
         ),
@@ -306,21 +321,30 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 Text(report.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold)),
                 Text(report.framework.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    style: TextStyle(
+                        color: context.colors.onSurfaceVariant, fontSize: 12)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    DuotoneIcon('calendar', size: 12, color: Colors.white.withAlpha(102)),
+                    DuotoneIcon('calendar',
+                        size: 12,
+                        color: context.colors.onSurfaceVariant
+                            .withValues(alpha: 0.7)),
                     const SizedBox(width: 4),
                     Text(
                       report.generatedAt != null
                           ? _formatDate(report.generatedAt!)
                           : 'Not available',
-                      style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                      style: TextStyle(
+                          color: context.colors.onSurfaceVariant
+                              .withValues(alpha: 0.7),
+                          fontSize: 11),
                     ),
                   ],
                 ),
@@ -351,6 +375,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   }
 
   void _showReportDetails(BuildContext context, ComplianceReport report) {
+    final cs = context.colors;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -361,13 +386,10 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         minChildSize: 0.4,
         expand: false,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -386,8 +408,10 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(report.name,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: cs.onSurface,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         GlassBadge(
                           text: _statusLabel(report.overallStatus),
@@ -401,7 +425,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
               if (report.description.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(report.description,
-                    style: TextStyle(color: Colors.white.withAlpha(204))),
+                    style: TextStyle(color: cs.onSurface)),
               ],
               const SizedBox(height: 20),
               GlassContainer(
@@ -447,7 +471,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         _controls.map((c) => c.framework.toLowerCase()).toSet().length;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // These are catalog definitions: the backend has not assessed them.
         GlassContainer(
@@ -460,13 +484,14 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 child: Text(
                   'Control catalog. Controls are assessed when a report is generated; '
                   'status here is "Not assessed".',
-                  style: TextStyle(color: Colors.white.withAlpha(178), fontSize: 12),
+                  style: TextStyle(
+                      color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Framework filter (server-side via ?framework=)
         Wrap(
@@ -477,7 +502,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 (f) => _buildFilterChip(f.toUpperCase(), f)),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         if (_isLoadingControls)
           const Padding(
@@ -492,7 +517,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
               const SizedBox(width: 12),
               _buildStatCard('Frameworks', '$frameworkCount', GlassTheme.successColor),
               const SizedBox(width: 12),
-              _buildStatCard('Not assessed', '${_controls.length}', Colors.grey),
+              _buildStatCard('Not assessed', '${_controls.length}',
+                  context.colors.onSurfaceVariant),
             ],
           ),
           const SizedBox(height: 24),
@@ -501,7 +527,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 children: [
                   GlassSectionHeader(title: entry.key),
                   ...entry.value.map((control) => _buildControlCard(control)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                 ],
               )),
         ],
@@ -515,9 +541,9 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
       label: Text(label),
       selected: selected,
       selectedColor: GlassTheme.primaryAccent,
-      backgroundColor: Colors.white12,
+      backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : Colors.white70,
+        color: selected ? Colors.white : context.colors.onSurfaceVariant,
         fontSize: 12,
       ),
       onSelected: (sel) {
@@ -536,7 +562,9 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label,
+                style: TextStyle(
+                    color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -548,7 +576,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
       onTap: () => _showControlDetails(context, control),
       child: Row(
         children: [
-          const DuotoneIcon('question_circle', color: Colors.grey, size: 24),
+          DuotoneIcon('question_circle',
+              color: context.colors.onSurfaceVariant, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -561,7 +590,9 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                     Expanded(
                       child: Text(
                         control.name,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.w500),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -570,7 +601,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 const SizedBox(height: 4),
                 Text(
                   control.description,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                  style: TextStyle(
+                      color: context.colors.onSurfaceVariant, fontSize: 11),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -587,7 +619,10 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 fontSize: 9,
               ),
               const SizedBox(height: 6),
-              const GlassBadge(text: 'Not assessed', color: Colors.grey, fontSize: 9),
+              GlassBadge(
+                  text: 'Not assessed',
+                  color: context.colors.onSurfaceVariant,
+                  fontSize: 9),
             ],
           ),
         ],
@@ -596,6 +631,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   }
 
   void _showControlDetails(BuildContext context, ComplianceControl control) {
+    final cs = context.colors;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -606,13 +642,10 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         minChildSize: 0.4,
         expand: false,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -623,11 +656,16 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                   Expanded(
                     child: Text(
                       control.name,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
-                  const GlassBadge(text: 'Not assessed', color: Colors.grey, fontSize: 10),
+                  GlassBadge(
+                      text: 'Not assessed',
+                      color: cs.onSurfaceVariant,
+                      fontSize: 10),
                 ],
               ),
               const SizedBox(height: 8),
@@ -641,18 +679,23 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                     fontSize: 10,
                   ),
                   if (control.category.isNotEmpty)
-                    GlassBadge(text: control.category, color: Colors.white54, fontSize: 10),
+                    GlassBadge(
+                        text: control.category,
+                        color: cs.onSurfaceVariant,
+                        fontSize: 10),
                 ],
               ),
               const SizedBox(height: 16),
               Text(control.description,
-                  style: TextStyle(color: Colors.white.withAlpha(204))),
+                  style: TextStyle(color: cs.onSurface)),
               if (control.requirements.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Requirements',
                   style: TextStyle(
-                      color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      color: cs.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 ...control.requirements.map((r) => Padding(
@@ -664,7 +707,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                               size: 16, color: GlassTheme.primaryAccent),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(r, style: const TextStyle(color: Colors.white)),
+                            child: Text(r, style: TextStyle(color: cs.onSurface)),
                           ),
                         ],
                       ),
@@ -689,9 +732,14 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           children: [
             DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: TextStyle(
+                    color: context.colors.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text(subtitle,
+                style: TextStyle(color: context.colors.onSurfaceVariant)),
           ],
         ),
       ),
@@ -707,14 +755,17 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           children: [
             DuotoneIcon('danger_triangle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to Load Data',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: context.colors.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -762,28 +813,29 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
 
   void _showGenerateReportDialog(BuildContext context) {
     String selectedFramework = _reportableFrameworks.first;
+    final cs = context.colors;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: GlassTheme.gradientTop,
-          title: const Text('Generate Report', style: TextStyle(color: Colors.white)),
+          backgroundColor: cs.surface,
+          title: Text('Generate Report', style: TextStyle(color: cs.onSurface)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'The backend assesses controls for GDPR, SOC 2 and CIS.',
-                style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: selectedFramework,
-                dropdownColor: GlassTheme.gradientTop,
-                style: const TextStyle(color: Colors.white),
+                dropdownColor: cs.surface,
+                style: TextStyle(color: cs.onSurface),
                 decoration: InputDecoration(
                   labelText: 'Framework',
-                  labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                  labelStyle: TextStyle(color: cs.onSurfaceVariant),
                 ),
                 items: _reportableFrameworks
                     .map((f) => DropdownMenuItem(value: f, child: Text(f.toUpperCase())))
@@ -815,8 +867,12 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label,
+              style: TextStyle(color: context.colors.onSurfaceVariant)),
+          Text(value,
+              style: TextStyle(
+                  color: context.colors.onSurface,
+                  fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -846,7 +902,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
       case 'partial':
         return GlassTheme.warningColor;
       default:
-        return Colors.grey;
+        return context.colors.onSurfaceVariant;
     }
   }
 

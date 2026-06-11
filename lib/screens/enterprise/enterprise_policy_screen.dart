@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -43,7 +44,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     IconButton(
-                      icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                      icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
                       onPressed: provider.isLoading ? null : provider.loadPolicies,
                       tooltip: 'Refresh',
                     ),
@@ -75,10 +76,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       onRefresh: provider.loadPolicies,
       color: GlassTheme.primaryAccent,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           _buildStats(provider),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           const GlassSectionHeader(title: 'Policies'),
           ...provider.policies.map((p) => _buildPolicyCard(p)),
         ],
@@ -94,7 +95,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
         _buildStatItem('Enabled', provider.enabledPolicies.length.toString(),
             GlassTheme.successColor),
         _buildStatItem('Disabled', provider.disabledPolicies.length.toString(),
-            Colors.grey),
+            context.colors.onSurfaceVariant),
       ],
     );
   }
@@ -117,7 +118,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withAlpha(153),
+                color: context.colors.onSurfaceVariant,
                 fontSize: 11,
               ),
             ),
@@ -129,7 +130,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
 
   Widget _buildPolicyCard(ConditionalAccessPolicy policy) {
     final statusColor =
-        policy.enabled ? GlassTheme.successColor : Colors.grey;
+        policy.enabled ? GlassTheme.successColor : context.colors.onSurfaceVariant;
     final requirementCount =
         policy.conditions.summary.length + policy.grantControls.summary.length;
 
@@ -155,8 +156,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                       policy.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.colors.onSurface,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -166,7 +167,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                       Text(
                         policy.description,
                         style: TextStyle(
-                          color: Colors.white.withAlpha(153),
+                          color: context.colors.onSurfaceVariant,
                           fontSize: 12,
                         ),
                         maxLines: 2,
@@ -189,12 +190,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             runSpacing: 8,
             children: [
               if (policy.priority != null)
-                _buildBadge('Priority ${policy.priority}', Colors.white54),
+                _buildBadge('Priority ${policy.priority}', context.colors.onSurfaceVariant),
               _buildBadge(
                 requirementCount == 1
                     ? '1 requirement'
                     : '$requirementCount requirements',
-                Colors.white54,
+                context.colors.onSurfaceVariant,
               ),
               if (policy.grantControls.requireMfa)
                 _buildBadge('MFA', GlassTheme.primaryAccent),
@@ -203,9 +204,9 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
               if (policy.conditions.requireManaged)
                 _buildBadge('Managed device', GlassTheme.warningColor),
               if (policy.appliesToAll)
-                _buildBadge('All users', Colors.white54)
+                _buildBadge('All users', context.colors.onSurfaceVariant)
               else
-                _buildBadge('Scoped', Colors.white54),
+                _buildBadge('Scoped', context.colors.onSurfaceVariant),
             ],
           ),
         ],
@@ -241,10 +242,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             DuotoneIcon('clipboard_text',
                 size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No Policies',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -252,7 +253,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             const SizedBox(height: 8),
             Text(
               'No conditional access policies are configured on the server.',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],
@@ -271,10 +272,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             const DuotoneIcon('danger_circle',
                 size: 64, color: GlassTheme.errorColor),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Policies',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -282,7 +283,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             const SizedBox(height: 8),
             Text(
               provider.error ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -313,13 +314,15 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
         minChildSize: 0.5,
         expand: false,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -332,8 +335,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                       policy.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.colors.onSurface,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -343,7 +346,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                     text: policy.enabled ? 'Enabled' : 'Disabled',
                     color: policy.enabled
                         ? GlassTheme.successColor
-                        : Colors.grey,
+                        : context.colors.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -351,7 +354,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                 const SizedBox(height: 8),
                 Text(
                   policy.description,
-                  style: TextStyle(color: Colors.white.withAlpha(178)),
+                  style: TextStyle(color: context.colors.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 16),
@@ -407,8 +410,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: context.colors.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -417,7 +420,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
         if (lines.isEmpty)
           Text(
             emptyText,
-            style: TextStyle(color: Colors.white.withAlpha(128)),
+            style: TextStyle(color: context.colors.onSurfaceVariant),
           )
         else
           ...lines.map((line) => Padding(
@@ -431,7 +434,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                     Expanded(
                       child: Text(
                         line,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: context.colors.onSurface),
                       ),
                     ),
                   ],
@@ -452,7 +455,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             Text(
               label,
               style: TextStyle(
-                  color: Colors.white.withAlpha(153), fontSize: 12),
+                  color: context.colors.onSurfaceVariant, fontSize: 12),
             ),
             const SizedBox(height: 6),
             Wrap(
@@ -461,9 +464,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
               children: values
                   .map((v) => Chip(
                         label: Text(v),
-                        backgroundColor: Colors.white12,
-                        labelStyle: const TextStyle(
-                            color: Colors.white, fontSize: 12),
+                        backgroundColor:
+                            context.colors.onSurface.withValues(alpha: 0.06),
+                        labelStyle: TextStyle(
+                            color: context.colors.onSurface, fontSize: 12),
                       ))
                   .toList(),
             ),
@@ -475,10 +479,10 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Assignment',
           style: TextStyle(
-            color: Colors.white,
+            color: context.colors.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -500,12 +504,12 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: context.colors.onSurface, fontWeight: FontWeight.w500),
               textAlign: TextAlign.end,
             ),
           ),

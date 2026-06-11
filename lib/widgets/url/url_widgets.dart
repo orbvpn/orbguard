@@ -65,7 +65,7 @@ class UrlCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _getCategoryColor();
+    final color = _getCategoryColor(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -84,7 +84,7 @@ class UrlCategoryChip extends StatelessWidget {
     );
   }
 
-  Color _getCategoryColor() {
+  Color _getCategoryColor(BuildContext context) {
     switch (category) {
       case UrlCategory.safe:
         return Colors.green;
@@ -107,7 +107,7 @@ class UrlCategoryChip extends StatelessWidget {
       case UrlCategory.cryptomining:
         return Colors.deepOrange;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 }
@@ -129,6 +129,7 @@ class UrlResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final borderColor = result.isSafe
         ? Colors.green.withAlpha(75)
         : Color(result.severity.color).withAlpha(75);
@@ -139,7 +140,7 @@ class UrlResultCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor),
         ),
@@ -172,7 +173,7 @@ class UrlResultCard extends StatelessWidget {
                       Text(
                         result.url,
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                         maxLines: 1,
@@ -232,7 +233,7 @@ class UrlResultCard extends StatelessWidget {
                           child: Text(
                             '• ${t.description}',
                             style: TextStyle(
-                              color: Colors.grey[400],
+                              color: cs.onSurfaceVariant,
                               fontSize: 11,
                             ),
                             maxLines: 2,
@@ -253,14 +254,14 @@ class UrlResultCard extends StatelessWidget {
                   DuotoneIcon(
                     AppIcons.lightbulb,
                     size: 16,
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       result.recommendation!,
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -276,7 +277,7 @@ class UrlResultCard extends StatelessWidget {
                 Text(
                   'Risk Score:',
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -286,7 +287,7 @@ class UrlResultCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: result.riskScore,
-                      backgroundColor: Colors.grey.withAlpha(50),
+                      backgroundColor: cs.onSurface.withValues(alpha: 0.06),
                       valueColor: AlwaysStoppedAnimation(
                         _getRiskColor(result.riskScore),
                       ),
@@ -384,7 +385,7 @@ class UrlHistoryItem extends StatelessWidget {
                   Text(
                     _formatTime(entry.checkedAt),
                     style: TextStyle(
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
                     maxLines: 1,
@@ -404,11 +405,13 @@ class UrlHistoryItem extends StatelessWidget {
               if (onDelete != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
+                  icon: DuotoneIcon(AppIcons.closeCircle,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ],
@@ -477,10 +480,11 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -497,7 +501,7 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
           Text(
             'Enter a URL to check if it\'s safe to visit',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -509,9 +513,9 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
             onSubmitted: (_) => _handleCheck(),
             decoration: InputDecoration(
               hintText: 'example.com or https://...',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF0A0E21),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -522,7 +526,7 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
               ),
               prefixIcon: DuotoneIcon(
                 AppIcons.urlProtection,
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -563,10 +567,11 @@ class UrlStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -587,11 +592,11 @@ class UrlStatsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Web Protection',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -603,7 +608,7 @@ class UrlStatsCard extends StatelessWidget {
                     Text(
                       'URL scanning & phishing protection',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                       maxLines: 1,
@@ -620,7 +625,7 @@ class UrlStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Checked',
                 value: stats.totalChecked.toString(),
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               _StatItem(
                 label: 'Safe',
@@ -636,12 +641,12 @@ class UrlStatsCard extends StatelessWidget {
           ),
           if (stats.threatsBlocked > 0) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Threats Blocked',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
-                color: Colors.grey,
+                color: cs.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -703,7 +708,7 @@ class _StatItem extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
             maxLines: 1,
@@ -769,10 +774,11 @@ class DomainDetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -781,7 +787,8 @@ class DomainDetailsCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              const DuotoneIcon(AppIcons.infoCircle, size: 20, color: Colors.grey),
+              DuotoneIcon(AppIcons.infoCircle,
+                  size: 20, color: cs.onSurfaceVariant),
               const SizedBox(width: 8),
               const Text(
                 'Domain Information',
@@ -869,7 +876,7 @@ class _InfoRow extends StatelessWidget {
           Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),
@@ -903,11 +910,15 @@ class _WarningRow extends StatelessWidget {
         children: [
           DuotoneIcon(AppIcons.dangerTriangle, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -957,7 +968,7 @@ class _SslSection extends StatelessWidget {
                   Text(
                     'Issued by: ${ssl.issuer}',
                     style: TextStyle(
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
                     maxLines: 1,
@@ -1001,8 +1012,9 @@ class UrlListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListTile(
-      leading: const DuotoneIcon(AppIcons.globus, color: Colors.grey),
+      leading: DuotoneIcon(AppIcons.globus, color: cs.onSurfaceVariant),
       title: Text(
         entry.domain,
         maxLines: 1,
@@ -1011,7 +1023,7 @@ class UrlListTile extends StatelessWidget {
       subtitle: Text(
         'Added ${_formatDate(entry.addedAt)}',
         style: TextStyle(
-          color: Colors.grey[500],
+          color: cs.onSurfaceVariant,
           fontSize: 12,
         ),
         maxLines: 1,

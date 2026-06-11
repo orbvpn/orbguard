@@ -206,7 +206,7 @@ class GlassListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     Widget tile = GlassContainer(
       padding: padding ?? const EdgeInsets.all(12),
@@ -229,7 +229,7 @@ class GlassListTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: actualIsDark ? Colors.white : Colors.black87,
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
                   ),
@@ -240,7 +240,7 @@ class GlassListTile extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: actualIsDark ? Colors.white54 : Colors.black45,
+                      color: cs.onSurfaceVariant,
                       fontSize: 13,
                     ),
                   ),
@@ -275,8 +275,6 @@ class GlassSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
       child: Row(
@@ -288,7 +286,7 @@ class GlassSectionHeader extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: actualIsDark ? Colors.white38 : Colors.black38,
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -315,12 +313,10 @@ class GlassDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       height: height,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      color: actualIsDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10),
+      color: Theme.of(context).colorScheme.outline,
     );
   }
 }

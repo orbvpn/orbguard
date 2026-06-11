@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -74,14 +75,14 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
           children: [
             const DuotoneIcon('danger_circle', size: 64, color: GlassTheme.errorColor),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Data',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -117,7 +118,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           IconButton(
-                            icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                            icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
                             onPressed: _isLoading ? null : _loadData,
                             tooltip: 'Refresh',
                           ),
@@ -130,7 +131,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                         onRefresh: _loadData,
                         color: GlassTheme.primaryAccent,
                         child: ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           children: [
                             const GlassSectionHeader(title: 'Zero Trust'),
                             _buildZeroTrustSection(),
@@ -143,7 +144,6 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                             const SizedBox(height: 24),
                             const GlassSectionHeader(title: 'Compliance'),
                             _buildComplianceSection(),
-                            const SizedBox(height: 24),
                           ],
                         ),
                       ),
@@ -187,6 +187,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         ),
         const SizedBox(height: 12),
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Column(
             children: [
               _buildDetailRow('High-trust devices', _fmt(_stats.highTrustDevices)),
@@ -277,6 +278,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         if (_stats.overallComplianceScore != null) ...[
           const SizedBox(height: 12),
           GlassCard(
+            margin: EdgeInsets.zero,
             child: _buildDetailRow(
               'Overall compliance score',
               '${_stats.overallComplianceScore!.toStringAsFixed(1)}%',
@@ -299,7 +301,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ],
@@ -319,7 +321,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
             ),
           ),
           const SizedBox(width: 12),
@@ -329,7 +331,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
             ),
           ),
         ],

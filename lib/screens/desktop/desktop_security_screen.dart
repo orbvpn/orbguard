@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -161,12 +162,12 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('download_minimalistic', size: 22, color: Colors.white),
+              icon: DuotoneIcon('download_minimalistic', size: 22, color: context.colors.onSurface),
               onPressed: _exportResults,
               tooltip: 'Export Results',
             ),
             IconButton(
-              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               onPressed: _isScanning ? null : _runScan,
               tooltip: 'Refresh',
             ),
@@ -213,7 +214,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final safe = _persistenceItems.length - suspicious;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Scan button
         _isDesktopPlatform
@@ -223,6 +224,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   final progress = provider.scanProgress;
 
                   return GlassCard(
+                    margin: EdgeInsets.zero,
                     onTap: (_isScanning || provider.isScanning) ? null : _runScan,
                     tintColor: (_isScanning || provider.isScanning) ? GlassTheme.primaryAccent : null,
                     child: Column(
@@ -240,13 +242,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                                 children: [
                                   Text(
                                     '${_getPlatformName()} Persistence Scanner',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     provider.isScanning
                                         ? scanPhase
                                         : 'Native scan for persistence mechanisms',
-                                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                                    style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                                   ),
                                 ],
                               ),
@@ -270,7 +272,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: progress,
-                              backgroundColor: Colors.white.withAlpha(30),
+                              backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
                               color: GlassTheme.primaryAccent,
                               minHeight: 4,
                             ),
@@ -282,6 +284,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 },
               )
             : GlassCard(
+                margin: EdgeInsets.zero,
                 onTap: _isScanning ? null : _runScan,
                 tintColor: _isScanning ? GlassTheme.primaryAccent : null,
                 child: Row(
@@ -295,13 +298,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Persistence Scanner',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                           ),
                           Text(
                             _isScanning ? 'Scanning...' : 'Scan for persistence mechanisms',
-                            style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                           ),
                         ],
                       ),
@@ -322,7 +325,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               ),
 
         // Stats
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         Row(
           children: [
             _buildStatCard('Suspicious', suspicious.toString(), GlassTheme.errorColor),
@@ -333,8 +336,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
         // Error display
         if (_error != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: GlassTheme.errorColor,
             child: Row(
               children: [
@@ -344,19 +348,19 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Error Loading Data',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         _error!,
-                        style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 12),
+                        style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const DuotoneIcon('refresh', color: Colors.white, size: 20),
+                  icon: DuotoneIcon('refresh', color: context.colors.onSurface, size: 20),
                   onPressed: _loadData,
                   tooltip: 'Retry',
                 ),
@@ -444,7 +448,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -470,19 +474,19 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   item.type,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   item.path,
                   style: TextStyle(
-                    color: Colors.white.withAlpha(102),
+                    color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
                     fontSize: 10,
                     fontFamily: 'monospace',
                   ),
@@ -506,14 +510,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     return GlassCard(
       child: Row(
         children: [
-          GlassSvgIconBox(icon: icon, color: enabled ? GlassTheme.primaryAccent : Colors.grey, size: 36),
+          GlassSvgIconBox(icon: icon, color: enabled ? GlassTheme.primaryAccent : context.colors.onSurfaceVariant, size: 36),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
           ),
           DuotoneIcon(
             enabled ? 'check_circle' : 'close_circle',
-            color: enabled ? GlassTheme.successColor : Colors.grey,
+            color: enabled ? GlassTheme.successColor : context.colors.onSurfaceVariant,
           ),
         ],
       ),
@@ -537,9 +541,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           final unavailable = provider.codeSigningUnavailableReason;
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               GlassCard(
+                margin: EdgeInsets.zero,
                 onTap: provider.isVerifyingCodeSigning
                     ? null
                     : () => provider.verifyLocalCodeSigning(),
@@ -552,10 +557,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Verify Code Signatures Locally',
                             style: TextStyle(
-                                color: Colors.white, fontWeight: FontWeight.bold),
+                                color: context.colors.onSurface,
+                                fontWeight: FontWeight.bold),
                           ),
                           Text(
                             provider.isVerifyingCodeSigning
@@ -566,7 +572,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                                         ? 'Authenticode verification of persistence executables'
                                         : 'Verification of persistence executables',
                             style: TextStyle(
-                                color: Colors.white.withAlpha(128), fontSize: 12),
+                                color: context.colors.onSurfaceVariant, fontSize: 12),
                           ),
                         ],
                       ),
@@ -583,7 +589,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               if (unavailable != null)
                 GlassCard(
                   tintColor: GlassTheme.warningColor,
@@ -596,7 +602,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         child: Text(
                           unavailable,
                           style: TextStyle(
-                              color: Colors.white.withAlpha(204), fontSize: 12),
+                              color: context.colors.onSurfaceVariant, fontSize: 12),
                         ),
                       ),
                     ],
@@ -641,7 +647,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final valid = _signedApps.where((a) => a.isSigned && a.isValid).length;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -702,13 +708,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(20),
+              color: context.colors.onSurface.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
               child: DuotoneIcon(
                 _getAppIcon(app.name),
-                color: Colors.white,
+                color: context.colors.onSurface,
                 size: 24,
               ),
             ),
@@ -722,20 +728,20 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   app.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                 ),
                 if (app.isSigned && app.developer.isNotEmpty)
                   Text(
                     app.developer,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                   ),
                 Text(
                   app.bundleId,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10, fontFamily: 'monospace'),
+                  style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10, fontFamily: 'monospace'),
                 ),
               ],
             ),
@@ -759,7 +765,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         _firewallRules.where((r) => r.action.toLowerCase() == 'block').length;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // REAL host firewall status, read from OS tooling
         // (socketfilterfw / netsh advfirewall / ufw+firewalld).
@@ -770,20 +776,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           )
         else
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: GlassTheme.warningColor,
             child: Row(
               children: [
                 GlassSvgIconBox(icon: 'shield', color: GlassTheme.warningColor),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Host Firewall',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                       ),
-                      Text(
+                      const Text(
                         'OS firewall control is only available on desktop platforms',
                         style: TextStyle(color: GlassTheme.warningColor, fontSize: 12),
                       ),
@@ -795,7 +802,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           ),
 
         // Stats
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         Row(
           children: [
             _buildStatCard('Server Rules', enabled.toString(), GlassTheme.primaryAccent),
@@ -870,7 +877,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     String icon;
     bool? switchValue;
     if (status == null) {
-      color = Colors.grey;
+      color = context.colors.onSurfaceVariant;
       stateText = 'Reading firewall state…';
       icon = 'shield';
       switchValue = null;
@@ -895,7 +902,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           switchValue = null;
           break;
         case HostFirewallState.unavailable:
-          color = Colors.grey;
+          color = context.colors.onSurfaceVariant;
           stateText = status.detail;
           icon = 'danger_circle';
           switchValue = null;
@@ -904,6 +911,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: color,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,7 +926,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   children: [
                     Text(
                       '${_getPlatformName()} Firewall',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       stateText,
@@ -936,7 +944,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 )
               else
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  icon: DuotoneIcon('refresh', size: 20, color: context.colors.onSurface),
                   onPressed: () => provider.refreshHostFirewallStatus(),
                   tooltip: 'Re-read firewall state',
                 ),
@@ -947,7 +955,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             Text(
               'Source: ${status.source}',
               style: TextStyle(
-                color: Colors.white.withAlpha(102),
+                color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),
@@ -991,12 +999,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                Text(title, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
+                Text(subtitle, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11)),
               ],
             ),
           ),
-          const DuotoneIcon('alt_arrow_right', color: Colors.white38),
+          DuotoneIcon('alt_arrow_right',
+              color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
         ],
       ),
     );
@@ -1031,11 +1040,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final enable = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.glassColor(true),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
+        backgroundColor: GlassTheme.glassColor(context.isDark),
+        title: Text(title, style: TextStyle(color: context.colors.onSurface)),
         content: Text(
           description,
-          style: TextStyle(color: Colors.white.withAlpha(204)),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -1093,7 +1102,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(rule.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(rule.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
                 Row(
                   children: [
                     GlassBadge(
@@ -1110,14 +1119,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     const SizedBox(width: 8),
                     GlassBadge(
                       text: rule.protocol,
-                      color: Colors.grey,
+                      color: context.colors.onSurfaceVariant,
                       fontSize: 10,
                     ),
                     if (!rule.isEnabled) ...[
                       const SizedBox(width: 8),
-                      const GlassBadge(
+                      GlassBadge(
                         text: 'Disabled',
-                        color: Colors.grey,
+                        color: context.colors.onSurfaceVariant,
                         fontSize: 10,
                       ),
                     ],
@@ -1126,7 +1135,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 const SizedBox(height: 4),
                 Text(
                   '${rule.destPort != null ? "Port ${rule.destPort}" : "All ports"} • ${rule.destAddress ?? "Any address"} • enforced on server host',
-                  style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                  style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                 ),
               ],
             ),
@@ -1176,10 +1185,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Summary card
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Row(
             children: [
               const GlassDuotoneIconBox(icon: 'wi_fi_router', color: GlassTheme.primaryAccent, size: 48, iconSize: 24),
@@ -1190,17 +1200,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   children: [
                     Text(
                       '${_networkConnections.length} Active Connections',
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       'Observed on the OrbGuard Lab server host (not this device)',
-                      style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                icon: DuotoneIcon('refresh', size: 20, color: context.colors.onSurface),
                 onPressed: () async {
                   final data = await _apiClient.getNetworkConnections().catchError((_) => <Map<String, dynamic>>[]);
                   setState(() => _networkConnections = data);
@@ -1217,7 +1227,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('No active connections detected', style: TextStyle(color: Colors.white.withAlpha(128))),
+                child: Text('No active connections detected', style: TextStyle(color: context.colors.onSurfaceVariant)),
               ),
             ),
           )
@@ -1249,10 +1259,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(process, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                        Text(process, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
                         Text(
                           '$remoteIp${remotePort.isNotEmpty ? ':$remotePort' : ''} ($protocol)',
-                          style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1260,7 +1270,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   if (state.isNotEmpty)
                     GlassBadge(
                       text: state,
-                      color: state == 'ESTABLISHED' ? GlassTheme.successColor : Colors.grey,
+                      color: state == 'ESTABLISHED' ? GlassTheme.successColor : context.colors.onSurfaceVariant,
                     ),
                 ],
               ),
@@ -1277,9 +1287,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final collecting = provider.isCollectingNetwork;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Row(
             children: [
               const GlassDuotoneIconBox(
@@ -1296,8 +1307,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       collecting
                           ? 'Collecting…'
                           : '${connections.length} Connections on This Device',
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: context.colors.onSurface,
                           fontSize: 18,
                           fontWeight: FontWeight.bold),
                     ),
@@ -1306,7 +1317,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                           ? 'Tap refresh to collect network connections'
                           : 'Source: ${provider.hostNetworkSource}',
                       style: TextStyle(
-                          color: Colors.white.withAlpha(153), fontSize: 12),
+                          color: context.colors.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -1320,7 +1331,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 )
               else
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  icon: DuotoneIcon('refresh', size: 20, color: context.colors.onSurface),
                   onPressed: () => provider.loadHostNetworkConnections(),
                 ),
             ],
@@ -1329,19 +1340,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         if (errors.isNotEmpty) ...[
           const SizedBox(height: 12),
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: GlassTheme.warningColor,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Collection Notes',
+                Text('Collection Notes',
                     style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 ...errors.map((e) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text('• $e',
                           style: TextStyle(
-                              color: Colors.white.withAlpha(179),
+                              color: context.colors.onSurfaceVariant,
                               fontSize: 11)),
                     )),
               ],
@@ -1358,7 +1371,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   errors.isEmpty
                       ? 'No connections collected yet — tap refresh'
                       : 'Collection failed — see notes above',
-                  style: TextStyle(color: Colors.white.withAlpha(128)),
+                  style: TextStyle(color: context.colors.onSurfaceVariant),
                 ),
               ),
             ),
@@ -1396,13 +1409,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(process,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w500)),
+                    style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.w500)),
                 Text(
                   remoteIp.isEmpty
                       ? 'local port $localPort ($protocol)'
                       : '$remoteIp${remotePort.isNotEmpty ? ':$remotePort' : ''} ($protocol)',
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
                 if (tags.isNotEmpty)
                   Text(
@@ -1418,7 +1432,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               text: state,
               color: state == 'ESTABLISHED' || state == 'ESTAB'
                   ? GlassTheme.successColor
-                  : Colors.grey,
+                  : context.colors.onSurfaceVariant,
             ),
         ],
       ),
@@ -1472,10 +1486,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final byBrowser = (scanResult?['by_browser'] as Map?)?.cast<String, dynamic>() ?? {};
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Summary card
         GlassCard(
+          margin: EdgeInsets.zero,
           tintColor: highRisk > 0 ? GlassTheme.warningColor : null,
           child: Row(
             children: [
@@ -1492,16 +1507,16 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   children: [
                     Text(
                       collecting ? 'Scanning…' : '$totalExt Extensions Found',
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       highRisk > 0 ? '$highRisk high-risk extension${highRisk > 1 ? 's' : ''} detected' : 'No high-risk extensions',
-                      style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       sourceLabel,
-                      style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                      style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
                     ),
                   ],
                 ),
@@ -1515,7 +1530,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 )
               else
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 20, color: Colors.white),
+                  icon: DuotoneIcon('refresh', size: 20, color: context.colors.onSurface),
                   onPressed: onRefresh,
                 ),
             ],
@@ -1524,18 +1539,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         if (errors.isNotEmpty) ...[
           const SizedBox(height: 12),
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: GlassTheme.warningColor,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Scan Notes',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Scan Notes',
+                    style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 ...errors.map((e) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text('• $e',
                           style: TextStyle(
-                              color: Colors.white.withAlpha(179), fontSize: 11)),
+                              color: context.colors.onSurfaceVariant, fontSize: 11)),
                     )),
               ],
             ),
@@ -1545,8 +1563,12 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
         // Browser breakdown
         if (byBrowser.isNotEmpty) ...[
-          const Text('By Browser', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Text('By Browser',
+              style: TextStyle(
+                  color: context.colors.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1554,7 +1576,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               return GlassBadge(text: '${e.key}: ${e.value}', color: GlassTheme.primaryAccent);
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
         ],
 
         // Extension list
@@ -1565,11 +1587,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    const DuotoneIcon('globe', size: 48, color: Colors.white24),
+                    DuotoneIcon('globe', size: 48, color: context.colors.outline),
                     const SizedBox(height: 12),
-                    Text('No extensions data', style: TextStyle(color: Colors.white.withAlpha(128))),
+                    Text('No extensions data', style: TextStyle(color: context.colors.onSurfaceVariant)),
                     const SizedBox(height: 4),
-                    Text('Tap refresh to scan browser extensions', style: TextStyle(color: Colors.white.withAlpha(89), fontSize: 12)),
+                    Text('Tap refresh to scan browser extensions', style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 12)),
                   ],
                 ),
               ),
@@ -1596,10 +1618,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                        Text(name, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
                         Text(
                           '$browser${version.isNotEmpty ? ' v$version' : ''}',
-                          style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1625,10 +1647,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         final quarantinedItems = snapshot.data ?? [];
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             // Header stats
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Row(
                 children: [
                   GlassSvgIconBox(
@@ -1645,8 +1668,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       children: [
                         Text(
                           'Quarantine',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: context.colors.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1657,7 +1680,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                               ? 'No items in quarantine'
                               : '${quarantinedItems.length} item${quarantinedItems.length == 1 ? '' : 's'} quarantined',
                           style: TextStyle(
-                            color: Colors.white.withAlpha(179),
+                            color: context.colors.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -1666,17 +1689,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   ),
                   if (quarantinedItems.isNotEmpty)
                     IconButton(
-                      icon: const DuotoneIcon('refresh', color: Colors.white),
+                      icon: DuotoneIcon('refresh', color: context.colors.onSurface),
                       onPressed: () => setState(() {}),
                       tooltip: 'Refresh',
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             // Info card
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Row(
                 children: [
                   DuotoneIcon('info_circle', color: GlassTheme.primaryAccent, size: 20),
@@ -1686,7 +1710,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       'Quarantined items are disabled and moved to a safe location. '
                       'You can restore them if needed.',
                       style: TextStyle(
-                        color: Colors.white.withAlpha(179),
+                        color: context.colors.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -1694,17 +1718,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             // Quarantine location
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Quarantine Location',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: context.colors.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1712,18 +1737,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(51),
+                      color: context.colors.onSurface.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        const DuotoneIcon('folder', color: Colors.white54, size: 16),
+                        DuotoneIcon('folder', color: context.colors.onSurfaceVariant, size: 16),
                         const SizedBox(width: 8),
                         Expanded(
                           child: SelectableText(
                             _getQuarantinePath(),
                             style: TextStyle(
-                              color: Colors.white.withAlpha(179),
+                              color: context.colors.onSurfaceVariant,
                               fontFamily: 'monospace',
                               fontSize: 12,
                             ),
@@ -1750,10 +1775,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         size: 64,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'No Quarantined Items',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.colors.onSurface,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1761,7 +1786,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Items you quarantine from the Persistence tab will appear here.',
-                        style: TextStyle(color: Colors.white.withAlpha(128)),
+                        style: TextStyle(color: context.colors.onSurfaceVariant),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1769,10 +1794,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
               )
             else ...[
-              const Text(
+              Text(
                 'Quarantined Items',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: context.colors.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1799,6 +1824,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
+        margin: EdgeInsets.zero,
         child: Row(
           children: [
             GlassSvgIconBox(
@@ -1815,8 +1841,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     item.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.colors.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1826,7 +1852,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withAlpha(179),
+                      color: context.colors.onSurfaceVariant,
                       fontSize: 12,
                     ),
                   ),
@@ -1843,7 +1869,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     Text(
                       item.originalPath,
                       style: TextStyle(
-                        color: Colors.white.withAlpha(100),
+                        color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
                         fontSize: 10,
                         fontFamily: 'monospace',
                       ),
@@ -1870,7 +1896,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         ? 'No registry backup exists for this item — it must be restored manually'
                         : 'Cannot auto-restore',
                     child: IconButton(
-                      icon: DuotoneIcon('refresh', color: Colors.white24, size: 20),
+                      icon: DuotoneIcon('refresh', color: context.colors.outline, size: 20),
                       onPressed: null,
                     ),
                   ),
@@ -1892,33 +1918,34 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.glassColor(true),
-        title: const Text('Restore Item?', style: TextStyle(color: Colors.white)),
+        backgroundColor: GlassTheme.glassColor(context.isDark),
+        title: Text('Restore Item?',
+            style: TextStyle(color: context.colors.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Are you sure you want to restore "${item.name}"?',
-              style: TextStyle(color: Colors.white.withAlpha(204)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
             ),
             if (item.originalPath.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
                 'Will restore to:',
-                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
               ),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(51),
+                  color: context.colors.onSurface.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   item.originalPath,
                   style: TextStyle(
-                    color: Colors.white.withAlpha(179),
+                    color: context.colors.onSurfaceVariant,
                     fontFamily: 'monospace',
                     fontSize: 11,
                   ),
@@ -1979,12 +2006,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.glassColor(true),
-        title: const Text('Delete Permanently?', style: TextStyle(color: Colors.white)),
+        backgroundColor: GlassTheme.glassColor(context.isDark),
+        title: Text('Delete Permanently?',
+            style: TextStyle(color: context.colors.onSurface)),
         content: Text(
           'Are you sure you want to permanently delete "${item.name}"? '
           'This action cannot be undone.',
-          style: TextStyle(color: Colors.white.withAlpha(204)),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -2167,13 +2195,18 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [
+                      GlassTheme.gradientTopLight,
+                      GlassTheme.gradientBottomLight
+                    ],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -2191,7 +2224,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         GlassBadge(
                           text: item.isSuspicious ? 'Suspicious' : 'Safe',
@@ -2217,18 +2250,21 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Path', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Path', style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               GlassContainer(
                 padding: const EdgeInsets.all(12),
                 child: SelectableText(
                   item.path,
-                  style: TextStyle(color: Colors.white.withAlpha(204), fontFamily: 'monospace', fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontFamily: 'monospace', fontSize: 12),
                 ),
               ),
               if (item.riskReasons.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                const Text('Risk Reasons', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Risk Reasons',
+                style: TextStyle(
+                    color: context.colors.onSurface,
+                    fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 GlassContainer(
                   padding: const EdgeInsets.all(12),
@@ -2317,21 +2353,26 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         maxChildSize: 0.8,
         minChildSize: 0.3,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [
+                      GlassTheme.gradientTopLight,
+                      GlassTheme.gradientBottomLight
+                    ],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(24),
             children: [
-              Text(app.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(app.name, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text(app.bundleId, style: TextStyle(color: Colors.white.withAlpha(153), fontFamily: 'monospace')),
+              Text(app.bundleId, style: TextStyle(color: context.colors.onSurfaceVariant, fontFamily: 'monospace')),
               const SizedBox(height: 16),
               GlassContainer(
                 padding: const EdgeInsets.all(16),
@@ -2354,14 +2395,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               ),
               if (app.path != null && app.path!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                const Text('Path', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Path', style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 GlassContainer(
                   padding: const EdgeInsets.all(12),
                   child: SelectableText(
                     app.path!,
                     style: TextStyle(
-                        color: Colors.white.withAlpha(204),
+                        color: context.colors.onSurfaceVariant,
                         fontFamily: 'monospace',
                         fontSize: 12),
                   ),
@@ -2411,9 +2452,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          backgroundColor: GlassTheme.glassColor(true),
+          backgroundColor: GlassTheme.glassColor(context.isDark),
           title: Text('VirusTotal: ${app.name}',
-              style: const TextStyle(color: Colors.white)),
+              style: TextStyle(color: context.colors.onSurface)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2421,7 +2462,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               if (!found)
                 Text(
                   'This file hash is not known to VirusTotal.',
-                  style: TextStyle(color: Colors.white.withAlpha(204)),
+                  style: TextStyle(color: context.colors.onSurfaceVariant),
                 )
               else
                 Text(
@@ -2438,7 +2479,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 SelectableText(
                   'SHA-256: $hash',
                   style: TextStyle(
-                      color: Colors.white.withAlpha(153),
+                      color: context.colors.onSurfaceVariant,
                       fontFamily: 'monospace',
                       fontSize: 11),
                 ),
@@ -2483,9 +2524,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           final isMacLocal = target == 'local' && Platform.isMacOS;
+          final dialogBg = dialogContext.isDark
+              ? GlassTheme.gradientTop
+              : GlassTheme.gradientTopLight;
           return AlertDialog(
-            backgroundColor: GlassTheme.gradientTop,
-            title: const Text('Add Firewall Rule', style: TextStyle(color: Colors.white)),
+            backgroundColor: dialogBg,
+            title: Text('Add Firewall Rule',
+                style: TextStyle(color: context.colors.onSurface)),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2493,11 +2538,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     initialValue: target,
-                    dropdownColor: GlassTheme.gradientTop,
-                    style: const TextStyle(color: Colors.white),
+                    dropdownColor: dialogBg,
+                    style: TextStyle(color: context.colors.onSurface),
                     decoration: InputDecoration(
                       labelText: 'Apply to',
-                      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                      labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                     ),
                     items: [
                       if (_isDesktopPlatform)
@@ -2515,10 +2560,10 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: nameController,
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: context.colors.onSurface),
                     decoration: InputDecoration(
                       labelText: 'Rule Name',
-                      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                      labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -2527,11 +2572,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           initialValue: action,
-                          dropdownColor: GlassTheme.gradientTop,
-                          style: const TextStyle(color: Colors.white),
+                          dropdownColor: dialogBg,
+                          style: TextStyle(color: context.colors.onSurface),
                           decoration: InputDecoration(
                             labelText: 'Action',
-                            labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                            labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                           ),
                           items: ['Allow', 'Block'].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
                           onChanged: (v) => setDialogState(() => action = v!),
@@ -2541,11 +2586,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           initialValue: direction,
-                          dropdownColor: GlassTheme.gradientTop,
-                          style: const TextStyle(color: Colors.white),
+                          dropdownColor: dialogBg,
+                          style: TextStyle(color: context.colors.onSurface),
                           decoration: InputDecoration(
                             labelText: 'Direction',
-                            labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                            labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                           ),
                           items: ['Inbound', 'Outbound'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                           onChanged: (v) => setDialogState(() => direction = v!),
@@ -2560,11 +2605,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: protocol,
-                            dropdownColor: GlassTheme.gradientTop,
-                            style: const TextStyle(color: Colors.white),
+                            dropdownColor: dialogBg,
+                            style: TextStyle(color: context.colors.onSurface),
                             decoration: InputDecoration(
                               labelText: 'Protocol',
-                              labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                              labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                             ),
                             items: ['TCP', 'UDP', 'Any'].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
                             onChanged: (v) => setDialogState(() => protocol = v!),
@@ -2574,11 +2619,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         Expanded(
                           child: TextField(
                             controller: portController,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: context.colors.onSurface),
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
                               labelText: 'Port (optional)',
-                              labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                              labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                             ),
                           ),
                         ),
@@ -2587,22 +2632,22 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: addressController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.colors.onSurface),
                       decoration: InputDecoration(
                         labelText: 'Remote address / CIDR (optional)',
-                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                        labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                       ),
                     ),
                   ] else ...[
                     const SizedBox(height: 16),
                     TextField(
                       controller: appPathController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.colors.onSurface),
                       decoration: InputDecoration(
                         labelText: 'Application path (required)',
                         helperText: 'macOS Application Firewall only supports per-app rules',
-                        helperStyle: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
-                        labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                        helperStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
+                        labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -2715,8 +2760,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -2806,14 +2851,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           children: [
             DuotoneIcon(
               icon,
-              color: Colors.white.withAlpha(100),
+              color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
               size: 48,
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.colors.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -2821,7 +2866,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 13),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],

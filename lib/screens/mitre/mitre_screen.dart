@@ -5,7 +5,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -46,7 +45,8 @@ class _MitreScreenState extends State<MitreScreen> {
         searchHint: 'Search techniques...',
         actions: [
           IconButton(
-            icon: const DuotoneIcon('info_circle', size: 22, color: Colors.white),
+            icon: DuotoneIcon('info_circle',
+                size: 22, color: Theme.of(context).colorScheme.onSurface),
             onPressed: _showInfoDialog,
             tooltip: 'Info',
           ),
@@ -71,16 +71,16 @@ class _MitreScreenState extends State<MitreScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
+        title: Text(
           'About MITRE ATT&CK',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
-        content: const Text(
+        content: Text(
           'MITRE ATT&CK is a globally-accessible knowledge base of adversary tactics and techniques based on real-world observations.\n\n'
           'This view shows Mobile ATT&CK techniques that can be used to attack mobile devices. '
           'Red items indicate techniques that have been detected in threats found on your device.',
-          style: TextStyle(color: Colors.white70),
+          style:
+              TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -178,13 +178,14 @@ class _MatrixTab extends StatelessWidget {
         minChildSize: 0.3,
         maxChildSize: 0.85,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF0A0E21),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
             controller: scrollController,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
               children: [
                 // Drag handle
@@ -193,7 +194,7 @@ class _MatrixTab extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -235,10 +236,10 @@ class _DetectionsTab extends StatelessWidget {
                   color: Colors.green.withAlpha(128),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'No Techniques Detected',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -247,7 +248,7 @@ class _DetectionsTab extends StatelessWidget {
                 Text(
                   'Your device appears to be clean.\nNo MITRE ATT&CK techniques have been detected.',
                   style: TextStyle(
-                    color: Colors.grey[400],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                   ),
                   textAlign: TextAlign.center,
@@ -265,7 +266,7 @@ class _DetectionsTab extends StatelessWidget {
         }
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             // Warning banner
             Container(
@@ -348,7 +349,7 @@ class _DetectionsTab extends StatelessWidget {
                         Text(
                           '${entry.value.length} technique(s)',
                           style: TextStyle(
-                            color: Colors.grey[500],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 11,
                           ),
                         ),
@@ -362,7 +363,7 @@ class _DetectionsTab extends StatelessWidget {
                         onTap: () => _showTechniqueDetail(context, detection),
                       )),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                 ],
               );
             }),
@@ -382,13 +383,14 @@ class _DetectionsTab extends StatelessWidget {
         minChildSize: 0.3,
         maxChildSize: 0.85,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF0A0E21),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
             controller: scrollController,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
               children: [
                 Container(
@@ -396,7 +398,7 @@ class _DetectionsTab extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -474,8 +476,8 @@ class _DetectionCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         detection.technique.name,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
                         ),
@@ -488,14 +490,14 @@ class _DetectionCard extends StatelessWidget {
                 Text(
                   'Source: ${detection.source}', maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey[400],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 11,
                   ),
                 ),
                 Text(
                   'Confidence: ${(detection.confidence * 100).toInt()}%', maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 10,
                   ),
                 ),
@@ -505,7 +507,10 @@ class _DetectionCard extends StatelessWidget {
           DuotoneIcon(
             'alt_arrow_right',
             size: 24,
-            color: Colors.grey[600],
+            color: Theme.of(context)
+                .colorScheme
+                .onSurfaceVariant
+                .withValues(alpha: 0.7),
           ),
         ],
       ),

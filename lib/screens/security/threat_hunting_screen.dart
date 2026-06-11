@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -55,7 +56,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           tabs: [
             GlassTab(
               label: 'Hunts',
-              iconPath: 'magnifier',
+              iconPath: 'magnifer',
               content: _buildHuntsContent(provider),
             ),
             GlassTab(
@@ -105,7 +106,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               )
             else
               IconButton(
-                icon: const DuotoneIcon('play', size: 22, color: Colors.white),
+                icon: DuotoneIcon('play', size: 22, color: context.onSurface),
                 tooltip: 'Run All Critical Hunts',
                 onPressed: () => provider.executeAllCriticalHunts(),
               ),
@@ -219,15 +220,15 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   children: [
                     Text(
                       hunt?.name ?? 'Running Hunt', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       progress.phase, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: context.onSurfaceMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -248,7 +249,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress.progress,
-              backgroundColor: Colors.white12,
+              backgroundColor: context.onSurface.withValues(alpha: 0.06),
               valueColor: const AlwaysStoppedAnimation<Color>(
                 GlassTheme.primaryAccent,
               ),
@@ -307,7 +308,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: context.onSurfaceMuted,
                 fontSize: 11,
               ),
             ),
@@ -336,7 +337,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       ..sort((a, b) => a.key.index.compareTo(b.key.index));
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: sortedEntries.map((entry) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,8 +431,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       children: [
                         Text(
                           hunt.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: context.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -472,7 +473,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Text(
                 hunt.description,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: context.onSurfaceMuted,
                   fontSize: 13,
                 ),
               ),
@@ -487,13 +488,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
+                          color: context.onSurface.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           id,
-                          style: const TextStyle(
-                            color: Colors.white54,
+                          style: TextStyle(
+                            color: context.onSurfaceMuted,
                             fontSize: 10,
                             fontFamily: 'monospace',
                           ),
@@ -507,7 +508,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.white12,
+                      disabledBackgroundColor: context.onSurface.withValues(alpha: 0.06),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
@@ -543,7 +544,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     allFindings.sort((a, b) => b.severity.compareTo(a.severity));
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: allFindings.length,
       itemBuilder: (context, index) {
         return _buildFindingCard(allFindings[index], provider);
@@ -586,15 +587,15 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     children: [
                       Text(
                         finding.ruleName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         finding.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').trim(), maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: context.onSurfaceMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -625,7 +626,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               finding.description,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
+                color: context.onSurface.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),
@@ -634,10 +635,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
-                  const DuotoneIcon(
+                  DuotoneIcon(
                     'code',
                     size: 14,
-                    color: Colors.white38,
+                    color: context.onSurfaceMuted.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -645,8 +646,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       finding.evidence,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: context.onSurfaceMuted,
                         fontSize: 11,
                         fontFamily: 'monospace',
                       ),
@@ -697,7 +698,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: context.onSurfaceMuted,
                               fontSize: 12,
                             ),
                           ),
@@ -722,7 +723,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.cases.length,
       itemBuilder: (context, index) {
         return _buildCaseCard(provider.cases[index]);
@@ -765,15 +766,15 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     children: [
                       Text(
                         caseItem.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         '${caseItem.relatedFindings.length} related findings', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: context.onSurfaceMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -804,7 +805,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               caseItem.description,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: context.onSurfaceMuted,
                 fontSize: 13,
               ),
             ),
@@ -814,13 +815,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 DuotoneIcon(
                   'clock_circle',
                   size: 14,
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: context.onSurfaceMuted,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'Opened ${_formatDate(caseItem.createdAt)}',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: context.onSurfaceMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -850,14 +851,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 16),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
           child: Text(
             'MITRE ATT&CK techniques covered by available hunts',
             style: TextStyle(
-              color: Colors.white70,
+              color: context.onSurfaceMuted,
               fontSize: 14,
             ),
           ),
@@ -899,7 +900,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 Text(
                   '${hunts.length} hunt(s)',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: context.onSurfaceMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -909,7 +910,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             Text(
               _getMitreDescription(techniqueId),
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: context.onSurfaceMuted,
                 fontSize: 13,
               ),
             ),
@@ -923,13 +924,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: context.onSurface.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       hunt.name,
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.onSurfaceMuted,
                         fontSize: 11,
                       ),
                     ),
@@ -957,8 +958,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -966,7 +967,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+              style: TextStyle(color: context.onSurfaceMuted),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1071,16 +1072,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                GlassTheme.gradientTop,
-                GlassTheme.gradientBottom,
-              ],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -1110,8 +1105,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       children: [
                         Text(
                           hunt.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: context.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1129,7 +1124,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Text(
                 hunt.description,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: context.onSurface.withValues(alpha: 0.8),
                   fontSize: 14,
                 ),
               ),
@@ -1139,10 +1134,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Hypothesis',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: context.onSurfaceMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1150,8 +1145,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     const SizedBox(height: 4),
                     Text(
                       hunt.hypothesis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.onSurface,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -1159,10 +1154,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Detection Rules',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: context.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1185,15 +1180,15 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                             children: [
                               Text(
                                 rule.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: context.onSurface,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                               Text(
                                 'Type: ${rule.type.name}', maxLines: 2, overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
+                                  color: context.onSurfaceMuted,
                                   fontSize: 11,
                                 ),
                               ),
@@ -1212,10 +1207,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   )),
               if (result != null) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Last Result',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: context.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1241,10 +1236,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 // for a clean one.
                 if (result.unavailableRules.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Rules Not Evaluated',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: context.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1272,8 +1267,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                               children: [
                                 Text(
                                   rule?.name ?? entry.key, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: context.onSurface,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1281,7 +1276,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                                 Text(
                                   entry.value, maxLines: 2, overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.6),
+                                    color: context.onSurfaceMuted,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -1309,7 +1304,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.white12,
+                    disabledBackgroundColor: context.onSurface.withValues(alpha: 0.06),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -1329,12 +1324,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: context.onSurfaceMuted),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: context.onSurface,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1365,10 +1360,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               const DuotoneIcon('danger_triangle',
                   color: GlassTheme.errorColor, size: 56),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Graph Unavailable',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: context.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold),
               ),
@@ -1377,7 +1372,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 provider.graphError!,
                 textAlign: TextAlign.center,
                 style:
-                    TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                    TextStyle(color: context.onSurfaceMuted, fontSize: 13),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
@@ -1405,9 +1400,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const DuotoneIcon('structure', color: Colors.white54, size: 64),
+            DuotoneIcon('structure', color: context.onSurfaceMuted, size: 64),
             const SizedBox(height: 16),
-            Text('No threat graph data available', style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text('No threat graph data available', style: TextStyle(color: context.onSurfaceMuted)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () => provider.loadGraphData(),
@@ -1445,10 +1440,11 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     final canvasHeight = 80.0 + ((nodes.length - 1) ~/ 3) * 100.0 + 80.0;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Graph visualization
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1456,13 +1452,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 children: [
                   const DuotoneIcon('structure', color: GlassTheme.primaryAccent, size: 24),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Threat Relationship Graph',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  Expanded(
+                    child: Text(
+                      'Threat Relationship Graph',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                   ),
-                  const Spacer(),
                   IconButton(
-                    icon: const DuotoneIcon('target', color: Colors.white54, size: 24),
+                    icon: DuotoneIcon('target', color: context.onSurfaceMuted, size: 24),
                     tooltip: 'Fit graph',
                     // Reset the viewport transform (pan/zoom) to identity.
                     onPressed: () => _graphTransform.value = Matrix4.identity(),
@@ -1473,7 +1472,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Container(
                 height: 300,
                 decoration: BoxDecoration(
-                  color: Colors.black26,
+                  color: context.isDark
+                      ? Colors.black26
+                      : Colors.black.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ClipRRect(
@@ -1493,7 +1494,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           CustomPaint(
                             size: Size(canvasWidth,
                                 canvasHeight < 300 ? 300 : canvasHeight),
-                            painter: _GraphEdgePainter(edges),
+                            painter: _GraphEdgePainter(
+                                edges, context.colors.outline),
                           ),
                           // Draw nodes
                           ...nodes.map((node) {
@@ -1519,7 +1521,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                                       const SizedBox(height: 2),
                                       Text(
                                         node.label,
-                                        style: const TextStyle(color: Colors.white, fontSize: 9),
+                                        style: TextStyle(color: context.onSurface, fontSize: 9),
                                         textAlign: TextAlign.center,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1541,20 +1543,21 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   'Showing ${nodes.length} of ${allNodes.length} entities — '
                   'open the Threat Graph screen for the full graph',
                   style: TextStyle(
-                      color: Colors.white.withAlpha(128), fontSize: 11),
+                      color: context.onSurfaceMuted, fontSize: 11),
                 ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Legend (only node types actually present)
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Legend', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Legend', style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 16,
@@ -1569,7 +1572,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Graph stats
         Row(
@@ -1580,7 +1583,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   children: [
                     Text('${allNodes.length}', style: const TextStyle(color: GlassTheme.primaryAccent, fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('Nodes', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+                    Text('Nodes', style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -1592,7 +1595,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   children: [
                     Text('${provider.graphRelations.length}', style: const TextStyle(color: GlassTheme.warningColor, fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('Edges', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+                    Text('Edges', style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -1604,7 +1607,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   children: [
                     Text('${allNodes.map((n) => n.type.toLowerCase()).toSet().length}', style: const TextStyle(color: GlassTheme.errorColor, fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('Types', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+                    Text('Types', style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -1621,7 +1624,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       children: [
         Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 12)),
+        Text(label, style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
       ],
     );
   }
@@ -1643,13 +1646,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         padding: const EdgeInsets.all(24),
         constraints:
             BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-          ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: ListView(
           shrinkWrap: true,
@@ -1662,8 +1662,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   child: Text(node.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: context.onSurface,
                           fontSize: 20,
                           fontWeight: FontWeight.bold)),
                 ),
@@ -1681,14 +1681,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               relationCount == 1
                   ? 'Connected to 1 other entity'
                   : 'Connected to $relationCount other entities',
-              style: TextStyle(color: Colors.white.withAlpha(179)),
+              style: TextStyle(color: context.onSurfaceMuted),
             ),
             // Raw graph properties (real data from the graph database)
             if (node.properties.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Properties',
+              Text('Properties',
                   style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                      color: context.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               GlassContainer(
                 padding: const EdgeInsets.all(12),
@@ -1740,7 +1740,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       case 'tool':
         return const Color(0xFF9C27B0);
       default:
-        return Colors.grey;
+        return context.onSurfaceMuted;
     }
   }
 
@@ -1784,7 +1784,6 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 : 'Correlation run complete — $found correlation'
                     '${found == 1 ? '' : 's'} found',
           ),
-          backgroundColor: GlassTheme.gradientTop,
         ),
       );
       await provider.loadCorrelationRules();
@@ -1816,10 +1815,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               const DuotoneIcon('danger_triangle',
                   color: GlassTheme.errorColor, size: 56),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Correlations Unavailable',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: context.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold),
               ),
@@ -1828,7 +1827,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 provider.correlationError!,
                 textAlign: TextAlign.center,
                 style:
-                    TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                    TextStyle(color: context.onSurfaceMuted, fontSize: 13),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
@@ -1855,9 +1854,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const DuotoneIcon('link', color: Colors.white54, size: 64),
+            DuotoneIcon('link', color: context.onSurfaceMuted, size: 64),
             const SizedBox(height: 16),
-            Text('No correlations recorded yet', style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text('No correlations recorded yet', style: TextStyle(color: context.onSurfaceMuted)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _isRunningCorrelation
@@ -1874,7 +1873,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -1890,6 +1889,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
         // Run correlation (POST /correlation/run on the live backend)
         GlassCard(
+          margin: EdgeInsets.zero,
           onTap: _isRunningCorrelation ? null : () => _runCorrelation(provider),
           child: Row(
             children: [
@@ -1911,18 +1911,22 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         _isRunningCorrelation
                             ? 'Running Correlation...'
                             : 'Run Correlation', maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    const Text('Correlate recent indicators across engines', maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        style: TextStyle(
+                            color: context.onSurface,
+                            fontWeight: FontWeight.bold)),
+                    Text('Correlate recent indicators across engines', maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.onSurfaceMuted, fontSize: 12)),
                   ],
                 ),
               ),
-              const DuotoneIcon('alt_arrow_right', color: Colors.white38, size: 24),
+              DuotoneIcon('alt_arrow_right',
+                  color: context.onSurfaceMuted.withValues(alpha: 0.7),
+                  size: 24),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         const GlassSectionHeader(title: 'Correlation Events'),
         ...events.map(_buildCorrelationEventCard),
@@ -1938,7 +1942,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
           ],
         ),
       ),
@@ -1960,7 +1964,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       case 'Campaign':
         return GlassTheme.warningColor;
       default:
-        return Colors.grey;
+        return context.onSurfaceMuted;
     }
   }
 
@@ -1970,7 +1974,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         ? GlassTheme.successColor
         : event.confidence >= 0.5
             ? GlassTheme.warningColor
-            : Colors.grey;
+            : context.onSurfaceMuted;
 
     return GlassCard(
       child: Column(
@@ -1985,12 +1989,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('${event.engine} correlation', maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: context.onSurface,
+                            fontWeight: FontWeight.bold)),
                     if (event.description.isNotEmpty)
                       Text(event.description,
                           style: TextStyle(
-                              color: Colors.white.withAlpha(128), fontSize: 12),
+                              color: context.onSurfaceMuted, fontSize: 12),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
                   ],
@@ -2006,7 +2011,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           fontSize: 16)),
                   Text('confidence',
                       style: TextStyle(
-                          color: Colors.white.withAlpha(102), fontSize: 10)),
+                          color: context.onSurfaceMuted.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
             ],
@@ -2022,14 +2027,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               const SizedBox(width: 8),
               Text('${event.indicators.length} indicators',
                   style: TextStyle(
-                      color: Colors.white.withAlpha(128), fontSize: 11)),
+                      color: context.onSurfaceMuted, fontSize: 11)),
               const Spacer(),
               Text(
                   event.createdAt != null
                       ? _formatDate(event.createdAt!)
                       : 'unknown',
                   style: TextStyle(
-                      color: Colors.white.withAlpha(128), fontSize: 11)),
+                      color: context.onSurfaceMuted, fontSize: 11)),
             ],
           ),
         ],
@@ -2065,9 +2070,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const DuotoneIcon('cpu', color: Colors.white54, size: 64),
+            DuotoneIcon('cpu', color: context.onSurfaceMuted, size: 64),
             const SizedBox(height: 16),
-            Text('No ML models available', style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text('No ML models available', style: TextStyle(color: context.onSurfaceMuted)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () => provider.loadMLModels(),
@@ -2081,10 +2086,11 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Overall ML stats
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Row(
             children: [
               Container(
@@ -2103,9 +2109,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('ML Engine', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('ML Engine', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text('${models.where((m) => m.isActive).length} active models', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(153))),
+                    Text('${models.where((m) => m.isActive).length} active models', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurfaceMuted)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -2115,7 +2121,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         const SizedBox(width: 16),
                         Text(
                           '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)} anomalies today',
-                          style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                          style: TextStyle(color: context.onSurfaceMuted, fontSize: 12),
                         ),
                       ],
                     ),
@@ -2125,7 +2131,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Model stats
         Row(
@@ -2153,7 +2159,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11)),
+            Text(label, style: TextStyle(color: context.onSurfaceMuted, fontSize: 11)),
           ],
         ),
       ),
@@ -2172,14 +2178,19 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: (model.isActive ? GlassTheme.primaryAccent : Colors.grey).withAlpha(40),
+                  color: (model.isActive
+                          ? GlassTheme.primaryAccent
+                          : context.onSurfaceMuted)
+                      .withAlpha(40),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: DuotoneIcon(
                     'cpu',
                     size: 24,
-                    color: model.isActive ? GlassTheme.primaryAccent : Colors.grey,
+                    color: model.isActive
+                        ? GlassTheme.primaryAccent
+                        : context.onSurfaceMuted,
                   ),
                 ),
               ),
@@ -2188,8 +2199,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(model.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold)),
+                    Text(model.description, style: TextStyle(color: context.onSurfaceMuted, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -2197,7 +2208,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('${model.accuracy}%', style: TextStyle(color: GlassTheme.successColor, fontWeight: FontWeight.bold, fontSize: 18)),
-                  Text('accuracy', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text('accuracy', style: TextStyle(color: context.onSurfaceMuted.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
             ],
@@ -2207,11 +2218,11 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             children: [
               GlassBadge(text: model.type, color: GlassTheme.primaryAccent, fontSize: 10),
               const SizedBox(width: 8),
-              GlassBadge(text: model.isActive ? 'Active' : 'Inactive', color: model.isActive ? GlassTheme.successColor : Colors.grey, fontSize: 10),
+              GlassBadge(text: model.isActive ? 'Active' : 'Inactive', color: model.isActive ? GlassTheme.successColor : context.onSurfaceMuted, fontSize: 10),
               const Spacer(),
               DuotoneIcon('danger_triangle', size: 14, color: GlassTheme.warningColor.withAlpha(179)),
               const SizedBox(width: 4),
-              Text('${model.anomaliesDetected} anomalies', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+              Text('${model.anomaliesDetected} anomalies', style: TextStyle(color: context.onSurfaceMuted, fontSize: 11)),
             ],
           ),
         ],
@@ -2229,13 +2240,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -2257,7 +2265,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: model.type, color: GlassTheme.primaryAccent),
                       ],
                     ),
@@ -2265,7 +2273,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              Text(model.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(model.description, style: TextStyle(color: context.onSurface.withValues(alpha: 0.8))),
               const SizedBox(height: 20),
               GlassContainer(
                 padding: const EdgeInsets.all(16),
@@ -2329,13 +2337,14 @@ class _HuntGraphNode {
 /// Paints the real relationship edges between rendered node positions.
 class _GraphEdgePainter extends CustomPainter {
   final List<(Offset, Offset)> edges;
+  final Color edgeColor;
 
-  _GraphEdgePainter(this.edges);
+  _GraphEdgePainter(this.edges, this.edgeColor);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white24
+      ..color = edgeColor
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
@@ -2346,7 +2355,7 @@ class _GraphEdgePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GraphEdgePainter oldDelegate) =>
-      oldDelegate.edges != edges;
+      oldDelegate.edges != edges || oldDelegate.edgeColor != edgeColor;
 }
 
 /// Parsed view of a backend CorrelationEvent ({id, type, strength,

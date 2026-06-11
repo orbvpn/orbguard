@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -112,7 +113,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
             ),
@@ -124,7 +125,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
 
   Widget _buildConnectionsTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -162,7 +163,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -190,6 +191,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
             width: 90,
             margin: const EdgeInsets.only(right: 12),
             child: GlassCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -197,7 +199,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   const SizedBox(height: 8),
                   Text(
                     siem['name'] as String,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: context.colors.onSurface, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -225,8 +227,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connection.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(connection.type, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(connection.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    Text(connection.type, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ),
@@ -241,7 +243,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${connection.eventsPerMinute} events/min',
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                    style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                   ),
                 ],
               ),
@@ -250,7 +252,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           const SizedBox(height: 12),
           Text(
             connection.endpoint,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11, fontFamily: 'monospace'),
+            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11, fontFamily: 'monospace'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -273,18 +275,18 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white38),
+        DuotoneIcon(icon, size: 14, color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
         const SizedBox(width: 4),
-        Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        Text(value, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11)),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(77), fontSize: 10)),
+        Text(label, style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
       ],
     );
   }
 
   Widget _buildForwardersTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         const GlassSectionHeader(title: 'Active Forwarders'),
         if (_forwarders.isEmpty)
@@ -305,15 +307,15 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
             children: [
               GlassSvgIconBox(
                 icon: 'plain',
-                color: forwarder.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
+                color: forwarder.isEnabled ? GlassTheme.primaryAccent : context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(forwarder.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('To: ${forwarder.destination}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(forwarder.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    Text('To: ${forwarder.destination}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ),
@@ -334,9 +336,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text('Format: ${forwarder.format}', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11)),
+              Text('Format: ${forwarder.format}', style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11)),
               const SizedBox(width: 16),
-              Text('Batch: ${forwarder.batchSize}', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11)),
+              Text('Batch: ${forwarder.batchSize}', style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11)),
             ],
           ),
         ],
@@ -351,7 +353,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     final forwardedCount = _alerts.where((a) => a.forwarded).length;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -417,12 +419,12 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(alert.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(alert.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
                     if (alert.source.isNotEmpty)
-                      Text(alert.source, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                      Text(alert.source, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
                     if (alert.description.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(alert.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(alert.description, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ],
                 ),
@@ -434,7 +436,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   const SizedBox(height: 4),
                   GlassBadge(text: forwardLabel, color: forwardColor, fontSize: 10),
                   const SizedBox(height: 4),
-                  Text(_formatTime(alert.createdAt), style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text(_formatTime(alert.createdAt), style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
             ],
@@ -466,9 +468,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title, style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text(subtitle, style: TextStyle(color: context.colors.onSurfaceVariant)),
           ],
         ),
       ),
@@ -484,14 +486,14 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to Load Data',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               error,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -522,13 +524,15 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -542,7 +546,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(connection.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(connection.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: connection.type, color: GlassTheme.primaryAccent),
                       ],
                     ),
@@ -576,11 +580,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
               overflow: TextOverflow.ellipsis,
             ),
           ),

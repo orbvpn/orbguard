@@ -74,12 +74,14 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       ],
       actions: [
         IconButton(
-          icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
+          icon: DuotoneIcon(AppIcons.addCircle,
+              size: 22, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => _showCreatePlaybookDialog(context),
           tooltip: 'Create Playbook',
         ),
         IconButton(
-          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+          icon: DuotoneIcon(AppIcons.refresh,
+              size: 22, color: Theme.of(context).colorScheme.onSurface),
           onPressed: _isLoading ? null : _loadData,
           tooltip: 'Refresh',
         ),
@@ -115,7 +117,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -140,7 +142,10 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12)),
           ],
         ),
       ),
@@ -148,6 +153,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Widget _buildPlaybookCard(Playbook playbook) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       onTap: () => _showPlaybookDetails(context, playbook),
       child: Column(
@@ -157,15 +163,17 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
             children: [
               GlassSvgIconBox(
                 icon: AppIcons.playCircle,
-                color: playbook.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
+                color: playbook.isEnabled
+                    ? GlassTheme.primaryAccent
+                    : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(playbook.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('${playbook.steps.length} steps', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(playbook.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
+                    Text('${playbook.steps.length} steps', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
                   ],
                 ),
               ),
@@ -179,7 +187,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           const SizedBox(height: 12),
           Text(
             playbook.description,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -190,7 +198,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               const Spacer(),
               Text(
                 '${playbook.executionCount} runs',
-                style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                    fontSize: 11),
               ),
             ],
           ),
@@ -209,7 +219,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: _executions.length,
       itemBuilder: (context, index) {
         return _buildExecutionCard(_executions[index]);
@@ -218,6 +228,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Widget _buildExecutionCard(PlaybookExecution execution) {
+    final cs = Theme.of(context).colorScheme;
     final statusColor = execution.status == 'success'
         ? GlassTheme.successColor
         : execution.status == 'running'
@@ -244,10 +255,10 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(execution.playbookName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(execution.playbookName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
                     Text(
                       execution.triggeredBy, maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                     ),
                   ],
                 ),
@@ -264,7 +275,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               const Spacer(),
               Text(
                 _formatTime(execution.startedAt),
-                style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                    fontSize: 11),
               ),
             ],
           ),
@@ -274,12 +287,13 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Widget _buildExecutionStat(String icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
@@ -289,21 +303,23 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     required String title,
     required String subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(subtitle, style: TextStyle(color: cs.onSurfaceVariant)),
         ],
       ),
     );
   }
 
   void _showPlaybookDetails(BuildContext context, Playbook playbook) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -313,21 +329,19 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(
+                isDark: Theme.of(context).brightness == Brightness.dark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(24),
             children: [
-              Text(playbook.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(playbook.name, style: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text(playbook.description, style: TextStyle(color: Colors.white.withAlpha(179))),
+              Text(playbook.description, style: TextStyle(color: cs.onSurfaceVariant)),
               const SizedBox(height: 20),
 
               GlassContainer(
@@ -342,7 +356,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               ),
 
               const SizedBox(height: 20),
-              const Text('Steps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Steps', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ...playbook.steps.asMap().entries.map((entry) => _buildStepCard(entry.key + 1, entry.value)),
 
@@ -377,6 +391,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
   }
 
   Widget _buildStepCard(int number, PlaybookStep step) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Row(
         children: [
@@ -399,25 +414,26 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(step.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                Text(step.action, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                Text(step.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
+                Text(step.action, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
               ],
             ),
           ),
-          DuotoneIcon(_getActionIcon(step.action), size: 20, color: Colors.white54),
+          DuotoneIcon(_getActionIcon(step.action), size: 20, color: cs.onSurfaceVariant),
         ],
       ),
     );
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -427,11 +443,13 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Create Playbook', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        title: Text('Create Playbook',
+            style:
+                TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        content: Text(
           'Use the playbook builder to create custom automated responses.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

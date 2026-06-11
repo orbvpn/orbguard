@@ -15,6 +15,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -116,12 +117,12 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           IconButton(
-                            icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: Colors.white),
+                            icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: context.onSurface),
                             onPressed: () => _showAddSourceDialog(context),
                             tooltip: 'Add Source',
                           ),
                           IconButton(
-                            icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                            icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.onSurface),
                             onPressed: _isLoading ? null : _loadSources,
                             tooltip: 'Refresh',
                           ),
@@ -131,7 +132,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                     // Content
                     Expanded(
                       child: ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                         children: [
                           // Stats
                           Row(
@@ -227,7 +228,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
           ],
         ),
       ),
@@ -235,6 +236,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
   }
 
   Widget _buildSourceCard(IntelSource source) {
+    final cs = Theme.of(context).colorScheme;
     final isUpdating = _updatingSlugs.contains(source.slug);
 
     return GlassCard(
@@ -249,7 +251,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                     ? GlassTheme.errorColor
                     : source.isEnabled
                         ? GlassTheme.successColor
-                        : Colors.grey,
+                        : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -258,11 +260,11 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                   children: [
                     Text(
                       source.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       source.type.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -297,7 +299,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
             const SizedBox(height: 8),
             Text(
               source.description!,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -331,7 +333,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                     ? GlassTheme.errorColor
                     : source.isEnabled
                         ? GlassTheme.successColor
-                        : Colors.grey,
+                        : cs.onSurfaceVariant,
                 fontSize: 10,
               ),
               const SizedBox(width: 8),
@@ -375,9 +377,9 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: context.onSurfaceMuted),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
       ],
     );
   }
@@ -389,14 +391,14 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
         children: [
           DuotoneIcon(AppIcons.intelligence, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Intelligence Sources',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Add threat intelligence feeds to enrich your data',
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: context.onSurfaceMuted),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -426,16 +428,16 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
         children: [
           DuotoneIcon(AppIcons.dangerTriangle, size: 64, color: GlassTheme.errorColor.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Failed to Load Sources',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
               _errorMessage ?? 'An unexpected error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.onSurfaceMuted),
               textAlign: TextAlign.center,
             ),
           ),
@@ -592,22 +594,23 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+      labelStyle: TextStyle(color: context.onSurfaceMuted),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
-      backgroundColor: GlassTheme.gradientTop,
-      title: const Text('Add Intelligence Source', style: TextStyle(color: Colors.white)),
+      backgroundColor: cs.surface,
+      title: Text('Add Intelligence Source', style: TextStyle(color: cs.onSurface)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: cs.onSurface),
               decoration: _decoration('Source Name'),
               onChanged: (value) {
                 if (!_slugEdited) {
@@ -618,15 +621,15 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _slugController,
-              style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+              style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
               decoration: _decoration('Slug (a-z, 0-9, _, -)'),
               onChanged: (_) => _slugEdited = true,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _type,
-              dropdownColor: GlassTheme.gradientTop,
-              style: const TextStyle(color: Colors.white),
+              dropdownColor: cs.surface,
+              style: TextStyle(color: cs.onSurface),
               decoration: _decoration('Type'),
               items: _types
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase())))
@@ -636,13 +639,13 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _urlController,
-              style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+              style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
               decoration: _decoration(_urlRequired ? 'Feed/API URL' : 'URL (optional)'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descriptionController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: cs.onSurface),
               decoration: _decoration('Description (optional)'),
             ),
             if (_error != null) ...[

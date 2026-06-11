@@ -174,7 +174,7 @@ class _ScanningScreenState extends State<ScanningScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: Theme.of(context).canvasColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -184,8 +184,9 @@ class _ScanningScreenState extends State<ScanningScreen>
               child: Row(
                 children: [
                   IconButton(
-                    icon: const DuotoneIcon('close_circle',
-                        size: 24, color: Colors.white54),
+                    icon: DuotoneIcon('close_circle',
+                        size: 24,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                     // A cancelled scan is NOT a clean result; pop null so the
                     // caller does not show an "all clear" dialog.
                     onPressed: () => Navigator.pop(context, null),
@@ -340,16 +341,18 @@ class _ScanningScreenState extends State<ScanningScreen>
             style: TextStyle(
               fontSize: 48,
               fontWeight: FontWeight.bold,
-              color: _scanComplete ? Colors.green : Colors.white,
+              color: _scanComplete
+                  ? Colors.green
+                  : Theme.of(context).colorScheme.onSurface,
             ),
           )
         else
-          const Text(
+          Text(
             'Scanning device…',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         const SizedBox(height: 8),
@@ -358,7 +361,7 @@ class _ScanningScreenState extends State<ScanningScreen>
             '$_stagesCompleted of $_totalStages scan stages completed',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         if (_threatsSoFar > 0)

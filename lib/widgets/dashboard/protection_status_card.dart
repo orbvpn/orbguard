@@ -29,13 +29,15 @@ class ProtectionStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      // Spacing comes from the parent screen's section gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           if (isLoading)
             _buildLoadingState()
           else
-            _buildProtectionStatus(),
+            _buildProtectionStatus(context),
         ],
       ),
     );
@@ -50,7 +52,7 @@ class ProtectionStatusCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProtectionStatus() {
+  Widget _buildProtectionStatus(BuildContext context) {
     final isProtected = protection?.isProtected ?? status?.isActive ?? false;
     final score = protection?.protectionScore ?? status?.score ?? 0.0;
     final grade = protection?.protectionGrade ?? status?.grade ?? 'U';
@@ -105,7 +107,7 @@ class ProtectionStatusCard extends StatelessWidget {
             'Last scan: ${_formatTime(protection!.lastScan)}',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         const SizedBox(height: 20),
@@ -221,7 +223,7 @@ class _ProtectionScoreCircle extends StatelessWidget {
                 '${score.round()}%',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[400],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -372,6 +374,8 @@ class DeviceHealthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      // Spacing comes from the parent screen's section gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,9 +390,9 @@ class DeviceHealthCard extends StatelessWidget {
               ),
             )
           else if (health != null)
-            _buildHealth()
+            _buildHealth(context)
           else
-            _buildEmptyState(),
+            _buildEmptyState(context),
         ],
       ),
     );
@@ -441,16 +445,18 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHealth() {
+  Widget _buildHealth(BuildContext context) {
     return Column(
       children: [
         // Health checks
-        _buildHealthCheck('Secure Screen Lock', health!.hasSecureScreenLock),
-        _buildHealthCheck('Device Encrypted', health!.isEncrypted),
-        _buildHealthCheck('Security Patch', health!.hasLatestSecurityPatch),
-        _buildHealthCheck('Not Rooted', !health!.isRooted),
         _buildHealthCheck(
-            'Dev Options Off', !health!.developerOptionsEnabled),
+            context, 'Secure Screen Lock', health!.hasSecureScreenLock),
+        _buildHealthCheck(context, 'Device Encrypted', health!.isEncrypted),
+        _buildHealthCheck(
+            context, 'Security Patch', health!.hasLatestSecurityPatch),
+        _buildHealthCheck(context, 'Not Rooted', !health!.isRooted),
+        _buildHealthCheck(
+            context, 'Dev Options Off', !health!.developerOptionsEnabled),
         // Issues
         if (health!.hasIssues) ...[
           const SizedBox(height: 12),
@@ -468,11 +474,15 @@ class DeviceHealthCard extends StatelessWidget {
                     const DuotoneIcon(AppIcons.infoCircle,
                         color: Colors.orange, size: 16),
                     const SizedBox(width: 8),
-                    Text(
-                      '${health!.issues.length} issue${health!.issues.length > 1 ? 's' : ''} found',
-                      style: const TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        '${health!.issues.length} issue${health!.issues.length > 1 ? 's' : ''} found',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -486,7 +496,9 @@ class DeviceHealthCard extends StatelessWidget {
                             '• $issue',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[400],
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         )),
@@ -498,7 +510,8 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthCheck(String label, bool passed) {
+  Widget _buildHealthCheck(BuildContext context, String label, bool passed) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -514,7 +527,7 @@ class DeviceHealthCard extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 13,
-                color: passed ? Colors.grey[300] : Colors.red[300],
+                color: passed ? cs.onSurfaceVariant : cs.error,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -525,17 +538,19 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.questionCircle, size: 40, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.questionCircle,
+                size: 40, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
             Text(
               'Health status unavailable',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ],
         ),

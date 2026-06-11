@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -63,12 +64,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: const DuotoneIcon('user_plus', size: 22, color: Colors.white),
+                  icon: DuotoneIcon('user_plus', size: 22, color: context.colors.onSurface),
                   onPressed: () => _showAddExecutiveSheet(context, provider),
                   tooltip: 'Add VIP',
                 ),
                 IconButton(
-                  icon: const DuotoneIcon('letter', size: 22, color: Colors.white),
+                  icon: DuotoneIcon('letter', size: 22, color: context.colors.onSurface),
                   onPressed: () => _showAnalyzeMessageSheet(context, provider),
                   tooltip: 'Analyze Message',
                 ),
@@ -82,28 +83,28 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
 
   Widget _buildDashboardTab(ExecutiveProtectionProvider provider) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Protection Status Card
         _buildStatusCard(provider),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Quick Stats
         _buildQuickStats(provider),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Attack Types Overview
         _buildAttackTypesCard(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Recent Alerts Preview
         if (provider.alerts.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(left: 4, bottom: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Recent Threats',
               style: TextStyle(
-                color: Colors.white70,
+                color: context.colors.onSurfaceVariant,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
@@ -119,6 +120,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     final hasAlerts = provider.criticalAlerts.isNotEmpty;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Row(
@@ -147,8 +149,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 children: [
                   Text(
                     hasAlerts ? 'Threats Detected' : 'Protected',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.colors.onSurface,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -159,7 +161,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         ? '${provider.criticalAlerts.length} critical alert(s) require attention'
                         : 'No impersonation attempts detected',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: context.colors.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),
@@ -173,7 +175,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                       const SizedBox(width: 8),
                       _buildStatusBadge(
                         '${provider.stats['corporate_domains'] ?? 0} Domains',
-                        Colors.white54,
+                        context.colors.onSurfaceVariant,
                       ),
                     ],
                   ),
@@ -234,6 +236,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
   Widget _buildStatCard(String label, String value, String icon, Color color) {
     return Expanded(
       child: GlassCard(
+        margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -251,7 +254,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: context.colors.onSurfaceVariant,
                   fontSize: 11,
                 ),
                 textAlign: TextAlign.center,
@@ -272,15 +275,16 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     ];
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'BEC Attack Types We Detect',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -339,7 +343,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.alerts.length,
       itemBuilder: (context, index) {
         return _buildAlertCard(provider.alerts[index], provider);
@@ -387,8 +391,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         alert.type?.displayName ?? 'Impersonation Detected',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.colors.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -399,7 +403,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: context.colors.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -431,7 +435,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     Text(
                       '${(alert.confidenceScore * 100).toInt()}% confidence',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: context.colors.onSurfaceVariant,
                         fontSize: 11,
                       ),
                     ),
@@ -443,10 +447,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
 
             // Indicators
             if (alert.indicators.isNotEmpty) ...[
-              const Text(
+              Text(
                 'Threat Indicators',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: context.colors.onSurfaceVariant,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
@@ -469,8 +473,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                             children: [
                               Text(
                                 indicator.description,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: context.colors.onSurface,
                                   fontSize: 12,
                                 ),
                               ),
@@ -478,7 +482,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                                 Text(
                                   indicator.evidence!,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
+                                    color: context.colors.onSurfaceVariant,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -506,8 +510,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                   Expanded(
                     child: Text(
                       alert.recommendation,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.colors.onSurface,
                         fontSize: 12,
                       ),
                     ),
@@ -536,7 +540,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.executives.length,
       itemBuilder: (context, index) {
         return _buildExecutiveCard(provider.executives[index], provider);
@@ -580,8 +584,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 exec.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: context.colors.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -614,7 +618,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: context.colors.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
@@ -624,14 +628,16 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: context.colors.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
           ],
         ),
         trailing: IconButton(
-          icon: const DuotoneIcon('trash_bin_minimalistic', color: Colors.white38, size: 24),
+          icon: DuotoneIcon('trash_bin_minimalistic',
+              color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+              size: 24),
           onPressed: () => _confirmRemoveExecutive(context, exec, provider),
         ),
       ),
@@ -655,8 +661,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.colors.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -664,7 +670,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             if (action != null) ...[
@@ -705,6 +711,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     final emailController = TextEditingController();
     final titleController = TextEditingController();
     bool isHighValue = false;
+    final cs = context.colors;
 
     showModalBottomSheet(
       context: context,
@@ -712,16 +719,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                GlassTheme.gradientTop,
-                GlassTheme.gradientBottom,
-              ],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: EdgeInsets.fromLTRB(
             24,
@@ -734,10 +735,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Add VIP Profile',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -746,22 +747,24 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 Text(
                   'Add an executive to monitor for impersonation attacks',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: cs.onSurfaceVariant,
                     fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: cs.onSurface),
+                  decoration: InputDecoration(
                     labelText: 'Full Name',
-                    labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: DuotoneIcon('user', color: Colors.white38, size: 24),
+                    labelStyle: TextStyle(color: cs.onSurfaceVariant),
+                    prefixIcon: DuotoneIcon('user',
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        size: 24),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
                         color: GlassTheme.primaryAccent,
                       ),
@@ -771,16 +774,18 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: emailController,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: cs.onSurface),
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Email Address',
-                    labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: DuotoneIcon('letter', color: Colors.white38, size: 24),
+                    labelStyle: TextStyle(color: cs.onSurfaceVariant),
+                    prefixIcon: DuotoneIcon('letter',
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        size: 24),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
                         color: GlassTheme.primaryAccent,
                       ),
@@ -790,17 +795,20 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: titleController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: cs.onSurface),
+                  decoration: InputDecoration(
                     labelText: 'Title (Optional)',
-                    labelStyle: TextStyle(color: Colors.white54),
-                    prefixIcon: DuotoneIcon('case', color: Colors.white38, size: 24),
+                    labelStyle: TextStyle(color: cs.onSurfaceVariant),
+                    prefixIcon: DuotoneIcon('case',
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        size: 24),
                     hintText: 'e.g., CEO, CFO, VP of Finance',
-                    hintStyle: TextStyle(color: Colors.white24),
+                    hintStyle: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
                         color: GlassTheme.primaryAccent,
                       ),
@@ -822,17 +830,17 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'High-Value Target',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: cs.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               'C-level executives, finance team',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: cs.onSurfaceVariant,
                                 fontSize: 12,
                               ),
                             ),
@@ -870,7 +878,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.white12,
+                      disabledBackgroundColor:
+                          cs.onSurface.withValues(alpha: 0.06),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('Add VIP'),
@@ -893,6 +902,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     final senderEmailController = TextEditingController();
     final subjectController = TextEditingController();
     final bodyController = TextEditingController();
+    final cs = context.colors;
 
     showModalBottomSheet(
       context: context,
@@ -900,16 +910,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       isScrollControlled: true,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              GlassTheme.gradientTop,
-              GlassTheme.gradientBottom,
-            ],
-          ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -917,17 +920,18 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
           children: [
             Row(
               children: [
-                const Text(
+                Text(
                   'Analyze Message',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const DuotoneIcon('close_circle', color: Colors.white54, size: 24),
+                  icon: DuotoneIcon('close_circle',
+                      color: cs.onSurfaceVariant, size: 24),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -936,7 +940,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             Text(
               'Paste a suspicious email to check for impersonation',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: cs.onSurfaceVariant,
                 fontSize: 14,
               ),
             ),
@@ -947,14 +951,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                   children: [
                     TextField(
                       controller: senderNameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: cs.onSurface),
+                      decoration: InputDecoration(
                         labelText: 'Sender Name',
-                        labelStyle: TextStyle(color: Colors.white54),
+                        labelStyle: TextStyle(color: cs.onSurfaceVariant),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(
                             color: GlassTheme.primaryAccent,
                           ),
@@ -964,14 +968,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: senderEmailController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: cs.onSurface),
+                      decoration: InputDecoration(
                         labelText: 'Sender Email',
-                        labelStyle: TextStyle(color: Colors.white54),
+                        labelStyle: TextStyle(color: cs.onSurfaceVariant),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(
                             color: GlassTheme.primaryAccent,
                           ),
@@ -981,14 +985,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: subjectController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: cs.onSurface),
+                      decoration: InputDecoration(
                         labelText: 'Subject',
-                        labelStyle: TextStyle(color: Colors.white54),
+                        labelStyle: TextStyle(color: cs.onSurfaceVariant),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(
                             color: GlassTheme.primaryAccent,
                           ),
@@ -998,16 +1002,16 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: bodyController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: cs.onSurface),
                       maxLines: 6,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Message Body',
-                        labelStyle: TextStyle(color: Colors.white54),
+                        labelStyle: TextStyle(color: cs.onSurfaceVariant),
                         alignLabelWithHint: true,
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(
                             color: GlassTheme.primaryAccent,
                           ),
@@ -1065,11 +1069,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
   void _showAnalysisResult(BuildContext context, ImpersonationResult result) {
     final riskColor =
         Color(ExecutiveProtectionProvider.getRiskLevelColor(result.riskLevel));
+    final cs = context.colors;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
+        backgroundColor: cs.surface,
         title: Row(
           children: [
             DuotoneIcon(
@@ -1083,7 +1088,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 result.isImpersonation
                     ? 'Impersonation Detected!'
                     : 'Message Appears Safe',
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: cs.onSurface),
               ),
             ),
           ],
@@ -1112,7 +1117,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             Text(
               result.recommendation,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
+                color: cs.onSurface,
                 fontSize: 14,
               ),
             ),
@@ -1133,17 +1138,18 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     ExecutiveProfile exec,
     ExecutiveProtectionProvider provider,
   ) {
+    final cs = context.colors;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
+        backgroundColor: cs.surface,
+        title: Text(
           'Remove VIP?',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         content: Text(
           'Stop monitoring ${exec.name} for impersonation attempts?',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+          style: TextStyle(color: cs.onSurface),
         ),
         actions: [
           TextButton(

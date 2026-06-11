@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -101,14 +102,17 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           children: [
             DuotoneIcon('danger_triangle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to Load Data',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: context.colors.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               error,
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -157,7 +161,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
             ),
@@ -169,10 +173,11 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
 
   Widget _buildServersTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Info card
         GlassCard(
+          margin: EdgeInsets.zero,
           child: Row(
             children: [
               GlassSvgIconBox(icon: 'info_circle', color: GlassTheme.primaryAccent),
@@ -181,10 +186,15 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('TAXII 2.1 Protocol', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('TAXII 2.1 Protocol',
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.bold)),
                     Text(
                       'Trusted Automated Exchange of Intelligence Information',
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                      style: TextStyle(
+                          color: context.colors.onSurfaceVariant,
+                          fontSize: 12),
                     ),
                   ],
                 ),
@@ -224,7 +234,9 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label,
+                style: TextStyle(
+                    color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -248,8 +260,18 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(server.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(server.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(server.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.bold)),
+                    Text(server.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.colors.onSurfaceVariant,
+                            fontSize: 12)),
                   ],
                 ),
               ),
@@ -263,7 +285,10 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           const SizedBox(height: 12),
           Text(
             server.discoveryUrl,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11, fontFamily: 'monospace'),
+            style: TextStyle(
+                color: context.colors.onSurfaceVariant,
+                fontSize: 11,
+                fontFamily: 'monospace'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -283,21 +308,27 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
   }
 
   Widget _buildServerStat(String icon, String value, String label) {
+    final cs = context.colors;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white38),
+        DuotoneIcon(icon,
+            size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
         const SizedBox(width: 4),
-        Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        Text(value,
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(77), fontSize: 10)),
+        Text(label,
+            style: TextStyle(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                fontSize: 10)),
       ],
     );
   }
 
   Widget _buildCollectionsTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Filter options
         SingleChildScrollView(
@@ -311,7 +342,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Collections
         if (_collections.isEmpty)
@@ -329,9 +360,13 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         label: Text(label),
         selected: selected,
         onSelected: (v) {},
-        backgroundColor: Colors.white12,
+        backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
         selectedColor: GlassTheme.primaryAccent.withAlpha(50),
-        labelStyle: TextStyle(color: selected ? GlassTheme.primaryAccent : Colors.white70, fontSize: 12),
+        labelStyle: TextStyle(
+            color: selected
+                ? GlassTheme.primaryAccent
+                : context.colors.onSurfaceVariant,
+            fontSize: 12),
         checkmarkColor: GlassTheme.primaryAccent,
       ),
     );
@@ -346,23 +381,43 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             children: [
               GlassSvgIconBox(
                 icon: 'folder',
-                color: collection.canRead ? GlassTheme.primaryAccent : Colors.grey,
+                color: collection.canRead
+                    ? GlassTheme.primaryAccent
+                    : context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(collection.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(collection.description, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(collection.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.bold)),
+                    Text(collection.description,
+                        style: TextStyle(
+                            color: context.colors.onSurfaceVariant,
+                            fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${collection.objectCount}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                  Text('objects', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text('${collection.objectCount}',
+                      style: TextStyle(
+                          color: context.colors.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
+                  Text('objects',
+                      style: TextStyle(
+                          color: context.colors.onSurfaceVariant
+                              .withValues(alpha: 0.7),
+                          fontSize: 10)),
                 ],
               ),
             ],
@@ -378,7 +433,10 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
               const Spacer(),
               Text(
                 'Server: ${collection.serverName}',
-                style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                style: TextStyle(
+                    color:
+                        context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+                    fontSize: 10),
               ),
             ],
           ),
@@ -386,7 +444,13 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: collection.mediaTypes.take(3).map((type) => GlassBadge(text: type.split('/').last, color: Colors.grey, fontSize: 9)).toList(),
+            children: collection.mediaTypes
+                .take(3)
+                .map((type) => GlassBadge(
+                    text: type.split('/').last,
+                    color: context.colors.onSurfaceVariant,
+                    fontSize: 9))
+                .toList(),
           ),
         ],
       ),
@@ -400,7 +464,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Object type stats
         SizedBox(
@@ -412,13 +476,21 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 width: 100,
                 margin: const EdgeInsets.only(right: 12),
                 child: GlassCard(
+                  margin: EdgeInsets.zero,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       DuotoneIcon(_getStixTypeIcon(entry.key), color: _getStixTypeColor(entry.key), size: 24),
                       const SizedBox(height: 4),
-                      Text('${entry.value.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      Text(entry.key.replaceAll('-', ' '), style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 9), textAlign: TextAlign.center),
+                      Text('${entry.value.length}',
+                          style: TextStyle(
+                              color: context.colors.onSurface,
+                              fontWeight: FontWeight.bold)),
+                      Text(entry.key.replaceAll('-', ' '),
+                          style: TextStyle(
+                              color: context.colors.onSurfaceVariant,
+                              fontSize: 9),
+                          textAlign: TextAlign.center),
                     ],
                   ),
                 ),
@@ -452,19 +524,29 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(obj.name ?? obj.id, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(obj.name ?? obj.id,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold)),
                 Row(
                   children: [
                     GlassBadge(text: obj.type, color: _getStixTypeColor(obj.type), fontSize: 10),
                     const SizedBox(width: 8),
-                    Text('v${obj.specVersion}', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                    Text('v${obj.specVersion}',
+                        style: TextStyle(
+                            color: context.colors.onSurfaceVariant
+                                .withValues(alpha: 0.7),
+                            fontSize: 10)),
                   ],
                 ),
                 if (obj.description != null) ...[
                   const SizedBox(height: 4),
                   Text(
                     obj.description!,
-                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    style: TextStyle(
+                        color: context.colors.onSurfaceVariant, fontSize: 11),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -472,7 +554,11 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
               ],
             ),
           ),
-          Text(_formatTime(obj.created), style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+          Text(_formatTime(obj.created),
+              style: TextStyle(
+                  color:
+                      context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+                  fontSize: 10)),
         ],
       ),
     );
@@ -486,9 +572,15 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           children: [
             DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: TextStyle(
+                    color: context.colors.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153)), textAlign: TextAlign.center),
+            Text(subtitle,
+                style: TextStyle(color: context.colors.onSurfaceVariant),
+                textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -496,6 +588,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
   }
 
   void _showServerDetails(BuildContext context, TaxiiServer server) {
+    final cs = context.colors;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -505,13 +598,10 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -525,7 +615,13 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(server.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(server.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: cs.onSurface,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold)),
                         GlassBadge(text: 'TAXII ${server.version}', color: GlassTheme.primaryAccent),
                       ],
                     ),
@@ -533,7 +629,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              Text(server.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(server.description, style: TextStyle(color: cs.onSurface)),
               const SizedBox(height: 20),
               GlassContainer(
                 padding: const EdgeInsets.all(16),
@@ -554,19 +650,16 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
   }
 
   void _showObjectDetails(BuildContext context, StixObject obj) {
+    final cs = context.colors;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-          ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -580,7 +673,13 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(obj.name ?? 'STIX Object', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(obj.name ?? 'STIX Object',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: cs.onSurface,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
                       GlassBadge(text: obj.type, color: _getStixTypeColor(obj.type)),
                     ],
                   ),
@@ -589,14 +688,17 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             ),
             const SizedBox(height: 16),
             if (obj.description != null) ...[
-              Text(obj.description!, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(obj.description!, style: TextStyle(color: cs.onSurface)),
               const SizedBox(height: 16),
             ],
             GlassContainer(
               padding: const EdgeInsets.all(12),
               child: SelectableText(
                 'ID: ${obj.id}',
-                style: const TextStyle(color: Colors.white70, fontFamily: 'monospace', fontSize: 11),
+                style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                    fontSize: 11),
               ),
             ),
             const SizedBox(height: 16),
@@ -622,9 +724,14 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label,
+              style: TextStyle(color: context.colors.onSurfaceVariant)),
           Flexible(
-            child: Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+            child: Text(value,
+                style: TextStyle(
+                    color: context.colors.onSurface,
+                    fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis),
           ),
         ],
       ),

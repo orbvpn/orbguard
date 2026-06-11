@@ -25,6 +25,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -145,7 +146,6 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 : 'Analysis complete — ${_anomalies.length} '
                     'anomal${_anomalies.length == 1 ? 'y' : 'ies'} detected',
           ),
-          backgroundColor: GlassTheme.gradientTop,
         ),
       );
     } on MlModelsNotTrainedError catch (e) {
@@ -170,6 +170,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoading) {
       return GlassPage(
         title: 'ML Analysis',
@@ -196,12 +197,12 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 ),
               )
             : IconButton(
-                icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
+                icon: DuotoneIcon(AppIcons.play, size: 22, color: cs.onSurface),
                 onPressed: _runAnalysis,
                 tooltip: 'Run Analysis',
               ),
         IconButton(
-          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+          icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
           onPressed: _isLoading ? null : _loadData,
           tooltip: 'Refresh',
         ),
@@ -210,37 +211,37 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         GlassTab(
           label: 'Models',
           iconPath: 'settings',
-          content: _buildModelsTab(),
+          content: _buildModelsTab(context),
         ),
         GlassTab(
           label: 'Anomalies',
           iconPath: 'danger_triangle',
-          content: _buildAnomaliesTab(),
+          content: _buildAnomaliesTab(context),
         ),
         GlassTab(
           label: 'Insights',
           iconPath: 'chart',
-          content: _buildInsightsTab(),
+          content: _buildInsightsTab(context),
         ),
       ],
     );
   }
 
-  Widget _buildModelsTab() {
+  Widget _buildModelsTab(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         if (_error != null) ...[
-          _buildErrorCard(_error!),
-          const SizedBox(height: 16),
+          _buildErrorCard(context, _error!),
+          const SizedBox(height: 24),
         ],
 
         // Stats
         Row(
           children: [
-            _buildStatCard('Models', _models.length.toString(), GlassTheme.primaryAccent),
+            _buildStatCard(context, 'Models', _models.length.toString(), GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Trained', _models.where((m) => m.isReady).length.toString(), GlassTheme.successColor),
+            _buildStatCard(context, 'Trained', _models.where((m) => m.isReady).length.toString(), GlassTheme.successColor),
           ],
         ),
         const SizedBox(height: 24),
@@ -248,28 +249,31 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         const GlassSectionHeader(title: 'Detection Models'),
         if (_models.isEmpty && _error == null)
           _buildEmptyState(
+            context,
             icon: AppIcons.mlAnalysis,
             title: 'No Models Reported',
             subtitle: 'The server did not return any ML models',
           )
         else
-          ..._models.map((model) => _buildModelCard(model)),
+          ..._models.map((model) => _buildModelCard(context, model)),
       ],
     );
   }
 
-  Widget _buildErrorCard(String message) {
+  Widget _buildErrorCard(BuildContext context, String message) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: GlassTheme.errorColor,
       child: Row(
         children: [
           const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(message, style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 12)),
+            child: Text(message, style: TextStyle(color: cs.onSurface, fontSize: 12)),
           ),
           IconButton(
-            icon: const DuotoneIcon('refresh', color: Colors.white, size: 20),
+            icon: DuotoneIcon('refresh', color: cs.onSurface, size: 20),
             onPressed: _loadData,
             tooltip: 'Retry',
           ),
@@ -278,7 +282,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(BuildContext context, String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassContainer(
         padding: const EdgeInsets.all(16),
@@ -286,17 +291,18 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildModelCard(MLModel model) {
+  Widget _buildModelCard(BuildContext context, MLModel model) {
+    final cs = Theme.of(context).colorScheme;
     final accuracy = model.accuracy;
     final accuracyColor = accuracy == null
-        ? Colors.white54
+        ? cs.onSurfaceVariant
         : accuracy >= 0.9
             ? GlassTheme.successColor
             : accuracy >= 0.7
@@ -311,17 +317,17 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             children: [
               GlassSvgIconBox(
                 icon: _getModelIcon(model.type),
-                color: model.isReady ? GlassTheme.primaryAccent : Colors.grey,
+                color: model.isReady ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text(model.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
                     Text(
                       model.version.isEmpty ? model.type : '${model.type} • v${model.version}', maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                     ),
                   ],
                 ),
@@ -349,14 +355,15 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           Row(
             children: [
               _buildModelMetric(
+                context,
                 'Accuracy',
                 accuracy != null ? '${(accuracy * 100).toInt()}%' : 'n/a',
                 accuracyColor,
               ),
               const SizedBox(width: 16),
-              _buildModelMetric('Training Size', model.trainingSize.toString(), Colors.white54),
+              _buildModelMetric(context, 'Training Size', model.trainingSize.toString(), cs.onSurfaceVariant),
               const SizedBox(width: 16),
-              _buildModelMetric('Features', model.featureNames.length.toString(), Colors.white54),
+              _buildModelMetric(context, 'Features', model.featureNames.length.toString(), cs.onSurfaceVariant),
             ],
           ),
           const SizedBox(height: 8),
@@ -364,33 +371,35 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             model.trainedAt != null
                 ? 'Last trained ${_formatTime(model.trainedAt!)}'
                 : 'Never trained',
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildModelMetric(String label, String value, Color color) {
+  Widget _buildModelMetric(BuildContext context, String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+        Text(label, style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
       ],
     );
   }
 
-  Widget _buildAnomaliesTab() {
+  Widget _buildAnomaliesTab(BuildContext context) {
     if (_modelsNotTrained) {
       return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [_buildModelsNotTrainedCard()],
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [_buildModelsNotTrainedCard(context)],
       );
     }
 
     if (_anomalies.isEmpty) {
       return _buildEmptyState(
+        context,
         icon: AppIcons.mlAnalysis,
         title: 'No Anomalies Detected',
         subtitle: 'The anomaly model scored recent indicators and found '
@@ -399,9 +408,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        ..._anomalies.map((anomaly) => _buildAnomalyCard(anomaly)),
+        ..._anomalies.map((anomaly) => _buildAnomalyCard(context, anomaly)),
       ],
     );
   }
@@ -409,7 +418,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
   /// Informative card for the 409 models_not_trained state: anomaly
   /// detection exists but its model has not been trained yet on this
   /// deployment, so there is honestly nothing to score with.
-  Widget _buildModelsNotTrainedCard() {
+  Widget _buildModelsNotTrainedCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       tintColor: GlassTheme.warningColor,
       child: Column(
@@ -422,13 +432,13 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 color: GlassTheme.warningColor,
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Anomaly Model Not Trained',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -441,14 +451,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             _modelsNotTrainedMessage ??
                 'The server-side anomaly detection model has not been '
                     'trained yet.',
-            style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 13),
+            style: TextStyle(color: cs.onSurface, fontSize: 13),
           ),
           const SizedBox(height: 8),
           Text(
             'Anomaly detection becomes available once the backend trains the '
             'isolation forest on collected indicators. No fabricated results '
             'are shown in the meantime.',
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const SizedBox(height: 12),
           Align(
@@ -468,7 +478,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildAnomalyCard(AnomalyDetection anomaly) {
+  Widget _buildAnomalyCard(BuildContext context, AnomalyDetection anomaly) {
+    final cs = Theme.of(context).colorScheme;
     final severityColor = _getSeverityColor(anomaly.severity);
 
     return GlassCard(
@@ -485,8 +496,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(anomaly.model, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
+                    Text(anomaly.model, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
                   ],
                 ),
               ),
@@ -494,11 +505,12 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(anomaly.description, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
+          Text(anomaly.description, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
           const SizedBox(height: 12),
           Row(
             children: [
               _buildAnomalyStat(
+                context,
                 AppIcons.graphUp,
                 anomaly.anomalyScore != null
                     ? 'Score: ${(anomaly.anomalyScore! * 100).toInt()}%'
@@ -506,6 +518,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
               ),
               const SizedBox(width: 16),
               _buildAnomalyStat(
+                context,
                 AppIcons.clock,
                 anomaly.detectedAt != null ? _formatTime(anomaly.detectedAt!) : 'Time unknown',
               ),
@@ -516,28 +529,31 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildAnomalyStat(String icon, String text) {
+  Widget _buildAnomalyStat(BuildContext context, String icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
 
-  Widget _buildInsightsTab() {
+  Widget _buildInsightsTab(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('AI Insights', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('AI Insights', style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
           if (_insights.isEmpty)
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Center(
@@ -545,13 +561,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                     'No insights yet — insights are derived from collected '
                     'indicators and model state, and the store is empty',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withAlpha(153)),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ),
               ),
             )
           else
             ..._insights.map((insight) => _buildInsightCard(
+              context,
               icon: insight.icon,
               title: insight.title,
               insight: insight.description,
@@ -559,7 +576,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             )),
 
           const SizedBox(height: 24),
-          const Text('Model Performance', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('Model Performance', style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
           GlassCard(
@@ -570,11 +587,11 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Text(
                           'No model data available',
-                          style: TextStyle(color: Colors.white.withAlpha(153)),
+                          style: TextStyle(color: cs.onSurfaceVariant),
                         ),
                       ),
                     ]
-                  : _models.map((model) => _buildPerformanceBar(model.name, model.accuracy)).toList(),
+                  : _models.map((model) => _buildPerformanceBar(context, model.name, model.accuracy)).toList(),
             ),
           ),
         ],
@@ -582,12 +599,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildInsightCard({
+  Widget _buildInsightCard(
+    BuildContext context, {
     required String icon,
     required String title,
     required String insight,
     required Color color,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,9 +617,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(insight, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
+                Text(insight, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
               ],
             ),
           ),
@@ -609,7 +628,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildPerformanceBar(String label, double? value) {
+  Widget _buildPerformanceBar(BuildContext context, String label, double? value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -618,11 +638,13 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
+              Expanded(
+                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+              ),
               Text(
                 value != null ? '${(value * 100).toInt()}%' : 'n/a',
                 style: TextStyle(
-                  color: value != null ? GlassTheme.primaryAccent : Colors.white54,
+                  color: value != null ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -633,7 +655,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
               value: value ?? 0,
-              backgroundColor: Colors.white12,
+              backgroundColor: cs.onSurface.withValues(alpha: 0.06),
               valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
               minHeight: 6,
             ),
@@ -643,22 +665,24 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     );
   }
 
-  Widget _buildEmptyState({
+  Widget _buildEmptyState(
+    BuildContext context, {
     required String icon,
     required String title,
     required String subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
@@ -678,13 +702,10 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.3,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -698,7 +719,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(anomaly.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
                         GlassBadge(text: anomaly.severity.toUpperCase(), color: severityColor),
                       ],
                     ),
@@ -706,7 +727,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(anomaly.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(anomaly.description, style: TextStyle(color: context.onSurfaceMuted)),
               const SizedBox(height: 20),
               GlassContainer(
                 padding: const EdgeInsets.all(16),
@@ -751,8 +772,10 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: context.onSurfaceMuted)),
+          Text(value,
+              style: TextStyle(
+                  color: context.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );

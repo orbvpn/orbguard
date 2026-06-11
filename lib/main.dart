@@ -50,6 +50,7 @@ import 'intelligence/cloud_threat_intelligence.dart';
 
 // Glass Theme & Colors
 import 'presentation/theme/glass_theme.dart';
+import 'presentation/theme/app_theme.dart';
 import 'presentation/theme/colors.dart';
 import 'presentation/widgets/glass_container.dart';
 import 'presentation/widgets/duotone_icon.dart';
@@ -164,38 +165,22 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(
             lazy: false, create: (_) => DeviceSecurityProvider()..init()),
       ],
-      child: MaterialApp(
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, _) => MaterialApp(
         title: 'OrbGuard',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: Colors.transparent,
-          primaryColor: AppColors.primary,
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.accent,
-            secondary: AppColors.secondary,
-            error: AppColors.error,
-            surface: AppColors.surfaceDark,
-          ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            systemOverlayStyle: SystemUiOverlayStyle.light,
-          ),
-          cardTheme: CardThemeData(
-            color: GlassTheme.glassColorDark,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
-            ),
-          ),
-        ),
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: settings.themeMode,
         builder: (context, child) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
           return GlassGradientBackground(
-            isDark: true,
+            isDark: isDark,
             child: AppLockGate(child: child ?? const SizedBox.shrink()),
           );
         },
         home: const HomeScreen(),
+      ),
       ),
     );
   }
@@ -367,7 +352,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -402,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 24),
@@ -484,26 +468,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
-    final iconColor = isDark ? Colors.white.withAlpha(150) : Colors.black.withAlpha(100);
+    final textColor = cs.onSurface;
+    final iconColor = cs.onSurfaceVariant;
 
     return Scaffold(
       backgroundColor: backgroundColor,
       drawer: _buildNavigationDrawer(),
       body: Stack(
         children: [
-          // Main content
+          // Main content (constrained on wide screens, centered)
           SafeArea(
-            child: Column(
-              children: [
-                // OrbX-style header
-                _buildOrbXHeader(isDark, textColor, iconColor),
-                // Body content
-                Expanded(
-                  child: _buildCurrentScreen(),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
+                child: Column(
+                  children: [
+                    // OrbX-style header
+                    _buildOrbXHeader(isDark, textColor, iconColor),
+                    // Body content — viewport ends above the floating nav
+                    Expanded(
+                      child: _buildCurrentScreen(),
+                    ),
+                    const SizedBox(height: GlassTheme.bottomNavClearance),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           // Bottom navigation bar
@@ -511,19 +504,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             bottom: 0,
             left: 0,
             right: 0,
-            child: GlassBottomNavBar(
-              currentIndex: _currentNavIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentNavIndex = index;
-                });
-              },
-              items: const [
-                NavItem(label: 'Home', iconPath: AppIcons.home),
-                NavItem(label: 'Scan', iconPath: AppIcons.search),
-                NavItem(label: 'Intel', iconPath: AppIcons.structure),
-                NavItem(label: 'Settings', iconPath: AppIcons.settings),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
+                child: GlassBottomNavBar(
+                  currentIndex: _currentNavIndex,
+                  onTap: (index) {
+                    setState(() {
+                      _currentNavIndex = index;
+                    });
+                  },
+                  items: const [
+                    NavItem(label: 'Home', iconPath: AppIcons.home),
+                    NavItem(label: 'Scan', iconPath: AppIcons.search),
+                    NavItem(label: 'Intel', iconPath: AppIcons.structure),
+                    NavItem(label: 'Settings', iconPath: AppIcons.settings),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -678,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withAlpha(200),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -686,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             'Detection capability: ${_detectionCapability.round()}%',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withAlpha(120),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -696,104 +695,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Intel tab content - show Intelligence Core
   Widget _buildIntelContent() {
-    // On desktop platforms, show the IntelligenceCoreScreen directly (embedded mode)
-    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-      return const IntelligenceCoreScreen(embedded: true);
-    }
-
-    // On mobile, show the button UI
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          GlassCircleButton(
-            size: 100,
-            tintColor: AppColors.accent,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (context) => const IntelligenceCoreScreen(),
-              ));
-            },
-            child: const DuotoneIcon(
-              AppIcons.structure,
-              size: 48,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Threat Intelligence',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withAlpha(200),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tap to browse IOCs & threat data',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withAlpha(120),
-            ),
-          ),
-        ],
-      ),
-    );
+    // A tab should show its content, not a launcher button — embed the
+    // Intelligence Core on every platform.
+    return const IntelligenceCoreScreen(embedded: true);
   }
 
   /// Settings tab content - show Settings
   Widget _buildSettingsContent() {
-    // On desktop platforms, show the SettingsScreen directly (embedded mode)
-    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-      return const SettingsScreen(embedded: true);
-    }
-
-    // On mobile, show the button UI
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          GlassCircleButton(
-            size: 100,
-            tintColor: AppColors.accent,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (context) => const SettingsScreen(),
-              ));
-            },
-            child: const DuotoneIcon(
-              AppIcons.settings,
-              size: 48,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Settings',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withAlpha(200),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Configure app preferences',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withAlpha(120),
-            ),
-          ),
-        ],
-      ),
-    );
+    // A tab should show its content, not a launcher button — embed the
+    // Settings screen on every platform.
+    return const SettingsScreen(embedded: true);
   }
 
   Widget _buildNavigationDrawer() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
-    final secondaryColor = isDark ? Colors.white.withAlpha(150) : AppColors.textSecondary;
+    final cs = Theme.of(context).colorScheme;
+    final textColor = cs.onSurface;
+    final secondaryColor = cs.onSurfaceVariant;
 
     return Drawer(
       backgroundColor: Colors.transparent,
@@ -1258,13 +1176,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildDrawerSection(String title) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: isDark ? Colors.white.withAlpha(100) : Colors.black.withAlpha(80),
+          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.5,
@@ -1280,8 +1197,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required VoidCallback onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
-    final secondaryColor = isDark ? Colors.white.withAlpha(130) : AppColors.textSecondary;
+    final cs = Theme.of(context).colorScheme;
+    final textColor = cs.onSurface;
+    final secondaryColor = cs.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),

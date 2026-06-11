@@ -28,8 +28,9 @@ class AppSecurityScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 PopupMenuButton<AppSortOption>(
-                  icon: const DuotoneIcon('sort_vertical', size: 24, color: Colors.white),
-                  color: GlassTheme.gradientTop,
+                  icon: DuotoneIcon('sort_vertical',
+                      size: 24,
+                      color: Theme.of(context).colorScheme.onSurface),
                   onSelected: (option) {
                     context.read<AppSecurityProvider>().setSortOption(option);
                   },
@@ -112,13 +113,14 @@ class _AppsTab extends StatelessWidget {
                   onSelected: (selected) {
                     provider.setFilterOption(option);
                   },
-                  backgroundColor: const Color(0xFF2A2B40),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                   selectedColor: const Color(0xFF00D9FF).withAlpha(40),
                   checkmarkColor: const Color(0xFF00D9FF),
                   labelStyle: TextStyle(
                     color: isSelected
                         ? const Color(0xFF00D9FF)
-                        : Colors.white70,
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -132,9 +134,9 @@ class _AppsTab extends StatelessWidget {
           child: provider.isLoading
               ? const Center(child: CircularProgressIndicator())
               : provider.apps.isEmpty
-                  ? _buildEmptyState()
+                  ? _buildEmptyState(context)
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: provider.apps.length,
                       itemBuilder: (context, index) {
                         final app = provider.apps[index];
@@ -157,7 +159,8 @@ class _AppsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -165,13 +168,13 @@ class _AppsTab extends StatelessWidget {
           DuotoneIcon(
             'smartphone',
             size: 64,
-            color: Colors.white.withAlpha(31),
+            color: cs.onSurface.withValues(alpha: 0.12),
           ),
           const SizedBox(height: 16),
           Text(
             'No apps found',
             style: TextStyle(
-              color: Colors.white.withAlpha(128),
+              color: cs.onSurfaceVariant,
               fontSize: 16,
             ),
           ),
@@ -179,7 +182,7 @@ class _AppsTab extends StatelessWidget {
           Text(
             'Pull down to refresh',
             style: TextStyle(
-              color: Colors.white.withAlpha(77),
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
               fontSize: 14,
             ),
           ),
@@ -195,7 +198,6 @@ class _AppsTab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -206,7 +208,7 @@ class _AppsTab extends StatelessWidget {
         expand: false,
         builder: (context, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -217,7 +219,7 @@ class _AppsTab extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: Theme.of(context).colorScheme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -229,7 +231,8 @@ class _AppsTab extends StatelessWidget {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2A2B40),
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
@@ -237,8 +240,8 @@ class _AppsTab extends StatelessWidget {
                         app.app.appName.isNotEmpty
                             ? app.app.appName[0].toUpperCase()
                             : '?',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
@@ -254,8 +257,8 @@ class _AppsTab extends StatelessWidget {
                           app.app.appName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -263,7 +266,8 @@ class _AppsTab extends StatelessWidget {
                         Text(
                           'v${app.app.version}',
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -342,10 +346,10 @@ class _AppsTab extends StatelessWidget {
                 const SizedBox(height: 24),
                 // Warnings
                 if (app.result!.warnings.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     'Warnings',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -379,10 +383,10 @@ class _AppsTab extends StatelessWidget {
                 ],
                 // Permissions
                 if (app.result!.permissionRisks.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     'Permissions',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -399,8 +403,8 @@ class _AppsTab extends StatelessWidget {
                 if (app.result!.detectedTrackers.isNotEmpty) ...[
                   Text(
                     'Trackers (${app.result!.detectedTrackers.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -446,13 +450,16 @@ class _AppsTab extends StatelessWidget {
                       DuotoneIcon(
                         'magnifer',
                         size: 48,
-                        color: Colors.grey.withAlpha(128),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'App not analyzed yet',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 16,
                         ),
                       ),
@@ -493,13 +500,14 @@ class _RisksTab extends StatelessWidget {
     final appsWithTrackers = provider.appsWithTrackers;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // High risk apps
           if (highRiskApps.isNotEmpty) ...[
             _buildSectionHeader(
+              context,
               'High Risk Apps',
               'danger_triangle',
               Colors.red,
@@ -528,11 +536,15 @@ class _RisksTab extends StatelessWidget {
                 children: [
                   DuotoneIcon('check_circle', size: 24, color: Colors.green.withAlpha(178)),
                   const SizedBox(width: 12),
-                  const Text(
-                    'No high risk apps detected',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.w500,
+                  const Expanded(
+                    child: Text(
+                      'No high risk apps detected',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
@@ -543,6 +555,7 @@ class _RisksTab extends StatelessWidget {
           // Sideloaded apps
           if (sideloadedApps.isNotEmpty) ...[
             _buildSectionHeader(
+              context,
               'Sideloaded Apps',
               'download_minimalistic',
               Colors.orange,
@@ -587,6 +600,7 @@ class _RisksTab extends StatelessWidget {
           // Apps with trackers
           if (appsWithTrackers.isNotEmpty) ...[
             _buildSectionHeader(
+              context,
               'Apps with Trackers',
               'eye',
               Colors.purple,
@@ -609,21 +623,25 @@ class _RisksTab extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(
-      String title, String svgIcon, Color color, int count) {
+  Widget _buildSectionHeader(BuildContext context, String title, String svgIcon,
+      Color color, int count) {
     return Row(
       children: [
         DuotoneIcon(svgIcon, color: color, size: 20),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
@@ -650,7 +668,6 @@ class _RisksTab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -661,7 +678,7 @@ class _RisksTab extends StatelessWidget {
         expand: false,
         builder: (context, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -672,7 +689,7 @@ class _RisksTab extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: Theme.of(context).colorScheme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -684,7 +701,8 @@ class _RisksTab extends StatelessWidget {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2A2B40),
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
@@ -692,8 +710,8 @@ class _RisksTab extends StatelessWidget {
                         app.app.appName.isNotEmpty
                             ? app.app.appName[0].toUpperCase()
                             : '?',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
@@ -709,8 +727,8 @@ class _RisksTab extends StatelessWidget {
                           app.app.appName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -718,7 +736,8 @@ class _RisksTab extends StatelessWidget {
                         Text(
                           'v${app.app.version}',
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -797,10 +816,10 @@ class _RisksTab extends StatelessWidget {
                 const SizedBox(height: 24),
                 // Warnings
                 if (app.result!.warnings.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     'Warnings',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -834,10 +853,10 @@ class _RisksTab extends StatelessWidget {
                 ],
                 // Permissions
                 if (app.result!.permissionRisks.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     'Permissions',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -854,8 +873,8 @@ class _RisksTab extends StatelessWidget {
                 if (app.result!.detectedTrackers.isNotEmpty) ...[
                   Text(
                     'Trackers (${app.result!.detectedTrackers.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -901,13 +920,16 @@ class _RisksTab extends StatelessWidget {
                       DuotoneIcon(
                         'magnifer',
                         size: 48,
-                        color: Colors.grey.withAlpha(128),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'App not analyzed yet',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 16,
                         ),
                       ),
@@ -944,26 +966,27 @@ class _StatsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         children: [
           AppSecurityStatsCard(stats: provider.stats),
           const SizedBox(height: 24),
           // Privacy grade distribution
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Privacy Grade Distribution',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildGradeBar(provider),
+                _buildGradeBar(context, provider),
               ],
             ),
           ),
@@ -973,16 +996,16 @@ class _StatsTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Risk Breakdown',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildRiskBreakdown(provider.stats),
+                _buildRiskBreakdown(context, provider.stats),
               ],
             ),
           ),
@@ -991,12 +1014,13 @@ class _StatsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildGradeBar(AppSecurityProvider provider) {
+  Widget _buildGradeBar(BuildContext context, AppSecurityProvider provider) {
     final apps = provider.allApps.where((a) => a.result != null).toList();
     if (apps.isEmpty) {
       return Text(
         'Scan apps to see grade distribution',
-        style: TextStyle(color: Colors.grey[500]),
+        style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant),
       );
     }
 
@@ -1038,7 +1062,7 @@ class _StatsTab extends StatelessWidget {
               Text(
                 count.toString(),
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -1049,27 +1073,30 @@ class _StatsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildRiskBreakdown(AppSecurityStats stats) {
+  Widget _buildRiskBreakdown(BuildContext context, AppSecurityStats stats) {
     final total = stats.highRiskApps + stats.mediumRiskApps + stats.lowRiskApps;
     if (total == 0) {
       return Text(
         'Scan apps to see risk breakdown',
-        style: TextStyle(color: Colors.grey[500]),
+        style:
+            TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       );
     }
 
     return Column(
       children: [
-        _buildRiskRow('High Risk', stats.highRiskApps, total, Colors.red),
+        _buildRiskRow(context, 'High Risk', stats.highRiskApps, total, Colors.red),
         const SizedBox(height: 12),
-        _buildRiskRow('Medium Risk', stats.mediumRiskApps, total, Colors.orange),
+        _buildRiskRow(
+            context, 'Medium Risk', stats.mediumRiskApps, total, Colors.orange),
         const SizedBox(height: 12),
-        _buildRiskRow('Low Risk', stats.lowRiskApps, total, Colors.green),
+        _buildRiskRow(context, 'Low Risk', stats.lowRiskApps, total, Colors.green),
       ],
     );
   }
 
-  Widget _buildRiskRow(String label, int count, int total, Color color) {
+  Widget _buildRiskRow(
+      BuildContext context, String label, int count, int total, Color color) {
     final percentage = total > 0 ? count / total : 0.0;
 
     return Row(
@@ -1079,7 +1106,7 @@ class _StatsTab extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -1090,7 +1117,10 @@ class _StatsTab extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: percentage,
-              backgroundColor: Colors.white10,
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.04),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),

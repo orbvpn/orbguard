@@ -83,7 +83,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: const DuotoneIcon('trash_bin_minimalistic', size: 22, color: Colors.white),
+                        icon: DuotoneIcon('trash_bin_minimalistic', size: 22, color: Theme.of(context).colorScheme.onSurface),
                         onPressed: () => _confirmClearHistory(context, provider),
                         tooltip: 'Clear History',
                       ),
@@ -97,8 +97,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildAnalyzeTab(ScamDetectionProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -113,9 +114,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           const SizedBox(height: 24),
 
           // Content type selector
-          const Text(
+          Text(
             'Select Content Type',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(
@@ -137,10 +138,13 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                         });
                       }
                     },
-                    backgroundColor: GlassTheme.glassColorDark,
+                    backgroundColor: GlassTheme.glassColor(
+                        Theme.of(context).brightness == Brightness.dark),
                     selectedColor: GlassTheme.primaryAccent.withValues(alpha: 0.3),
                     labelStyle: TextStyle(
-                      color: isSelected ? GlassTheme.primaryAccent : Colors.white70,
+                      color: isSelected
+                          ? GlassTheme.primaryAccent
+                          : cs.onSurfaceVariant,
                     ),
                   ),
                 );
@@ -181,7 +185,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
 
           // Analysis errors — surfaced, never swallowed.
           if (provider.error != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             _buildErrorCard(provider),
           ],
 
@@ -196,7 +200,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildErrorCard(ScamDetectionProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: GlassTheme.errorColor,
       child: Row(
         children: [
@@ -208,11 +214,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               provider.error!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: TextStyle(color: cs.onSurface, fontSize: 13),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: Colors.white54),
+            icon: Icon(Icons.close, size: 18, color: cs.onSurfaceVariant),
             onPressed: provider.clearError,
           ),
         ],
@@ -231,7 +237,10 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
+            Text(label,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12)),
           ],
         ),
       ),
@@ -239,6 +248,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildInputField(ScamDetectionProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     switch (_selectedType) {
       case ScamContentType.text:
         return GlassContainer(
@@ -246,10 +256,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           child: TextField(
             controller: _textController,
             maxLines: 5,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Paste suspicious message or text...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(12),
             ),
@@ -260,13 +271,14 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           padding: const EdgeInsets.all(4),
           child: TextField(
             controller: _urlController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Enter URL to check...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-              prefixIcon: const Padding(
-                padding: EdgeInsets.all(12),
-                child: DuotoneIcon('link', color: Colors.white54, size: 24),
+              hintStyle: TextStyle(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DuotoneIcon('link', color: cs.onSurfaceVariant, size: 24),
               ),
               border: InputBorder.none,
             ),
@@ -278,13 +290,15 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           child: TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Enter phone number...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-              prefixIcon: const Padding(
-                padding: EdgeInsets.all(12),
-                child: DuotoneIcon('smartphone', color: Colors.white54, size: 24),
+              hintStyle: TextStyle(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DuotoneIcon('smartphone',
+                    color: cs.onSurfaceVariant, size: 24),
               ),
               border: InputBorder.none,
             ),
@@ -300,6 +314,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   /// base64 in the `content` field (the backend ScamAnalysisRequest documents
   /// `content` as "text content or base64 for images").
   Widget _buildMediaPickerField() {
+    final cs = Theme.of(context).colorScheme;
     final isImage = _selectedType == ScamContentType.image;
     final file = _pickedMediaFile;
 
@@ -312,7 +327,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             children: [
               DuotoneIcon(
                 isImage ? 'gallery' : 'microphone',
-                color: Colors.white54,
+                color: cs.onSurfaceVariant,
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -322,11 +337,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                         isImage
                             ? 'Select a screenshot or image to analyze'
                             : 'Select a voice message or audio file to analyze',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+                        style: TextStyle(color: cs.onSurfaceVariant),
                       )
                     : Text(
                         '${file.name} (${_formatBytes(file.size)})',
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: cs.onSurface),
                         overflow: TextOverflow.ellipsis,
                       ),
               ),
@@ -445,9 +460,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildResultCard(ScamAnalysisResult result) {
+    final cs = Theme.of(context).colorScheme;
     final riskColor = Color(result.riskColor);
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: riskColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,7 +491,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                     ),
                     Text(
                       '${(result.confidence * 100).toInt()}% confidence', maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                     ),
                   ],
                 ),
@@ -500,8 +517,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             Text(
               'The backend was unreachable — this verdict comes from the '
               'limited on-device heuristic, not the server AI.',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
             ),
           ],
           if (result.scamType != null) ...[
@@ -511,11 +527,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               blur: false,
               child: Row(
                 children: [
-                  const DuotoneIcon('tag', size: 18, color: Colors.white54),
+                  DuotoneIcon('tag', size: 18, color: cs.onSurfaceVariant),
                   const SizedBox(width: 8),
                   Text(
                     'Type: ${result.scamType!.displayName}',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -523,9 +539,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           ],
           if (result.indicators.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Indicators Found',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             ...result.indicators.take(5).map((indicator) => Padding(
@@ -539,7 +555,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                           indicator,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                         ),
                       ),
                     ],
@@ -548,9 +564,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           ],
           if (result.recommendations.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Recommendations',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             ...result.recommendations.map((rec) => Padding(
@@ -565,7 +581,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                           rec,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                         ),
                       ),
                     ],
@@ -587,7 +603,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.analysisHistory.length,
       itemBuilder: (context, index) {
         final result = provider.analysisHistory[index];
@@ -597,6 +613,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildHistoryCard(ScamAnalysisResult result) {
+    final cs = Theme.of(context).colorScheme;
     final riskColor = Color(result.riskColor);
 
     return GlassCard(
@@ -614,11 +631,11 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               children: [
                 Text(
                   result.contentType.displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   _truncateContent(result.content),
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -640,7 +657,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               const SizedBox(height: 4),
               Text(
                 _formatTime(result.analyzedAt),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
+                style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                    fontSize: 10),
               ),
             ],
           ),
@@ -667,7 +686,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                 const SizedBox(height: 12),
                 Text(
                   provider.error!,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -688,7 +709,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.patterns.length,
       itemBuilder: (context, index) {
         final pattern = provider.patterns[index];
@@ -698,6 +719,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   Widget _buildPatternCard(ScamPattern pattern) {
+    final cs = Theme.of(context).colorScheme;
     final typeColor = _getScamTypeColor(pattern.type);
 
     return GlassCard(
@@ -714,7 +736,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                   children: [
                     Text(
                       pattern.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       pattern.type.displayName, maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -728,7 +750,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           const SizedBox(height: 12),
           Text(
             pattern.description,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
           if (pattern.keywords.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -739,12 +761,12 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: cs.onSurface.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     keyword,
-                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                   ),
                 );
               }).toList(),
@@ -760,6 +782,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     required String title,
     required String subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -768,12 +791,12 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+            style: TextStyle(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
@@ -782,6 +805,8 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   void _showResultDetails(BuildContext context, ScamAnalysisResult result) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -791,13 +816,10 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -805,16 +827,16 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             children: [
               _buildResultCard(result),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Original Content',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               GlassContainer(
                 padding: const EdgeInsets.all(12),
                 child: SelectableText(
                   result.content,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                  style: TextStyle(color: cs.onSurface, fontSize: 13),
                 ),
               ),
             ],
@@ -825,14 +847,15 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   }
 
   void _confirmClearHistory(BuildContext context, ScamDetectionProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Clear History', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        backgroundColor: cs.surface,
+        title: Text('Clear History', style: TextStyle(color: cs.onSurface)),
+        content: Text(
           'Are you sure you want to clear all analysis history?',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: cs.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -874,7 +897,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
       case ScamType.government:
         return const Color(0xFF3F51B5);
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 

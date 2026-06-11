@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../presentation/widgets/glass_app_bar.dart';
@@ -97,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _showConnectionSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -117,8 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? Colors.white.withAlpha(150) : Colors.black.withAlpha(100);
+    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return GlassPage(
       title: 'Dashboard',
@@ -143,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: const Color(0xFF00D9FF),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -158,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       isLoading: _dashboardProvider.isLoading,
                       onScanTap: _navigateToScan,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Threat Stats Card
                     ThreatStatsCard(
@@ -172,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Recent Alerts (no dedicated "all alerts" screen exists,
                     // so no view-all affordance is shown).
@@ -182,7 +180,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       onAlertTap: (alertId) =>
                           _dashboardProvider.markAlertAsRead(alertId),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Real-time Events
                     RealtimeEventsWidget(
@@ -190,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       isConnected: _dashboardProvider.isConnected,
                       onConnect: () => _dashboardProvider.connectRealtime(),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Device Health Card
                     DeviceHealthCard(
@@ -207,13 +205,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                             'Updated ${_dashboardProvider.timeSinceRefresh}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
                       ),
-
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),

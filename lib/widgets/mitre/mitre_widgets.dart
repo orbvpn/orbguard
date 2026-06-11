@@ -24,6 +24,7 @@ class TacticHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -31,12 +32,12 @@ class TacticHeader extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF00D9FF).withAlpha(51)
-              : const Color(0xFF1D1E33),
+              : cs.surfaceContainerHighest,
           border: Border(
             bottom: BorderSide(
               color: isSelected
                   ? const Color(0xFF00D9FF)
-                  : Colors.grey.withAlpha(77),
+                  : cs.outline,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -47,7 +48,7 @@ class TacticHeader extends StatelessWidget {
             Text(
               tactic.shortName,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF00D9FF) : Colors.white,
+                color: isSelected ? const Color(0xFF00D9FF) : cs.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -95,6 +96,7 @@ class TechniqueChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -105,7 +107,7 @@ class TechniqueChip extends StatelessWidget {
               ? Colors.red.withAlpha(51)
               : isSelected
                   ? const Color(0xFF00D9FF).withAlpha(51)
-                  : const Color(0xFF2A2D3E),
+                  : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
             color: isDetected
@@ -143,7 +145,7 @@ class TechniqueChip extends StatelessWidget {
               child: Text(
                 technique.name,
                 style: TextStyle(
-                  color: isDetected ? Colors.red[100] : Colors.white70,
+                  color: isDetected ? Colors.red[100] : cs.onSurfaceVariant,
                   fontSize: 10,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -175,6 +177,7 @@ class TacticColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 160,
       margin: const EdgeInsets.only(right: 8),
@@ -185,7 +188,7 @@ class TacticColumn extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF1D1E33),
+              color: cs.surfaceContainerHighest,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
               border: Border.all(color: const Color(0xFF00D9FF).withAlpha(77)),
             ),
@@ -206,7 +209,7 @@ class TacticColumn extends StatelessWidget {
                 Text(
                   tactic.id,
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 9,
                   ),
                 ),
@@ -217,10 +220,10 @@ class TacticColumn extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0E21).withAlpha(128),
+                color: cs.surface.withValues(alpha: 0.5),
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
                 border: Border.all(
-                  color: const Color(0xFF1D1E33),
+                  color: cs.outline,
                 ),
               ),
               child: ListView.builder(
@@ -262,10 +265,11 @@ class TechniqueDetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: detection != null
             ? Border.all(color: Colors.red.withAlpha(128))
@@ -297,8 +301,8 @@ class TechniqueDetailCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   technique.name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: cs.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -308,7 +312,7 @@ class TechniqueDetailCard extends StatelessWidget {
               ),
               if (onClose != null)
                 IconButton(
-                  icon: const DuotoneIcon(AppIcons.closeCircle, color: Colors.white54, size: 20),
+                  icon: DuotoneIcon(AppIcons.closeCircle, color: cs.onSurfaceVariant, size: 20),
                   onPressed: onClose,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -362,8 +366,8 @@ class TechniqueDetailCard extends StatelessWidget {
           // Description
           Text(
             technique.description,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -372,10 +376,10 @@ class TechniqueDetailCard extends StatelessWidget {
           // Platforms
           Row(
             children: [
-              const Text(
+              Text(
                 'Platforms: ',
                 style: TextStyle(
-                  color: Colors.white54,
+                  color: cs.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
@@ -391,7 +395,7 @@ class TechniqueDetailCard extends StatelessWidget {
                     child: Text(
                       p,
                       style: TextStyle(
-                        color: p == 'Android' ? Colors.green : Colors.grey,
+                        color: p == 'Android' ? Colors.green : cs.onSurfaceVariant,
                         fontSize: 10,
                       ),
                     ),
@@ -404,8 +408,8 @@ class TechniqueDetailCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               'Mitigations: ${technique.mitigations!.join(", ")}',
-              style: const TextStyle(
-                color: Colors.white54,
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
                 fontSize: 11,
               ),
             ),
@@ -417,24 +421,24 @@ class TechniqueDetailCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0E21),
+                color: cs.onSurface.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Evidence:',
                     style: TextStyle(
-                      color: Colors.white54,
+                      color: cs.onSurfaceVariant,
                       fontSize: 10,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     detection!.evidence,
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
                       fontSize: 11,
                       fontFamily: 'monospace',
                     ),
@@ -464,10 +468,11 @@ class MitreStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -481,12 +486,16 @@ class MitreStatsCard extends StatelessWidget {
                 size: 24,
               ),
               const SizedBox(width: 8),
-              const Text(
-                'MITRE ATT&CK Coverage',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  'MITRE ATT&CK Coverage',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ],
@@ -496,9 +505,11 @@ class MitreStatsCard extends StatelessWidget {
           // Stats row
           Row(
             children: [
-              _buildStat('Total Techniques', '$totalTechniques', Colors.blue),
+              _buildStat(
+                  context, 'Total Techniques', '$totalTechniques', Colors.blue),
               const SizedBox(width: 16),
               _buildStat(
+                context,
                 'Detected',
                 '$detectedTechniques',
                 detectedTechniques > 0 ? Colors.red : Colors.green,
@@ -508,10 +519,10 @@ class MitreStatsCard extends StatelessWidget {
 
           if (detectedByTactic.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Detected by Tactic:',
               style: TextStyle(
-                color: Colors.white54,
+                color: cs.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
@@ -553,7 +564,8 @@ class MitreStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStat(String label, String value, Color color) {
+  Widget _buildStat(
+      BuildContext context, String label, String value, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -576,8 +588,8 @@ class MitreStatsCard extends StatelessWidget {
             ),
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white54,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 11,
               ),
               maxLines: 1,
@@ -596,26 +608,27 @@ class MitreLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildLegendItem('Normal', const Color(0xFF2A2D3E)),
+          _buildLegendItem(context, 'Normal', cs.outline),
           const SizedBox(width: 16),
-          _buildLegendItem('Selected', const Color(0xFF00D9FF)),
+          _buildLegendItem(context, 'Selected', const Color(0xFF00D9FF)),
           const SizedBox(width: 16),
-          _buildLegendItem('Detected', Colors.red),
+          _buildLegendItem(context, 'Detected', Colors.red),
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
+  Widget _buildLegendItem(BuildContext context, String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -631,8 +644,8 @@ class MitreLegend extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white54,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontSize: 11,
           ),
         ),

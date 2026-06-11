@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -82,6 +81,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   Widget build(BuildContext context) {
     return Consumer<NetworkProvider>(
       builder: (context, provider, child) {
+        final cs = Theme.of(context).colorScheme;
         return GlassTabPage(
           title: 'Network Security',
           hasSearch: true,
@@ -93,7 +93,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
                   onPressed: () {
                     provider.refreshNetworkInfo();
                     provider.scanNetworks();
@@ -131,6 +131,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildWifiTab(NetworkProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     // Filter networks based on search query
     final filteredNetworks = _searchQuery.isEmpty
         ? provider.nearbyNetworks
@@ -139,7 +140,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             .toList();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -157,8 +158,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'Active Threats (${provider.activeThreats.length})',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -208,8 +209,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             children: [
               Text(
                 _searchQuery.isEmpty ? 'Nearby Networks' : 'Search Results',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: cs.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -217,7 +218,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               Text(
                 '${filteredNetworks.where((n) => !n.isConnected).length} found',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -232,12 +233,12 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     DuotoneIcon(
                       'wi_fi_router',
                       size: 48,
-                      color: Colors.grey.withAlpha(77),
+                      color: cs.onSurfaceVariant.withAlpha(77),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       _searchQuery.isEmpty ? 'No networks found' : 'No matching networks',
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -245,7 +246,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                           ? 'Tap scan to search for nearby networks'
                           : 'Try a different search term',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -269,13 +270,15 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildVpnTab(NetworkProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Honest informational card: OrbGuard does not run a VPN tunnel.
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -295,10 +298,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'VPN protection is provided by OrbVPN', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: cs.onSurface,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
@@ -309,7 +312,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                         'your traffic and hide your IP address, install and '
                         'connect with the separate OrbVPN app.', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -321,10 +324,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           ),
           const SizedBox(height: 24),
           // Benefits section
-          const Text(
+          Text(
             'Why use a VPN',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -393,10 +396,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           ],
           const SizedBox(height: 24),
           // Informational OrbVPN server list (read-only).
-          const Text(
+          Text(
             'OrbVPN Server Network',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -409,6 +412,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildVpnServerList() {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoadingVpnServers) {
       return const GlassCard(
         child: Center(
@@ -450,7 +454,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
         child: Center(
           child: Text(
             'No VPN servers are currently published.',
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
         ),
       );
@@ -485,7 +489,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                       Text(
                         location, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -499,7 +503,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     color: status.toLowerCase() == 'online' ||
                             status.toLowerCase() == 'active'
                         ? Colors.green
-                        : Colors.grey[500],
+                        : cs.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -512,6 +516,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildBenefitItem(String iconName, String title, String description) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -543,7 +548,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 Text(
                   description, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -556,13 +561,15 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildDnsTab(NetworkProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Honest guidance card: DNS filtering is configured at the OS level.
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -583,10 +590,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Secure DNS is set up in your device settings', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: cs.onSurface,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
@@ -597,7 +604,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                         'enable encrypted, threat-blocking DNS at the '
                         'operating-system level using the steps below.', maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -610,10 +617,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           const SizedBox(height: 24),
           // DNS hijack check: real client-side canary resolution verified by
           // the backend against known-good answer sets.
-          const Text(
+          Text(
             'DNS Security Check',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -622,7 +629,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           Text(
             'Resolves well-known canary domains through this device\'s DNS '
             'resolver and verifies the answers against known-good records.',
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -656,6 +663,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           if (provider.dnsCheckError != null) ...[
             const SizedBox(height: 12),
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Row(
                 children: [
                   const DuotoneIcon('danger_circle', size: 20, color: Colors.red),
@@ -677,16 +685,17 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             _buildDnsCheckResultCard(provider.dnsCheckResult!),
           ],
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'How to Enable Private DNS',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Column(
               children: [
                 _buildDnsInfoRow(
@@ -712,10 +721,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Threat-Blocking DNS Providers',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -724,7 +733,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           Text(
             'Independent public resolvers (not operated by OrbGuard). '
             'Tap to copy the hostname.',
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const SizedBox(height: 12),
           ..._privateDnsProviders.map(
@@ -739,8 +748,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   /// honestly: hijack check performed, hijack check not run, and the leak
   /// check (explicitly unavailable — no controlled canary domain deployed).
   Widget _buildDnsCheckResultCard(DnsCheckResult result) {
+    final cs = Theme.of(context).colorScheme;
     final hijackColor = !result.hijackCheckPerformed
-        ? Colors.grey
+        ? cs.onSurfaceVariant
         : result.isHijacked
             ? Colors.red
             : Colors.green;
@@ -751,6 +761,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
     }
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -788,7 +799,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                           ? statusDetail(result.hijackCheckStatus)
                           : result.hijackDescription ??
                               statusDetail(result.hijackCheckStatus), maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -800,7 +811,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Confidence: ${(result.hijackConfidence! * 100).toInt()}%',
-                style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
               ),
             ),
           if (result.providerName != null)
@@ -808,7 +819,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Resolver provider: ${result.providerName}',
-                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               ),
             ),
           if (result.issues.isNotEmpty) ...[
@@ -839,13 +850,13 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(10),
+              color: cs.onSurface.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const DuotoneIcon('info_circle', size: 16, color: Colors.grey),
+                DuotoneIcon('info_circle', size: 16, color: cs.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -855,7 +866,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                         : 'Leak check: ${result.leakCheckStatus}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                   ),
                 ),
               ],
@@ -867,7 +878,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             Text(
               'Measured on this device',
               style: TextStyle(
-                color: Colors.grey[400],
+                color: cs.onSurfaceVariant,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -882,7 +893,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                     style: TextStyle(
                       color: r.lookupError != null
                           ? Colors.orange[300]
-                          : Colors.grey[500],
+                          : cs.onSurfaceVariant,
                       fontSize: 11,
                       fontFamily: 'monospace',
                     ),
@@ -895,7 +906,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
               child: Text(
                 'Resolver: ${result.resolverHint}',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: cs.onSurfaceVariant,
                   fontSize: 11,
                   fontFamily: 'monospace',
                 ),
@@ -907,6 +918,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildDnsProviderCard(String name, String host, String description) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -935,13 +947,13 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 ),
                 Text(
                   description, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.copy, size: 18, color: Colors.white70),
+            icon: Icon(Icons.copy, size: 18, color: cs.onSurfaceVariant),
             tooltip: 'Copy hostname',
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: host));
@@ -957,6 +969,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildDnsInfoRow(String number, String title, String description) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -994,7 +1007,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 Text(
                   description, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -1007,8 +1020,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildStatsTab(NetworkProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         children: [
           NetworkStatsCard(stats: provider.stats),
@@ -1018,10 +1032,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Security Recommendations',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1051,6 +1065,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildRecommendation(bool isComplete, String text, String iconName) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -1067,14 +1082,14 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             child: Center(
               child: isComplete
                   ? const DuotoneIcon('check_circle', size: 18, color: Colors.green)
-                  : DuotoneIcon(iconName, size: 18, color: Colors.grey),
+                  : DuotoneIcon(iconName, size: 18, color: cs.onSurfaceVariant),
             ),
           ),
           const SizedBox(width: 12),
           Text(
             text,
             style: TextStyle(
-              color: isComplete ? Colors.green : Colors.grey[400],
+              color: isComplete ? Colors.green : cs.onSurfaceVariant,
               fontSize: 13,
               decoration: isComplete ? TextDecoration.lineThrough : null,
             ),
@@ -1085,9 +1100,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   void _showNetworkDetails(BuildContext context, WifiNetwork network) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1104,7 +1120,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: cs.outline,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1112,8 +1128,8 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             // Network name
             Text(
               network.ssid.isEmpty ? '(Hidden Network)' : network.ssid,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: cs.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -1158,6 +1174,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -1166,14 +1183,14 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: cs.onSurface,
               fontWeight: FontWeight.w500,
             ),
           ),

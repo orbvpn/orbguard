@@ -62,6 +62,7 @@ class GlassBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
@@ -117,10 +118,8 @@ class GlassBottomNavBar extends StatelessWidget {
                               item.iconPath,
                               size: 22,
                               color: isSelected
-                                  ? AppColors.accent
-                                  : (isDark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black.withAlpha(100)),
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -133,10 +132,8 @@ class GlassBottomNavBar extends StatelessWidget {
                                     ? FontWeight.w600
                                     : FontWeight.w500,
                                 color: isSelected
-                                    ? AppColors.accent
-                                    : (isDark
-                                        ? Colors.white.withAlpha(150)
-                                        : Colors.black.withAlpha(100)),
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant,
                                 letterSpacing: -0.2,
                               ),
                             ),

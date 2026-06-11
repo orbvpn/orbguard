@@ -12,6 +12,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -73,6 +74,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GlassPage(
       title: 'Correlation Engine',
       body: _isLoading
@@ -86,12 +89,12 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.play, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.play, size: 22, color: cs.onSurface),
                         onPressed: _isCorrelating ? null : _runCorrelation,
                         tooltip: 'Run Correlation',
                       ),
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
                         onPressed: _isLoading ? null : _loadResults,
                         tooltip: 'Refresh',
                       ),
@@ -111,10 +114,10 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                           label: Text(engine),
                           selected: isSelected,
                           onSelected: (_) => setState(() => _selectedEngine = engine),
-                          backgroundColor: GlassTheme.glassColorDark,
+                          backgroundColor: GlassTheme.glassColor(isDark),
                           selectedColor: GlassTheme.primaryAccent.withAlpha(77),
                           labelStyle: TextStyle(
-                            color: isSelected ? GlassTheme.primaryAccent : Colors.white70,
+                            color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -128,9 +131,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      _buildStatCard('Correlations', _results.length.toString(), GlassTheme.primaryAccent),
+                      _buildStatCard(context, 'Correlations', _results.length.toString(), GlassTheme.primaryAccent),
                       const SizedBox(width: 12),
-                      _buildStatCard('High Confidence', _results.where((r) => r.confidence >= 0.8).length.toString(), GlassTheme.successColor),
+                      _buildStatCard(context, 'High Confidence', _results.where((r) => r.confidence >= 0.8).length.toString(), GlassTheme.successColor),
                     ],
                   ),
                 ),
@@ -150,13 +153,13 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                             child: Text(
                               _error!,
                               style: TextStyle(
-                                  color: Colors.white.withAlpha(204),
+                                  color: cs.onSurface,
                                   fontSize: 12),
                             ),
                           ),
                           IconButton(
-                            icon: const DuotoneIcon('refresh',
-                                color: Colors.white, size: 20),
+                            icon: DuotoneIcon('refresh',
+                                color: cs.onSurface, size: 20),
                             onPressed: _loadResults,
                             tooltip: 'Retry',
                           ),
@@ -183,8 +186,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Running correlation...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                                Text('Analyzing threat patterns', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                                Text('Running correlation...', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
+                                Text('Analyzing threat patterns', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -196,12 +199,12 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                 // Results
                 Expanded(
                   child: _results.isEmpty
-                      ? _buildEmptyState()
+                      ? _buildEmptyState(context)
                       : ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           itemCount: _filteredResults.length,
                           itemBuilder: (context, index) {
-                            return _buildResultCard(_filteredResults[index]);
+                            return _buildResultCard(context, _filteredResults[index]);
                           },
                         ),
                 ),
@@ -215,7 +218,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     return _results.where((r) => r.engine == _selectedEngine).toList();
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(BuildContext context, String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassContainer(
         padding: const EdgeInsets.all(16),
@@ -223,19 +227,20 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildResultCard(CorrelationResult result) {
+  Widget _buildResultCard(BuildContext context, CorrelationResult result) {
+    final cs = Theme.of(context).colorScheme;
     final confidenceColor = result.confidence >= 0.8
         ? GlassTheme.successColor
         : result.confidence >= 0.5
             ? GlassTheme.warningColor
-            : Colors.grey;
+            : cs.onSurfaceVariant;
 
     return GlassCard(
       onTap: () => _showResultDetails(context, result),
@@ -246,7 +251,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
             children: [
               GlassSvgIconBox(
                 icon: _getEngineIcon(result.engine),
-                color: _getEngineColor(result.engine),
+                color: _getEngineColor(context, result.engine),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -257,13 +262,13 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                       result.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       result.engine,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: _getEngineColor(result.engine), fontSize: 11),
+                      style: TextStyle(color: _getEngineColor(context, result.engine), fontSize: 11),
                     ),
                   ],
                 ),
@@ -275,7 +280,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                     '${(result.confidence * 100).toInt()}%',
                     style: TextStyle(color: confidenceColor, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  Text('confidence', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text('confidence', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
             ],
@@ -283,16 +288,16 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
           const SizedBox(height: 12),
           Text(
             result.description,
-            style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildCorrelationStat(AppIcons.urlProtection, '${result.linkedEntities} entities'),
+              _buildCorrelationStat(context, AppIcons.urlProtection, '${result.linkedEntities} entities'),
               const SizedBox(width: 16),
-              _buildCorrelationStat(AppIcons.clock, _formatTime(result.timestamp)),
+              _buildCorrelationStat(context, AppIcons.clock, _formatTime(result.timestamp)),
             ],
           ),
           if (result.relatedIndicators.isNotEmpty) ...[
@@ -318,32 +323,34 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     );
   }
 
-  Widget _buildCorrelationStat(String icon, String text) {
+  Widget _buildCorrelationStat(BuildContext context, String icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DuotoneIcon(AppIcons.correlation, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Correlations',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Run correlation to find threat relationships',
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -389,7 +396,6 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                 : 'Correlation run complete — $found correlation'
                     '${found == 1 ? '' : 's'} found',
           ),
-          backgroundColor: GlassTheme.gradientTop,
         ),
       );
 
@@ -414,23 +420,20 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(24),
             children: [
-              Text(result.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(result.title, style: TextStyle(color: context.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              GlassBadge(text: result.engine, color: _getEngineColor(result.engine)),
+              GlassBadge(text: result.engine, color: _getEngineColor(context, result.engine)),
               const SizedBox(height: 16),
-              Text(result.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(result.description, style: TextStyle(color: context.onSurfaceMuted)),
               const SizedBox(height: 20),
               GlassContainer(
                 padding: const EdgeInsets.all(16),
@@ -447,7 +450,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
               ),
               if (result.relatedIndicators.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('Correlated Indicators (IDs)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Correlated Indicators (IDs)', style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...result.relatedIndicators.map((indicator) => GlassCard(
                       child: Row(
@@ -459,7 +462,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                               indicator,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 12),
+                              style: TextStyle(color: context.onSurface, fontFamily: 'monospace', fontSize: 12),
                             ),
                           ),
                         ],
@@ -479,14 +482,15 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: context.onSurfaceMuted)),
           Flexible(
             child: Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: context.onSurface, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -494,7 +498,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     );
   }
 
-  Color _getEngineColor(String engine) {
+  Color _getEngineColor(BuildContext context, String engine) {
     switch (engine) {
       case 'Temporal':
         return const Color(0xFF2196F3);
@@ -509,7 +513,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       case 'Campaign':
         return GlassTheme.warningColor;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 

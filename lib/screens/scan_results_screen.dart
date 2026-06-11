@@ -62,28 +62,31 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     final isClean = widget.threats.isEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: Theme.of(context).canvasColor,
       body: CustomScrollView(
         slivers: [
           // App Bar
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: const Color(0xFF0A0E21),
+            backgroundColor: Theme.of(context).canvasColor,
             flexibleSpace: FlexibleSpaceBar(
               background: _buildHeader(isClean, critical.length, high.length),
             ),
             leading: IconButton(
-              icon: const DuotoneIcon('alt_arrow_left', color: Colors.white, size: 24),
+              icon: DuotoneIcon('alt_arrow_left',
+                  color: Theme.of(context).colorScheme.onSurface, size: 24),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
-                icon: const DuotoneIcon('share', color: Colors.white, size: 24),
+                icon: DuotoneIcon('share',
+                    color: Theme.of(context).colorScheme.onSurface, size: 24),
                 onPressed: () => _shareResults(),
               ),
               IconButton(
-                icon: const DuotoneIcon('info_circle', color: Colors.white, size: 24),
+                icon: DuotoneIcon('info_circle',
+                    color: Theme.of(context).colorScheme.onSurface, size: 24),
                 onPressed: () => _showScanDetails(),
               ),
             ],
@@ -103,7 +106,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -122,19 +125,19 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                       if (critical.isNotEmpty) ...[
                         _buildSectionHeader('Critical Threats', Colors.red, critical.length),
                         ...critical.map((t) => _buildThreatCard(t, Colors.red)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                       ],
 
                       if (high.isNotEmpty) ...[
                         _buildSectionHeader('High Priority', Colors.orange, high.length),
                         ...high.map((t) => _buildThreatCard(t, Colors.orange)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                       ],
 
                       if (medium.isNotEmpty) ...[
                         _buildSectionHeader('Medium Priority', Colors.amber, medium.length),
                         ...medium.map((t) => _buildThreatCard(t, Colors.amber)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                       ],
 
                       if (low.isNotEmpty) ...[
@@ -148,8 +151,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                       if (critical.isNotEmpty || high.isNotEmpty)
                         _buildRemoveAllButton(),
                     ],
-
-                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -161,16 +162,17 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   }
 
   Widget _buildHeader(bool isClean, int critical, int high) {
+    final bg = Theme.of(context).canvasColor;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: isClean
-              ? [Colors.green.withValues(alpha: 0.3), const Color(0xFF0A0E21)]
+              ? [Colors.green.withValues(alpha: 0.3), bg]
               : critical > 0
-                  ? [Colors.red.withValues(alpha: 0.3), const Color(0xFF0A0E21)]
-                  : [Colors.orange.withValues(alpha: 0.3), const Color(0xFF0A0E21)],
+                  ? [Colors.red.withValues(alpha: 0.3), bg]
+                  : [Colors.orange.withValues(alpha: 0.3), bg],
         ),
       ),
       child: SafeArea(
@@ -238,7 +240,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                   : 'Action required to secure your device',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -265,7 +267,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: count > 0
             ? Border.all(color: color.withValues(alpha: 0.5), width: 1)
@@ -278,7 +280,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: count > 0 ? color : Colors.grey[600],
+              color: count > 0 ? color : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
@@ -286,7 +288,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             label,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -298,7 +300,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -307,13 +309,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           Container(
             width: 1,
             height: 40,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.outline,
           ),
           _buildSummaryItem('clock_circle', 'Scan Time', _formatDuration(widget.scanDuration)),
           Container(
             width: 1,
             height: 40,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.outline,
           ),
           _buildSummaryItem(
             'shield_check',
@@ -342,7 +344,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             label, maxLines: 2, overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 10,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -354,7 +356,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
@@ -385,7 +387,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 20),
@@ -436,7 +438,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             subtitle,
             style: TextStyle(
               fontSize: 10,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -458,14 +460,18 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -490,7 +496,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
@@ -525,7 +531,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               threat.description,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -705,7 +711,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -725,7 +731,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -852,7 +858,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   void _showScanDetails() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1D1E33),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -884,7 +889,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[400])),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
@@ -897,7 +902,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Remove Threat'),
         content: Column(
@@ -911,7 +915,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SizedBox(height: 12),
             Text(
               _getRemovalDescription(threat),
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
           ],
         ),
@@ -954,7 +958,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Dismiss Warning'),
         content: Column(
@@ -969,7 +972,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             Text(
               'This removes the warning from the scan results. It does not '
               'change anything on your device.',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
           ],
         ),
@@ -1005,7 +1008,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Color(0xFF1D1E33),
       ),
     );
 
@@ -1063,7 +1065,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               ],
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Color(0xFF1D1E33),
           ),
         );
 
@@ -1105,7 +1106,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF1D1E33),
         duration: const Duration(seconds: 6),
       ),
     );
@@ -1115,7 +1115,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Remove All Threats'),
         content: const Text(
@@ -1215,7 +1214,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           parts.isEmpty ? 'No threats to remove' : parts.join(', '),
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF1D1E33),
         duration: const Duration(seconds: 6),
       ),
     );

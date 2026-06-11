@@ -24,6 +24,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   Widget build(BuildContext context) {
     return Consumer<DarkWebProvider>(
       builder: (context, provider, child) {
+        final cs = Theme.of(context).colorScheme;
         return GlassTabPage(
           title: 'Dark Web Monitor',
           hasSearch: true,
@@ -41,7 +42,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   label: const Text('Add Asset'),
                 ),
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
                   onPressed: () {
                     context.read<DarkWebProvider>().refreshAssets();
                   },
@@ -78,16 +79,17 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   Widget _buildEmailTab(DarkWebProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Email check section
-          const Text(
+          Text(
             'Check Email Breaches',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -96,7 +98,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           Text(
             'Check if your email has been compromised in known data breaches.',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -111,10 +113,10 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             BreachCheckResultCard(result: provider.lastCheckResult!),
             if (provider.lastCheckResult!.breaches.isNotEmpty) ...[
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Breaches Found',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -130,14 +132,14 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             ],
           ],
           // Monitored emails section
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Monitored Emails',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -164,16 +166,17 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   Widget _buildPasswordTab(DarkWebProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Password check section
-          const Text(
+          Text(
             'Check Password Breaches',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -182,7 +185,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           Text(
             'Check if your password has been exposed in data breaches using k-anonymity (your password never leaves your device).',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -197,8 +200,9 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             PasswordCheckResultCard(result: provider.lastPasswordResult!),
           ],
           // Info section
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -206,10 +210,10 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   children: [
                     const DuotoneIcon('shield_check', size: 24, color: Color(0xFF00D9FF)),
                     const SizedBox(width: 12),
-                    const Text(
+                    Text(
                       'How It Works',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: cs.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -242,6 +246,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   Widget _buildInfoRow(String number, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
@@ -259,7 +264,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: Colors.grey[400],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -270,6 +275,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   Widget _buildAlertsTab(DarkWebProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final alerts = provider.alerts;
 
     if (alerts.isEmpty) {
@@ -280,13 +286,13 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             DuotoneIcon(
               'bell',
               size: 64,
-              color: Colors.white.withAlpha(31),
+              color: cs.onSurface.withValues(alpha: 0.12),
             ),
             const SizedBox(height: 16),
             Text(
               'No breach alerts',
               style: TextStyle(
-                color: Colors.white.withAlpha(128),
+                color: cs.onSurfaceVariant,
                 fontSize: 16,
               ),
             ),
@@ -294,7 +300,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             Text(
               'Add assets to monitor for breaches',
               style: TextStyle(
-                color: Colors.white.withAlpha(77),
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
             ),
@@ -313,8 +319,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             children: [
               Text(
                 '${alerts.length} alert${alerts.length > 1 ? 's' : ''}',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -329,7 +335,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
         // Alert list
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             itemCount: alerts.length,
             itemBuilder: (context, index) {
               final alert = alerts[index];
@@ -352,21 +358,22 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   Widget _buildStatsTab(DarkWebProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final stats = provider.stats;
     final assets = provider.assets;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DarkWebStatsCard(stats: stats),
           const SizedBox(height: 24),
           // Monitored assets section
-          const Text(
+          Text(
             'Monitored Assets',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -380,13 +387,13 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                     DuotoneIcon(
                       'add_circle',
                       size: 48,
-                      color: Colors.grey.withAlpha(77),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'No assets being monitored',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: cs.onSurfaceVariant,
                         fontSize: 14,
                       ),
                     ),
@@ -394,7 +401,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                     Text(
                       'Add emails and other assets to monitor',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                         fontSize: 13,
                       ),
                     ),
@@ -416,7 +423,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           child: Text(
             'No assets in this category',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -446,6 +453,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   void _showAddAssetSheet(BuildContext context, {AssetType? preselectedType}) {
+    final cs = Theme.of(context).colorScheme;
     final provider = context.read<DarkWebProvider>();
     AssetType selectedType = preselectedType ?? AssetType.email;
     final controller = TextEditingController();
@@ -453,7 +461,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -475,16 +483,16 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: cs.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Add Asset to Monitor',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -508,12 +516,12 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                             setState(() => selectedType = type);
                           }
                         },
-                        backgroundColor: const Color(0xFF2A2B40),
+                        backgroundColor: cs.surfaceContainerHighest,
                         selectedColor: const Color(0xFF00D9FF).withAlpha(40),
                         labelStyle: TextStyle(
                           color: isSelected
                               ? const Color(0xFF00D9FF)
-                              : Colors.grey,
+                              : cs.onSurfaceVariant,
                         ),
                       ),
                     );
@@ -524,7 +532,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               // Input field
               TextField(
                 controller: controller,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: cs.onSurface),
                 keyboardType: selectedType == AssetType.email
                     ? TextInputType.emailAddress
                     : selectedType == AssetType.phone
@@ -532,13 +540,13 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                         : TextInputType.text,
                 decoration: InputDecoration(
                   hintText: _getHintText(selectedType),
-                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant),
                   prefixIcon: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: DuotoneIcon(_getAssetIcon(selectedType), size: 24, color: Colors.grey),
+                    child: DuotoneIcon(_getAssetIcon(selectedType), size: 24, color: cs.onSurfaceVariant),
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF2A2B40),
+                  fillColor: cs.surfaceContainerHighest,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -610,10 +618,11 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
   }
 
   void _showBreachDetails(BuildContext context, BreachInfo breach) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -624,7 +633,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
         expand: false,
         builder: (context, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -635,7 +644,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: cs.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -672,8 +681,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           breach.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
@@ -683,7 +692,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color: cs.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -722,10 +731,10 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               // Description
               if (breach.description != null) ...[
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'About This Breach',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -734,7 +743,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 Text(
                   breach.description!,
                   style: TextStyle(
-                    color: Colors.grey[400],
+                    color: cs.onSurfaceVariant,
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -743,10 +752,10 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               // Data classes
               if (breach.dataClasses.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Exposed Data Types',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -810,11 +819,12 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
 
   Widget _buildDetailRow(String label, String value, String icon,
       {Color? color}) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          DuotoneIcon(icon, size: 20, color: color ?? Colors.grey[500]),
+          DuotoneIcon(icon, size: 20, color: color ?? cs.onSurfaceVariant),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,14 +832,14 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
               Text(
                 value,
                 style: TextStyle(
-                  color: color ?? Colors.white,
+                  color: color ?? cs.onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -853,7 +863,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -876,10 +886,11 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
 
   void _showAssetBreaches(
       BuildContext context, MonitoredAsset asset, List<BreachInfo> breaches) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -896,7 +907,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: cs.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -914,8 +925,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           'Breaches for ${asset.displayValue}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -923,7 +934,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                         Text(
                           '${breaches.length} breaches found',
                           style: TextStyle(
-                            color: Colors.grey[500],
+                            color: cs.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -937,7 +948,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             Expanded(
               child: ListView.builder(
                 controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 itemCount: breaches.length,
                 itemBuilder: (context, index) {
                   return Padding(
@@ -961,17 +972,18 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
 
   void _confirmDeleteAsset(
       BuildContext context, DarkWebProvider provider, MonitoredAsset asset) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
+        backgroundColor: cs.surface,
+        title: Text(
           'Remove Asset',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         content: Text(
           'Stop monitoring ${asset.displayValue}?',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: cs.onSurfaceVariant),
         ),
         actions: [
           TextButton(

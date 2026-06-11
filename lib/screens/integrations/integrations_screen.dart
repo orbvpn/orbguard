@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -62,7 +63,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
                   onPressed: _isLoading ? null : _loadIntegrations,
                   tooltip: 'Refresh',
                 ),
@@ -76,7 +77,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                 : _errorMessage != null
                     ? _buildErrorState()
                     : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
                       // Stats
                       Row(
@@ -113,7 +114,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -147,11 +148,11 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               children: [
                 Text(
                   integration.name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
                   integration.description,
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -185,13 +186,15 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -221,22 +224,22 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       children: [
                         Text(
                           integration.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: context.colors.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         integration.isConnected
                             ? const GlassBadge(text: 'Connected', color: GlassTheme.successColor)
-                            : const GlassBadge(text: 'Not Connected', color: Colors.grey),
+                            : GlassBadge(text: 'Not Connected', color: context.colors.onSurfaceVariant),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
-              Text(integration.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(integration.description, style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8))),
               const SizedBox(height: 24),
 
-              const Text('Features', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Features', style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ...integration.features.map((feature) => _buildFeatureRow(feature)),
 
@@ -298,7 +301,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           DuotoneIcon(AppIcons.checkCircle, size: 18, color: GlassTheme.successColor),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(feature, style: TextStyle(color: Colors.white.withAlpha(204))),
+            child: Text(feature, style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8))),
           ),
         ],
       ),
@@ -316,12 +319,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
             const SizedBox(height: 16),
             Text(
               'Error Loading Integrations',
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),

@@ -182,7 +182,7 @@ class GlassTabPageState extends State<GlassTabPage>
 
   Widget _buildBottomNav() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
+    final textColor = Theme.of(context).colorScheme.onSurface;
 
     // SafeArea in GlassPage already handles safe area insets
     // We only add 12px margin from the safe area boundary
@@ -223,6 +223,7 @@ class GlassTabPageState extends State<GlassTabPage>
   }
 
   Widget _buildTabsContainer(bool isDark, Color textColor) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       height: 60,
       decoration: BoxDecoration(
@@ -267,10 +268,8 @@ class GlassTabPageState extends State<GlassTabPage>
                             tab.iconPath,
                             size: 22,
                             color: isSelected
-                                ? AppColors.accent
-                                : (isDark
-                                    ? Colors.white.withAlpha(150)
-                                    : Colors.black.withAlpha(100)),
+                                ? cs.primary
+                                : cs.onSurfaceVariant,
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -282,10 +281,8 @@ class GlassTabPageState extends State<GlassTabPage>
                               fontWeight:
                                   isSelected ? FontWeight.w600 : FontWeight.w500,
                               color: isSelected
-                                  ? AppColors.accent
-                                  : (isDark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black.withAlpha(100)),
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -316,7 +313,7 @@ class GlassTabPageState extends State<GlassTabPage>
               child: DuotoneIcon(
                 'magnifer',
                 size: 24,
-                color: isDark ? Colors.white.withAlpha(180) : Colors.black.withAlpha(120),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -340,7 +337,7 @@ class GlassTabPageState extends State<GlassTabPage>
               child: DuotoneIcon(
                 currentTab.iconPath,
                 size: 26,
-                color: AppColors.accent,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),

@@ -36,7 +36,7 @@ class GlassHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Padding(
@@ -164,7 +164,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = actualIsDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final totalHeight = height +
         (bottom?.preferredSize.height ?? 0) +
         MediaQuery.of(context).padding.top;
@@ -281,8 +281,7 @@ class GlassAppBarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = color ?? (actualIsDark ? Colors.white : Colors.black87);
+    final iconColor = color ?? Theme.of(context).colorScheme.onSurface;
 
     Widget iconWidget;
     if (svgIcon != null) {
@@ -471,20 +470,27 @@ class GlassPage extends StatelessWidget {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
 
     return GlassStatusBar(
       isDark: isDark,
       child: Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
-          child: Column(
-            children: [
-              // OrbX-style header: round back + pill title
-              _buildOrbXHeader(context, isDark, textColor),
-              // Main content
-              Expanded(child: body),
-            ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
+              child: Column(
+                children: [
+                  // OrbX-style header: round back + pill title
+                  _buildOrbXHeader(context, isDark, textColor),
+                  // Main content
+                  Expanded(child: body),
+                ],
+              ),
+            ),
           ),
         ),
         bottomNavigationBar: bottomNavigationBar,
@@ -611,8 +617,8 @@ class GlassBottomNav extends StatelessWidget {
                 final item = items[index];
                 final isSelected = index == currentIndex;
                 final iconColor = isSelected
-                    ? AppColors.accent
-                    : (actualIsDark ? Colors.white54 : Colors.black45);
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant;
 
                 return GestureDetector(
                   onTap: () => onTap(index),

@@ -5,7 +5,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -155,6 +154,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   }
 
   Widget _buildActionsRow() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -170,7 +170,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const DuotoneIcon('shield_check', size: 18, color: Colors.white),
+                  : DuotoneIcon('shield_check', size: 18, color: cs.onSurface),
               label: Text(
                 _provider.isAnalyzing
                     ? 'Scanning...'
@@ -178,7 +178,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               ),
             ),
           IconButton(
-            icon: const DuotoneIcon('forbidden', size: 22, color: Colors.white),
+            icon: DuotoneIcon('forbidden', size: 22, color: cs.onSurface),
             onPressed: () => _showBlockedSendersSheet(),
             tooltip: 'Blocked Senders',
           ),
@@ -223,7 +223,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
             child: messages.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final message = messages[index];
@@ -247,6 +247,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   }
 
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -258,7 +259,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               DuotoneIcon(
                 'chat_dots',
                 size: 64,
-                color: Colors.grey[700],
+                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 16),
               Text(
@@ -266,7 +267,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[400],
+                  color: cs.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
@@ -276,7 +277,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                     : _getEmptyStateMessage(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: cs.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -381,7 +382,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
 
   Widget _buildCheckTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -393,7 +394,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
 
           // Result
           if (_manualAnalysisResult != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildManualAnalysisResult(),
           ],
         ],
@@ -447,7 +448,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.grey[300],
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 13,
                       ),
                     ),
@@ -542,7 +543,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -554,13 +555,16 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.2),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     p,
-                    style: const TextStyle(
-                      color: Colors.grey,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
                   ),
@@ -575,7 +579,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
 
   Widget _buildStatsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         children: [
           // Stats card
@@ -585,11 +589,11 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 _provider.unanalyzedCount > 0 ? _provider.analyzeAllMessages : null,
             isScanning: _provider.isAnalyzing,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Protection status
           _buildProtectionStatus(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Recent threats
           _buildRecentThreats(),
@@ -604,6 +608,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
     final cloud = _cloudStatus();
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -644,8 +649,9 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
             icon: 'forbidden',
             label: 'Blocked Senders',
             status: '${_provider.blockedSenders.length}',
-            statusColor:
-                _provider.blockedSenders.isEmpty ? Colors.grey : Colors.orange,
+            statusColor: _provider.blockedSenders.isEmpty
+                ? Theme.of(context).colorScheme.onSurfaceVariant
+                : Colors.orange,
           ),
           if (_provider.lastAnalyzeSucceeded == false &&
               _provider.lastAnalyzeError != null) ...[
@@ -673,7 +679,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
       case SmsPlatformStatus.error:
         return ('Error', Colors.red);
       case SmsPlatformStatus.unknown:
-        return ('Checking...', Colors.grey);
+        return ('Checking...', Theme.of(context).colorScheme.onSurfaceVariant);
     }
   }
 
@@ -681,7 +687,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   /// enabled in settings.
   (String, Color) _analysisStatus() {
     if (_provider.platformStatus != SmsPlatformStatus.ready) {
-      return ('Inactive', Colors.grey);
+      return ('Inactive', Theme.of(context).colorScheme.onSurfaceVariant);
     }
     return _provider.protectionEnabled
         ? ('Enabled', Colors.green)
@@ -694,7 +700,10 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
     final ok = _provider.lastAnalyzeSucceeded;
     if (ok == true) return ('Connected', Colors.green);
     if (ok == false) return ('Error', Colors.red);
-    return ('Not contacted yet', Colors.grey);
+    return (
+      'Not contacted yet',
+      Theme.of(context).colorScheme.onSurfaceVariant
+    );
   }
 
   Widget _buildRecentThreats() {
@@ -743,7 +752,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                     Text(
                       'No threats detected',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 14,
                       ),
                     ),
@@ -767,7 +776,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   void _showBlockedSendersSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -797,9 +806,10 @@ class _StatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final row = Row(
       children: [
-        DuotoneIcon(icon, size: 20, color: Colors.grey[500]),
+        DuotoneIcon(icon, size: 20, color: cs.onSurfaceVariant),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -807,7 +817,7 @@ class _StatusRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -876,7 +886,7 @@ class _InboxBanner extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
               ),
             ),
@@ -949,7 +959,7 @@ class _ThreatListItem extends StatelessWidget {
                     message.analysisResult?.threats.first.type.displayName ??
                         'Unknown threat', maxLines: 2, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
                   ),
@@ -996,6 +1006,7 @@ class _BlockedSendersSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1008,7 +1019,7 @@ class _BlockedSendersSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[600],
+                color: cs.onSurfaceVariant.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1031,7 +1042,7 @@ class _BlockedSendersSheet extends StatelessWidget {
               Text(
                 '${blockedSenders.length}',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: cs.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -1047,14 +1058,15 @@ class _BlockedSendersSheet extends StatelessWidget {
                 child: Text(
                   'No blocked senders',
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ),
             )
           else
             ...blockedSenders.map((sender) => ListTile(
-                  leading: const DuotoneIcon('smartphone', color: Colors.grey, size: 24),
+                  leading: DuotoneIcon('smartphone',
+                      color: cs.onSurfaceVariant, size: 24),
                   title: Text(sender),
                   trailing: IconButton(
                     icon: const DuotoneIcon('minus_circle', color: Colors.red, size: 24),

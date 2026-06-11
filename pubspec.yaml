@@ -58,6 +58,7 @@ dependencies:
   local_auth: ^2.3.0
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:

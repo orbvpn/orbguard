@@ -29,6 +29,7 @@ class RecentAlertsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,6 +347,7 @@ class RealtimeEventsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

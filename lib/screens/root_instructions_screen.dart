@@ -62,9 +62,8 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -80,10 +79,9 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Android Root Guide')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           const Card(
-            color: Color(0xFF1D1E33),
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Column(
@@ -106,7 +104,7 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           _buildMethodCard(
             'Method 1: Magisk (Recommended)',
@@ -177,7 +175,6 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
     String note,
   ) {
     return Card(
-      color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(16),

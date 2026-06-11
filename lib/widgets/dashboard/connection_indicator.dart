@@ -243,13 +243,15 @@ class ConnectionHealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      // Spacing comes from the surrounding sheet/screen gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildDetails(),
+          _buildDetails(context),
           const SizedBox(height: 16),
           _buildActions(),
         ],
@@ -305,19 +307,21 @@ class ConnectionHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetails() {
+  Widget _buildDetails(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black26,
+        color: cs.onSurface.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          _buildDetailRow('Network', health.networkTypeText,
+          _buildDetailRow(context, 'Network', health.networkTypeText,
               health.hasNetwork ? Colors.green : Colors.red),
           const SizedBox(height: 8),
           _buildDetailRow(
+            context,
             'Events Received',
             health.eventsReceived.toString(),
             Colors.cyan,
@@ -325,17 +329,19 @@ class ConnectionHealthCard extends StatelessWidget {
           if (health.lastEventTime != null) ...[
             const SizedBox(height: 8),
             _buildDetailRow(
+              context,
               'Last Event',
               _formatTime(health.lastEventTime!),
-              Colors.grey,
+              cs.onSurfaceVariant,
             ),
           ],
           if (health.lastHealthCheck != null) ...[
             const SizedBox(height: 8),
             _buildDetailRow(
+              context,
               'Last Check',
               _formatTime(health.lastHealthCheck!),
-              Colors.grey,
+              cs.onSurfaceVariant,
             ),
           ],
         ],
@@ -343,7 +349,8 @@ class ConnectionHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color valueColor) {
+  Widget _buildDetailRow(
+      BuildContext context, String label, String value, Color valueColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -351,7 +358,7 @@ class ConnectionHealthCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[500],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         Flexible(

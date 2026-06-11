@@ -253,7 +253,6 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 Card(
-                  color: const Color(0xFF1D1E33),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -396,7 +395,6 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
     required List<String> benefits,
   }) {
     return Card(
-      color: const Color(0xFF1D1E33),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -433,9 +431,9 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -449,12 +447,12 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Enables:',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),

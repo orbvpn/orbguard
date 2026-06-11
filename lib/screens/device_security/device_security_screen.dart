@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -96,12 +97,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             : GlassTheme.successColor;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Device Status Card
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: statusColor,
             child: Column(
               children: [
@@ -137,7 +139,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                           if (status.lastSeen != null)
                             Text(
                               'Last seen ${_formatTime(status.lastSeen!)}',
-                              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                             ),
                         ],
                       ),
@@ -182,13 +184,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // Initialization / API errors — surfaced, never swallowed.
           if (provider.error != null) ...[
             _buildErrorCard(provider),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
 
           // Owner message pushed via remote "message" command.
           if (provider.agentDisplayMessage != null) ...[
             _buildOwnerMessageCard(provider.agentDisplayMessage!),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
 
           // On-device agent state (real lifecycle, honest unavailability).
@@ -200,9 +202,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           const SizedBox(height: 24),
 
           // Quick Actions
-          const Text(
+          Text(
             'Quick Actions',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -245,9 +247,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // Issued command lifecycle (pending -> executed/failed).
           if (provider.issuedCommands.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Recent Commands',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...provider.issuedCommands.take(5).map(_buildCommandCard),
@@ -259,9 +261,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'OS Vulnerabilities',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 GlassBadge(
                   text: '${status.vulnerabilities.length} found',
@@ -281,7 +283,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     // Score is null until the backend has actually computed it — shown as
     // an explicit "not assessed" state rather than a fabricated 100.
     final color = score == null
-        ? Colors.white38
+        ? context.colors.onSurfaceVariant.withValues(alpha: 0.7)
         : score >= 80
             ? GlassTheme.successColor
             : score >= 50
@@ -289,6 +291,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 : GlassTheme.errorColor;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Row(
         children: [
           SizedBox(
@@ -300,7 +303,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 CircularProgressIndicator(
                   value: score == null ? 0 : score / 100,
                   strokeWidth: 6,
-                  backgroundColor: Colors.white12,
+                  backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
@@ -315,9 +318,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Security Score',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -328,7 +331,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                           : score >= 50
                               ? 'Some security improvements needed'
                               : 'Your device needs attention',
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -344,6 +347,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildErrorCard(DeviceSecurityProvider provider) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: GlassTheme.errorColor,
       child: Row(
         children: [
@@ -352,11 +356,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           Expanded(
             child: Text(
               provider.error!,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 13),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: Colors.white54),
+            icon: Icon(Icons.close, size: 18, color: context.colors.onSurfaceVariant),
             onPressed: provider.clearError,
           ),
         ],
@@ -366,6 +370,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildOwnerMessageCard(AgentDisplayMessage message) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: GlassTheme.primaryAccent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,12 +384,12 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   message.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                 ),
               ),
               Text(
                 _formatTime(message.receivedAt),
-                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
               ),
             ],
           ),
@@ -392,7 +397,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 8),
             Text(
               message.message,
-              style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 13),
+              style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8), fontSize: 13),
             ),
           ],
         ],
@@ -415,13 +420,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               width: 90,
               child: Text(
                 label,
-                style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
               ),
             ),
             Expanded(
               child: Text(
                 value,
-                style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 11),
+                style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8), fontSize: 11),
               ),
             ),
           ],
@@ -430,6 +435,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     }
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -448,7 +454,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                     if (provider.agentLastPollAt != null)
                       Text(
                         'Last check ${_formatTime(provider.agentLastPollAt!)}',
-                        style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                        style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                       ),
                   ],
                 ),
@@ -486,18 +492,18 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               children: [
                 Text(
                   cmd.command.displayName,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 if (cmd.detail != null)
                   Text(
                     cmd.detail!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                   ),
                 Text(
                   _formatTime(cmd.issuedAt),
-                  style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                  style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                 ),
               ],
             ),
@@ -532,7 +538,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
             ),
           ],
         ),
@@ -561,11 +567,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   children: [
                     Text(
                       vuln.cveId,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       vuln.title,
-                      style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 12),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -576,7 +582,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           const SizedBox(height: 12),
           Text(
             vuln.description,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
           ),
           const SizedBox(height: 8),
           Row(
@@ -594,7 +600,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   'Affects ${vuln.affectedVersions} · CVSS ${vuln.cvssScore.toStringAsFixed(1)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                 ),
               ),
             ],
@@ -624,13 +630,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     final settings = provider.settings;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Anti-Theft Settings',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -690,9 +696,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Failed Unlock Attempts Before Action',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -704,7 +710,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                         max: 10,
                         divisions: 7,
                         activeColor: GlassTheme.primaryAccent,
-                        inactiveColor: Colors.white24,
+                        inactiveColor: context.colors.outline,
                         onChanged: (v) => provider.updateSettings(
                           settings.copyWith(maxUnlockAttempts: v.toInt()),
                         ),
@@ -723,9 +729,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // Thief selfies
           if (provider.thiefSelfies.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Captured Photos',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             GlassCard(
@@ -737,7 +743,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   Expanded(
                     child: Text(
                       '${provider.thiefSelfies.length} photos captured',
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.colors.onSurface),
                     ),
                   ),
                   TextButton(
@@ -751,21 +757,21 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             // Honest empty state: the feature is armed but nothing has been
             // captured — never a placeholder photo.
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Captured Photos',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             GlassCard(
               child: Row(
                 children: [
-                  DuotoneIcon('camera', size: 24, color: Colors.white54),
+                  DuotoneIcon('camera', size: 24, color: context.colors.onSurfaceVariant),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'No selfies captured. A photo is taken after '
                       'repeated failed unlock attempts and will appear here.',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                     ),
                   ),
                 ],
@@ -794,10 +800,10 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(title, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
                 Text(
                   subtitle,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -814,22 +820,22 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildLocationTab(DeviceSecurityProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Current location
           if (provider.status.lastKnownLocation != null) ...[
-            const Text(
+            Text(
               'Last Known Location',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             _buildLocationCard(provider.status.lastKnownLocation!, isCurrent: true),
           ],
 
           // Locate button
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -853,9 +859,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // Location history
           if (provider.locationHistory.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Location History',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...provider.locationHistory.take(10).map((loc) => _buildLocationCard(loc)),
@@ -867,6 +873,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildLocationCard(DeviceLocation location, {bool isCurrent = false}) {
     return GlassCard(
+      margin: isCurrent ? EdgeInsets.zero : null,
       tintColor: isCurrent ? GlassTheme.primaryAccent : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,7 +882,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             children: [
               GlassSvgIconBox(
                 icon: 'map_point',
-                color: isCurrent ? GlassTheme.primaryAccent : Colors.white54,
+                color: isCurrent ? GlassTheme.primaryAccent : context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -884,11 +891,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   children: [
                     Text(
                       location.address ?? 'Unknown Address',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                     ),
                     Text(
                       '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12, fontFamily: 'monospace'),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12, fontFamily: 'monospace'),
                     ),
                   ],
                 ),
@@ -899,19 +906,19 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              DuotoneIcon('clock_circle', size: 14, color: Colors.white.withAlpha(102)),
+              DuotoneIcon('clock_circle', size: 14, color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
               const SizedBox(width: 4),
               Text(
                 _formatTime(location.timestamp),
-                style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
               ),
               if (location.accuracy != null) ...[
                 const SizedBox(width: 16),
-                DuotoneIcon('map_point', size: 14, color: Colors.white.withAlpha(102)),
+                DuotoneIcon('map_point', size: 14, color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
                 const SizedBox(width: 4),
                 Text(
                   '±${location.accuracy!.toStringAsFixed(0)}m',
-                  style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                  style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
                 ),
               ],
             ],
@@ -923,7 +930,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildSimTab(DeviceSecurityProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -931,6 +938,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // platform) straight from the agent.
           if (provider.agentSimStatus != null) ...[
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Row(
                 children: [
                   DuotoneIcon('sim_card', size: 20, color: GlassTheme.primaryAccent),
@@ -938,27 +946,27 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   Expanded(
                     child: Text(
                       provider.agentSimStatus!,
-                      style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 12),
+                      style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8), fontSize: 12),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
 
           // Current SIMs (active subscriptions reported by this device).
           if (provider.currentSims.isNotEmpty) ...[
-            const Text(
+            Text(
               'Current SIM Cards',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
               'Android does not expose real ICCIDs to apps — entries marked '
               '"sub:" are stable subscription fingerprints used for change '
               'detection.',
-              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
             ),
             const SizedBox(height: 12),
             ...provider.currentSims.map((sim) => _buildSimCard(
@@ -971,9 +979,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // SIM change events with backend risk assessment.
           if (provider.simEvents.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'SIM Change Events',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...provider.simEvents.map(_buildSimEventCard),
@@ -1022,11 +1030,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               children: [
                 Text(
                   description,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   _formatTime(event.detectedAt),
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                 ),
               ],
             ),
@@ -1052,7 +1060,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 ? GlassTheme.successColor
                 : isCurrent
                     ? GlassTheme.primaryAccent
-                    : Colors.white54,
+                    : context.colors.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1061,16 +1069,16 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               children: [
                 Text(
                   sim.carrier ?? 'Unknown Carrier',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   sim.iccid,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11, fontFamily: 'monospace'),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11, fontFamily: 'monospace'),
                 ),
                 if (sim.phoneNumber != null)
                   Text(
                     sim.phoneNumber!,
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 12),
+                    style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 12),
                   ),
               ],
             ),
@@ -1102,12 +1110,12 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1122,22 +1130,22 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Lock Device', style: TextStyle(color: Colors.white)),
+        backgroundColor: context.colors.surface,
+        title: Text('Lock Device', style: TextStyle(color: context.colors.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Enter a message to display on the lock screen:',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.onSurface),
               decoration: InputDecoration(
                 hintText: 'e.g., "Call +1234567890 if found"',
-                hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -1166,7 +1174,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
+        backgroundColor: context.colors.surface,
         title: const Text('Wipe Device', style: TextStyle(color: GlassTheme.errorColor)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1176,17 +1184,17 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               style: TextStyle(color: GlassTheme.errorColor),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Type "WIPE" to confirm:',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.onSurface),
               decoration: InputDecoration(
                 hintText: 'WIPE',
-                hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -1215,11 +1223,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Mark as Lost', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        backgroundColor: context.colors.surface,
+        title: Text('Mark as Lost', style: TextStyle(color: context.colors.onSurface)),
+        content: Text(
           'This will enable tracking features and help locate your device.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -1239,11 +1247,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Mark as Stolen', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        backgroundColor: context.colors.surface,
+        title: Text('Mark as Stolen', style: TextStyle(color: context.colors.onSurface)),
+        content: Text(
           'This will activate all anti-theft features and enable continuous tracking.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -1268,11 +1276,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
+        backgroundColor: context.colors.surface,
         title: const Text('Enable Remote Wipe', style: TextStyle(color: GlassTheme.errorColor)),
-        content: const Text(
+        content: Text(
           'WARNING: Enabling this allows remote erasure of all data. Only enable if you understand the risks.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -1292,8 +1300,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Captured Photos', style: TextStyle(color: Colors.white)),
+        backgroundColor: context.colors.surface,
+        title: Text('Captured Photos', style: TextStyle(color: context.colors.onSurface)),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.separated(
@@ -1310,7 +1318,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   Text(
                     'Trigger: ${selfie.triggerType}'
                     '${selfie.capturedAt != null ? ' · ${_formatTime(selfie.capturedAt!)}' : ''}',
-                    style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11),
+                    style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
                   ),
                 ],
               );
@@ -1346,7 +1354,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     return Text(
       'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}) '
       '— cannot be rendered inline',
-      style: const TextStyle(color: Colors.white70, fontSize: 12),
+      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
     );
   }
 

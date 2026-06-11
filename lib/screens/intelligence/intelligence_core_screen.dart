@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -97,7 +98,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
       embedded: widget.embedded,
       actions: [
         IconButton(
-          icon: const DuotoneIcon('database', size: 22, color: Colors.white),
+          icon: DuotoneIcon('database', size: 22, color: context.onSurface),
           onPressed: () {
             Navigator.push(
               context,
@@ -109,7 +110,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           tooltip: 'Intelligence Sources',
         ),
         IconButton(
-          icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+          icon: DuotoneIcon('refresh', size: 22, color: context.onSurface),
           onPressed: _isLoading ? null : _loadIndicators,
           tooltip: 'Refresh',
         ),
@@ -122,7 +123,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         ),
         GlassTab(
           label: 'Check',
-          iconPath: 'magnifier',
+          iconPath: 'magnifer',
           content: _buildCheckTab(),
         ),
         GlassTab(
@@ -160,6 +161,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   Widget _buildBrowseTab() {
+    final cs = Theme.of(context).colorScheme;
     // Show loading state inline
     if (_isLoading) {
       return Center(
@@ -170,7 +172,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             const SizedBox(height: 16),
             Text(
               'Loading indicators...',
-              style: TextStyle(color: Colors.white.withAlpha(179)),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -187,12 +189,12 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             const SizedBox(height: 16),
             Text(
               'Failed to load indicators',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _error!,
-              style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -223,15 +225,15 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    const DuotoneIcon('magnifer', size: 20, color: Colors.white38),
+                    DuotoneIcon('magnifer', size: 20, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: cs.onSurface),
+                        decoration: InputDecoration(
                           hintText: 'Search indicators...',
-                          hintStyle: TextStyle(color: Colors.white38),
+                          hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                           border: InputBorder.none,
                         ),
                         onChanged: (value) => setState(() {}),
@@ -239,7 +241,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                     ),
                     if (_searchController.text.isNotEmpty)
                       IconButton(
-                        icon: const DuotoneIcon('close_circle', size: 20, color: Colors.white38),
+                        icon: DuotoneIcon('close_circle', size: 20, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {});
@@ -263,10 +265,10 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                         onSelected: (selected) {
                           setState(() => _selectedType = type);
                         },
-                        backgroundColor: Colors.white12,
+                        backgroundColor: cs.onSurface.withValues(alpha: 0.06),
                         selectedColor: GlassTheme.primaryAccent.withAlpha(50),
                         labelStyle: TextStyle(
-                          color: isSelected ? GlassTheme.primaryAccent : Colors.white70,
+                          color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                         checkmarkColor: GlassTheme.primaryAccent,
@@ -291,11 +293,11 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         // Indicators List
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             itemCount: filteredIndicators.length,
             itemBuilder: (context, index) {
               final indicator = filteredIndicators[index];
@@ -319,7 +321,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11)),
+            Text(label, style: TextStyle(color: context.onSurfaceMuted, fontSize: 11)),
           ],
         ),
       ),
@@ -327,6 +329,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   Widget _buildIndicatorCard(api.ThreatIndicator indicator) {
+    final cs = Theme.of(context).colorScheme;
     final statusColor = Color(indicator.severity.color);
     final statusText = indicator.severity.displayName;
 
@@ -345,8 +348,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               children: [
                 Text(
                   indicator.value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: cs.onSurface,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
                     fontSize: 13,
@@ -359,9 +362,13 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                   children: [
                     GlassBadge(text: _getTypeDisplayName(indicator.type), color: GlassTheme.primaryAccent, fontSize: 10),
                     const SizedBox(width: 8),
-                    Text(
-                      indicator.sourceName ?? 'Unknown',
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    Expanded(
+                      child: Text(
+                        indicator.sourceName ?? 'Unknown',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                      ),
                     ),
                   ],
                 ),
@@ -375,7 +382,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               const SizedBox(height: 4),
               Text(
                 '${(indicator.confidence * 100).toInt()}% conf',
-                style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
               ),
             ],
           ),
@@ -385,35 +392,37 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   Widget _buildCheckTab() {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Check Input
           GlassCard(
+            margin: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Check Indicator',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Enter an IP address, domain, URL, hash, or email to check against threat intelligence',
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _checkInputController,
-                  style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+                  style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'Enter indicators (one per line)\ne.g., 192.168.1.1\nmalware.com\n5d41402abc4b2a76b9719d911017c592',
-                    hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                    hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                     filled: true,
-                    fillColor: Colors.white.withAlpha(13),
+                    fillColor: cs.onSurface.withValues(alpha: 0.04),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -477,6 +486,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   Widget _buildQuickCheckButton(String icon, String title, String subtitle) {
     return Expanded(
       child: GlassCard(
+        margin: EdgeInsets.zero,
         onTap: () => _showQuickCheckDialog(context, title),
         child: Row(
           children: [
@@ -486,8 +496,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13)),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.onSurface, fontWeight: FontWeight.w500, fontSize: 13)),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
             ),
@@ -505,14 +515,14 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           children: [
             DuotoneIcon('history', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No Check History',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Your indicator checks will appear here',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.onSurfaceMuted),
             ),
           ],
         ),
@@ -520,7 +530,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: _checkHistory.length,
       itemBuilder: (context, index) {
         final result = _checkHistory[index];
@@ -544,7 +554,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               children: [
                 Text(
                   result.value, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                  style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                 ),
                 Row(
                   children: [
@@ -601,6 +611,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   void _showIndicatorDetails(BuildContext context, api.ThreatIndicator indicator) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = Color(indicator.severity.color);
 
     showModalBottomSheet(
@@ -612,13 +624,9 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(isDark: isDark),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -643,8 +651,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                         const SizedBox(height: 4),
                         SelectableText(
                           indicator.value,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'monospace',
@@ -671,12 +679,12 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               ),
               if (indicator.description != null) ...[
                 const SizedBox(height: 20),
-                const Text('Description', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Description', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(indicator.description!, style: TextStyle(color: Colors.white.withAlpha(179))),
+                Text(indicator.description!, style: TextStyle(color: cs.onSurfaceVariant)),
               ],
               const SizedBox(height: 20),
-              const Text('Tags', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Tags', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -685,7 +693,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               ),
               if (indicator.mitreTechniques != null && indicator.mitreTechniques!.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('MITRE Techniques', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('MITRE Techniques', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -724,21 +732,22 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   }
 
   void _showQuickCheckDialog(BuildContext context, String type) {
+    final cs = Theme.of(context).colorScheme;
     final controller = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: Text('Check $type', style: const TextStyle(color: Colors.white)),
+        backgroundColor: cs.surface,
+        title: Text('Check $type', style: TextStyle(color: cs.onSurface)),
         content: TextField(
           controller: controller,
-          style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+          style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
           decoration: InputDecoration(
             hintText: 'Enter $type',
-            hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+            hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
             filled: true,
-            fillColor: Colors.white.withAlpha(13),
+            fillColor: cs.onSurface.withValues(alpha: 0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -777,8 +786,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: context.onSurfaceMuted)),
+          Text(value, style: TextStyle(color: context.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );

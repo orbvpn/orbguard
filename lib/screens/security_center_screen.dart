@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../presentation/theme/app_theme.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
@@ -130,7 +131,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     final scoreColor = _getScoreColor(score);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0A0F) : Colors.grey[100],
+      // Transparent so the app-wide ambient gradient shows through —
+      // keeps this tab visually consistent with the other glass tabs.
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _onRefresh,
@@ -143,27 +146,27 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               children: [
                 // Header
                 _buildHeader(isDark),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Security Score Hero Card
                 _buildSecurityScoreCard(isDark, score, scoreColor),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Quick Actions Grid
                 _buildQuickActionsGrid(isDark),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Threat Intelligence Card
                 _buildThreatIntelCard(isDark),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Active Protections Card
                 _buildActiveProtectionsCard(isDark, settings),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Recent Activity
                 _buildRecentActivityCard(isDark),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Security Features Grid
                 _buildFeatureCardsGrid(isDark),
@@ -184,7 +187,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
+            color: context.onSurface,
           ),
         ),
       ],
@@ -200,6 +203,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
     return GlassCard(
       isDark: isDark,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(0),
         child: Column(
@@ -275,7 +279,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black,
+                          color: context.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -305,7 +309,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                             'danger_triangle',
                             '$_threatCount',
                             'Threats',
-                            _threatCount > 0 ? Colors.red : Colors.grey,
+                            _threatCount > 0 ? Colors.red : context.onSurfaceMuted,
                             isDark,
                           ),
                         ],
@@ -382,7 +386,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isDark ? Colors.white54 : Colors.black45,
+            color: context.onSurfaceMuted,
           ),
         ),
       ],
@@ -402,7 +406,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
+            color: context.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -467,33 +471,34 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
       },
       child: GlassCard(
         isDark: isDark,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(40),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: DuotoneIcon(icon, size: 24, color: color),
-                ),
+        margin: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        child: Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withAlpha(40),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-                textAlign: TextAlign.center,
+              child: Center(
+                child: DuotoneIcon(icon, size: 24, color: color),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: context.onSurfaceMuted,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
@@ -508,6 +513,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
     return GlassCard(
       isDark: isDark,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -525,7 +531,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
+                      color: context.onSurface,
                     ),
                   ),
                 ),
@@ -583,7 +589,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               'By Severity',
               style: TextStyle(
                 fontSize: 12,
-                color: isDark ? Colors.white54 : Colors.black45,
+                color: context.onSurfaceMuted,
               ),
             ),
             const SizedBox(height: 8),
@@ -604,14 +610,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
+            color: context.onSurface,
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 11,
-            color: isDark ? Colors.white54 : Colors.black45,
+            color: context.onSurfaceMuted,
           ),
           textAlign: TextAlign.center,
         ),
@@ -680,7 +686,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white70 : Colors.black54,
+            color: context.onSurfaceMuted,
           ),
         ),
       ],
@@ -699,6 +705,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
     return GlassCard(
       isDark: isDark,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -716,7 +723,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
+                      color: context.onSurface,
                     ),
                   ),
                 ),
@@ -785,14 +792,15 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: (isEnabled ? Colors.green : Colors.grey).withAlpha(40),
+              color: (isEnabled ? Colors.green : context.onSurfaceMuted)
+                  .withAlpha(40),
               shape: BoxShape.circle,
             ),
             child: Center(
               child: DuotoneIcon(
                 icon,
                 size: 20,
-                color: isEnabled ? Colors.green : Colors.grey,
+                color: isEnabled ? Colors.green : context.onSurfaceMuted,
               ),
             ),
           ),
@@ -805,14 +813,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                   title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : Colors.black,
+                    color: context.onSurface,
                   ),
                 ),
                 Text(
                   subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? Colors.white54 : Colors.black45,
+                    color: context.onSurfaceMuted,
                   ),
                 ),
               ],
@@ -835,7 +843,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   Widget _buildDivider(bool isDark) {
     return Divider(
       height: 1,
-      color: isDark ? Colors.white12 : Colors.black12,
+      color: context.colors.outline,
     );
   }
 
@@ -848,6 +856,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
     return GlassCard(
       isDark: isDark,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -865,7 +874,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
+                      color: context.onSurface,
                     ),
                   ),
                 ),
@@ -882,13 +891,13 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                       DuotoneIcon(
                         'check_circle',
                         size: 48,
-                        color: isDark ? Colors.white38 : Colors.black26,
+                        color: context.onSurfaceMuted.withValues(alpha: 0.7),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'No recent security activity',
                         style: TextStyle(
-                          color: isDark ? Colors.white54 : Colors.black45,
+                          color: context.onSurfaceMuted,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -896,7 +905,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                         'Your recent scans will appear here',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? Colors.white38 : Colors.black26,
+                          color: context.onSurfaceMuted.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -965,14 +974,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                   title, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: isAlert ? Colors.red : (isDark ? Colors.white : Colors.black),
+                    color: isAlert ? Colors.red : context.onSurface,
                   ),
                 ),
                 Text(
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? Colors.white54 : Colors.black45,
+                    color: context.onSurfaceMuted,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -984,7 +993,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             _formatTimeAgo(time),
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? Colors.white38 : Colors.black26,
+              color: context.onSurfaceMuted.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -1005,7 +1014,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
+            color: context.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -1013,7 +1022,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          // mainAxisSpacing: 12,
+          mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.2,
           children: [
@@ -1072,6 +1081,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
       },
       child: GlassCard(
         isDark: isDark,
+        margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(0),
           child: Column(
@@ -1091,10 +1101,12 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               const Spacer(),
               Text(
                 title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: isDark ? Colors.white : Colors.black,
+                  color: context.onSurface,
                 ),
               ),
               const SizedBox(height: 2),
@@ -1102,7 +1114,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                 description,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isDark ? Colors.white54 : Colors.black45,
+                  color: context.onSurfaceMuted,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

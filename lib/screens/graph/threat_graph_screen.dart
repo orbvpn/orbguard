@@ -104,14 +104,18 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                         children: [
                           IconButton(
                             icon: DuotoneIcon(AppIcons.search,
-                                size: 22, color: Colors.white),
+                                size: 22,
+                                color:
+                                    Theme.of(context).colorScheme.onSurface),
                             onPressed: () =>
                                 _showSearchDialog(context, provider),
                             tooltip: 'Search',
                           ),
                           IconButton(
                             icon: DuotoneIcon(AppIcons.refresh,
-                                size: 22, color: Colors.white),
+                                size: 22,
+                                color:
+                                    Theme.of(context).colorScheme.onSurface),
                             onPressed: provider.isLoadingGraph
                                 ? null
                                 : () => provider.loadGraphData(),
@@ -144,6 +148,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildErrorState(ThreatHuntingProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -153,10 +158,10 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
             DuotoneIcon(AppIcons.dangerTriangle,
                 size: 56, color: GlassTheme.errorColor),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Graph Unavailable',
               style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold),
             ),
@@ -164,7 +169,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
             Text(
               provider.graphError!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -182,6 +187,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -189,17 +195,17 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
           DuotoneIcon(AppIcons.structure,
               size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Graph Data',
             style: TextStyle(
-                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'The threat graph has no nodes yet — indicators, campaigns and '
             'actors appear here once they are synced to the graph database.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
         ],
       ),
@@ -207,6 +213,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildGraphVisualization() {
+    final cs = Theme.of(context).colorScheme;
     final layout = _layout;
     if (layout == null) return const SizedBox.shrink();
 
@@ -231,6 +238,8 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                     painter: _ThreatGraphPainter(
                       layout: layout,
                       nodeColor: _getNodeColor,
+                      edgeColor: cs.onSurface.withValues(alpha: 0.18),
+                      labelColor: cs.onSurfaceVariant,
                     ),
                   ),
                 );
@@ -248,12 +257,13 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                           '(${_relations.length} relationships)'
                       : '$totalCount entities, ${_relations.length} relationships',
                   style:
-                      TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                      TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                 ),
                 Text(
                   'Tap a node for details',
-                  style:
-                      TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                  style: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      fontSize: 11),
                 ),
               ],
             ),
@@ -293,7 +303,9 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
         ),
         const SizedBox(width: 4),
         Text(label,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 10)),
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 10)),
       ],
     );
   }
@@ -316,7 +328,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
 
   Widget _buildEntityList() {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
         const GlassSectionHeader(title: 'Entities'),
         ..._nodes.take(50).map(_buildEntityCard),
@@ -325,6 +337,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildEntityCard(GraphNode node) {
+    final cs = Theme.of(context).colorScheme;
     final color = _getNodeColor(node.type);
 
     return GlassCard(
@@ -344,8 +357,8 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                   node.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: cs.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   _displayType(node.type).toUpperCase(),
@@ -360,7 +373,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
               Text(
                 '${node.relationCount} relations',
                 style:
-                    TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                    TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
               ),
               if (node.confidence != null)
                 Text(
@@ -376,6 +389,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   void _showEntityDetails(BuildContext context, GraphNode node) {
+    final cs = Theme.of(context).colorScheme;
     final color = _getNodeColor(node.type);
     final relatedRelations = _relations
         .where((r) => r.sourceId == node.id || r.targetId == node.id)
@@ -390,13 +404,11 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            gradient: GlassTheme.backgroundGradient(
+                isDark: Theme.of(context).brightness == Brightness.dark),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -419,8 +431,8 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                           node.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
+                          style: TextStyle(
+                              color: cs.onSurface,
                               fontSize: 18,
                               fontWeight: FontWeight.bold),
                         ),
@@ -453,10 +465,10 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
               // Raw graph properties (real data from Neo4j)
               if (node.properties.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Properties',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: cs.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold),
                 ),
@@ -476,10 +488,10 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
               // Related entities
               if (relatedRelations.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Related Entities',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: cs.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold),
                 ),
@@ -494,6 +506,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildRelationCard(GraphRelation relation, String currentNodeId) {
+    final cs = Theme.of(context).colorScheme;
     final isSource = relation.sourceId == currentNodeId;
     final relatedNodeId = isSource ? relation.targetId : relation.sourceId;
     final relatedNode = _nodes
@@ -523,13 +536,13 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                   relatedNode?.name ?? relatedNodeId,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: cs.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   '${isSource ? "→" : "←"} ${relation.relationType}',
                   style: TextStyle(
-                      color: Colors.white.withAlpha(128), fontSize: 11),
+                      color: cs.onSurfaceVariant, fontSize: 11),
                 ),
               ],
             ),
@@ -540,20 +553,21 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
           const SizedBox(width: 12),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: cs.onSurface, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -563,20 +577,21 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
 
   void _showSearchDialog(
       BuildContext context, ThreatHuntingProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title:
-            const Text('Search Graph', style: TextStyle(color: Colors.white)),
+        title: Text('Search Graph', style: TextStyle(color: cs.onSurface)),
         content: TextField(
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Search indicators, actors, campaigns...',
-            hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+            hintStyle: TextStyle(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
-              child: DuotoneIcon(AppIcons.search, size: 20, color: Colors.white54),
+              child: DuotoneIcon(AppIcons.search,
+                  size: 20, color: cs.onSurfaceVariant),
             ),
           ),
           onSubmitted: (value) {
@@ -844,13 +859,20 @@ class _GraphLayout {
 class _ThreatGraphPainter extends CustomPainter {
   final _GraphLayout layout;
   final Color Function(String type) nodeColor;
+  final Color edgeColor;
+  final Color labelColor;
 
-  _ThreatGraphPainter({required this.layout, required this.nodeColor});
+  _ThreatGraphPainter({
+    required this.layout,
+    required this.nodeColor,
+    required this.edgeColor,
+    required this.labelColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final edgePaint = Paint()
-      ..color = Colors.white.withAlpha(46)
+      ..color = edgeColor
       ..strokeWidth = 1;
 
     for (final (a, b, _) in layout.edges) {
@@ -884,7 +906,7 @@ class _ThreatGraphPainter extends CustomPainter {
           text: TextSpan(
             text: label,
             style: TextStyle(
-              color: Colors.white.withAlpha(179),
+              color: labelColor,
               fontSize: 9,
             ),
           ),
@@ -902,5 +924,7 @@ class _ThreatGraphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ThreatGraphPainter oldDelegate) =>
-      oldDelegate.layout != layout;
+      oldDelegate.layout != layout ||
+      oldDelegate.edgeColor != edgeColor ||
+      oldDelegate.labelColor != labelColor;
 }

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -40,7 +41,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: DuotoneIcon(AppIcons.shield, size: 22, color: Colors.white),
+                  icon: DuotoneIcon(AppIcons.shield, size: 22, color: context.colors.onSurface),
                   onPressed: provider.isAuditing ? null : () => provider.runAudit(),
                   tooltip: 'Run Audit',
                 ),
@@ -84,7 +85,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
 
   Widget _buildOverviewTab(PrivacyProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -96,9 +97,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           const SizedBox(height: 24),
 
           // Quick Settings
-          const Text(
+          Text(
             'Protection Settings',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -139,9 +140,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
 
           // Stats
           if (provider.lastAudit != null) ...[
-            const Text(
+            Text(
               'Privacy Stats',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Row(
@@ -156,9 +157,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           // Issues found by the audit
           if (provider.lastAudit != null && provider.lastAudit!.issues.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Issues Found',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...provider.lastAudit!.issues.map((issue) => GlassCard(
@@ -173,7 +174,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                           issue,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                         ),
                       ),
                     ],
@@ -184,9 +185,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           // Recommendations
           if (provider.lastAudit != null && provider.lastAudit!.recommendations.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Recommendations',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...provider.lastAudit!.recommendations.map((rec) => GlassCard(
@@ -199,7 +200,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                           rec,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                         ),
                       ),
                     ],
@@ -220,6 +221,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             : GlassTheme.errorColor;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: color,
       child: Row(
         children: [
@@ -232,7 +234,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                 CircularProgressIndicator(
                   value: score / 100,
                   strokeWidth: 8,
-                  backgroundColor: Colors.white12,
+                  backgroundColor:
+                      context.colors.onSurface.withValues(alpha: 0.06),
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
@@ -249,9 +252,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               children: [
                 Row(
                   children: [
-                    const Text(
+                    Text(
                       'Privacy Score',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     if (audit.grade != null) ...[
                       const SizedBox(width: 8),
@@ -266,7 +269,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                       : score >= 50
                           ? 'Some privacy improvements needed'
                           : 'Your privacy needs attention', maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                 ),
                 if (audit.riskLevel != null) ...[
                   const SizedBox(height: 4),
@@ -287,19 +290,22 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
   /// result exists — including the provider's specific unavailability reason.
   Widget _buildAuditUnavailableCard(PrivacyProvider provider) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const GlassSvgIconBox(icon: AppIcons.shield, color: Colors.white54),
+              GlassSvgIconBox(
+                  icon: AppIcons.shield,
+                  color: context.colors.onSurfaceVariant),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Privacy Audit Not Available',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
               if (provider.isAuditing)
@@ -316,7 +322,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             provider.auditUnavailableReason ??
                 'No audit has been run yet. Tap the shield icon above to run '
                     'a privacy audit.',
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
           ),
         ],
       ),
@@ -340,10 +346,10 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
                 Text(
                   subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -369,7 +375,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -378,7 +384,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
 
   Widget _buildCameraMicTab(PrivacyProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -387,9 +393,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             children: [
               DuotoneIcon(AppIcons.camera, color: GlassTheme.primaryAccent, size: 24),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Recent Camera Access',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -407,9 +413,9 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             children: [
               DuotoneIcon(AppIcons.microphone, color: const Color(0xFFFF5722), size: 24),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Recent Microphone Access',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -441,7 +447,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '${provider.backgroundEvents.length} apps accessed camera/mic in the background',
-                    style: TextStyle(color: Colors.white.withAlpha(179)),
+                    style: TextStyle(color: context.colors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -457,7 +463,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
       child: Center(
         child: Text(
           message,
-          style: TextStyle(color: Colors.white.withAlpha(128)),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
       ),
     );
@@ -480,7 +486,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               children: [
                 Text(
                   event.appName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   event.isBackground ? 'Background access' : 'Foreground access', maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -491,7 +497,10 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           ),
           Text(
             _formatTime(event.timestamp),
-            style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+            style: TextStyle(
+                color:
+                    context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+                fontSize: 11),
           ),
         ],
       ),
@@ -513,10 +522,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Blocked count
         GlassCard(
+          margin: EdgeInsets.zero,
           tintColor: GlassTheme.successColor,
           child: Row(
             children: [
@@ -528,11 +538,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   children: [
                     Text(
                       '${provider.blockedTrackers.length} Trackers Blocked', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       'Out of ${provider.trackers.length} known trackers', maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -540,7 +550,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         ...groupedTrackers.entries.map((entry) {
           return Column(
@@ -570,11 +580,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               children: [
                 Text(
                   tracker.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   tracker.company, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -599,7 +609,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: provider.events.length,
       itemBuilder: (context, index) {
         final event = provider.events[index];
@@ -621,12 +631,12 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: context.colors.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
