@@ -643,6 +643,67 @@ func (r *DeviceSecurityRepository) InsertDefaultSettings(ctx context.Context, se
 }
 
 // ---------------------------------------------------------------------------
+// Push tokens (FCM real-time command delivery)
+// ---------------------------------------------------------------------------
+
+// UpsertToken stores/refreshes a device's FCM registration token in the
+// dedicated device_push_tokens table and mirrors it onto the anti-theft device
+// record (best-effort, only when the device is registered) for backwards
+// compatibility with consumers that read device_security_devices.push_token.
+func (r *DeviceSecurityRepository) UpsertToken(ctx context.Context, deviceID, token, platform string) error {
+	if _, err := r.pool.Exec(ctx, `
+		INSERT INTO device_push_tokens (device_id, fcm_token, platform, fcm_token_updated_at, created_at)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (device_id) DO UPDATE SET
+		  fcm_token            = EXCLUDED.fcm_token,
+		  platform             = EXCLUDED.platform,
+		  fcm_token_updated_at = NOW()`,
+		deviceID, token, platform); err != nil {
+		return err
+	}
+
+	// Mirror onto the device record when one exists; ignore if not registered.
+	_, _ = r.pool.Exec(ctx, `
+		UPDATE device_security_devices SET push_token = $2, updated_at = NOW()
+		WHERE device_id = $1`,
+		deviceID, token)
+	return nil
+}
+
+// GetToken returns a device's current FCM token, or an empty string when no
+// token is registered.
+func (r *DeviceSecurityRepository) GetToken(ctx context.Context, deviceID string) (string, error) {
+	var token string
+	err := r.pool.QueryRow(ctx,
+		`SELECT fcm_token FROM device_push_tokens WHERE device_id = $1`,
+		deviceID).Scan(&token)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// ClearToken removes a device's FCM token (used when FCM reports the token is
+// UNREGISTERED). The row is kept with an empty token so platform/history are
+// retained; the device record mirror is also cleared.
+func (r *DeviceSecurityRepository) ClearToken(ctx context.Context, deviceID string) error {
+	if _, err := r.pool.Exec(ctx, `
+		UPDATE device_push_tokens SET fcm_token = '', fcm_token_updated_at = NOW()
+		WHERE device_id = $1`,
+		deviceID); err != nil {
+		return err
+	}
+	_, _ = r.pool.Exec(ctx, `
+		UPDATE device_security_devices SET push_token = '', updated_at = NOW()
+		WHERE device_id = $1`,
+		deviceID)
+	return nil
+}
+
+// ---------------------------------------------------------------------------
 // Stats
 // ---------------------------------------------------------------------------
 

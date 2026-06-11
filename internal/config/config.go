@@ -33,6 +33,20 @@ type Config struct {
 	SafeBrowsing SafeBrowsingConfig `mapstructure:"safe_browsing"`
 	ScamDetector ScamDetectorConfig `mapstructure:"scam_detector"`
 	DNSCanary    DNSCanaryConfig    `mapstructure:"dns_canary"`
+	Push         PushConfig         `mapstructure:"push"`
+}
+
+// PushConfig holds Firebase Cloud Messaging (FCM HTTP v1) configuration for
+// real-time anti-theft command delivery. When Enabled is false, or either
+// FCMProjectID or FCMServiceAccountJSON is empty, the push service runs as an
+// explicit no-op (commands are still delivered by device polling).
+type PushConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+	// FCMProjectID is the Firebase/GCP project id used in the FCM v1 send URL.
+	FCMProjectID string `mapstructure:"fcm_project_id"`
+	// FCMServiceAccountJSON is the service-account credential: either the raw
+	// JSON content or a path to a file containing it. Both forms are accepted.
+	FCMServiceAccountJSON string `mapstructure:"fcm_service_account_json"`
 }
 
 // DNSCanaryConfig holds the DNS leak-check canary settings. Zone is the
@@ -401,6 +415,12 @@ func Load(configPath string) (*Config, error) {
 	// check reported unavailable)
 	v.BindEnv("dns_canary.zone", "ORBGUARD_DNS_CANARY_ZONE")
 
+	// FCM push (real-time anti-theft command delivery). Empty project id /
+	// service-account JSON keeps push as an explicit no-op (polling only).
+	v.BindEnv("push.enabled", "ORBGUARD_PUSH_ENABLED")
+	v.BindEnv("push.fcm_project_id", "ORBGUARD_FCM_PROJECT_ID")
+	v.BindEnv("push.fcm_service_account_json", "ORBGUARD_FCM_SERVICE_ACCOUNT_JSON")
+
 	// Defaults for sections that may be absent from older config files.
 	// PatternDB and PhoneRep are local databases with no external dependency,
 	// so they default to enabled. LLM/vision/speech default to enabled but
@@ -420,6 +440,12 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("intelx.enabled", true)
 	v.SetDefault("intelx.base_url", "https://2.intelx.io")
 	v.SetDefault("dns_canary.zone", "")
+
+	// Push defaults: master switch on, but effective only when FCM credentials
+	// are configured (gated at startup on project id + service-account JSON).
+	v.SetDefault("push.enabled", true)
+	v.SetDefault("push.fcm_project_id", "")
+	v.SetDefault("push.fcm_service_account_json", "")
 
 	// Source API keys
 	v.BindEnv("sources.threatfox.api_key", "ORBGUARD_THREATFOX_API_KEY")

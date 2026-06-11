@@ -30,11 +30,13 @@ require (
 	github.com/miekg/dns v1.1.72
 	github.com/nats-io/nats.go v1.48.0
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.4
+	golang.org/x/oauth2 v0.30.0
 	howett.net/plist v1.0.1
 	modernc.org/sqlite v1.46.1
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

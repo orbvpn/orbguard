@@ -343,6 +343,16 @@ func (c *LLMClient) getScamDetectionSystemPrompt() string {
 6. Detect suspicious URLs and domains
 7. Identify requests for personal/financial information
 
+## Response Language:
+Write all human-readable fields (explanation, red_flags, safety_tips, intent,
+manipulation_tactics) in **English by default**. A "Language" hint may be
+supplied with the content; treat it only as a low-confidence signal. Switch to
+that language ONLY when the message content itself is clearly and predominantly
+written in that non-English language (multiple full words/sentences in it).
+Short or ambiguous messages — including short English phishing texts that may be
+mis-tagged — must always be explained in English. Do not guess a language from a
+few characters.
+
 ## Response Format:
 Respond in valid JSON format with this structure:
 {

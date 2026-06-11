@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"orbguard-lab/internal/domain/models"
+	"orbguard-lab/internal/domain/services/push"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
@@ -35,17 +36,49 @@ const deviceCacheTTL = 60 * time.Second
 type DeviceSecurityService struct {
 	repo   *repository.DeviceSecurityRepository
 	cache  *cache.RedisCache
+	push   push.Sender
 	logger *logger.Logger
 }
 
 // NewDeviceSecurityService creates a new device security service. repo may be
 // nil when the API runs without a database; persistence-dependent operations
 // then return ErrDeviceSecurityPersistenceUnavailable.
-func NewDeviceSecurityService(repo *repository.DeviceSecurityRepository, c *cache.RedisCache, log *logger.Logger) *DeviceSecurityService {
+//
+// pushSender delivers real-time "command pending" notifications so devices
+// poll immediately after a remote command is issued. It may be nil (or a
+// disabled no-op Sender) — command creation never depends on push success.
+func NewDeviceSecurityService(repo *repository.DeviceSecurityRepository, c *cache.RedisCache, pushSender push.Sender, log *logger.Logger) *DeviceSecurityService {
 	return &DeviceSecurityService{
 		repo:   repo,
 		cache:  c,
+		push:   pushSender,
 		logger: log.WithComponent("device-security"),
+	}
+}
+
+// RegisterPushToken stores/refreshes a device's FCM token so anti-theft
+// commands can be delivered in real time. platform is "android" or "ios".
+func (s *DeviceSecurityService) RegisterPushToken(ctx context.Context, deviceID, token, platform string) error {
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
+	if err := s.repo.UpsertToken(ctx, deviceID, token, platform); err != nil {
+		return fmt.Errorf("persist push token: %w", err)
+	}
+	s.invalidateDeviceCache(ctx, deviceID)
+	s.logger.Info().Str("device_id", deviceID).Str("platform", platform).Msg("push token registered")
+	return nil
+}
+
+// notifyCommandPending best-effort delivers a real-time push so the device
+// polls immediately. Any failure is logged and swallowed: the command is still
+// delivered by polling, so push must never affect command-creation outcome.
+func (s *DeviceSecurityService) notifyCommandPending(ctx context.Context, deviceID string) {
+	if s.push == nil {
+		return
+	}
+	if err := s.push.NotifyCommand(ctx, deviceID); err != nil {
+		s.logger.Warn().Err(err).Str("device_id", deviceID).Msg("command push notification failed (command still polled)")
 	}
 }
 
@@ -293,6 +326,11 @@ func (s *DeviceSecurityService) IssueCommand(ctx context.Context, cmd *models.Re
 		Str("command", string(cmd.Type)).
 		Str("command_id", cmd.ID.String()).
 		Msg("command issued")
+
+	// Best-effort real-time delivery: tell the device to poll now. Push
+	// failure never fails command creation — the command is already persisted
+	// and will be delivered by polling.
+	s.notifyCommandPending(ctx, cmd.DeviceID)
 
 	return nil
 }

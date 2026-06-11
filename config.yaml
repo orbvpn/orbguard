@@ -287,3 +287,13 @@ scam_detector:
 # unavailable instead of fabricating a result.
 dns_canary:
   zone: ""  # Set via ORBGUARD_DNS_CANARY_ZONE env
+
+# Firebase Cloud Messaging (FCM HTTP v1) push for real-time anti-theft command
+# delivery. When enabled is false, or fcm_project_id / fcm_service_account_json
+# is empty, push runs as an explicit no-op and remote commands are delivered by
+# device polling instead. fcm_service_account_json accepts either the raw JSON
+# content or a path to the service-account key file.
+push:
+  enabled: true
+  fcm_project_id: ""           # Set via ORBGUARD_FCM_PROJECT_ID env
+  fcm_service_account_json: "" # Set via ORBGUARD_FCM_SERVICE_ACCOUNT_JSON env (JSON content or file path)

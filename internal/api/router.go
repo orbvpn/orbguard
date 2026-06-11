@@ -505,6 +505,9 @@ func (r *Router) Setup() http.Handler {
 			dev.Get("/{device_id}/settings", r.handlers.DeviceSecurity.GetSettings)
 			dev.Put("/{device_id}/settings", r.handlers.DeviceSecurity.UpdateSettings)
 
+			// FCM push token registration (real-time command delivery)
+			dev.Post("/{device_id}/push-token", r.handlers.DeviceSecurity.RegisterPushToken)
+
 			// OS vulnerability auditing
 			dev.Post("/vulnerabilities/audit", r.handlers.DeviceSecurity.AuditOSVulnerabilities)
 

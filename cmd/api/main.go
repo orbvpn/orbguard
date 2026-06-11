@@ -20,6 +20,7 @@ import (
 	"orbguard-lab/internal/domain/services/ai"
 	"orbguard-lab/internal/domain/services/desktop_security"
 	"orbguard-lab/internal/domain/services/digital_footprint"
+	"orbguard-lab/internal/domain/services/push"
 	"orbguard-lab/internal/forensics"
 	grpcserver "orbguard-lab/internal/grpc/threatintel"
 	"orbguard-lab/internal/infrastructure/cache"
@@ -250,8 +251,21 @@ func main() {
 	privacyService := services.NewPrivacyService(redisCache, log)
 	log.Info().Msg("privacy protection service initialized")
 
+	// Initialize FCM push service for real-time anti-theft command delivery.
+	// Config-gated: a no-op (polling-only) when FCM credentials are absent.
+	// A nil repo means no token store, so push self-disables in that mode.
+	var pushTokenStore push.TokenStore
+	if deviceSecurityRepo != nil {
+		pushTokenStore = deviceSecurityRepo
+	}
+	pushService := push.NewService(push.Config{
+		Enabled:            cfg.Push.Enabled,
+		ProjectID:          cfg.Push.FCMProjectID,
+		ServiceAccountJSON: cfg.Push.FCMServiceAccountJSON,
+	}, pushTokenStore, log)
+
 	// Initialize device security service (anti-theft, SIM monitoring, OS vulnerabilities)
-	deviceSecurityService := services.NewDeviceSecurityService(deviceSecurityRepo, redisCache, log)
+	deviceSecurityService := services.NewDeviceSecurityService(deviceSecurityRepo, redisCache, pushService, log)
 	log.Info().Msg("device security service initialized")
 
 	// Initialize QR security service (quishing protection)
