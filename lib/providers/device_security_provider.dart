@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api/orbguard_api_client.dart';
 import '../services/device_agent/agent_api.dart';
 import '../services/device_agent/device_agent.dart';
+import '../services/device_agent/push_service.dart';
 
 /// Device command type (backend models.CommandType values).
 enum DeviceCommand {
@@ -464,6 +465,14 @@ class DeviceSecurityProvider extends ChangeNotifier {
           deviceId: _deviceId!,
           policy: _settings.toAgentPolicy(),
         );
+
+        // Wire up push wake-ups now that the device is registered. With FCM
+        // disabled (the default build) this is a logged no-op and the agent's
+        // HTTP polling stays the wake mechanism; once Firebase is enabled
+        // (docs/FCM_SETUP.md) it obtains + registers the token and registers
+        // the message handler that calls DevicePushService.onPushReceived().
+        unawaited(DevicePushService.instance.init());
+
         _initialized = true;
       }
     } catch (e) {

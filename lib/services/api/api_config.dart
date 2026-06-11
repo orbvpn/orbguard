@@ -760,6 +760,18 @@ class ApiEndpoints {
   /// "platform" and "os_version" are REQUIRED (400 otherwise)
   static const String deviceVulnerabilitiesAudit = '$_v1/device/vulnerabilities/audit';
 
+  /// Register a push (FCM/APNs) token for a device so the backend can wake the
+  /// device-agent with a high-priority data push instead of waiting for the
+  /// next HTTP poll.
+  /// POST /api/v1/device/{device_id}/push-token
+  /// Body: { "token": "<fcm/apns token>", "platform": "android"|"ios" }
+  ///
+  /// ACTIVATION: the backend handler + migration 022 (device push_token column
+  /// already exists; 022 adds the route wiring + FCM sender config) ship with
+  /// the FCM rollout — see docs/FCM_SETUP.md. Until Firebase provides a token
+  /// on-device this endpoint is never called, so it is inert in current builds.
+  static String devicePushToken(String id) => '$_v1/device/$id/push-token';
+
   // ============================================
   // FORENSICS
   // ============================================

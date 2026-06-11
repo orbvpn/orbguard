@@ -555,6 +555,36 @@ class OrbGuardApiClient {
     }
   }
 
+  /// Register a push (FCM/APNs) token for the registered device so the backend
+  /// can wake the device-agent with a high-priority data push.
+  /// POST /api/v1/device/{device_id}/push-token
+  /// Body: { "token", "platform" }
+  ///
+  /// [platform] defaults to the current OS ("android"/"ios"). This is only
+  /// invoked once Firebase Cloud Messaging hands the app a real token (see
+  /// DevicePushService and docs/FCM_SETUP.md); with no Firebase dependency in
+  /// the current build it is never called.
+  Future<bool> registerPushToken(String token, {String? platform}) async {
+    if (token.isEmpty) {
+      throw ApiError(
+        message: 'A non-empty push token is required',
+        code: 'INVALID_ARGUMENT',
+      );
+    }
+    try {
+      await _dio.post(
+        ApiEndpoints.devicePushToken(_requiredDeviceId),
+        data: {
+          'token': token,
+          'platform': platform ?? Platform.operatingSystem,
+        },
+      );
+      return true;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
   // ============================================
   // FORENSICS
   // ============================================
