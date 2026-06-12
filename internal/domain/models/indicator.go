@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,7 +86,9 @@ type Indicator struct {
 	CVEIDs      []string `json:"cve_ids,omitempty" db:"cve_ids"`
 	ReportCount int      `json:"report_count" db:"report_count"`
 	SourceCount int      `json:"source_count" db:"source_count"`
-	Metadata    []byte   `json:"metadata,omitempty" db:"metadata"`
+	// json.RawMessage (not []byte): a plain []byte marshals to a base64
+	// string, which mobile clients cannot parse as the JSON object it is.
+	Metadata json.RawMessage `json:"metadata,omitempty" db:"metadata"`
 
 	// Audit
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
