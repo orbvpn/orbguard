@@ -1,6 +1,27 @@
 // Threat Indicator Models
 // Models for threat indicators from OrbGuard Lab API
 
+import 'dart:convert';
+
+/// Backend JSON-blob fields (metadata/properties) arrive in different shapes
+/// depending on server version: a JSON object, a JSON string, or — when Go
+/// marshals a []byte column — a base64-encoded JSON blob. Accept all three;
+/// anything unparseable becomes null instead of failing the whole response.
+Map<String, dynamic>? parseJsonBlob(dynamic raw) {
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  if (raw is String && raw.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    try {
+      final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+  }
+  return null;
+}
+
 /// Types of threat indicators
 enum IndicatorType {
   domain('domain'),
@@ -172,7 +193,7 @@ class ThreatIndicator {
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      metadata: parseJsonBlob(json['metadata']),
       mitreTechniques:
           (json['mitre_techniques'] as List<dynamic>?)?.cast<String>(),
     );
@@ -469,7 +490,7 @@ class GraphNode {
       id: json['id'] as String,
       label: json['label'] as String? ?? '',
       type: json['type'] as String? ?? 'unknown',
-      properties: json['properties'] as Map<String, dynamic>?,
+      properties: parseJsonBlob(json['properties']),
     );
   }
 }
@@ -493,7 +514,7 @@ class GraphEdge {
       source: json['source'] as String,
       target: json['target'] as String,
       relationship: json['relationship'] as String? ?? 'related',
-      properties: json['properties'] as Map<String, dynamic>?,
+      properties: parseJsonBlob(json['properties']),
     );
   }
 }

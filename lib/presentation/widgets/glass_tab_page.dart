@@ -35,6 +35,7 @@ class GlassTabPage extends StatefulWidget {
   final List<Widget>? actions;
   final Widget? headerContent;
   final int initialIndex;
+
   /// When true, skips the outer GlassPage wrapper (for embedding in other screens)
   final bool embedded;
 
@@ -145,45 +146,65 @@ class GlassTabPageState extends State<GlassTabPage>
       title: widget.title,
       actions: widget.actions,
       embedded: widget.embedded,
-      body: Stack(
-        children: [
-          // Header content + Tab content
-          Column(
-            children: [
-              // Optional header content (like action buttons)
-              if (widget.headerContent != null) widget.headerContent!,
+      body: widget.embedded ? _buildEmbeddedLayout() : _buildStandaloneLayout(),
+    );
+  }
 
-              // Tab content
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children:
-                      widget.tabs.map((tab) => tab.content).toList(),
-                ),
-              ),
+  /// Standalone screens own the whole page, so the tab selector floats at the
+  /// bottom like the app's main navigation bar.
+  Widget _buildStandaloneLayout() {
+    return Stack(
+      children: [
+        // Header content + Tab content
+        Column(
+          children: [
+            // Optional header content (like action buttons)
+            if (widget.headerContent != null) widget.headerContent!,
 
-              // Space for bottom nav (height + margin only, SafeArea handles safe area)
-              const SizedBox(height: 60 + 12),
-            ],
-          ),
+            // Tab content
+            Expanded(child: _buildTabContent()),
 
-          // Bottom navigation
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildBottomNav(),
-          ),
-        ],
-      ),
+            // Space for bottom nav (height + margin only, SafeArea handles safe area)
+            const SizedBox(height: 60 + 12),
+          ],
+        ),
+
+        // Bottom navigation
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: _buildBottomNav(),
+        ),
+      ],
+    );
+  }
+
+  /// Embedded screens sit inside the app shell, which already shows the main
+  /// bottom navigation bar — render the tab selector at the top instead of
+  /// stacking a second pill above it.
+  Widget _buildEmbeddedLayout() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: _buildNavRow(),
+        ),
+        if (widget.headerContent != null) widget.headerContent!,
+        Expanded(child: _buildTabContent()),
+      ],
+    );
+  }
+
+  Widget _buildTabContent() {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      children: widget.tabs.map((tab) => tab.content).toList(),
     );
   }
 
   Widget _buildBottomNav() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).colorScheme.onSurface;
-
     // SafeArea in GlassPage already handles safe area insets
     // We only add 12px margin from the safe area boundary
     return Padding(
@@ -192,7 +213,15 @@ class GlassTabPageState extends State<GlassTabPage>
         right: 16,
         bottom: 12,
       ),
-      child: AnimatedBuilder(
+      child: _buildNavRow(),
+    );
+  }
+
+  Widget _buildNavRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
+    return AnimatedBuilder(
         animation: _searchExpandAnimation,
         builder: (context, child) {
           return Row(
@@ -217,9 +246,7 @@ class GlassTabPageState extends State<GlassTabPage>
               ],
             ],
           );
-        },
-      ),
-    );
+        });
   }
 
   Widget _buildTabsContainer(bool isDark, Color textColor) {
@@ -267,9 +294,8 @@ class GlassTabPageState extends State<GlassTabPage>
                           DuotoneIcon(
                             tab.iconPath,
                             size: 22,
-                            color: isSelected
-                                ? cs.primary
-                                : cs.onSurfaceVariant,
+                            color:
+                                isSelected ? cs.primary : cs.onSurfaceVariant,
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -278,11 +304,11 @@ class GlassTabPageState extends State<GlassTabPage>
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 9,
-                              fontWeight:
-                                  isSelected ? FontWeight.w600 : FontWeight.w500,
-                              color: isSelected
-                                  ? cs.primary
-                                  : cs.onSurfaceVariant,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color:
+                                  isSelected ? cs.primary : cs.onSurfaceVariant,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -305,7 +331,8 @@ class GlassTabPageState extends State<GlassTabPage>
       child: Container(
         width: 60,
         height: 60,
-        decoration: GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
+        decoration:
+            GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
         child: ClipOval(
           child: BackdropFilter(
             filter: GlassTheme.blurFilter,
@@ -329,7 +356,8 @@ class GlassTabPageState extends State<GlassTabPage>
       child: Container(
         width: 60,
         height: 60,
-        decoration: GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
+        decoration:
+            GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
         child: ClipOval(
           child: BackdropFilter(
             filter: GlassTheme.blurFilter,
