@@ -74,7 +74,7 @@ class Campaign {
           SeverityLevel.fromString(json['severity'] as String? ?? 'unknown'),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      metadata: parseJsonBlob(json['metadata']),
     );
   }
 

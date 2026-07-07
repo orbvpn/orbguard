@@ -944,7 +944,7 @@ class QrScanResult {
               ?.map((t) => QrThreat.fromJson(t as Map<String, dynamic>))
               .toList() ??
           [],
-      parsedContent: json['parsed_content'] as Map<String, dynamic>?,
+      parsedContent: parseJsonBlob(json['parsed_content']),
       isSafe: json['is_safe'] as bool? ?? false,
       shouldBlock: json['should_block'] as bool? ?? false,
       warnings: (json['warnings'] as List<dynamic>?)?.cast<String>() ?? [],
