@@ -21,6 +21,16 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
+// FirewallStore is the persistence interface for firewall rules and manually
+// blocked IPs. *repository.NetworkSecurityRepository satisfies it.
+type FirewallStore interface {
+	SaveFirewallRule(ctx context.Context, deviceID string, rule models.FirewallRule) error
+	DeleteFirewallRule(ctx context.Context, ruleID uuid.UUID) error
+	ListFirewallRules(ctx context.Context, deviceID string) ([]models.FirewallRule, error)
+	SaveBlockedIP(ctx context.Context, deviceID, ip, reason string) error
+	ListBlockedIPs(ctx context.Context, deviceID string) (map[string]string, error)
+}
+
 // NetworkMonitor monitors network connections and manages firewall rules
 type NetworkMonitor struct {
 	logger     *logger.Logger
@@ -30,9 +40,14 @@ type NetworkMonitor struct {
 	rules      []models.FirewallRule
 	rulesMutex sync.RWMutex
 
+	// Durable persistence for rules/blocked IPs. deviceID scopes persisted
+	// rows; empty means "the host this API process runs on".
+	store    FirewallStore
+	deviceID string
+
 	// Connection tracking
-	connections     map[string]models.NetworkConnection
-	connMutex       sync.RWMutex
+	connections map[string]models.NetworkConnection
+	connMutex   sync.RWMutex
 
 	// Process resolver
 	processResolver *ProcessResolver
@@ -56,6 +71,39 @@ func NewNetworkMonitor(redisCache *cache.RedisCache, log *logger.Logger) *Networ
 		blockedIPs:      make(map[string]string),
 		blockedDomains:  make(map[string]string),
 	}
+}
+
+// SetStore wires the Postgres-backed firewall store and loads previously
+// persisted firewall rules and blocked IPs into memory.
+func (m *NetworkMonitor) SetStore(ctx context.Context, store FirewallStore) error {
+	if store == nil {
+		return fmt.Errorf("firewall store is nil")
+	}
+	m.store = store
+
+	rules, err := store.ListFirewallRules(ctx, m.deviceID)
+	if err != nil {
+		return fmt.Errorf("load firewall rules: %w", err)
+	}
+	m.rulesMutex.Lock()
+	m.rules = rules
+	m.rulesMutex.Unlock()
+
+	blocked, err := store.ListBlockedIPs(ctx, m.deviceID)
+	if err != nil {
+		return fmt.Errorf("load blocked IPs: %w", err)
+	}
+	m.iocMutex.Lock()
+	for ip, reason := range blocked {
+		m.blockedIPs[ip] = reason
+	}
+	m.iocMutex.Unlock()
+
+	m.logger.Info().
+		Int("rules", len(rules)).
+		Int("blocked_ips", len(blocked)).
+		Msg("loaded persisted firewall state")
+	return nil
 }
 
 // defaultNetworkConfig returns default network monitor configuration
@@ -476,11 +524,9 @@ func (m *NetworkMonitor) parseNetstatLine(line string) *models.NetworkConnection
 	return conn
 }
 
-// AddFirewallRule adds a firewall rule
+// AddFirewallRule adds a firewall rule, persisting it durably before adding
+// it to the in-memory rule set.
 func (m *NetworkMonitor) AddFirewallRule(rule models.FirewallRule) error {
-	m.rulesMutex.Lock()
-	defer m.rulesMutex.Unlock()
-
 	if rule.ID == uuid.Nil {
 		rule.ID = uuid.New()
 	}
@@ -488,7 +534,20 @@ func (m *NetworkMonitor) AddFirewallRule(rule models.FirewallRule) error {
 	rule.UpdatedAt = time.Now()
 	rule.Platform = m.platform
 
+	if m.store != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := m.store.SaveFirewallRule(ctx, m.deviceID, rule); err != nil {
+			m.logger.Error().Err(err).Str("rule_id", rule.ID.String()).Msg("failed to persist firewall rule")
+			return fmt.Errorf("persist firewall rule: %w", err)
+		}
+	} else {
+		m.logger.Warn().Str("rule_id", rule.ID.String()).Msg("firewall store not configured; rule is in-memory only")
+	}
+
+	m.rulesMutex.Lock()
 	m.rules = append(m.rules, rule)
+	m.rulesMutex.Unlock()
 
 	m.logger.Info().
 		Str("rule_id", rule.ID.String()).
@@ -499,20 +558,34 @@ func (m *NetworkMonitor) AddFirewallRule(rule models.FirewallRule) error {
 	return nil
 }
 
-// RemoveFirewallRule removes a firewall rule
+// RemoveFirewallRule removes a firewall rule from memory and the durable store.
 func (m *NetworkMonitor) RemoveFirewallRule(ruleID uuid.UUID) error {
 	m.rulesMutex.Lock()
-	defer m.rulesMutex.Unlock()
-
+	found := false
 	for i, rule := range m.rules {
 		if rule.ID == ruleID {
 			m.rules = append(m.rules[:i], m.rules[i+1:]...)
-			m.logger.Info().Str("rule_id", ruleID.String()).Msg("removed firewall rule")
-			return nil
+			found = true
+			break
+		}
+	}
+	m.rulesMutex.Unlock()
+
+	if !found {
+		return fmt.Errorf("rule not found: %s", ruleID)
+	}
+
+	if m.store != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := m.store.DeleteFirewallRule(ctx, ruleID); err != nil {
+			m.logger.Error().Err(err).Str("rule_id", ruleID.String()).Msg("failed to delete persisted firewall rule")
+			return fmt.Errorf("delete persisted firewall rule: %w", err)
 		}
 	}
 
-	return fmt.Errorf("rule not found: %s", ruleID)
+	m.logger.Info().Str("rule_id", ruleID.String()).Msg("removed firewall rule")
+	return nil
 }
 
 // GetFirewallRules returns all firewall rules
@@ -652,11 +725,24 @@ func (m *NetworkMonitor) portMatches(rulePort string, connPort int) bool {
 	return port == connPort
 }
 
-// BlockIP adds an IP to the blocklist
+// BlockIP adds an IP to the blocklist and persists it durably (the method
+// signature is handler-facing and returns no error; persistence failures are
+// logged).
 func (m *NetworkMonitor) BlockIP(ip, reason string) {
 	m.iocMutex.Lock()
-	defer m.iocMutex.Unlock()
 	m.blockedIPs[ip] = reason
+	m.iocMutex.Unlock()
+
+	if m.store == nil {
+		m.logger.Warn().Str("ip", ip).Msg("firewall store not configured; blocked IP is in-memory only")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := m.store.SaveBlockedIP(ctx, m.deviceID, ip, reason); err != nil {
+		m.logger.Error().Err(err).Str("ip", ip).Msg("failed to persist blocked IP")
+	}
 }
 
 // BlockDomain adds a domain to the blocklist

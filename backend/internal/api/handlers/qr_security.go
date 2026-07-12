@@ -1,17 +1,27 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
+
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
 // QRSecurityHandler handles QR code security API requests
 type QRSecurityHandler struct {
 	service *services.QRSecurityService
+	repo    *repository.QRSecurityRepository
 	logger  *logger.Logger
 }
 
@@ -21,6 +31,92 @@ func NewQRSecurityHandler(service *services.QRSecurityService, log *logger.Logge
 		service: service,
 		logger:  log.WithComponent("qr-security-handler"),
 	}
+}
+
+// WithRepositories wires the persistence layer into the handler, reusing the
+// shared connection pool. Returns the handler for call-site chaining.
+func (h *QRSecurityHandler) WithRepositories(repos *repository.Repositories) *QRSecurityHandler {
+	h.repo = repository.NewQRSecurityRepositoryFromRepos(repos)
+	return h
+}
+
+// qrContentHashPattern matches a SHA-256 hex digest.
+var qrContentHashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// QRReportFalsePositiveRequest is the body for false-positive reports.
+// Either the raw content (hashed server-side, never stored) or a
+// pre-computed content_hash must be provided.
+type QRReportFalsePositiveRequest struct {
+	Content     string `json:"content,omitempty"`
+	ContentHash string `json:"content_hash,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	DeviceID    string `json:"device_id,omitempty"` // service callers only
+}
+
+// ReportFalsePositive handles POST /api/v1/qr/report-false-positive —
+// records a user report that a QR scan was incorrectly flagged.
+func (h *QRSecurityHandler) ReportFalsePositive(w http.ResponseWriter, r *http.Request) {
+	if h.repo == nil {
+		h.logger.Error().Msg("QR false-positive reporting unavailable: repository not configured")
+		h.respondError(w, http.StatusServiceUnavailable, "report storage unavailable")
+		return
+	}
+
+	var req QRReportFalsePositiveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Resolve the content hash: prefer an explicit pre-computed hash,
+	// otherwise hash the raw content server-side (raw value is discarded).
+	contentHash := strings.ToLower(strings.TrimSpace(req.ContentHash))
+	if contentHash != "" && !qrContentHashPattern.MatchString(contentHash) {
+		h.respondError(w, http.StatusBadRequest, "content_hash must be a 64-character SHA-256 hex digest")
+		return
+	}
+	if contentHash == "" {
+		if strings.TrimSpace(req.Content) == "" {
+			h.respondError(w, http.StatusBadRequest, "either content or content_hash is required")
+			return
+		}
+		sum := sha256.Sum256([]byte(req.Content))
+		contentHash = hex.EncodeToString(sum[:])
+	}
+
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" && middleware.IsServiceRequest(r.Context()) {
+		deviceID = req.DeviceID
+	}
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device ID is required (authenticate as a device or pass device_id)")
+		return
+	}
+
+	rec := &repository.QRFalsePositiveRecord{
+		ID:          uuid.New(),
+		DeviceID:    deviceID,
+		ContentHash: contentHash,
+		Reason:      strings.TrimSpace(req.Reason),
+		ReportedAt:  time.Now().UTC(),
+	}
+
+	if err := h.repo.InsertFalsePositive(r.Context(), rec); err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to record QR false positive")
+		h.respondError(w, http.StatusInternalServerError, "failed to record report")
+		return
+	}
+
+	h.logger.Info().
+		Str("device_id", deviceID).
+		Str("report_id", rec.ID.String()).
+		Msg("QR false positive recorded")
+
+	h.respondJSON(w, http.StatusCreated, map[string]any{
+		"id":          rec.ID,
+		"status":      "recorded",
+		"reported_at": rec.ReportedAt,
+	})
 }
 
 // Scan handles POST /api/v1/qr/scan
@@ -264,8 +360,8 @@ func (h *QRSecurityHandler) GetThreatTypes(w http.ResponseWriter, r *http.Reques
 // GetSuspiciousTLDs handles GET /api/v1/qr/suspicious-tlds
 func (h *QRSecurityHandler) GetSuspiciousTLDs(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"tlds":  models.SuspiciousTLDs,
-		"count": len(models.SuspiciousTLDs),
+		"tlds":        models.SuspiciousTLDs,
+		"count":       len(models.SuspiciousTLDs),
 		"description": "Top-level domains commonly associated with malicious sites",
 	})
 }

@@ -3,7 +3,10 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +39,44 @@ func NewGraphService(
 		cache:     cache,
 		logger:    log.WithComponent("graph-service"),
 	}
+}
+
+// ErrGraphUnavailable is returned when Neo4j is not configured or could not
+// be reached at startup, so graph exploration features cannot be served.
+var ErrGraphUnavailable = errors.New("graph database (Neo4j) is not available")
+
+// Available reports whether the graph backend can serve queries. The service
+// is only constructed when Neo4j connects at startup, but this guards against
+// partially-wired instances.
+func (s *GraphService) Available() bool {
+	return s != nil && s.graphRepo != nil
+}
+
+// ListNodes returns graph nodes for the exploration API, optionally filtered
+// by node label (type) and a free-text search. Limit is capped by the caller.
+func (s *GraphService) ListNodes(ctx context.Context, nodeType, search string, limit int) ([]graph.NodeView, error) {
+	if !s.Available() {
+		return nil, ErrGraphUnavailable
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	return s.graphRepo.ListNodes(queryCtx, nodeType, search, limit)
+}
+
+// ListRelations returns graph relationships for the exploration API,
+// optionally filtered by relationship type, endpoint node id, and free-text
+// search. Limit is capped by the caller.
+func (s *GraphService) ListRelations(ctx context.Context, relType, nodeID, search string, limit int) ([]graph.RelationView, error) {
+	if !s.Available() {
+		return nil, ErrGraphUnavailable
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	return s.graphRepo.ListRelations(queryCtx, relType, nodeID, search, limit)
 }
 
 // SyncFromPostgres syncs data from PostgreSQL to Neo4j
@@ -132,6 +173,31 @@ func (s *GraphService) syncActors(ctx context.Context) (int, error) {
 			continue
 		}
 		count++
+
+		// Build (Actor)-[:USES]->(Technique) edges from the actor's known
+		// techniques and the techniques of campaigns attributed to it.
+		techniques := normalizeTechniqueIDs(a.CommonTechniques)
+		if s.sqlRepos.Campaigns != nil {
+			campaigns, err := s.sqlRepos.Campaigns.ListByThreatActor(ctx, a.ID)
+			if err != nil {
+				s.logger.Warn().Err(err).Str("actor", a.Name).Msg("failed to list campaigns for actor technique sync")
+			} else {
+				for _, c := range campaigns {
+					techniques = mergeTechniqueIDs(techniques, c.MitreTechniques)
+				}
+			}
+		}
+
+		if len(techniques) > 0 {
+			linkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			linked, err := s.graphRepo.LinkActorToTechniques(linkCtx, a.ID, techniques)
+			cancel()
+			if err != nil {
+				s.logger.Warn().Err(err).Str("actor", a.Name).Msg("failed to link actor techniques")
+			} else if linked > 0 {
+				s.logger.Debug().Str("actor", a.Name).Int("techniques", linked).Msg("actor technique edges synced")
+			}
+		}
 	}
 
 	return count, nil
@@ -346,17 +412,242 @@ func (s *GraphService) GetStats(ctx context.Context) (*models.GraphStats, error)
 	return stats, nil
 }
 
-// CalculateTTPSimilarity calculates TTP similarity between threat actors
+// CalculateTTPSimilarity calculates TTP similarity between threat actors as
+// the Jaccard similarity over their MITRE ATT&CK technique sets. Technique
+// sets come from (Actor)-[:USES]->(Technique) edges in Neo4j, falling back to
+// relational data (actor common_techniques, campaign and indicator MITRE
+// fields) when the graph holds no data for an actor.
 func (s *GraphService) CalculateTTPSimilarity(ctx context.Context, actor1ID, actor2ID uuid.UUID) (*models.TTPSimilarity, error) {
-	// This would query the graph for shared MITRE techniques between actors
-	// For now, return a placeholder
-	return &models.TTPSimilarity{
+	ttp1, err := s.collectActorTTPData(ctx, actor1ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect TTP data for actor %s: %w", actor1ID, err)
+	}
+
+	ttp2, err := s.collectActorTTPData(ctx, actor2ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect TTP data for actor %s: %w", actor2ID, err)
+	}
+
+	result := &models.TTPSimilarity{
 		Actor1:           actor1ID.String(),
 		Actor2:           actor2ID.String(),
 		SharedTactics:    []string{},
 		SharedTechniques: []string{},
 		Similarity:       0.0,
-	}, nil
+		DataSource:       combineTTPSources(ttp1.source, ttp2.source),
+	}
+
+	// Similarity is only meaningful when both actors have technique data.
+	if len(ttp1.techniques) == 0 || len(ttp2.techniques) == 0 {
+		result.InsufficientData = true
+		return result, nil
+	}
+
+	shared := make([]string, 0)
+	unionSize := len(ttp2.techniques)
+	for t := range ttp1.techniques {
+		if _, ok := ttp2.techniques[t]; ok {
+			shared = append(shared, t)
+		} else {
+			unionSize++
+		}
+	}
+	sort.Strings(shared)
+
+	sharedTactics := make([]string, 0)
+	for t := range ttp1.tactics {
+		if _, ok := ttp2.tactics[t]; ok {
+			sharedTactics = append(sharedTactics, t)
+		}
+	}
+	sort.Strings(sharedTactics)
+
+	result.SharedTechniques = shared
+	result.SharedTactics = sharedTactics
+	if unionSize > 0 {
+		result.Similarity = float64(len(shared)) / float64(unionSize)
+	}
+
+	return result, nil
+}
+
+// actorTTPData holds the technique/tactic sets gathered for a single actor.
+type actorTTPData struct {
+	techniques map[string]struct{}
+	tactics    map[string]struct{}
+	source     string // "graph", "sql_fallback", or "none"
+}
+
+// collectActorTTPData gathers an actor's MITRE technique and tactic sets.
+// Techniques are read from the graph first; when the graph has no USES edges
+// for the actor, they are derived from relational data (actor
+// common_techniques, attributed campaigns, attributed indicators) and the
+// graph is back-filled best-effort. Tactics always come from relational data
+// because Technique nodes do not carry tactic information.
+func (s *GraphService) collectActorTTPData(ctx context.Context, actorID uuid.UUID) (*actorTTPData, error) {
+	data := &actorTTPData{
+		techniques: make(map[string]struct{}),
+		tactics:    make(map[string]struct{}),
+		source:     "none",
+	}
+
+	// 1. Graph: (Actor)-[:USES]->(Technique)
+	graphTechniques, err := s.graphRepo.GetActorTechniques(ctx, actorID)
+	if err != nil {
+		// Graph unavailability is not fatal — fall back to SQL below.
+		s.logger.Warn().Err(err).Str("actor_id", actorID.String()).Msg("failed to read actor techniques from graph, falling back to SQL")
+	}
+	for _, t := range normalizeTechniqueIDs(graphTechniques) {
+		data.techniques[t] = struct{}{}
+	}
+	if len(data.techniques) > 0 {
+		data.source = "graph"
+	}
+
+	if s.sqlRepos == nil {
+		return data, nil
+	}
+
+	// 2. Relational data: actor record, campaigns, indicators.
+	sqlTechniques := make(map[string]struct{})
+
+	if s.sqlRepos.Actors != nil {
+		actor, err := s.sqlRepos.Actors.GetByID(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if actor != nil {
+			for _, t := range normalizeTechniqueIDs(actor.CommonTechniques) {
+				sqlTechniques[t] = struct{}{}
+			}
+		}
+	}
+
+	if s.sqlRepos.Campaigns != nil {
+		campaigns, err := s.sqlRepos.Campaigns.ListByThreatActor(ctx, actorID)
+		if err != nil {
+			s.logger.Warn().Err(err).Str("actor_id", actorID.String()).Msg("failed to list campaigns for TTP data")
+		} else {
+			for _, c := range campaigns {
+				for _, t := range normalizeTechniqueIDs(c.MitreTechniques) {
+					sqlTechniques[t] = struct{}{}
+				}
+				for _, t := range normalizeTacticNames(c.MitreTactics) {
+					data.tactics[t] = struct{}{}
+				}
+			}
+		}
+	}
+
+	if s.sqlRepos.Indicators != nil {
+		filter := repository.IndicatorFilter{
+			ThreatActorID: &actorID,
+			Limit:         2000,
+		}
+		indicators, _, err := s.sqlRepos.Indicators.List(ctx, filter)
+		if err != nil {
+			s.logger.Warn().Err(err).Str("actor_id", actorID.String()).Msg("failed to list indicators for TTP data")
+		} else {
+			for _, ind := range indicators {
+				for _, t := range normalizeTechniqueIDs(ind.MitreTechniques) {
+					sqlTechniques[t] = struct{}{}
+				}
+				for _, t := range normalizeTacticNames(ind.MitreTactics) {
+					data.tactics[t] = struct{}{}
+				}
+			}
+		}
+	}
+
+	if len(data.techniques) == 0 && len(sqlTechniques) > 0 {
+		// Graph had nothing — use SQL-derived techniques and back-fill the
+		// graph so future queries are served from Neo4j directly.
+		data.source = "sql_fallback"
+		backfill := make([]string, 0, len(sqlTechniques))
+		for t := range sqlTechniques {
+			data.techniques[t] = struct{}{}
+			backfill = append(backfill, t)
+		}
+		sort.Strings(backfill)
+
+		linkCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		if _, err := s.graphRepo.LinkActorToTechniques(linkCtx, actorID, backfill); err != nil {
+			s.logger.Warn().Err(err).Str("actor_id", actorID.String()).Msg("failed to back-fill actor technique edges")
+		}
+		cancel()
+	}
+
+	return data, nil
+}
+
+// combineTTPSources combines per-actor data sources into a single label.
+func combineTTPSources(s1, s2 string) string {
+	switch {
+	case s1 == s2:
+		return s1
+	case s1 == "none":
+		return s2
+	case s2 == "none":
+		return s1
+	default:
+		return "mixed"
+	}
+}
+
+// normalizeTechniqueIDs trims, upper-cases, and de-duplicates MITRE technique
+// IDs (e.g. "t1059.001" -> "T1059.001"), dropping empty entries.
+func normalizeTechniqueIDs(ids []string) []string {
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		norm := strings.ToUpper(strings.TrimSpace(id))
+		if norm == "" {
+			continue
+		}
+		if _, ok := seen[norm]; ok {
+			continue
+		}
+		seen[norm] = struct{}{}
+		out = append(out, norm)
+	}
+	return out
+}
+
+// normalizeTacticNames trims, lower-cases, and de-duplicates MITRE tactic
+// names (e.g. "Initial Access" -> "initial-access"), dropping empty entries.
+func normalizeTacticNames(tactics []string) []string {
+	seen := make(map[string]struct{}, len(tactics))
+	out := make([]string, 0, len(tactics))
+	for _, t := range tactics {
+		norm := strings.ToLower(strings.TrimSpace(t))
+		norm = strings.ReplaceAll(norm, " ", "-")
+		if norm == "" {
+			continue
+		}
+		if _, ok := seen[norm]; ok {
+			continue
+		}
+		seen[norm] = struct{}{}
+		out = append(out, norm)
+	}
+	return out
+}
+
+// mergeTechniqueIDs merges additional technique IDs into an existing
+// normalized list, preserving order and uniqueness.
+func mergeTechniqueIDs(existing []string, additional []string) []string {
+	seen := make(map[string]struct{}, len(existing))
+	for _, t := range existing {
+		seen[t] = struct{}{}
+	}
+	for _, t := range normalizeTechniqueIDs(additional) {
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		existing = append(existing, t)
+	}
+	return existing
 }
 
 // FindTemporalCorrelation finds indicators that appeared around the same time

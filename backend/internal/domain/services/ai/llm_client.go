@@ -5,10 +5,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"orbguard-lab/internal/domain/models"
@@ -20,14 +24,88 @@ type LLMClient struct {
 	httpClient   *http.Client
 	logger       *logger.Logger
 	config       LLMConfig
+
+	// Content-filter circuit breaker: some deployments (Azure default
+	// Responsible-AI policy) reject scam/phishing content under analysis as
+	// if it were an attack prompt. After repeated rejections the LLM path is
+	// paused so requests stay fast on the rule-based engines instead of
+	// burning latency on calls that will be blocked.
+	breakerMu            sync.Mutex
+	contentFilterStrikes int
+	llmDisabledUntil     time.Time
+}
+
+// contentFilterStrikeLimit and contentFilterCooldown govern the breaker. The
+// cooldown is short so the LLM path self-heals quickly after a transient
+// slowdown or a deploy; a persistent block (e.g. a content-filter policy) just
+// re-trips it on the next batch of requests.
+const (
+	contentFilterStrikeLimit = 3
+	contentFilterCooldown    = 3 * time.Minute
+)
+
+// ErrLLMTemporarilyDisabled is returned while the content-filter breaker is open.
+var ErrLLMTemporarilyDisabled = fmt.Errorf("llm temporarily disabled: deployment content filter repeatedly blocked analysis prompts")
+
+func (c *LLMClient) breakerOpen() bool {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	return time.Now().Before(c.llmDisabledUntil)
+}
+
+func (c *LLMClient) recordContentFilter() {
+	c.recordStrike("content filter blocked repeated analysis prompts; pausing LLM calls (request a Responsible-AI filter exemption or switch llm_provider)")
+}
+
+// recordTimeout counts provider timeouts toward the same breaker: a
+// deployment that cannot answer within the per-call budget degrades every
+// request identically to one that rejects them.
+func (c *LLMClient) recordTimeout() {
+	c.recordStrike("provider repeatedly exceeded the per-call timeout; pausing LLM calls (deployment too slow for interactive analysis)")
+}
+
+func (c *LLMClient) recordStrike(reason string) {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	c.contentFilterStrikes++
+	if c.contentFilterStrikes >= contentFilterStrikeLimit {
+		c.llmDisabledUntil = time.Now().Add(contentFilterCooldown)
+		c.contentFilterStrikes = 0
+		if c.logger != nil {
+			c.logger.Warn().
+				Str("provider", c.config.Provider).
+				Dur("cooldown", contentFilterCooldown).
+				Msg(reason)
+		}
+	}
+}
+
+func (c *LLMClient) recordLLMSuccess() {
+	c.breakerMu.Lock()
+	defer c.breakerMu.Unlock()
+	c.contentFilterStrikes = 0
 }
 
 // LLMConfig holds LLM client configuration
 type LLMConfig struct {
-	Provider       string  // claude, openai
+	Provider       string  // claude, openai, deepseek, azure-openai
 	ClaudeAPIKey   string
 	OpenAIAPIKey   string
-	Model          string  // claude-3-sonnet-20240229, gpt-4-turbo, etc.
+	DeepSeekAPIKey string
+	// Azure OpenAI settings (used only when Provider == "azure-openai").
+	AzureOpenAIEndpoint   string // e.g. https://my-resource.openai.azure.com
+	AzureOpenAIKey        string
+	AzureOpenAIDeployment string
+	AzureOpenAIAPIVersion string // defaults to 2024-02-15-preview
+	// BaseURL overrides the provider's default API base URL
+	// (claude, openai and deepseek paths; Azure uses AzureOpenAIEndpoint).
+	BaseURL        string
+	Model          string  // claude-3-sonnet-20240229, gpt-4-turbo, deepseek-chat, etc.
+	// ReasoningEffort, when non-empty, is sent as the "reasoning_effort"
+	// chat-completions parameter for reasoning-capable OpenAI/Azure OpenAI
+	// deployments (GPT-5.x, o-series). Empty omits the parameter. It is never
+	// sent to DeepSeek or Claude.
+	ReasoningEffort string
 	Temperature    float64
 	MaxTokens      int
 	VisionEnabled  bool
@@ -35,22 +113,49 @@ type LLMConfig struct {
 	Timeout        time.Duration
 }
 
+// DefaultModelForProvider returns the default model used when no explicit
+// model is configured for the given provider. For azure-openai the model is
+// implied by the deployment, so there is no provider-level default.
+func DefaultModelForProvider(provider string) string {
+	switch provider {
+	case "claude":
+		return "claude-3-sonnet-20240229"
+	case "deepseek":
+		return "deepseek-chat"
+	case "azure-openai":
+		return ""
+	default:
+		return "gpt-4-turbo"
+	}
+}
+
 // NewLLMClient creates a new LLM client
 func NewLLMClient(cfg LLMConfig, log *logger.Logger) *LLMClient {
 	if cfg.Timeout == 0 {
-		cfg.Timeout = 60 * time.Second
+		// Scam analysis runs intent + entity (parallel) plus an optional deep
+		// pass per request behind an ingress that resets slow responses. The
+		// budget must cover a cross-region hop plus generation; paired with the
+		// capped MaxTokens below this keeps interactive requests responsive.
+		cfg.Timeout = 18 * time.Second
 	}
 	if cfg.Temperature == 0 {
 		cfg.Temperature = 0.3 // Low temperature for factual analysis
 	}
 	if cfg.MaxTokens == 0 {
-		cfg.MaxTokens = 4096
+		// Scam analyses return compact structured JSON; a large ceiling only
+		// lets a verbose model run long enough to blow the timeout. 1024 tokens
+		// comfortably holds every analysis schema while keeping latency low.
+		cfg.MaxTokens = 1024
+	}
+	if cfg.AzureOpenAIAPIVersion == "" {
+		cfg.AzureOpenAIAPIVersion = "2024-02-15-preview"
 	}
 	if cfg.Model == "" {
-		if cfg.Provider == "claude" {
-			cfg.Model = "claude-3-sonnet-20240229"
-		} else {
-			cfg.Model = "gpt-4-turbo"
+		cfg.Model = DefaultModelForProvider(cfg.Provider)
+		if cfg.Provider == "azure-openai" {
+			// Azure selects the model via the deployment; record it so
+			// analysis results report which model was used.
+			cfg.Model = cfg.AzureOpenAIDeployment
 		}
 	}
 
@@ -156,6 +261,10 @@ func (c *LLMClient) AnalyzeForScam(ctx context.Context, req *models.ScamAnalysis
 		messages[0].Content = append(messages[0].Content, imageContent)
 	}
 
+	if c.breakerOpen() {
+		return nil, ErrLLMTemporarilyDisabled
+	}
+
 	// Make the API call
 	var response *CompletionResponse
 	var err error
@@ -165,6 +274,10 @@ func (c *LLMClient) AnalyzeForScam(ctx context.Context, req *models.ScamAnalysis
 		response, err = c.callClaude(ctx, systemPrompt, messages)
 	case "openai":
 		response, err = c.callOpenAI(ctx, systemPrompt, messages)
+	case "deepseek":
+		response, err = c.callDeepSeek(ctx, systemPrompt, messages)
+	case "azure-openai":
+		response, err = c.callAzureOpenAI(ctx, systemPrompt, messages)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", c.config.Provider)
 	}
@@ -229,6 +342,16 @@ func (c *LLMClient) getScamDetectionSystemPrompt() string {
 5. Recognize impersonation of trusted brands/authorities
 6. Detect suspicious URLs and domains
 7. Identify requests for personal/financial information
+
+## Response Language:
+Write all human-readable fields (explanation, red_flags, safety_tips, intent,
+manipulation_tactics) in **English by default**. A "Language" hint may be
+supplied with the content; treat it only as a low-confidence signal. Switch to
+that language ONLY when the message content itself is clearly and predominantly
+written in that non-English language (multiple full words/sentences in it).
+Short or ambiguous messages — including short English phishing texts that may be
+mis-tagged — must always be explained in English. Do not guess a language from a
+few characters.
 
 ## Response Format:
 Respond in valid JSON format with this structure:
@@ -306,7 +429,11 @@ func (c *LLMClient) buildScamAnalysisPrompt(req *models.ScamAnalysisRequest) str
 
 // callClaude makes a request to Claude API
 func (c *LLMClient) callClaude(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
-	url := "https://api.anthropic.com/v1/messages"
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.anthropic.com"
+	}
+	url := strings.TrimRight(base, "/") + "/v1/messages"
 
 	// Convert messages to Claude format
 	claudeMessages := make([]map[string]interface{}, len(messages))
@@ -412,10 +539,50 @@ func (c *LLMClient) callClaude(ctx context.Context, system string, messages []Me
 	}, nil
 }
 
-// callOpenAI makes a request to OpenAI API
+// callOpenAI makes a request to the OpenAI API.
 func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
-	url := "https://api.openai.com/v1/chat/completions"
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.openai.com/v1"
+	}
+	url := strings.TrimRight(base, "/") + "/chat/completions"
+	headers := map[string]string{"Authorization": "Bearer " + c.config.OpenAIAPIKey}
+	return c.callOpenAICompatible(ctx, system, messages, url, headers, "OpenAI")
+}
 
+// callDeepSeek makes a request to the DeepSeek API, which is OpenAI-compatible.
+func (c *LLMClient) callDeepSeek(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
+	base := c.config.BaseURL
+	if base == "" {
+		base = "https://api.deepseek.com"
+	}
+	url := strings.TrimRight(base, "/") + "/chat/completions"
+	headers := map[string]string{"Authorization": "Bearer " + c.config.DeepSeekAPIKey}
+	return c.callOpenAICompatible(ctx, system, messages, url, headers, "DeepSeek")
+}
+
+// callAzureOpenAI makes a request to an Azure OpenAI deployment. Azure uses
+// the OpenAI-shaped request/response body but authenticates with an "api-key"
+// header (not Bearer) and addresses the model via the deployment in the URL.
+func (c *LLMClient) callAzureOpenAI(ctx context.Context, system string, messages []Message) (*CompletionResponse, error) {
+	if c.config.AzureOpenAIEndpoint == "" || c.config.AzureOpenAIDeployment == "" {
+		return nil, fmt.Errorf("azure-openai provider requires endpoint and deployment to be configured")
+	}
+	endpoint := strings.TrimRight(c.config.AzureOpenAIEndpoint, "/")
+	requestURL := fmt.Sprintf(
+		"%s/openai/deployments/%s/chat/completions?api-version=%s",
+		endpoint,
+		url.PathEscape(c.config.AzureOpenAIDeployment),
+		url.QueryEscape(c.config.AzureOpenAIAPIVersion),
+	)
+	headers := map[string]string{"api-key": c.config.AzureOpenAIKey}
+	return c.callOpenAICompatible(ctx, system, messages, requestURL, headers, "Azure OpenAI")
+}
+
+// callOpenAICompatible makes a chat-completions request to any
+// OpenAI-compatible endpoint (OpenAI, DeepSeek, Azure OpenAI) with
+// provider-specific URL and auth headers.
+func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, messages []Message, requestURL string, headers map[string]string, providerName string) (*CompletionResponse, error) {
 	// Convert messages to OpenAI format
 	openAIMessages := []map[string]interface{}{
 		{
@@ -453,38 +620,105 @@ func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Me
 
 	reqBody := map[string]interface{}{
 		"model":       c.config.Model,
-		"max_tokens":  c.config.MaxTokens,
 		"temperature": c.config.Temperature,
 		"messages":    openAIMessages,
 	}
+	// OpenAI and Azure OpenAI replaced max_tokens with max_completion_tokens
+	// (newer model families reject the legacy parameter outright). DeepSeek's
+	// OpenAI-compatible API still uses max_tokens.
+	if strings.EqualFold(providerName, "deepseek") {
+		reqBody["max_tokens"] = c.config.MaxTokens
+	} else {
+		reqBody["max_completion_tokens"] = c.config.MaxTokens
+	}
+	// reasoning_effort is only understood by OpenAI and Azure OpenAI
+	// reasoning-capable deployments; DeepSeek rejects unknown parameters.
+	if c.config.ReasoningEffort != "" &&
+		(strings.EqualFold(providerName, "openai") || strings.EqualFold(providerName, "azure openai")) {
+		reqBody["reasoning_effort"] = c.config.ReasoningEffort
+	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	doRequest := func(payload map[string]interface{}) (int, []byte, error) {
+		jsonBody, err := json.Marshal(payload)
+		if err != nil {
+			return 0, nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return 0, nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return 0, nil, err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return resp.StatusCode, nil, err
+		}
+		return resp.StatusCode, body, nil
+	}
+
+	status, body, err := doRequest(reqBody)
 	if err != nil {
+		if isTimeoutErr(err) {
+			c.recordTimeout()
+		}
 		return nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return nil, err
+	// Some deployments reject parameters the family normally accepts: reasoning
+	// models (GPT-5.x) require the default temperature, non-reasoning models
+	// reject reasoning_effort, legacy models reject max_completion_tokens.
+	// Adapt to whichever parameter the 400 names and retry, up to a few times
+	// so multiple offending parameters are stripped in sequence.
+	for attempt := 0; attempt < 3 && status == http.StatusBadRequest && isAdjustableParamError(string(body)); attempt++ {
+		retryBody := make(map[string]interface{}, len(reqBody))
+		for k, v := range reqBody {
+			retryBody[k] = v
+		}
+		bodyStr := string(body)
+		if strings.Contains(bodyStr, "temperature") {
+			// Reasoning models accept only the default (1); send that
+			// explicitly rather than dropping it so deployments that require
+			// the field present still succeed.
+			retryBody["temperature"] = 1
+		}
+		if strings.Contains(bodyStr, "reasoning_effort") {
+			delete(retryBody, "reasoning_effort")
+		}
+		if strings.Contains(bodyStr, "max_completion_tokens") {
+			delete(retryBody, "max_completion_tokens")
+			retryBody["max_tokens"] = c.config.MaxTokens
+		} else if strings.Contains(bodyStr, "max_tokens") {
+			delete(retryBody, "max_tokens")
+			retryBody["max_completion_tokens"] = c.config.MaxTokens
+		}
+		// Carry the adapted body forward so the next iteration keeps the fix.
+		reqBody = retryBody
+		status, body, err = doRequest(retryBody)
+		if err != nil {
+			if isTimeoutErr(err) {
+				c.recordTimeout()
+			}
+			return nil, err
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.config.OpenAIAPIKey)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
+	if status != http.StatusOK {
+		if strings.Contains(string(body), "content_filter") || strings.Contains(string(body), "ResponsibleAIPolicyViolation") {
+			// Azure's default Responsible-AI filter flags scam/phishing
+			// content being ANALYZED as if it were an attack prompt. This is
+			// a deployment-policy limitation, not a transient error.
+			c.recordContentFilter()
+			return nil, fmt.Errorf("%s content filter blocked the analysis prompt (deployment policy; request a Responsible-AI filter exemption for security-analysis use cases or switch llm_provider): %d: %s", providerName, status, string(body))
+		}
+		return nil, fmt.Errorf("%s API error %d: %s", providerName, status, string(body))
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OpenAI API error %d: %s", resp.StatusCode, string(body))
-	}
+	c.recordLLMSuccess()
 
 	// Parse OpenAI response
 	var openAIResp struct {
@@ -505,7 +739,7 @@ func (c *LLMClient) callOpenAI(ctx context.Context, system string, messages []Me
 	}
 
 	if len(openAIResp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from OpenAI")
+		return nil, fmt.Errorf("no response from %s", providerName)
 	}
 
 	return &CompletionResponse{
@@ -564,6 +798,9 @@ func NewTextMessage(role, text string) Message {
 
 // Chat sends a chat message and returns the response
 func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string) (string, error) {
+	if c.breakerOpen() {
+		return "", ErrLLMTemporarilyDisabled
+	}
 	if system == "" {
 		system = c.config.SystemPrompt
 	}
@@ -576,6 +813,10 @@ func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string)
 		response, err = c.callClaude(ctx, system, messages)
 	case "openai":
 		response, err = c.callOpenAI(ctx, system, messages)
+	case "deepseek":
+		response, err = c.callDeepSeek(ctx, system, messages)
+	case "azure-openai":
+		response, err = c.callAzureOpenAI(ctx, system, messages)
 	default:
 		return "", fmt.Errorf("unsupported provider: %s", c.config.Provider)
 	}
@@ -591,4 +832,33 @@ func (c *LLMClient) Chat(ctx context.Context, messages []Message, system string)
 
 func isJPEG(data []byte) bool {
 	return len(data) >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF
+}
+
+// isTimeoutErr reports whether an HTTP client error was a timeout/deadline.
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	return strings.Contains(err.Error(), "Client.Timeout exceeded")
+}
+
+// isAdjustableParamError reports whether a 400 body names a request parameter
+// we know how to adapt (temperature, reasoning_effort, max_tokens family).
+func isAdjustableParamError(body string) bool {
+	if !strings.Contains(body, "unsupported_parameter") &&
+		!strings.Contains(body, "unsupported_value") &&
+		!strings.Contains(body, "invalid_request_error") {
+		return false
+	}
+	return strings.Contains(body, "temperature") ||
+		strings.Contains(body, "reasoning_effort") ||
+		strings.Contains(body, "max_completion_tokens") ||
+		strings.Contains(body, "max_tokens")
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -79,15 +80,14 @@ func (c *GoogleSafeBrowsingClient) CheckURLs(ctx context.Context, urls []string)
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST",
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		fmt.Sprintf("https://safebrowsing.googleapis.com/v4/threatMatches:find?key=%s", c.apiKey),
-		nil)
+		bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Body = newBodyReader(jsonBody)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -154,35 +154,13 @@ type safeBrowsingResponse struct {
 }
 
 type threatMatch struct {
-	ThreatType      string      `json:"threatType"`
-	PlatformType    string      `json:"platformType"`
-	Threat          threatEntry `json:"threat"`
-	CacheDuration   string      `json:"cacheDuration"`
+	ThreatType    string      `json:"threatType"`
+	PlatformType  string      `json:"platformType"`
+	Threat        threatEntry `json:"threat"`
+	CacheDuration string      `json:"cacheDuration"`
 }
 
 // Helper functions
-
-type bodyReader struct {
-	data   []byte
-	offset int
-}
-
-func newBodyReader(data []byte) *bodyReader {
-	return &bodyReader{data: data}
-}
-
-func (r *bodyReader) Read(p []byte) (n int, err error) {
-	if r.offset >= len(r.data) {
-		return 0, nil
-	}
-	n = copy(p, r.data[r.offset:])
-	r.offset += n
-	return n, nil
-}
-
-func (r *bodyReader) Close() error {
-	return nil
-}
 
 func parseCacheDuration(s string) int {
 	// Parse duration like "300s"
@@ -204,9 +182,9 @@ type MockSafeBrowsingClient struct {
 func NewMockSafeBrowsingClient() *MockSafeBrowsingClient {
 	return &MockSafeBrowsingClient{
 		ThreatURLs: map[string][]string{
-			"http://malware.testing.google.test/testing/malware/":       {"MALWARE"},
-			"http://phishing.testing.google.test/testing/phishing/":     {"SOCIAL_ENGINEERING"},
-			"http://unwanted.testing.google.test/testing/unwanted/":     {"UNWANTED_SOFTWARE"},
+			"http://malware.testing.google.test/testing/malware/":   {"MALWARE"},
+			"http://phishing.testing.google.test/testing/phishing/": {"SOCIAL_ENGINEERING"},
+			"http://unwanted.testing.google.test/testing/unwanted/": {"UNWANTED_SOFTWARE"},
 		},
 	}
 }

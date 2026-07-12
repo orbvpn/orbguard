@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -94,6 +95,18 @@ func (a *AggregatorRepositoryAdapter) UpdateSourceAfterSuccess(ctx context.Conte
 // UpdateSourceAfterError updates source after failed fetch
 func (a *AggregatorRepositoryAdapter) UpdateSourceAfterError(ctx context.Context, sourceID uuid.UUID, errMsg string) error {
 	return a.sources.UpdateAfterError(ctx, sourceID, errMsg)
+}
+
+// UpdateSourceRateLimited defers a source's next fetch to honor a provider
+// rate limit, without escalating error_count/status
+func (a *AggregatorRepositoryAdapter) UpdateSourceRateLimited(ctx context.Context, sourceID uuid.UUID, nextFetch time.Time, errMsg string) error {
+	return a.sources.UpdateAfterRateLimit(ctx, sourceID, nextFetch, errMsg)
+}
+
+// UpdateSourcePlanLimited marks a source as errored due to an API plan
+// limitation, with a long backoff
+func (a *AggregatorRepositoryAdapter) UpdateSourcePlanLimited(ctx context.Context, sourceID uuid.UUID, errMsg string) error {
+	return a.sources.MarkPlanLimited(ctx, sourceID, errMsg)
 }
 
 // UpdateHistoryRepository handles update history operations
@@ -209,6 +222,19 @@ type Repositories struct {
 	// Adapter for aggregator
 	AggregatorAdapter *AggregatorRepositoryAdapter
 	Devices           *DeviceRepository
+	// Wave 2 production-hardening repositories
+	SMS              *SMSRepository
+	ThreatReports    *ThreatReportRepository
+	AppSecurity      *AppSecurityRepository
+	DarkWeb          *DarkWebRepository
+	DeviceSecurity   *DeviceSecurityRepository
+	URLLists         *URLListRepository
+	Analytics        *AnalyticsRepository
+	AnalyticsReports *AnalyticsReportRepository
+	Footprint        *FootprintRepository
+	NetworkSecurity  *NetworkSecurityRepository
+	// Wave 6: Zero Trust conditional access policy persistence
+	EnterprisePolicies *EnterprisePolicyRepository
 }
 
 // NewRepositories creates all repository instances from a database pool
@@ -229,5 +255,16 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		UpdateHistory:     updateHistory,
 		AggregatorAdapter: adapter,
 		Devices:           devices,
+		SMS:               NewSMSRepository(pool),
+		ThreatReports:     NewThreatReportRepository(pool),
+		AppSecurity:       NewAppSecurityRepository(pool),
+		DarkWeb:           NewDarkWebRepository(pool),
+		DeviceSecurity:    NewDeviceSecurityRepository(pool),
+		URLLists:          NewURLListRepository(pool),
+		Analytics:         NewAnalyticsRepository(pool),
+		AnalyticsReports:  NewAnalyticsReportRepository(pool),
+		Footprint:          NewFootprintRepository(pool),
+		NetworkSecurity:    NewNetworkSecurityRepository(pool),
+		EnterprisePolicies: NewEnterprisePolicyRepository(pool),
 	}
 }

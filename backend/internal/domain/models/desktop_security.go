@@ -366,28 +366,6 @@ type DesktopSecurityScan struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
-// KnownGoodHash represents a known good binary hash
-type KnownGoodHash struct {
-	Hash        string          `json:"hash"` // SHA256
-	Name        string          `json:"name"`
-	Publisher   string          `json:"publisher"`
-	Version     string          `json:"version,omitempty"`
-	Platform    DesktopPlatform `json:"platform"`
-	Source      string          `json:"source"` // apple, microsoft, homebrew, etc.
-	VerifiedAt  time.Time       `json:"verified_at"`
-}
-
-// KnownBadHash represents a known malicious binary hash
-type KnownBadHash struct {
-	Hash        string          `json:"hash"` // SHA256
-	Name        string          `json:"name,omitempty"`
-	MalwareFamily string        `json:"malware_family,omitempty"`
-	Platform    DesktopPlatform `json:"platform"`
-	Source      string          `json:"source"` // VT, internal, etc.
-	Severity    string          `json:"severity"`
-	FirstSeen   time.Time       `json:"first_seen"`
-}
-
 // CalculateRiskScore calculates the risk score for a persistence scan
 func (r *PersistenceScanResult) CalculateRiskScore() {
 	var score float64

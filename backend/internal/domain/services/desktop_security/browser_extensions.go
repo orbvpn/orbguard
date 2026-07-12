@@ -635,6 +635,17 @@ func (s *BrowserExtensionScanner) scanOpera(ctx context.Context) ([]models.Brows
 	return s.scanChromeExtensionsDir(extPath, "opera", "Default")
 }
 
+// Assess re-runs the server-side risk assessment on an extension collected by
+// a client device. Risk fields are recomputed from scratch so client-supplied
+// risk values are never trusted; collection facts (permissions, store origin,
+// paths) are taken as reported by the device.
+func (s *BrowserExtensionScanner) Assess(ext *models.BrowserExtension) {
+	ext.IsKnownMalware = false
+	ext.RiskReasons = nil
+	ext.RiskLevel = models.PersistenceRiskClean
+	s.assessExtensionRisk(ext)
+}
+
 // GetHighRiskExtensions filters extensions by risk level
 func (s *BrowserExtensionScanner) GetHighRiskExtensions(extensions []models.BrowserExtension) []models.BrowserExtension {
 	var highRisk []models.BrowserExtension

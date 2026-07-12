@@ -97,6 +97,14 @@ type AppAnalysisRequest struct {
 	SignatureHash string         `json:"signature_hash,omitempty"`
 	APKHash      string          `json:"apk_hash,omitempty"`
 	DeviceID     string          `json:"device_id,omitempty"`
+	// DetectedLibraries lists SDK/library package prefixes detected inside the
+	// app (e.g. from DEX class scanning). Tracker detection matches these
+	// against KnownTrackers. Empty means no library data was collected, which
+	// yields no tracker findings (not an error).
+	DetectedLibraries []string `json:"detected_libraries,omitempty"`
+	// UserID is the authenticated user submitting the analysis. It is set
+	// server-side from the auth context and never accepted from clients.
+	UserID string `json:"-"`
 }
 
 // AppAnalysisResult contains the complete security analysis of an app

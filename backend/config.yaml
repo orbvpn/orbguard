@@ -138,7 +138,9 @@ sources:
   # IP Reputation
   abuseipdb:
     enabled: true
-    update_interval: 1h
+    # Free tier allows only 5 blacklist requests/day — 6h = 4 requests/day
+    # (the connector also enforces a 6h minimum regardless of this value)
+    update_interval: 6h
     api_key: ""  # Set via ORBGUARD_SOURCES_ABUSEIPDB_API_KEY env
 
   greynoise:
@@ -161,7 +163,9 @@ sources:
 
   koodous:
     enabled: true
-    update_interval: 6h
+    # Koodous free-tier throttling locks the API for 8+ hours once exhausted;
+    # 12h keeps us safely inside the quota
+    update_interval: 12h
     api_key: ""  # Set via ORBGUARD_SOURCES_KOODOUS_API_KEY env
 
   # General
@@ -233,3 +237,63 @@ ml:
     enabled: true
     min_samples: 5
     eps: 0.5
+
+# Have I Been Pwned breach data (dark web monitoring)
+hibp:
+  enabled: true
+  api_key: ""  # Set via ORBGUARD_HIBP_API_KEY env
+
+# LeakCheck breach search (dark web monitoring)
+leakcheck:
+  enabled: true
+  api_key: ""  # Set via ORBGUARD_LEAKCHECK_API_KEY env
+
+# Intelligence X dark web search
+intelx:
+  enabled: true
+  base_url: https://2.intelx.io
+  api_key: ""  # Set via ORBGUARD_INTELX_API_KEY env
+
+# Google Safe Browsing for live URL reputation lookups.
+# Falls back to sources.google_safebrowsing.api_key when empty.
+safe_browsing:
+  api_key: ""  # Set via ORBGUARD_SAFE_BROWSING_API_KEY env
+
+# AI-powered scam detection
+scam_detector:
+  enable_pattern_db: true   # local pattern database, no external dependency
+  enable_phone_rep: true    # local phone reputation database
+  enable_llm: true          # effective only when a Claude/OpenAI API key is set
+  enable_vision: true       # requires an LLM API key
+  enable_speech: true       # requires an OpenAI API key or an Azure OpenAI transcribe deployment
+  llm_provider: claude      # claude, openai, deepseek or azure-openai
+  llm_base_url: ""          # optional API base URL override (ORBGUARD_SCAM_DETECTOR_LLM_BASE_URL)
+  llm_model: ""             # optional model override (ORBGUARD_SCAM_DETECTOR_LLM_MODEL)
+  llm_reasoning_effort: "low"  # reasoning_effort for OpenAI/Azure reasoning models (ORBGUARD_SCAM_DETECTOR_LLM_REASONING_EFFORT); "" omits
+  claude_api_key: ""        # Set via ORBGUARD_CLAUDE_API_KEY env
+  openai_api_key: ""        # Set via ORBGUARD_OPENAI_API_KEY env
+  deepseek_api_key: ""      # Set via ORBGUARD_DEEPSEEK_API_KEY env
+  azure_openai_endpoint: "" # e.g. https://my-resource.openai.azure.com (ORBGUARD_AZURE_OPENAI_ENDPOINT)
+  azure_openai_key: ""      # Set via ORBGUARD_AZURE_OPENAI_KEY env
+  azure_openai_deployment: ""              # Set via ORBGUARD_AZURE_OPENAI_DEPLOYMENT env
+  azure_openai_api_version: "2024-02-15-preview"  # ORBGUARD_AZURE_OPENAI_API_VERSION
+  azure_openai_transcribe_deployment: ""   # audio transcription deployment, e.g. gpt-4o-transcribe (ORBGUARD_AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT)
+  scam_threshold: 0.7
+  suspicious_threshold: 0.4
+
+# DNS leak-check canary. zone is the controlled, NS-delegated domain served
+# by the authoritative responder in cmd/dnscanary (e.g. dnscheck.example.com).
+# When empty, POST /network/dns/check reports the leak check as explicitly
+# unavailable instead of fabricating a result.
+dns_canary:
+  zone: ""  # Set via ORBGUARD_DNS_CANARY_ZONE env
+
+# Firebase Cloud Messaging (FCM HTTP v1) push for real-time anti-theft command
+# delivery. When enabled is false, or fcm_project_id / fcm_service_account_json
+# is empty, push runs as an explicit no-op and remote commands are delivered by
+# device polling instead. fcm_service_account_json accepts either the raw JSON
+# content or a path to the service-account key file.
+push:
+  enabled: true
+  fcm_project_id: ""           # Set via ORBGUARD_FCM_PROJECT_ID env
+  fcm_service_account_json: "" # Set via ORBGUARD_FCM_SERVICE_ACCOUNT_JSON env (JSON content or file path)

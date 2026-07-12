@@ -237,6 +237,13 @@ type TTPSimilarity struct {
 	SharedTactics []string `json:"shared_tactics"`
 	SharedTechniques []string `json:"shared_techniques"`
 	Similarity    float64  `json:"similarity"`
+	// InsufficientData is true when one or both actors have no known
+	// technique data in the graph or relational store, meaning the
+	// similarity score cannot be meaningfully computed.
+	InsufficientData bool `json:"insufficient_data,omitempty"`
+	// DataSource describes where technique data came from: "graph",
+	// "sql_fallback", "mixed", or "none".
+	DataSource string `json:"data_source,omitempty"`
 }
 
 // CampaignDetection represents auto-detected campaign grouping

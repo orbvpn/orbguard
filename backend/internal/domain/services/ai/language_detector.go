@@ -339,102 +339,159 @@ func (d *LanguageDetector) detectCyrillicLanguage(text string) string {
 	return "ru"
 }
 
-// detectLatinLanguage detects specific Latin-script language
+// Minimum number of letter characters required before we trust a non-English
+// Latin-script classification. Below this, short strings (e.g. "you won a
+// prize") produce too few stop-word hits to distinguish languages reliably, so
+// we default to English — the app's primary language — to avoid the common
+// misfire where a short English phishing message is tagged as Portuguese/Spanish.
+const minLatinLettersForNonEnglish = 25
+
+// minNonEnglishMargin is the score lead a non-English language must hold over
+// English (and over the runner-up) before we accept it. A thin margin is more
+// likely noise than a genuine signal, so we fall back to English.
+const minNonEnglishMargin = 2
+
+// detectLatinLanguage detects specific Latin-script language.
+//
+// Detection is intentionally conservative: it uses whole-word matching of
+// stop-words (not substring matching, which lets short English text accidentally
+// match foreign single-letter articles like "a"/"o"/"de"), weights
+// language-specific diacritics, and requires both a minimum amount of text and a
+// confidence margin before returning a non-English language. When the text is
+// short or the margin is thin it defaults to English.
 func (d *LanguageDetector) detectLatinLanguage(text string) string {
 	textLower := strings.ToLower(text)
+	tokens := tokenizeWords(textLower)
 
-	// Spanish indicators
-	spanishPatterns := []string{"el", "la", "de", "que", "los", "del", "las", "una", "por", "con", "está", "ñ"}
-	spanishScore := 0
-	for _, p := range spanishPatterns {
-		if strings.Contains(textLower, " "+p+" ") || strings.Contains(textLower, p) {
-			spanishScore++
+	// Count letters to gauge how much signal we actually have.
+	letterCount := 0
+	for _, r := range textLower {
+		if unicode.IsLetter(r) {
+			letterCount++
 		}
 	}
 
-	// French indicators
-	frenchPatterns := []string{"le", "la", "de", "les", "des", "un", "une", "est", "dans", "pour", "avec", "ce", "ç", "é", "è", "ê", "à", "ù", "û"}
-	frenchScore := 0
-	for _, p := range frenchPatterns {
-		if strings.Contains(textLower, p) {
-			frenchScore++
+	// Whole-word stop-word sets. Single-character entries are deliberately
+	// excluded because they match far too easily across languages.
+	wordScore := func(words map[string]struct{}) int {
+		score := 0
+		for _, tok := range tokens {
+			if _, ok := words[tok]; ok {
+				score++
+			}
+		}
+		return score
+	}
+
+	// Diacritic signals: characters that strongly indicate a specific language.
+	diacriticScore := func(chars string) int {
+		score := 0
+		for _, c := range chars {
+			score += strings.Count(textLower, string(c))
+		}
+		return score
+	}
+
+	englishScore := wordScore(englishStopWords)
+	// Diacritics are a strong signal; weight them so a single accented marker
+	// can tip a short message away from English when nothing else fires.
+	spanishScore := wordScore(spanishStopWords) + diacriticScore("ñ¿¡")*2
+	frenchScore := wordScore(frenchStopWords) + diacriticScore("çêàùû")*2
+	germanScore := wordScore(germanStopWords) + diacriticScore("ßüöä")*2
+	portugueseScore := wordScore(portugueseStopWords) + diacriticScore("ãõç")*2
+	italianScore := wordScore(italianStopWords)
+	dutchScore := wordScore(dutchStopWords)
+
+	type cand struct {
+		lang  string
+		score int
+	}
+	nonEnglish := []cand{
+		{"es", spanishScore},
+		{"fr", frenchScore},
+		{"de", germanScore},
+		{"pt", portugueseScore},
+		{"it", italianScore},
+		{"nl", dutchScore},
+	}
+
+	// Pick the best non-English candidate.
+	best := cand{lang: "en", score: 0}
+	for _, c := range nonEnglish {
+		if c.score > best.score {
+			best = c
 		}
 	}
 
-	// German indicators
-	germanPatterns := []string{"der", "die", "das", "und", "ist", "ein", "eine", "nicht", "mit", "auf", "ich", "ß", "ü", "ö", "ä"}
-	germanScore := 0
-	for _, p := range germanPatterns {
-		if strings.Contains(textLower, p) {
-			germanScore++
-		}
+	// Default to English when there's not enough text to trust a non-English
+	// guess, or when the candidate doesn't clearly beat English.
+	if letterCount < minLatinLettersForNonEnglish {
+		return "en"
+	}
+	if best.score-englishScore < minNonEnglishMargin {
+		return "en"
 	}
 
-	// Portuguese indicators
-	portuguesePatterns := []string{"o", "a", "de", "que", "em", "do", "da", "com", "não", "uma", "os", "as", "ã", "ç"}
-	portugueseScore := 0
-	for _, p := range portuguesePatterns {
-		if strings.Contains(textLower, p) {
-			portugueseScore++
-		}
-	}
+	return best.lang
+}
 
-	// Italian indicators
-	italianPatterns := []string{"il", "di", "che", "è", "la", "un", "una", "per", "non", "sono", "con"}
-	italianScore := 0
-	for _, p := range italianPatterns {
-		if strings.Contains(textLower, p) {
-			italianScore++
-		}
-	}
+// tokenizeWords splits text into lowercase word tokens using non-letter
+// boundaries (so punctuation and digits don't merge words). It preserves
+// accented letters so diacritic-bearing stop-words still match.
+func tokenizeWords(textLower string) []string {
+	return strings.FieldsFunc(textLower, func(r rune) bool {
+		return !unicode.IsLetter(r)
+	})
+}
 
-	// Dutch indicators
-	dutchPatterns := []string{"de", "het", "een", "van", "en", "is", "dat", "op", "te", "niet", "met", "ij"}
-	dutchScore := 0
-	for _, p := range dutchPatterns {
-		if strings.Contains(textLower, p) {
-			dutchScore++
-		}
-	}
+// Whole-word stop-word sets. Single-character function words are omitted on
+// purpose: matching them as substrings (or even whole tokens) creates too many
+// false positives for short text.
+var (
+	englishStopWords = toSet([]string{
+		"the", "be", "to", "of", "and", "in", "that", "have", "it", "for",
+		"not", "on", "with", "he", "as", "you", "do", "at", "this", "but",
+		"his", "by", "from", "they", "we", "say", "her", "she", "will",
+		"your", "click", "here", "account", "bank", "won", "prize", "now",
+		"new", "number", "urgent", "suspended", "verify", "please", "is", "has",
+	})
+	spanishStopWords = toSet([]string{
+		"el", "la", "los", "las", "del", "que", "una", "por", "con", "está",
+		"para", "como", "pero", "más", "este", "esta", "son", "muy", "todo",
+		"hola", "gracias", "usted", "su", "se",
+	})
+	frenchStopWords = toSet([]string{
+		"le", "les", "des", "une", "est", "dans", "pour", "avec", "ce", "vous",
+		"nous", "qui", "que", "pas", "sur", "mais", "votre", "bonjour", "merci",
+		"cliquez", "ici", "compte",
+	})
+	germanStopWords = toSet([]string{
+		"der", "die", "das", "und", "ist", "ein", "eine", "nicht", "mit",
+		"auf", "ich", "sie", "sind", "wird", "haben", "für", "konto", "bitte",
+		"hallo", "danke",
+	})
+	portugueseStopWords = toSet([]string{
+		"que", "em", "do", "da", "com", "não", "uma", "os", "as", "dos",
+		"das", "para", "como", "mas", "mais", "este", "esta", "são", "você",
+		"sua", "seu", "obrigado", "olá", "clique", "aqui", "conta", "banco",
+	})
+	italianStopWords = toSet([]string{
+		"il", "di", "che", "è", "la", "un", "una", "per", "non", "sono",
+		"con", "del", "della", "questo", "questa", "ciao", "grazie",
+	})
+	dutchStopWords = toSet([]string{
+		"de", "het", "een", "van", "en", "is", "dat", "op", "te", "niet",
+		"met", "ij", "zijn", "voor", "maar", "hallo", "bedankt",
+	})
+)
 
-	// English indicators (common words)
-	englishPatterns := []string{"the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", "as", "you", "do", "at"}
-	englishScore := 0
-	for _, p := range englishPatterns {
-		if strings.Contains(textLower, " "+p+" ") {
-			englishScore++
-		}
+// toSet builds a set from a slice of strings for O(1) membership checks.
+func toSet(items []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		set[it] = struct{}{}
 	}
-
-	// Find highest score
-	maxScore := englishScore
-	lang := "en"
-
-	if spanishScore > maxScore {
-		maxScore = spanishScore
-		lang = "es"
-	}
-	if frenchScore > maxScore {
-		maxScore = frenchScore
-		lang = "fr"
-	}
-	if germanScore > maxScore {
-		maxScore = germanScore
-		lang = "de"
-	}
-	if portugueseScore > maxScore {
-		maxScore = portugueseScore
-		lang = "pt"
-	}
-	if italianScore > maxScore {
-		maxScore = italianScore
-		lang = "it"
-	}
-	if dutchScore > maxScore {
-		lang = "nl"
-	}
-
-	return lang
+	return set
 }
 
 // GetLanguageInfo returns information about a language code

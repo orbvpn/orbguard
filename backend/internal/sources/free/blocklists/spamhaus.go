@@ -3,6 +3,7 @@ package blocklists
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -18,12 +19,12 @@ import (
 )
 
 const (
-	// Spamhaus DROP list - IP addresses hijacked or leased by spammers
-	spamhausDROPURL = "https://www.spamhaus.org/drop/drop.txt"
-	// Spamhaus EDROP list - Extended DROP (additional netblocks)
-	spamhausEDROPURL = "https://www.spamhaus.org/drop/edrop.txt"
-	// Spamhaus ASN DROP - Autonomous System Numbers controlled by spammers
-	spamhausASNDROPURL = "https://www.spamhaus.org/drop/asndrop.txt"
+	// Spamhaus DROP list (JSON) - IP ranges hijacked or leased by spammers.
+	// Note: the legacy text lists are deprecated — EDROP was merged into
+	// DROP in 2024 and asndrop.txt was replaced by a JSON version.
+	spamhausDROPURL = "https://www.spamhaus.org/drop/drop_v4.json"
+	// Spamhaus ASN DROP (JSON) - Autonomous Systems controlled by spammers
+	spamhausASNDROPURL = "https://www.spamhaus.org/drop/asndrop.json"
 
 	spamhausSlug = "spamhaus"
 )
@@ -106,20 +107,13 @@ func (c *SpamhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResul
 
 	var allIndicators []models.RawIndicator
 
-	// Fetch DROP list
+	// Fetch DROP list (includes the former EDROP entries, merged by
+	// Spamhaus into DROP in 2024)
 	dropIndicators, err := c.fetchList(ctx, spamhausDROPURL, "DROP")
 	if err != nil {
 		c.logger.Warn().Err(err).Msg("failed to fetch DROP list")
 	} else {
 		allIndicators = append(allIndicators, dropIndicators...)
-	}
-
-	// Fetch EDROP list
-	edropIndicators, err := c.fetchList(ctx, spamhausEDROPURL, "EDROP")
-	if err != nil {
-		c.logger.Warn().Err(err).Msg("failed to fetch EDROP list")
-	} else {
-		allIndicators = append(allIndicators, edropIndicators...)
 	}
 
 	// Fetch ASN DROP list
@@ -171,9 +165,17 @@ func (c *SpamhausConnector) fetchList(ctx context.Context, url, listType string)
 	return c.parseDROPList(resp.Body, listType)
 }
 
-// parseDROPList parses DROP/EDROP format
-// Format: CIDR ; SBL ID
-// Example: 1.10.16.0/20 ; SBL123456
+// spamhausDROPRecord is one newline-delimited JSON record from drop_v4.json.
+// Example: {"cidr":"1.10.16.0/20","sblid":"SBL256894","rir":"apnic"}
+type spamhausDROPRecord struct {
+	CIDR  string `json:"cidr"`
+	SBLID string `json:"sblid"`
+	RIR   string `json:"rir"`
+}
+
+// parseDROPList parses the newline-delimited JSON DROP list (drop_v4.json).
+// Lines that are not data records (e.g. the trailing metadata record) are
+// skipped.
 func (c *SpamhausConnector) parseDROPList(reader io.Reader, listType string) ([]models.RawIndicator, error) {
 	var indicators []models.RawIndicator
 	now := time.Now()
@@ -183,21 +185,22 @@ func (c *SpamhausConnector) parseDROPList(reader io.Reader, listType string) ([]
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip empty lines and comments
+		// Skip empty lines and legacy-style comments
 		if line == "" || strings.HasPrefix(line, ";") {
 			continue
 		}
 
-		// Parse CIDR ; SBL ID
-		parts := strings.SplitN(line, ";", 2)
-		if len(parts) == 0 {
+		var rec spamhausDROPRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			c.logger.Debug().Str("line", line).Msg("skipping non-JSON DROP line")
+			continue
+		}
+		if rec.CIDR == "" {
+			// Metadata record or unrelated entry
 			continue
 		}
 
-		cidr := strings.TrimSpace(parts[0])
-		if cidr == "" {
-			continue
-		}
+		cidr := rec.CIDR
 
 		// Validate CIDR
 		_, ipNet, err := net.ParseCIDR(cidr)
@@ -206,11 +209,7 @@ func (c *SpamhausConnector) parseDROPList(reader io.Reader, listType string) ([]
 			continue
 		}
 
-		// Get SBL ID if present
-		sblID := ""
-		if len(parts) > 1 {
-			sblID = strings.TrimSpace(parts[1])
-		}
+		sblID := rec.SBLID
 
 		// Determine severity based on CIDR size
 		severity := models.SeverityHigh
@@ -240,6 +239,7 @@ func (c *SpamhausConnector) parseDROPList(reader io.Reader, listType string) ([]
 				"list_type": listType,
 				"cidr":      cidr,
 				"sbl_id":    sblID,
+				"rir":       rec.RIR,
 			},
 		}
 
@@ -296,9 +296,19 @@ func (c *SpamhausConnector) fetchASNList(ctx context.Context, url string) ([]mod
 	return c.parseASNList(resp.Body)
 }
 
-// parseASNList parses ASN DROP format
-// Format: ASxxxx ; SBL ID | Country | ASN Name
-// Example: AS12345 ; SBL123456 | US | Bad Actor ISP
+// spamhausASNRecord is one newline-delimited JSON record from asndrop.json.
+// Example: {"asn":245,"rir":"arin","domain":"example.com","cc":"US","asname":"PRC-AS"}
+type spamhausASNRecord struct {
+	ASN    int64  `json:"asn"`
+	RIR    string `json:"rir"`
+	Domain string `json:"domain"`
+	CC     string `json:"cc"`
+	ASName string `json:"asname"`
+}
+
+// parseASNList parses the newline-delimited JSON ASN DROP list
+// (asndrop.json). Lines that are not data records (e.g. the trailing
+// metadata record) are skipped.
 func (c *SpamhausConnector) parseASNList(reader io.Reader) ([]models.RawIndicator, error) {
 	var indicators []models.RawIndicator
 	now := time.Now()
@@ -308,39 +318,24 @@ func (c *SpamhausConnector) parseASNList(reader io.Reader) ([]models.RawIndicato
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip empty lines and comments
+		// Skip empty lines and legacy-style comments
 		if line == "" || strings.HasPrefix(line, ";") {
 			continue
 		}
 
-		// Parse ASN ; info
-		parts := strings.SplitN(line, ";", 2)
-		if len(parts) == 0 {
+		var rec spamhausASNRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			c.logger.Debug().Str("line", line).Msg("skipping non-JSON ASN DROP line")
+			continue
+		}
+		if rec.ASN <= 0 {
+			// Metadata record or unrelated entry
 			continue
 		}
 
-		asn := strings.TrimSpace(parts[0])
-		if asn == "" || !strings.HasPrefix(strings.ToUpper(asn), "AS") {
-			continue
-		}
-
-		// Parse additional info
-		sblID := ""
-		country := ""
-		asnName := ""
-		if len(parts) > 1 {
-			info := strings.TrimSpace(parts[1])
-			infoParts := strings.Split(info, "|")
-			if len(infoParts) > 0 {
-				sblID = strings.TrimSpace(infoParts[0])
-			}
-			if len(infoParts) > 1 {
-				country = strings.TrimSpace(infoParts[1])
-			}
-			if len(infoParts) > 2 {
-				asnName = strings.TrimSpace(infoParts[2])
-			}
-		}
+		asn := fmt.Sprintf("AS%d", rec.ASN)
+		country := rec.CC
+		asnName := rec.ASName
 
 		description := fmt.Sprintf("Spamhaus ASN DROP - Autonomous System controlled by spammers: %s", asn)
 		if asnName != "" {
@@ -366,7 +361,8 @@ func (c *SpamhausConnector) parseASNList(reader io.Reader) ([]models.RawIndicato
 			RawData: map[string]any{
 				"source":   "spamhaus",
 				"asn":      asn,
-				"sbl_id":   sblID,
+				"rir":      rec.RIR,
+				"domain":   rec.Domain,
 				"country":  country,
 				"asn_name": asnName,
 			},

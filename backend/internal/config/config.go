@@ -10,30 +10,121 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	App         AppConfig         `mapstructure:"app"`
-	Server      ServerConfig      `mapstructure:"server"`
-	Database    DatabaseConfig    `mapstructure:"database"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	Neo4j       Neo4jConfig       `mapstructure:"neo4j"`
-	NATS        NATSConfig        `mapstructure:"nats"`
-	JWT         JWTConfig         `mapstructure:"jwt"`
-	CORS        CORSConfig        `mapstructure:"cors"`
-	RateLimit   RateLimitConfig   `mapstructure:"ratelimit"`
-	Logger      LoggerConfig      `mapstructure:"logger"`
-	Aggregation AggregationConfig `mapstructure:"aggregation"`
-	Sources     SourcesConfig     `mapstructure:"sources"`
-	Scoring     ScoringConfig     `mapstructure:"scoring"`
-	Detection   DetectionConfig   `mapstructure:"detection"`
-	MITRE       MITREConfig       `mapstructure:"mitre"`
-	STIX        STIXConfig        `mapstructure:"stix"`
-	ML          MLConfig          `mapstructure:"ml"`
-	HIBP        HIBPConfig        `mapstructure:"hibp"`
+	App          AppConfig          `mapstructure:"app"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	Neo4j        Neo4jConfig        `mapstructure:"neo4j"`
+	NATS         NATSConfig         `mapstructure:"nats"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	CORS         CORSConfig         `mapstructure:"cors"`
+	RateLimit    RateLimitConfig    `mapstructure:"ratelimit"`
+	Logger       LoggerConfig       `mapstructure:"logger"`
+	Aggregation  AggregationConfig  `mapstructure:"aggregation"`
+	Sources      SourcesConfig      `mapstructure:"sources"`
+	Scoring      ScoringConfig      `mapstructure:"scoring"`
+	Detection    DetectionConfig    `mapstructure:"detection"`
+	MITRE        MITREConfig        `mapstructure:"mitre"`
+	STIX         STIXConfig         `mapstructure:"stix"`
+	ML           MLConfig           `mapstructure:"ml"`
+	HIBP         HIBPConfig         `mapstructure:"hibp"`
+	LeakCheck    LeakCheckConfig    `mapstructure:"leakcheck"`
+	IntelX       IntelXConfig       `mapstructure:"intelx"`
+	SafeBrowsing SafeBrowsingConfig `mapstructure:"safe_browsing"`
+	ScamDetector ScamDetectorConfig `mapstructure:"scam_detector"`
+	DNSCanary    DNSCanaryConfig    `mapstructure:"dns_canary"`
+	Push         PushConfig         `mapstructure:"push"`
+}
+
+// PushConfig holds Firebase Cloud Messaging (FCM HTTP v1) configuration for
+// real-time anti-theft command delivery. When Enabled is false, or either
+// FCMProjectID or FCMServiceAccountJSON is empty, the push service runs as an
+// explicit no-op (commands are still delivered by device polling).
+type PushConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+	// FCMProjectID is the Firebase/GCP project id used in the FCM v1 send URL.
+	FCMProjectID string `mapstructure:"fcm_project_id"`
+	// FCMServiceAccountJSON is the service-account credential: either the raw
+	// JSON content or a path to a file containing it. Both forms are accepted.
+	FCMServiceAccountJSON string `mapstructure:"fcm_service_account_json"`
+}
+
+// DNSCanaryConfig holds the DNS leak-check canary settings. Zone is the
+// controlled, NS-delegated domain served by cmd/dnscanary (e.g.
+// "dnscheck.example.com"). When empty, the API reports the DNS leak check as
+// explicitly unavailable instead of fabricating a result.
+type DNSCanaryConfig struct {
+	Zone string `mapstructure:"zone"`
 }
 
 // HIBPConfig holds Have I Been Pwned API configuration
 type HIBPConfig struct {
 	APIKey  string `mapstructure:"api_key"`
 	Enabled bool   `mapstructure:"enabled"`
+}
+
+// LeakCheckConfig holds LeakCheck breach-search API configuration
+type LeakCheckConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	Enabled bool   `mapstructure:"enabled"`
+}
+
+// IntelXConfig holds Intelligence X dark-web search API configuration
+type IntelXConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	BaseURL string `mapstructure:"base_url"`
+	Enabled bool   `mapstructure:"enabled"`
+}
+
+// SafeBrowsingConfig holds the Google Safe Browsing key used by the URL
+// reputation service. When APIKey is empty it falls back to
+// sources.google_safebrowsing.api_key (see EffectiveSafeBrowsingKey).
+type SafeBrowsingConfig struct {
+	APIKey string `mapstructure:"api_key"`
+}
+
+// EffectiveSafeBrowsingKey returns the Safe Browsing API key for URL
+// reputation lookups, falling back to the source connector key so a single
+// key can drive both the feed connector and live lookups.
+func (c *Config) EffectiveSafeBrowsingKey() string {
+	if c.SafeBrowsing.APIKey != "" {
+		return c.SafeBrowsing.APIKey
+	}
+	return c.Sources.GoogleSafeBrowsing.APIKey
+}
+
+// ScamDetectorConfig holds AI-powered scam detection configuration.
+// LLM, vision and speech capabilities are only activated at startup when the
+// corresponding API keys are configured; pattern and phone reputation
+// databases are local and have no external dependency.
+type ScamDetectorConfig struct {
+	EnableLLM        bool    `mapstructure:"enable_llm"`
+	EnablePatternDB  bool    `mapstructure:"enable_pattern_db"`
+	EnablePhoneRep   bool    `mapstructure:"enable_phone_rep"`
+	EnableVision     bool    `mapstructure:"enable_vision"`
+	EnableSpeech     bool    `mapstructure:"enable_speech"`
+	LLMProvider      string  `mapstructure:"llm_provider"`
+	LLMBaseURL       string  `mapstructure:"llm_base_url"`
+	LLMModel         string  `mapstructure:"llm_model"`
+	// LLMReasoningEffort is sent as reasoning_effort to reasoning-capable
+	// OpenAI/Azure OpenAI deployments (GPT-5.x, o-series); classification at
+	// "low" effort is fast and high quality. Empty omits the parameter.
+	LLMReasoningEffort string `mapstructure:"llm_reasoning_effort"`
+	ClaudeAPIKey     string  `mapstructure:"claude_api_key"`
+	OpenAIAPIKey     string  `mapstructure:"openai_api_key"`
+	DeepSeekAPIKey   string  `mapstructure:"deepseek_api_key"`
+	ScamThreshold    float64 `mapstructure:"scam_threshold"`
+	SuspiciousThresh float64 `mapstructure:"suspicious_threshold"`
+
+	// Azure OpenAI (used only when llm_provider == "azure-openai")
+	AzureOpenAIEndpoint   string `mapstructure:"azure_openai_endpoint"`
+	AzureOpenAIKey        string `mapstructure:"azure_openai_key"`
+	AzureOpenAIDeployment string `mapstructure:"azure_openai_deployment"`
+	AzureOpenAIAPIVersion string `mapstructure:"azure_openai_api_version"`
+	// AzureOpenAITranscribeDeployment enables Azure OpenAI audio transcription
+	// (e.g. gpt-4o-transcribe) for speech analysis; works together with
+	// azure_openai_endpoint and azure_openai_key.
+	AzureOpenAITranscribeDeployment string `mapstructure:"azure_openai_transcribe_deployment"`
 }
 
 type AppConfig struct {
@@ -176,9 +267,9 @@ type SourceConfig struct {
 }
 
 type ScoringConfig struct {
-	Weights           ScoringWeights           `mapstructure:"weights"`
-	Bonuses           ScoringBonuses           `mapstructure:"bonuses"`
-	SourceReliability map[string]float64       `mapstructure:"source_reliability"`
+	Weights           ScoringWeights     `mapstructure:"weights"`
+	Bonuses           ScoringBonuses     `mapstructure:"bonuses"`
+	SourceReliability map[string]float64 `mapstructure:"source_reliability"`
 }
 
 type ScoringWeights struct {
@@ -212,8 +303,8 @@ type BehavioralConfig struct {
 }
 
 type SupplyChainConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	OSVAPURL  string `mapstructure:"osv_api_url"`
+	Enabled  bool   `mapstructure:"enabled"`
+	OSVAPURL string `mapstructure:"osv_api_url"`
 }
 
 type MITREConfig struct {
@@ -223,7 +314,7 @@ type MITREConfig struct {
 }
 
 type STIXConfig struct {
-	Enabled     bool             `mapstructure:"enabled"`
+	Enabled     bool              `mapstructure:"enabled"`
 	TAXIIServer TAXIIServerConfig `mapstructure:"taxii_server"`
 }
 
@@ -288,6 +379,73 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("neo4j.database", "ORBGUARD_NEO4J_DATABASE")
 	v.BindEnv("nats.enabled", "ORBGUARD_NATS_ENABLED")
 	v.BindEnv("app.environment", "ORBGUARD_APP_ENVIRONMENT")
+
+	// Dark web / breach intelligence API keys
+	v.BindEnv("hibp.api_key", "ORBGUARD_HIBP_API_KEY")
+	v.BindEnv("hibp.enabled", "ORBGUARD_HIBP_ENABLED")
+	v.BindEnv("leakcheck.api_key", "ORBGUARD_LEAKCHECK_API_KEY")
+	v.BindEnv("leakcheck.enabled", "ORBGUARD_LEAKCHECK_ENABLED")
+	v.BindEnv("intelx.api_key", "ORBGUARD_INTELX_API_KEY")
+	v.BindEnv("intelx.base_url", "ORBGUARD_INTELX_BASE_URL")
+	v.BindEnv("intelx.enabled", "ORBGUARD_INTELX_ENABLED")
+
+	// URL reputation Safe Browsing key (falls back to sources.google_safebrowsing.api_key)
+	v.BindEnv("safe_browsing.api_key", "ORBGUARD_SAFE_BROWSING_API_KEY")
+
+	// AI scam detector
+	v.BindEnv("scam_detector.enable_llm", "ORBGUARD_SCAM_DETECTOR_ENABLE_LLM")
+	v.BindEnv("scam_detector.enable_pattern_db", "ORBGUARD_SCAM_DETECTOR_ENABLE_PATTERN_DB")
+	v.BindEnv("scam_detector.enable_phone_rep", "ORBGUARD_SCAM_DETECTOR_ENABLE_PHONE_REP")
+	v.BindEnv("scam_detector.enable_vision", "ORBGUARD_SCAM_DETECTOR_ENABLE_VISION")
+	v.BindEnv("scam_detector.enable_speech", "ORBGUARD_SCAM_DETECTOR_ENABLE_SPEECH")
+	v.BindEnv("scam_detector.llm_provider", "ORBGUARD_SCAM_DETECTOR_LLM_PROVIDER")
+	v.BindEnv("scam_detector.llm_base_url", "ORBGUARD_SCAM_DETECTOR_LLM_BASE_URL")
+	v.BindEnv("scam_detector.llm_model", "ORBGUARD_SCAM_DETECTOR_LLM_MODEL")
+	v.BindEnv("scam_detector.llm_reasoning_effort", "ORBGUARD_SCAM_DETECTOR_LLM_REASONING_EFFORT")
+	v.BindEnv("scam_detector.claude_api_key", "ORBGUARD_CLAUDE_API_KEY")
+	v.BindEnv("scam_detector.openai_api_key", "ORBGUARD_OPENAI_API_KEY")
+	v.BindEnv("scam_detector.deepseek_api_key", "ORBGUARD_DEEPSEEK_API_KEY")
+	v.BindEnv("scam_detector.azure_openai_endpoint", "ORBGUARD_AZURE_OPENAI_ENDPOINT")
+	v.BindEnv("scam_detector.azure_openai_key", "ORBGUARD_AZURE_OPENAI_KEY")
+	v.BindEnv("scam_detector.azure_openai_deployment", "ORBGUARD_AZURE_OPENAI_DEPLOYMENT")
+	v.BindEnv("scam_detector.azure_openai_api_version", "ORBGUARD_AZURE_OPENAI_API_VERSION")
+	v.BindEnv("scam_detector.azure_openai_transcribe_deployment", "ORBGUARD_AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT")
+
+	// DNS leak-check canary zone (served by cmd/dnscanary; empty = leak
+	// check reported unavailable)
+	v.BindEnv("dns_canary.zone", "ORBGUARD_DNS_CANARY_ZONE")
+
+	// FCM push (real-time anti-theft command delivery). Empty project id /
+	// service-account JSON keeps push as an explicit no-op (polling only).
+	v.BindEnv("push.enabled", "ORBGUARD_PUSH_ENABLED")
+	v.BindEnv("push.fcm_project_id", "ORBGUARD_FCM_PROJECT_ID")
+	v.BindEnv("push.fcm_service_account_json", "ORBGUARD_FCM_SERVICE_ACCOUNT_JSON")
+
+	// Defaults for sections that may be absent from older config files.
+	// PatternDB and PhoneRep are local databases with no external dependency,
+	// so they default to enabled. LLM/vision/speech default to enabled but
+	// are gated at startup on the presence of their API keys.
+	v.SetDefault("scam_detector.enable_pattern_db", true)
+	v.SetDefault("scam_detector.enable_phone_rep", true)
+	v.SetDefault("scam_detector.enable_llm", true)
+	v.SetDefault("scam_detector.enable_vision", true)
+	v.SetDefault("scam_detector.enable_speech", true)
+	v.SetDefault("scam_detector.llm_provider", "claude")
+	v.SetDefault("scam_detector.llm_reasoning_effort", "low")
+	v.SetDefault("scam_detector.azure_openai_api_version", "2024-02-15-preview")
+	v.SetDefault("scam_detector.scam_threshold", 0.7)
+	v.SetDefault("scam_detector.suspicious_threshold", 0.4)
+	v.SetDefault("hibp.enabled", true)
+	v.SetDefault("leakcheck.enabled", true)
+	v.SetDefault("intelx.enabled", true)
+	v.SetDefault("intelx.base_url", "https://2.intelx.io")
+	v.SetDefault("dns_canary.zone", "")
+
+	// Push defaults: master switch on, but effective only when FCM credentials
+	// are configured (gated at startup on project id + service-account JSON).
+	v.SetDefault("push.enabled", true)
+	v.SetDefault("push.fcm_project_id", "")
+	v.SetDefault("push.fcm_service_account_json", "")
 
 	// Source API keys
 	v.BindEnv("sources.threatfox.api_key", "ORBGUARD_THREATFOX_API_KEY")
