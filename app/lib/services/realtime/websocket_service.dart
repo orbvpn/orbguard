@@ -1,8 +1,9 @@
-/// WebSocket Service for Real-time Threat Alerts
-/// Connects to OrbGuard Lab WebSocket endpoint for live threat updates
+// WebSocket Service for Real-time Threat Alerts
+// Connects to OrbGuard Lab WebSocket endpoint for live threat updates
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -35,7 +36,6 @@ class WebSocketService {
 
   WebSocketState _state = WebSocketState.disconnected;
   int _reconnectAttempts = 0;
-  DateTime? _lastMessageTime;
 
   // Configuration
   static const int _maxReconnectAttempts = 10;
@@ -126,7 +126,7 @@ class WebSocketService {
       // Send subscription preferences
       _sendSubscriptions();
 
-      print('WebSocket connected to $_wsUrl');
+      developer.log('WebSocket connected to $_wsUrl', name: 'OrbGuard.WS');
     } catch (e) {
       _onError(e);
     }
@@ -147,7 +147,7 @@ class WebSocketService {
     _setState(WebSocketState.disconnected);
     _reconnectAttempts = 0;
 
-    print('WebSocket disconnected');
+    developer.log('WebSocket disconnected', name: 'OrbGuard.WS');
   }
 
   /// Subscribe to specific severity levels
@@ -177,21 +177,19 @@ class WebSocketService {
   /// Send a message to the server
   void send(Map<String, dynamic> message) {
     if (_state != WebSocketState.connected || _channel == null) {
-      print('Cannot send message: not connected');
+      developer.log('Cannot send message: not connected', name: 'OrbGuard.WS');
       return;
     }
 
     try {
       _channel!.sink.add(jsonEncode(message));
     } catch (e) {
-      print('Error sending message: $e');
+      developer.log('Error sending message: $e', name: 'OrbGuard.WS');
     }
   }
 
   /// Handle incoming message
   void _onMessage(dynamic message) {
-    _lastMessageTime = DateTime.now();
-
     try {
       final data = jsonDecode(message as String) as Map<String, dynamic>;
       final eventType = data['type'] as String?;
@@ -209,7 +207,7 @@ class WebSocketService {
           break;
 
         case 'subscribed':
-          print('Subscription confirmed: ${data['filters']}');
+          developer.log('Subscription confirmed: ${data['filters']}', name: 'OrbGuard.WS');
           break;
 
         case 'error':
@@ -218,16 +216,16 @@ class WebSocketService {
           break;
 
         default:
-          print('Unknown message type: $eventType');
+          developer.log('Unknown message type: $eventType', name: 'OrbGuard.WS');
       }
     } catch (e) {
-      print('Error parsing message: $e');
+      developer.log('Error parsing message: $e', name: 'OrbGuard.WS');
     }
   }
 
   /// Handle WebSocket error
   void _onError(dynamic error) {
-    print('WebSocket error: $error');
+    developer.log('WebSocket error: $error', name: 'OrbGuard.WS');
     _setState(WebSocketState.error);
     _errorController.add(error.toString());
     _scheduleReconnect();
@@ -235,7 +233,7 @@ class WebSocketService {
 
   /// Handle WebSocket close
   void _onDone() {
-    print('WebSocket connection closed');
+    developer.log('WebSocket connection closed', name: 'OrbGuard.WS');
     if (_state != WebSocketState.disconnected) {
       _setState(WebSocketState.disconnected);
       _scheduleReconnect();
@@ -245,7 +243,7 @@ class WebSocketService {
   /// Schedule reconnection with exponential backoff
   void _scheduleReconnect() {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('Max reconnection attempts reached');
+      developer.log('Max reconnection attempts reached', name: 'OrbGuard.WS');
       _setState(WebSocketState.error);
       _errorController.add('Connection failed after $_maxReconnectAttempts attempts');
       return;
@@ -255,7 +253,7 @@ class WebSocketService {
 
     // Exponential backoff with jitter
     final delay = _calculateReconnectDelay();
-    print('Scheduling reconnect in ${delay}ms (attempt ${_reconnectAttempts + 1})');
+    developer.log('Scheduling reconnect in ${delay}ms (attempt ${_reconnectAttempts + 1})', name: 'OrbGuard.WS');
 
     _setState(WebSocketState.reconnecting);
     _reconnectTimer = Timer(Duration(milliseconds: delay), () {

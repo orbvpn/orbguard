@@ -1,5 +1,5 @@
-/// Campaigns Screen
-/// Active threat campaign tracking and intelligence interface
+// Campaigns Screen
+// Active threat campaign tracking and intelligence interface
 
 import 'package:flutter/material.dart';
 
@@ -51,6 +51,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GlassTabPage(
       title: 'Threat Campaigns',
       hasSearch: true,
@@ -64,7 +65,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               icon: DuotoneIcon(
                 _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
                 size: 24,
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               onPressed: () {
                 setState(() => _showActiveOnly = !_showActiveOnly);
@@ -72,7 +73,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               },
             ),
             IconButton(
-              icon: const DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
+              icon: DuotoneIcon(AppIcons.refresh, size: 24, color: cs.onSurface),
               onPressed: _isLoading ? null : _loadCampaigns,
             ),
           ],
@@ -120,22 +121,23 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildStatsView() {
+    final cs = Theme.of(context).colorScheme;
     final activeCampaigns = _campaigns.where((c) => c.isActive).length;
     final criticalCount = _campaigns.where((c) => c.severity == SeverityLevel.critical).length;
     final highCount = _campaigns.where((c) => c.severity == SeverityLevel.high).length;
     final totalIOCs = _campaigns.fold<int>(0, (sum, c) => sum + c.indicatorCount);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Campaign Overview',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -154,6 +156,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildStatRow(String label, String value, String icon) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -163,13 +166,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.white.withAlpha(179)),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: cs.onSurface,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),
@@ -189,7 +192,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: campaigns.length,
       itemBuilder: (context, index) {
         return _buildCampaignCard(campaigns[index]);
@@ -198,6 +201,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildCampaignCard(Campaign campaign) {
+    final cs = Theme.of(context).colorScheme;
     final severityColor = _getSeverityColor(campaign.severity);
 
     return GlassCard(
@@ -219,8 +223,10 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                   children: [
                     Text(
                       campaign.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: cs.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -237,9 +243,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                        Text(
-                          campaign.objective ?? 'Unknown',
-                          style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                        Flexible(
+                          child: Text(
+                            campaign.objective ?? 'Unknown',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -252,7 +262,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           const SizedBox(height: 12),
           Text(
             campaign.description ?? 'No description available',
-            style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -287,12 +297,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildCampaignStat(String icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
@@ -320,6 +331,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     required String title,
     required String subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -328,12 +340,12 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
@@ -342,6 +354,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildErrorState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -350,14 +363,14 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           children: [
             DuotoneIcon(AppIcons.dangerTriangle, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Campaigns',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -377,6 +390,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   void _showCampaignDetails(BuildContext context, Campaign campaign) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final severityColor = _getSeverityColor(campaign.severity);
 
     showModalBottomSheet(
@@ -388,13 +403,15 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -416,8 +433,10 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                       children: [
                         Text(
                           campaign.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -437,7 +456,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                             Text(
                               campaign.isActive ? 'Active Campaign' : 'Inactive',
                               style: TextStyle(
-                                color: campaign.isActive ? GlassTheme.successColor : Colors.grey,
+                                color: campaign.isActive ? GlassTheme.successColor : cs.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -452,7 +471,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // Description
               Text(
                 campaign.description ?? 'No description available',
-                style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 14),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
               ),
               const SizedBox(height: 20),
 
@@ -478,9 +497,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // Targets
               if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Targets',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 if (campaign.targetedCountries.isNotEmpty) ...[
@@ -507,9 +526,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // TTPs
               if (campaign.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'MITRE ATT&CK TTPs',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -540,16 +559,17 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500),
               textAlign: TextAlign.end,
             ),
           ),

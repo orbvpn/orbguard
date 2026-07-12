@@ -1,7 +1,7 @@
-/// Settings Provider
-/// State management for app settings and configuration
+// Settings Provider
+// State management for app settings and configuration
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Protection feature settings
@@ -261,6 +261,10 @@ class SettingsProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Appearance — app-wide light/dark/system theme (persisted).
+  static const String _kThemeMode = 'app_theme_mode';
+  ThemeMode _themeMode = ThemeMode.system;
+
   // Getters
   ProtectionSettings get protection => _protection;
   NotificationSettings get notifications => _notifications;
@@ -270,6 +274,16 @@ class SettingsProvider extends ChangeNotifier {
   VpnSettings get vpn => _vpn;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  ThemeMode get themeMode => _themeMode;
+
+  /// Update the app theme mode and persist it.
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
+    notifyListeners();
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setString(_kThemeMode, mode.name);
+  }
 
   /// Initialize provider
   Future<void> init() async {
@@ -278,6 +292,7 @@ class SettingsProvider extends ChangeNotifier {
 
     try {
       _prefs = await SharedPreferences.getInstance();
+      _themeMode = _parseThemeMode(_prefs!.getString(_kThemeMode));
       await _loadSettings();
     } catch (e) {
       _error = 'Failed to load settings: $e';
@@ -285,6 +300,17 @@ class SettingsProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  ThemeMode _parseThemeMode(String? v) {
+    switch (v) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
   }
 
   /// Load settings from storage

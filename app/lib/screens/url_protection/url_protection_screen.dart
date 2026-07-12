@@ -1,7 +1,6 @@
 /// URL Protection Screen
 /// Main screen for URL/web protection
-
-library url_protection_screen;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -86,7 +85,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   void _showDomainDetailsSheet(DomainReputation domain) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -98,7 +97,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
         expand: false,
         builder: (context, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -108,7 +107,10 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -169,7 +171,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   void _showListManagementSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -187,7 +189,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           IconButton(
-            icon: const DuotoneIcon('clipboard_text', size: 22, color: Colors.white),
+            icon: DuotoneIcon('clipboard_text',
+                size: 22, color: Theme.of(context).colorScheme.onSurface),
             onPressed: _showListManagementSheet,
             tooltip: 'Manage Lists',
           ),
@@ -250,7 +253,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
 
   Widget _buildCheckTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -262,7 +265,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
 
           // Result
           if (_checkResult != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             UrlResultCard(
               result: _checkResult!,
               onTap: () => _showDomainDetails(_checkResult!.domain),
@@ -285,7 +288,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
             ),
           ],
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Recent threats
           if (_provider.recentThreats.isNotEmpty) ...[
@@ -328,7 +331,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
     return history.isEmpty
         ? _buildEmptyHistoryState()
         : ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             itemCount: history.length + 1, // +1 for clear button
             itemBuilder: (context, index) {
               if (index == 0) {
@@ -339,7 +342,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                       Text(
                         '${history.length} URLs checked',
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -350,7 +353,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                             showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
-                                backgroundColor: const Color(0xFF1D1E33),
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.surface,
                                 title: const Text('Clear History'),
                                 content: const Text(
                                   'Are you sure you want to clear all URL check history?',
@@ -397,6 +401,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   }
 
   Widget _buildEmptyHistoryState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -406,7 +411,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
             DuotoneIcon(
               'history',
               size: 64,
-              color: Colors.grey[700],
+              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -414,7 +419,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[400],
+                color: cs.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -424,7 +429,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                   : 'URLs you check will appear here',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey[600],
+                color: cs.onSurfaceVariant,
                 fontSize: 14,
               ),
             ),
@@ -436,16 +441,16 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
 
   Widget _buildStatsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         children: [
           // Stats card
           UrlStatsCard(stats: _provider.stats),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Protection status
           _buildProtectionStatus(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // List summary
           _buildListSummary(),
@@ -456,6 +461,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
 
   Widget _buildProtectionStatus() {
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -577,15 +583,18 @@ class _StatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
-        DuotoneIcon(icon, size: 20, color: Colors.grey[500]),
+        DuotoneIcon(icon, size: 20, color: cs.onSurfaceVariant),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -643,7 +652,7 @@ class _ListCountCard extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -728,7 +737,10 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -785,9 +797,11 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
                   controller: _domainController,
                   decoration: InputDecoration(
                     hintText: 'Enter domain (e.g., example.com)',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    hintStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: const Color(0xFF0A0E21),
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,
@@ -822,12 +836,13 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
               ? Center(
                   child: Text(
                     'No domains in ${isWhitelist ? 'whitelist' : 'blacklist'}',
-                    style: TextStyle(color: Colors.grey[500]),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 )
               : ListView.builder(
                   controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   itemCount: list.length,
                   itemBuilder: (context, index) {
                     final entry = list[index];

@@ -362,7 +362,9 @@ class DuotoneIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = color ?? Theme.of(context).iconTheme.color ?? Colors.white;
+    final iconColor = color ??
+        Theme.of(context).iconTheme.color ??
+        Theme.of(context).colorScheme.onSurface;
 
     return SvgPicture.asset(
       'assets/icons/$icon.svg',

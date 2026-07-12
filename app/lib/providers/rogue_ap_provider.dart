@@ -1,10 +1,13 @@
-/// Rogue AP Detection Provider
-/// State management for detecting rogue access points and WiFi threats
+// Rogue AP Detection Provider
+// State management for detecting rogue access points and WiFi threats
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api/orbguard_api_client.dart';
+import '../services/notifications/notification_service.dart';
+import '../services/notifications/notification_channels.dart';
 
 /// AP threat level
 enum APThreatLevel {
@@ -139,7 +142,12 @@ class RogueAPProvider extends ChangeNotifier {
   // Error state
   String? _error;
 
-  // Protection settings
+  // Protection settings (persisted)
+  static const _prefsAutoProtectKey = 'rogueap_auto_protect';
+  static const _prefsAlertOnRogueKey = 'rogueap_alert_on_rogue';
+  static const _prefsAlertOnOpenKey = 'rogueap_alert_on_open';
+
+  SharedPreferences? _prefs;
   bool _autoProtect = true;
   bool _alertOnRogue = true;
   bool _alertOnOpen = true;
@@ -158,6 +166,18 @@ class RogueAPProvider extends ChangeNotifier {
   bool get alertOnRogue => _alertOnRogue;
   bool get alertOnOpen => _alertOnOpen;
 
+  /// OrbGuard does not bundle a VPN engine, so the "auto protection"
+  /// preference cannot switch a VPN on by itself. It is stored and shown
+  /// honestly: when enabled, threat notifications tell the user to connect
+  /// their VPN manually. UI should label the switch accordingly.
+  bool get autoProtectVpnSwitchAvailable => false;
+
+  /// Why the VPN auto-switch is inert on this build.
+  String get autoProtectLimitation =>
+      'OrbGuard cannot enable a VPN automatically on this build because no '
+      'VPN engine is bundled. When a rogue network is detected you will be '
+      'alerted and asked to switch networks or connect your VPN manually.';
+
   // Computed getters
   List<DetectedAP> get rogueAPs =>
       _detectedAPs.where((a) => a.threatLevel == APThreatLevel.dangerous).toList();
@@ -170,6 +190,7 @@ class RogueAPProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _loadSettings();
       await _loadTrustedAPs();
       await scanForAPs();
     } catch (e) {
@@ -262,12 +283,71 @@ class RogueAPProvider extends ChangeNotifier {
       _scanStatus = 'Scan complete';
       _scanProgress = 1.0;
       _updateStats();
+
+      // Fire real alert notifications according to the persisted settings.
+      await _emitScanAlerts();
     } catch (e) {
       _error = 'Scan failed: $e';
       debugPrint('Rogue AP scan failed: $e');
     } finally {
       _isScanning = false;
       notifyListeners();
+    }
+  }
+
+  /// Send local notifications for the findings of the scan that just
+  /// completed, honoring the user's alert settings. This is the real consumer
+  /// of [alertOnRogue] / [alertOnOpen]; [autoProtect] cannot switch a VPN
+  /// (see [autoProtectLimitation]) so its notification says so explicitly.
+  Future<void> _emitScanAlerts() async {
+    final notifications = NotificationService.instance;
+
+    if (_alertOnRogue) {
+      final dangerous = _detectedAPs
+          .where((a) =>
+              !isTrusted(a) &&
+              (a.threatLevel == APThreatLevel.dangerous ||
+                  a.threatLevel == APThreatLevel.suspicious))
+          .toList();
+      if (dangerous.isNotEmpty) {
+        final names = dangerous.map((a) => a.ssid).take(3).join(', ');
+        final suffix =
+            dangerous.length > 3 ? ' and ${dangerous.length - 3} more' : '';
+        final action = _autoProtect
+            ? ' Auto-protection cannot switch your VPN on this build — '
+                'connect your VPN or switch networks manually.'
+            : '';
+        try {
+          await notifications.showNotification(
+            title: dangerous.length == 1
+                ? 'Rogue access point detected'
+                : '${dangerous.length} rogue access points detected',
+            body: 'Dangerous Wi-Fi nearby: $names$suffix.$action',
+            channel: NotificationChannels.high,
+            payload: 'rogue_ap_scan',
+          );
+        } catch (e) {
+          debugPrint('RogueAPProvider: failed to show rogue AP alert: $e');
+        }
+      }
+    }
+
+    if (_alertOnOpen) {
+      final connectedOpen = _currentConnection != null &&
+          _currentConnection!.security == WiFiSecurity.open;
+      if (connectedOpen) {
+        try {
+          await notifications.showNotification(
+            title: 'Connected to an unencrypted network',
+            body: 'The network "${_currentConnection!.ssid}" has no '
+                'encryption. Traffic on it can be read by others nearby.',
+            channel: NotificationChannels.medium,
+            payload: 'rogue_ap_open_network',
+          );
+        } catch (e) {
+          debugPrint('RogueAPProvider: failed to show open-network alert: $e');
+        }
+      }
     }
   }
 
@@ -312,16 +392,38 @@ class RogueAPProvider extends ChangeNotifier {
     return _trustedAPs.any((t) => t.bssid == ap.bssid);
   }
 
-  /// Update protection settings
-  void updateSettings({
+  /// Load persisted protection settings.
+  Future<void> _loadSettings() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('RogueAPProvider: failed to open preferences: $e');
+      return;
+    }
+    _autoProtect = _prefs!.getBool(_prefsAutoProtectKey) ?? true;
+    _alertOnRogue = _prefs!.getBool(_prefsAlertOnRogueKey) ?? true;
+    _alertOnOpen = _prefs!.getBool(_prefsAlertOnOpenKey) ?? true;
+  }
+
+  /// Update protection settings (persisted across restarts).
+  Future<void> updateSettings({
     bool? autoProtect,
     bool? alertOnRogue,
     bool? alertOnOpen,
-  }) {
+  }) async {
     if (autoProtect != null) _autoProtect = autoProtect;
     if (alertOnRogue != null) _alertOnRogue = alertOnRogue;
     if (alertOnOpen != null) _alertOnOpen = alertOnOpen;
     notifyListeners();
+
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs!.setBool(_prefsAutoProtectKey, _autoProtect);
+      await _prefs!.setBool(_prefsAlertOnRogueKey, _alertOnRogue);
+      await _prefs!.setBool(_prefsAlertOnOpenKey, _alertOnOpen);
+    } catch (e) {
+      debugPrint('RogueAPProvider: failed to persist settings: $e');
+    }
   }
 
   /// Update statistics

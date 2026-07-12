@@ -1,5 +1,5 @@
-/// SMS Widgets
-/// Reusable widgets for SMS protection screens
+// SMS Widgets
+// Reusable widgets for SMS protection screens
 
 import 'package:flutter/material.dart';
 
@@ -26,10 +26,10 @@ class ThreatLevelBadge extends StatelessWidget {
         vertical: compact ? 2 : 4,
       ),
       decoration: BoxDecoration(
-        color: Color(level.color).withOpacity(0.2),
+        color: Color(level.color).withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(compact ? 4 : 8),
         border: Border.all(
-          color: Color(level.color).withOpacity(0.5),
+          color: Color(level.color).withValues(alpha: 0.5),
           width: 1,
         ),
       ),
@@ -86,6 +86,7 @@ class SmsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final hasAnalysis = message.analysisResult != null;
     final threatLevel = message.threatLevel;
 
@@ -95,11 +96,11 @@ class SmsCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: hasAnalysis && threatLevel != SmsThreatLevel.safe
               ? Border.all(
-                  color: Color(threatLevel.color).withOpacity(0.3),
+                  color: Color(threatLevel.color).withValues(alpha: 0.3),
                   width: 1,
                 )
               : null,
@@ -115,7 +116,7 @@ class SmsCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: _getSenderColor().withOpacity(0.2),
+                    color: _getSenderColor().withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -149,9 +150,11 @@ class SmsCard extends StatelessWidget {
                       Text(
                         _formatTime(),
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -187,7 +190,7 @@ class SmsCard extends StatelessWidget {
             Text(
               message.content,
               style: TextStyle(
-                color: Colors.grey[300],
+                color: cs.onSurface,
                 fontSize: 14,
                 height: 1.4,
               ),
@@ -198,7 +201,7 @@ class SmsCard extends StatelessWidget {
             // Threat info if dangerous
             if (hasAnalysis && message.analysisResult!.hasThreats) ...[
               const SizedBox(height: 12),
-              _buildThreatInfo(),
+              _buildThreatInfo(context),
             ],
 
             // Extracted URLs
@@ -213,14 +216,15 @@ class SmsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildThreatInfo() {
+  Widget _buildThreatInfo(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final threats = message.analysisResult!.threats;
     if (threats.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Color(message.threatLevel.color).withOpacity(0.1),
+        color: Color(message.threatLevel.color).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -262,9 +266,11 @@ class SmsCard extends StatelessWidget {
                       child: Text(
                         threat.type.displayName,
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -276,7 +282,7 @@ class SmsCard extends StatelessWidget {
               child: Text(
                 '+${threats.length - 2} more threats',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: cs.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
@@ -295,7 +301,7 @@ class SmsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -376,10 +382,11 @@ class SmsStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -390,7 +397,7 @@ class SmsStatsCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withOpacity(0.2),
+                  color: const Color(0xFF00D9FF).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const DuotoneIcon(
@@ -400,23 +407,27 @@ class SmsStatsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'SMS Protection',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'Smishing & phishing detection',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -440,7 +451,7 @@ class SmsStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Total',
                 value: stats.totalMessages.toString(),
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               _StatItem(
                 label: 'Analyzed',
@@ -464,19 +475,23 @@ class SmsStatsCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   const DuotoneIcon(AppIcons.dangerCircle, color: Colors.red, size: 16),
                   const SizedBox(width: 8),
-                  Text(
-                    '${stats.criticalThreats} critical, ${stats.highThreats} high severity threats',
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      '${stats.criticalThreats} critical, ${stats.highThreats} high severity threats',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
@@ -512,14 +527,18 @@ class _StatItem extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -542,6 +561,7 @@ class SmsFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isSelected = filter == selectedFilter;
 
     return GestureDetector(
@@ -550,19 +570,17 @@ class SmsFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF00D9FF).withOpacity(0.2)
-              : const Color(0xFF1D1E33),
+              ? const Color(0xFF00D9FF).withValues(alpha: 0.2)
+              : cs.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFF00D9FF)
-                : Colors.grey.withOpacity(0.3),
+            color: isSelected ? const Color(0xFF00D9FF) : cs.outline,
           ),
         ),
         child: Text(
           _getLabel(),
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00D9FF) : Colors.grey[400],
+            color: isSelected ? const Color(0xFF00D9FF) : cs.onSurfaceVariant,
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -598,7 +616,7 @@ class SenderAnalysisCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -662,7 +680,8 @@ class SenderAnalysisCard extends StatelessWidget {
                         child: Text(
                           w,
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -698,26 +717,31 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          DuotoneIcon(icon, size: 16, color: Colors.grey[500]),
+          DuotoneIcon(icon, size: 16, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
           const SizedBox(width: 6),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: valueColor ?? cs.onSurface,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -734,13 +758,14 @@ class ThreatDetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(threat.severity.color).withOpacity(0.1),
+        color: Color(threat.severity.color).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: Color(threat.severity.color).withOpacity(0.3),
+          color: Color(threat.severity.color).withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -762,13 +787,15 @@ class ThreatDetailCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Color(threat.severity.color).withOpacity(0.2),
+                  color: Color(threat.severity.color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -786,7 +813,7 @@ class ThreatDetailCard extends StatelessWidget {
           Text(
             threat.description,
             style: TextStyle(
-              color: Colors.grey[300],
+              color: cs.onSurface,
               fontSize: 13,
             ),
           ),
@@ -795,18 +822,19 @@ class ThreatDetailCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black26,
+                color: cs.onSurface.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.quoteDown, size: 14, color: Colors.grey),
+                  DuotoneIcon(AppIcons.quoteDown,
+                      size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       threat.evidence!,
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                       ),
@@ -827,13 +855,13 @@ class ThreatDetailCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     t,
-                    style: const TextStyle(
-                      color: Colors.grey,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
                       fontSize: 10,
                     ),
                   ),
@@ -895,9 +923,9 @@ class UrlAnalysisCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -927,7 +955,7 @@ class UrlAnalysisCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
+                      color: Colors.orange.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -945,7 +973,7 @@ class UrlAnalysisCard extends StatelessWidget {
             Text(
               url.url,
               style: TextStyle(
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 11,
               ),
               maxLines: 2,
@@ -960,13 +988,16 @@ class UrlAnalysisCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       c,
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 10,
                       ),
                     ),
@@ -1009,10 +1040,11 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1029,7 +1061,7 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
           Text(
             'Paste a suspicious message to analyze',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -1038,9 +1070,9 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
             controller: _senderController,
             decoration: InputDecoration(
               hintText: 'Sender (optional)',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF0A0E21),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -1057,9 +1089,9 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Paste message content here...',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF0A0E21),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

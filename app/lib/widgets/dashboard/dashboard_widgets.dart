@@ -1,5 +1,5 @@
-/// Dashboard Widgets Barrel Export
-/// Export all dashboard widgets from a single file
+// Dashboard Widgets Barrel Export
+// Export all dashboard widgets from a single file
 
 export 'protection_status_card.dart';
 export 'threat_stats_card.dart';

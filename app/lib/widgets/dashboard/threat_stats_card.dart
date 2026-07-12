@@ -1,7 +1,5 @@
-/// Threat Statistics Card Widget
-/// Displays threat statistics from OrbGuard Lab API
-
-import 'dart:ui';
+// Threat Statistics Card Widget
+// Displays threat statistics from OrbGuard Lab API
 
 import 'package:flutter/material.dart';
 
@@ -30,6 +28,7 @@ class ThreatStatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +52,7 @@ class ThreatStatsCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.cyan.withOpacity(0.2),
+            color: Colors.cyan.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const DuotoneIcon(
@@ -168,9 +167,9 @@ class ThreatStatsCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -226,11 +225,15 @@ class _StatItem extends StatelessWidget {
           children: [
             DuotoneIcon(icon, size: 14, color: color),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[500],
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[500],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -243,6 +246,8 @@ class _StatItem extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: color,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -266,9 +271,9 @@ class _SeverityChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -279,13 +284,17 @@ class _SeverityChip extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: color,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

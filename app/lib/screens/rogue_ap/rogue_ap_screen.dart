@@ -1,5 +1,5 @@
-/// Rogue AP Detection Screen
-/// Detects and monitors rogue access points and WiFi threats
+// Rogue AP Detection Screen
+// Detects and monitors rogue access points and WiFi threats
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +18,8 @@ class RogueAPScreen extends StatefulWidget {
 }
 
 class _RogueAPScreenState extends State<RogueAPScreen> {
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -26,14 +28,27 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     });
   }
 
+  /// Case-insensitive SSID/BSSID filter applied to the AP lists.
+  List<DetectedAP> _filterAPs(List<DetectedAP> aps) {
+    if (_searchQuery.isEmpty) return aps;
+    final query = _searchQuery.toLowerCase();
+    return aps
+        .where((ap) =>
+            ap.ssid.toLowerCase().contains(query) ||
+            ap.bssid.toLowerCase().contains(query))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<RogueAPProvider>(
       builder: (context, provider, _) {
+        final cs = Theme.of(context).colorScheme;
         return GlassTabPage(
           title: 'Rogue AP Detection',
           hasSearch: true,
           searchHint: 'Search networks...',
+          onSearchChanged: (query) => setState(() => _searchQuery = query),
           headerContent: Column(
             children: [
               // Actions row
@@ -56,12 +71,12 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       )
                     else
                       IconButton(
-                        icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                        icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
                         onPressed: () => provider.scanForAPs(),
                         tooltip: 'Scan',
                       ),
                     IconButton(
-                      icon: const DuotoneIcon('settings', size: 22, color: Colors.white),
+                      icon: DuotoneIcon('settings', size: 22, color: cs.onSurface),
                       onPressed: () => _showSettings(context, provider),
                       tooltip: 'Settings',
                     ),
@@ -118,6 +133,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildScanProgress(RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return GlassContainer(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -137,7 +153,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               Expanded(
                 child: Text(
                   provider.scanStatus,
-                  style: const TextStyle(color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: cs.onSurface),
                 ),
               ),
               Text(
@@ -154,7 +172,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: provider.scanProgress,
-              backgroundColor: Colors.white12,
+              backgroundColor: cs.onSurface.withValues(alpha: 0.06),
               valueColor: const AlwaysStoppedAnimation<Color>(
                 GlassTheme.primaryAccent,
               ),
@@ -166,6 +184,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildCurrentConnection(RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final ap = provider.currentConnection!;
     return GlassContainer(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -176,7 +195,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Color(ap.threatLevel.color).withOpacity(0.2),
+              color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -194,11 +213,15 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Connected to: ${ap.ssid}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'Connected to: ${ap.ssid}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -208,7 +231,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Color(ap.threatLevel.color).withOpacity(0.2),
+                        color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -224,9 +247,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${ap.security.displayName} • Channel ${ap.channel} • ${RogueAPProvider.getSignalDescription(ap.signalStrength)}',
+                  '${ap.security.displayName} • Channel ${ap.channel} • ${RogueAPProvider.getSignalDescription(ap.signalStrength)}', maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -275,6 +298,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildStatItem(String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassContainer(
         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -292,7 +316,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: cs.onSurfaceVariant,
                 fontSize: 11,
               ),
             ),
@@ -311,12 +335,21 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
       );
     }
 
+    final filtered = _filterAPs(provider.detectedAPs);
+    if (filtered.isEmpty) {
+      return _buildEmptyState(
+        icon: 'radar',
+        title: 'No Matching Networks',
+        subtitle: 'No access points match "$_searchQuery"',
+      );
+    }
+
     // Sort by signal strength
-    final sortedAPs = List<DetectedAP>.from(provider.detectedAPs)
+    final sortedAPs = List<DetectedAP>.from(filtered)
       ..sort((a, b) => b.signalStrength.compareTo(a.signalStrength));
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: sortedAPs.length,
       itemBuilder: (context, index) {
         return _buildAPCard(sortedAPs[index], provider);
@@ -325,23 +358,25 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildThreatsTab(RogueAPProvider provider) {
-    final threats = provider.detectedAPs
+    final threats = _filterAPs(provider.detectedAPs
         .where((ap) =>
             ap.threatLevel == APThreatLevel.dangerous ||
             ap.threatLevel == APThreatLevel.suspicious)
-        .toList();
+        .toList());
 
     if (threats.isEmpty) {
       return _buildEmptyState(
         icon: 'shield_check',
-        title: 'No Threats Detected',
-        subtitle: 'Your WiFi environment appears safe',
+        title: _searchQuery.isEmpty ? 'No Threats Detected' : 'No Matching Threats',
+        subtitle: _searchQuery.isEmpty
+            ? 'Your WiFi environment appears safe'
+            : 'No threats match "$_searchQuery"',
         color: GlassTheme.successColor,
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: threats.length,
       itemBuilder: (context, index) {
         return _buildThreatCard(threats[index], provider);
@@ -358,16 +393,34 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
       );
     }
 
+    final query = _searchQuery.toLowerCase();
+    final trusted = _searchQuery.isEmpty
+        ? provider.trustedAPs
+        : provider.trustedAPs
+            .where((ap) =>
+                ap.ssid.toLowerCase().contains(query) ||
+                ap.bssid.toLowerCase().contains(query))
+            .toList();
+
+    if (trusted.isEmpty) {
+      return _buildEmptyState(
+        icon: 'verified_check',
+        title: 'No Matching Networks',
+        subtitle: 'No trusted networks match "$_searchQuery"',
+      );
+    }
+
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: provider.trustedAPs.length,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      itemCount: trusted.length,
       itemBuilder: (context, index) {
-        return _buildTrustedCard(provider.trustedAPs[index], provider);
+        return _buildTrustedCard(trusted[index], provider);
       },
     );
   }
 
   Widget _buildAPCard(DetectedAP ap, RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final isTrusted = provider.isTrusted(ap);
 
     return GlassCard(
@@ -383,7 +436,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Color(ap.threatLevel.color).withOpacity(0.2),
+                  color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Stack(
@@ -406,7 +459,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                             color: GlassTheme.successColor,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: GlassTheme.gradientTop,
+                              color: cs.surface,
                               width: 2,
                             ),
                           ),
@@ -425,8 +478,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         Expanded(
                           child: Text(
                             ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: cs.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -448,7 +501,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         Text(
                           'Ch ${ap.channel}',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: cs.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -456,7 +509,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                         Text(
                           '${ap.signalStrength} dBm',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: cs.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -474,7 +527,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Color(ap.threatLevel.color).withOpacity(0.2),
+                              color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -497,7 +550,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Color(ap.threatLevel.color).withOpacity(0.2),
+                  color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -517,6 +570,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildThreatCard(DetectedAP ap, RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -530,7 +584,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Color(ap.threatLevel.color).withOpacity(0.2),
+                    color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -549,17 +603,17 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
                       Text(
-                        ap.bssid,
+                        ap.bssid, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -587,10 +641,10 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Detected Threats',
               style: TextStyle(
-                color: Colors.white70,
+                color: cs.onSurfaceVariant,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -611,16 +665,16 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              threat.displayName,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              threat.displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: cs.onSurface,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              threat.description,
+                              threat.description, maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
+                                color: cs.onSurfaceVariant,
                                 fontSize: 12,
                               ),
                             ),
@@ -631,36 +685,21 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   ),
                 )),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const DuotoneIcon('forbidden', size: 18),
-                    label: const Text('Block'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: GlassTheme.errorColor,
-                      side: const BorderSide(
-                        color: GlassTheme.errorColor,
-                      ),
-                    ),
+            // No platform exposes an API to block another access point, so
+            // the only real action is whitelisting a known-good network.
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => provider.addTrustedAP(ap),
+                icon: const DuotoneIcon('shield_check', size: 18),
+                label: const Text('Trust'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: GlassTheme.primaryAccent,
+                  side: const BorderSide(
+                    color: GlassTheme.primaryAccent,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => provider.addTrustedAP(ap),
-                    icon: const DuotoneIcon('shield_check', size: 18),
-                    label: const Text('Trust'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: GlassTheme.primaryAccent,
-                      side: const BorderSide(
-                        color: GlassTheme.primaryAccent,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
@@ -669,6 +708,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildTrustedCard(TrustedAP ap, RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -676,7 +716,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: GlassTheme.primaryAccent.withOpacity(0.2),
+            color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Center(
@@ -689,15 +729,15 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         ),
         title: Text(
           ap.ssid,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: cs.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
         subtitle: Text(
           'Added ${_formatDate(ap.addedAt)}',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
@@ -721,7 +761,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -752,18 +792,19 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     required String subtitle,
     Color color = GlassTheme.primaryAccent,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: cs.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -771,7 +812,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],
@@ -827,21 +868,26 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     DetectedAP ap,
     RogueAPProvider provider,
   ) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              GlassTheme.gradientTop,
-              GlassTheme.gradientBottom,
-            ],
+            colors: isDark
+                ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                : const [
+                    GlassTheme.gradientTopLight,
+                    GlassTheme.gradientBottomLight,
+                  ],
           ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -854,7 +900,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Color(ap.threatLevel.color).withOpacity(0.2),
+                    color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -871,17 +917,17 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.onSurface,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        ap.bssid,
+                        ap.bssid, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: cs.onSurfaceVariant,
                           fontSize: 14,
                         ),
                       ),
@@ -901,10 +947,10 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             _buildDetailRow('Threat Level', ap.threatLevel.displayName),
             if (ap.threats.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Detected Threats',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: cs.onSurfaceVariant,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -920,7 +966,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Color(ap.threatLevel.color).withOpacity(0.2),
+                      color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -977,6 +1023,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -984,12 +1031,12 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: cs.onSurface,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -999,38 +1046,45 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   void _showSettings(BuildContext context, RogueAPProvider provider) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              GlassTheme.gradientTop,
-              GlassTheme.gradientBottom,
-            ],
+            colors: isDark
+                ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                : const [
+                    GlassTheme.gradientTopLight,
+                    GlassTheme.gradientBottomLight,
+                  ],
           ),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Protection Settings',
               style: TextStyle(
-                color: Colors.white,
+                color: cs.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 24),
             _buildSettingSwitch(
-              'Auto Protection',
-              'Automatically enable VPN when threats detected',
+              'Threat Action Reminders',
+              // No VPN engine is bundled, so this cannot switch a VPN on —
+              // label it with the provider's honest limitation statement.
+              provider.autoProtectLimitation,
               provider.autoProtect,
               (value) => provider.updateSettings(autoProtect: value),
             ),
@@ -1059,6 +1113,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     bool value,
     ValueChanged<bool> onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return GlassContainer(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1069,16 +1124,16 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: cs.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  subtitle,
+                  subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -1088,7 +1143,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: GlassTheme.primaryAccent,
+            activeThumbColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -1100,17 +1155,18 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     TrustedAP ap,
     RogueAPProvider provider,
   ) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
+        backgroundColor: cs.surface,
+        title: Text(
           'Remove Trusted Network?',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         content: Text(
           'Remove "${ap.ssid}" from your trusted networks?',
-          style: TextStyle(color: Colors.white.withOpacity(0.8)),
+          style: TextStyle(color: cs.onSurface),
         ),
         actions: [
           TextButton(

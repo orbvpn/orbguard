@@ -1,5 +1,5 @@
-/// Network Widgets
-/// Reusable widgets for network security screens
+// Network Widgets
+// Reusable widgets for network security screens
 
 import 'package:flutter/material.dart';
 
@@ -66,6 +66,7 @@ class SignalStrengthIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final color = _getColor();
     final bars = _getBars();
 
@@ -81,7 +82,7 @@ class SignalStrengthIndicator extends StatelessWidget {
               height: 6 + (index * 4).toDouble(),
               margin: const EdgeInsets.only(right: 2),
               decoration: BoxDecoration(
-                color: isActive ? color : Colors.grey.withAlpha(77),
+                color: isActive ? color : cs.onSurfaceVariant.withAlpha(77),
                 borderRadius: BorderRadius.circular(1),
               ),
             );
@@ -128,11 +129,12 @@ class WifiNetworkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final borderColor = network.isConnected
         ? const Color(0xFF00D9FF).withAlpha(75)
         : !network.security.isSecure
             ? Colors.red.withAlpha(75)
-            : Colors.white10;
+            : cs.outline;
 
     return InkWell(
       onTap: onTap,
@@ -140,7 +142,7 @@ class WifiNetworkCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor),
         ),
@@ -155,7 +157,7 @@ class WifiNetworkCard extends StatelessWidget {
                     ? const Color(0xFF00D9FF).withAlpha(40)
                     : !network.security.isSecure
                         ? Colors.red.withAlpha(40)
-                        : const Color(0xFF2A2B40),
+                        : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: DuotoneIcon(
@@ -164,7 +166,7 @@ class WifiNetworkCard extends StatelessWidget {
                     ? const Color(0xFF00D9FF)
                     : !network.security.isSecure
                         ? Colors.red
-                        : Colors.grey,
+                        : cs.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 14),
@@ -181,7 +183,7 @@ class WifiNetworkCard extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            color: network.isHidden ? Colors.grey : Colors.white,
+                            color: network.isHidden ? cs.onSurfaceVariant : cs.onSurface,
                             fontStyle:
                                 network.isHidden ? FontStyle.italic : FontStyle.normal,
                           ),
@@ -222,13 +224,13 @@ class WifiNetworkCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(15),
+                          color: cs.onSurface.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           network.is5GHz ? '5 GHz' : '2.4 GHz',
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color: cs.onSurfaceVariant,
                             fontSize: 10,
                           ),
                         ),
@@ -262,6 +264,7 @@ class NetworkThreatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final color = threat.isCritical ? Colors.red : Colors.orange;
 
     return InkWell(
@@ -270,7 +273,7 @@ class NetworkThreatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withAlpha(75)),
         ),
@@ -304,6 +307,8 @@ class NetworkThreatCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         threat.severity.toUpperCase(),
@@ -312,15 +317,17 @@ class NetworkThreatCard extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 if (onDismiss != null)
                   IconButton(
-                    icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
+                    icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: cs.onSurfaceVariant),
                     onPressed: onDismiss,
-                    color: Colors.grey,
+                    color: cs.onSurfaceVariant,
                   ),
               ],
             ),
@@ -328,7 +335,7 @@ class NetworkThreatCard extends StatelessWidget {
             Text(
               threat.description,
               style: TextStyle(
-                color: Colors.grey[400],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -379,316 +386,6 @@ class NetworkThreatCard extends StatelessWidget {
   }
 }
 
-/// VPN status card
-class VpnStatusCard extends StatelessWidget {
-  final VpnStatus status;
-  final VoidCallback? onConnect;
-  final VoidCallback? onDisconnect;
-
-  const VpnStatusCard({
-    super.key,
-    required this.status,
-    this.onConnect,
-    this.onDisconnect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: status.isConnected
-              ? Colors.green.withAlpha(75)
-              : Colors.white10,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // VPN icon
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: status.isConnected
-                      ? Colors.green.withAlpha(40)
-                      : Colors.grey.withAlpha(40),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: DuotoneIcon(
-                  status.isConnected ? AppIcons.vpn : AppIcons.key,
-                  color: status.isConnected ? Colors.green : Colors.grey,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Status info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      status.isConnected ? 'Connected' : 'Disconnected',
-                      style: TextStyle(
-                        color: status.isConnected ? Colors.green : Colors.grey,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (status.isConnected && status.serverLocation != null)
-                      Text(
-                        status.serverLocation!,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                      ),
-                    if (!status.isConnected)
-                      Text(
-                        'Your connection is not protected',
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (status.isConnected) ...[
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Protocol', status.protocol ?? 'N/A'),
-                _buildStatItem('IP', status.serverIp ?? 'N/A'),
-                _buildStatItem(
-                  'Duration',
-                  _formatDuration(status.connectionDuration),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: status.isConnected ? onDisconnect : onConnect,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: status.isConnected
-                    ? Colors.red.withAlpha(40)
-                    : const Color(0xFF00D9FF),
-                foregroundColor: status.isConnected ? Colors.red : Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                status.isConnected ? 'Disconnect' : 'Connect to VPN',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey[500],
-            fontSize: 11,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return 'N/A';
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    }
-    return '${minutes}m';
-  }
-}
-
-/// DNS protection card
-class DnsProtectionCard extends StatelessWidget {
-  final DnsProtectionStatus status;
-  final VoidCallback? onToggle;
-  final VoidCallback? onSettings;
-
-  const DnsProtectionCard({
-    super.key,
-    required this.status,
-    this.onToggle,
-    this.onSettings,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: status.isEnabled
-                      ? const Color(0xFF00D9FF).withAlpha(40)
-                      : Colors.grey.withAlpha(40),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DuotoneIcon(
-                  AppIcons.server,
-                  color: status.isEnabled ? const Color(0xFF00D9FF) : Colors.grey,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DNS Protection',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      status.isEnabled ? status.provider : 'Not Configured',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: status.isEnabled,
-                onChanged: (_) => onToggle?.call(),
-                activeColor: const Color(0xFF00D9FF),
-              ),
-            ],
-          ),
-          if (status.isEnabled) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildFeatureChip(
-                    'Malware',
-                    status.isMalwareBlocking,
-                    AppIcons.bug,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildFeatureChip(
-                    'Ads',
-                    status.isAdBlocking,
-                    AppIcons.forbidden,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildFeatureChip(
-                    'Trackers',
-                    status.isTrackingBlocking,
-                    AppIcons.radar,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2B40),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const DuotoneIcon(AppIcons.shield, size: 18, color: Color(0xFF00D9FF)),
-                  const SizedBox(width: 10),
-                  Text(
-                    '${status.blockedQueries} threats blocked',
-                    style: const TextStyle(
-                      color: Color(0xFF00D9FF),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureChip(String label, bool enabled, String icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: enabled
-            ? Colors.green.withAlpha(30)
-            : Colors.grey.withAlpha(30),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DuotoneIcon(
-            icon,
-            size: 14,
-            color: enabled ? Colors.green : Colors.grey,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: enabled ? Colors.green : Colors.grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Network stats card
 class NetworkStatsCard extends StatelessWidget {
   final NetworkSecurityStats stats;
@@ -697,19 +394,20 @@ class NetworkStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Network Security',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -719,6 +417,7 @@ class NetworkStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Scans',
                   stats.totalScans.toString(),
                   AppIcons.radar,
@@ -727,6 +426,7 @@ class NetworkStatsCard extends StatelessWidget {
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Threats',
                   stats.threatsDetected.toString(),
                   AppIcons.dangerTriangle,
@@ -740,6 +440,7 @@ class NetworkStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Open Networks',
                   stats.openNetworksFound.toString(),
                   AppIcons.lockUnlocked,
@@ -748,10 +449,11 @@ class NetworkStatsCard extends StatelessWidget {
               ),
               Expanded(
                 child: _buildStatItem(
-                  'DNS Blocked',
-                  stats.dnsQueriesBlocked.toString(),
+                  context,
+                  'Rogue APs',
+                  stats.rogueApsDetected.toString(),
                   AppIcons.shield,
-                  Colors.purple,
+                  stats.rogueApsDetected > 0 ? Colors.red : Colors.purple,
                 ),
               ),
             ],
@@ -761,8 +463,9 @@ class NetworkStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(
+  Widget _buildStatItem(BuildContext context,
       String label, String value, String icon, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -773,25 +476,31 @@ class NetworkStatsCard extends StatelessWidget {
         children: [
           DuotoneIcon(icon, color: color, size: 20),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -812,11 +521,12 @@ class CurrentNetworkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (network == null) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -824,20 +534,20 @@ class CurrentNetworkCard extends StatelessWidget {
             DuotoneIcon(
               AppIcons.wifi,
               size: 48,
-              color: Colors.grey.withAlpha(128),
+              color: cs.onSurfaceVariant.withAlpha(128),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Not Connected',
               style: TextStyle(
-                color: Colors.white70,
+                color: cs.onSurfaceVariant,
                 fontSize: 16,
               ),
             ),
             Text(
               'Connect to a WiFi network',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
@@ -849,7 +559,7 @@ class CurrentNetworkCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: network!.security.isSecure
@@ -884,11 +594,13 @@ class CurrentNetworkCard extends StatelessWidget {
                   children: [
                     Text(
                       network!.ssid,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: cs.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     WifiSecurityBadge(security: network!.security),
@@ -903,15 +615,15 @@ class CurrentNetworkCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2B40),
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildDetailItem('Frequency', network!.is5GHz ? '5 GHz' : '2.4 GHz'),
-                _buildDetailItem('Signal', '${network!.signalStrength} dBm'),
-                _buildDetailItem('BSSID', _formatBssid(network!.bssid)),
+                _buildDetailItem(context, 'Frequency', network!.is5GHz ? '5 GHz' : '2.4 GHz'),
+                _buildDetailItem(context, 'Signal', '${network!.signalStrength} dBm'),
+                _buildDetailItem(context, 'BSSID', _formatBssid(network!.bssid)),
               ],
             ),
           ),
@@ -945,23 +657,28 @@ class CurrentNetworkCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailItem(String label, String value) {
+  Widget _buildDetailItem(BuildContext context, String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: cs.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         Text(
           label,
           style: TextStyle(
-            color: Colors.grey[500],
+            color: cs.onSurfaceVariant,
             fontSize: 10,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

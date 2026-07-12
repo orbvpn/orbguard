@@ -1,11 +1,12 @@
-/// QR Scanner Screen
-/// Main screen for QR code scanning and security analysis
+// QR Scanner Screen
+// Main screen for QR code scanning and security analysis
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -50,14 +51,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
     setState(() {
       _isCameraActive = true;
-    });
-  }
-
-  void _stopCamera() {
-    _scannerController?.dispose();
-    _scannerController = null;
-    setState(() {
-      _isCameraActive = false;
     });
   }
 
@@ -142,7 +135,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         maxChildSize: 0.95,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
-            color: GlassTheme.gradientTop,
+            color: context.colors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -153,7 +146,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: context.colors.outline,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -161,7 +154,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   child: Column(
                     children: [
                       QrResultCard(result: result),
@@ -183,8 +176,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               icon: const DuotoneIcon('copy', size: 18),
                               label: const Text('Copy'),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                                side: const BorderSide(color: Colors.white24),
+                                foregroundColor: context.colors.onSurfaceVariant,
+                                side: BorderSide(color: context.colors.outline),
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
                               ),
@@ -214,17 +207,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              // Report false positive
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Report submitted'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              _scannerController?.start();
-                            },
+                            onPressed: () => _reportFalsePositive(context, content),
                             icon: const DuotoneIcon('flag', size: 18),
                             label: const Text('Report False Positive'),
                             style: ElevatedButton.styleFrom(
@@ -247,6 +230,32 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       // Resume scanning when bottom sheet is dismissed
       _scannerController?.start();
     });
+  }
+
+  /// Submit a real false-positive report via POST /qr/report-false-positive
+  /// and surface the actual outcome — no fake "submitted" confirmation.
+  Future<void> _reportFalsePositive(
+      BuildContext sheetContext, String content) async {
+    final provider = context.read<QrProvider>();
+    Navigator.pop(sheetContext);
+
+    final success = await provider.reportFalsePositive(
+      content,
+      reason: 'User marked the scan verdict as a false positive',
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'False positive reported'
+              : provider.error ?? 'Failed to submit report',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    _scannerController?.start();
   }
 
   void _onManualInput(String content) async {
@@ -282,16 +291,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   icon: DuotoneIcon(
                     'bolt',
                     size: 22,
-                    color: _isFlashOn ? GlassTheme.primaryAccent : Colors.white,
+                    color: _isFlashOn ? GlassTheme.primaryAccent : context.colors.onSurface,
                   ),
                   tooltip: 'Flash',
                 ),
                 IconButton(
                   onPressed: _isCameraActive ? _switchCamera : null,
-                  icon: const DuotoneIcon(
+                  icon: DuotoneIcon(
                     'camera',
                     size: 22,
-                    color: Colors.white,
+                    color: context.colors.onSurface,
                   ),
                   tooltip: 'Switch Camera',
                 ),
@@ -390,14 +399,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         // Manual input section
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Or enter content manually:',
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: context.colors.onSurfaceVariant,
                     fontSize: 14,
                   ),
                 ),
@@ -425,13 +434,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             DuotoneIcon(
               'qr_code',
               size: 64,
-              color: Colors.white.withAlpha(31),
+              color: context.colors.onSurface.withValues(alpha: 0.12),
             ),
             const SizedBox(height: 16),
             Text(
               'No QR codes scanned yet',
               style: TextStyle(
-                color: Colors.white.withAlpha(128),
+                color: context.colors.onSurfaceVariant,
                 fontSize: 16,
               ),
             ),
@@ -439,7 +448,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             Text(
               'Scan a QR code to see it here',
               style: TextStyle(
-                color: Colors.white.withAlpha(77),
+                color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
             ),
@@ -458,8 +467,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             children: [
               Text(
                 '${history.length} scans',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: context.colors.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -468,14 +477,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      backgroundColor: GlassTheme.gradientTop,
-                      title: const Text(
+                      backgroundColor: context.colors.surface,
+                      title: Text(
                         'Clear History',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: context.colors.onSurface),
                       ),
-                      content: const Text(
+                      content: Text(
                         'Are you sure you want to clear all scan history?',
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(color: context.colors.onSurfaceVariant),
                       ),
                       actions: [
                         TextButton(
@@ -499,7 +508,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
                 label: const Text('Clear'),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.white54,
+                  foregroundColor: context.colors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -508,7 +517,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         // History list
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             itemCount: history.length,
             itemBuilder: (context, index) {
               final entry = history[index];
@@ -538,7 +547,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     final recentThreats = provider.recentThreats;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -547,10 +556,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           const SizedBox(height: 24),
           // Recent threats section
           if (recentThreats.isNotEmpty) ...[
-            const Text(
+            Text(
               'Recent Threats',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -578,10 +587,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       color: Colors.green.withAlpha(179),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'No threats detected',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.colors.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
@@ -590,7 +599,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     Text(
                       'All your scanned QR codes are safe',
                       style: TextStyle(
-                        color: Colors.white.withAlpha(128),
+                        color: context.colors.onSurfaceVariant,
                         fontSize: 14,
                       ),
                     ),

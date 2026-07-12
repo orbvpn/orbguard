@@ -1,9 +1,9 @@
-/// Glass Container Widgets - iOS 26 Liquid Glass Design
-/// Reusable glass-effect container widgets
-///
-/// Note: Core glass widgets (GlassContainer, GlassCircleButton, GlassPillContainer,
-/// GlassGradientBackground) are defined in glass_theme.dart.
-/// This file contains additional specialized glass widgets.
+// Glass Container Widgets - iOS 26 Liquid Glass Design
+// Reusable glass-effect container widgets
+//
+// Note: Core glass widgets (GlassContainer, GlassCircleButton, GlassPillContainer,
+// GlassGradientBackground) are defined in glass_theme.dart.
+// This file contains additional specialized glass widgets.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -35,8 +35,6 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     Widget card = GlassContainer(
       padding: padding ?? const EdgeInsets.all(16),
       margin: margin ?? const EdgeInsets.only(bottom: 12),
@@ -92,6 +90,8 @@ class GlassBadge extends StatelessWidget {
           ],
           Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: badgeColor,
               fontSize: fontSize ?? 12,
@@ -206,7 +206,7 @@ class GlassListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     Widget tile = GlassContainer(
       padding: padding ?? const EdgeInsets.all(12),
@@ -226,8 +226,10 @@ class GlassListTile extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: actualIsDark ? Colors.white : Colors.black87,
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
                   ),
@@ -235,8 +237,10 @@ class GlassListTile extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: actualIsDark ? Colors.white54 : Colors.black45,
+                      color: cs.onSurfaceVariant,
                       fontSize: 13,
                     ),
                   ),
@@ -271,20 +275,22 @@ class GlassSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: actualIsDark ? Colors.white38 : Colors.black38,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+          Flexible(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
           if (trailing != null) trailing!,
@@ -307,12 +313,10 @@ class GlassDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       height: height,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      color: actualIsDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10),
+      color: Theme.of(context).colorScheme.outline,
     );
   }
 }

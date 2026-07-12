@@ -1,6 +1,6 @@
 /// QR Widgets
 /// Reusable widgets for QR code scanning screens
-library qr_widgets;
+library;
 
 import 'package:flutter/material.dart';
 
@@ -21,6 +21,7 @@ class QrResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final borderColor = result.threatLevel == SmsThreatLevel.safe
         ? Colors.green.withAlpha(75)
         : Color(result.threatLevel.color).withAlpha(75);
@@ -31,7 +32,7 @@ class QrResultCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor),
         ),
@@ -53,12 +54,14 @@ class QrResultCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _formatContent(result.content),
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                         maxLines: 1,
@@ -86,14 +89,14 @@ class QrResultCard extends StatelessWidget {
                   DuotoneIcon(
                     AppIcons.lightbulb,
                     size: 16,
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       result.recommendation!,
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -109,7 +112,7 @@ class QrResultCard extends StatelessWidget {
                 Text(
                   'Risk Score:',
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -119,7 +122,7 @@ class QrResultCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: result.riskScore,
-                      backgroundColor: Colors.grey.withAlpha(50),
+                      backgroundColor: cs.onSurface.withValues(alpha: 0.12),
                       valueColor: AlwaysStoppedAnimation(
                         _getRiskColor(result.riskScore),
                       ),
@@ -159,9 +162,9 @@ class QrResultCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {},
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey,
+                        foregroundColor: cs.onSurfaceVariant,
                       ),
-                      icon: const DuotoneIcon(AppIcons.copy, size: 18, color: Colors.grey),
+                      icon: DuotoneIcon(AppIcons.copy, size: 18, color: cs.onSurfaceVariant),
                       label: const Text('Copy'),
                     ),
                   ),
@@ -352,7 +355,7 @@ class _ThreatsList extends StatelessWidget {
                       child: Text(
                         t.description,
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 11,
                         ),
                         maxLines: 2,
@@ -428,14 +431,18 @@ class QrHistoryItem extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _formatTime(entry.scannedAt),
                     style: TextStyle(
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -447,11 +454,12 @@ class QrHistoryItem extends StatelessWidget {
               if (onDelete != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
+                  icon: DuotoneIcon(AppIcons.closeCircle, size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ],
@@ -503,10 +511,11 @@ class QrStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -528,23 +537,27 @@ class QrStatsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'QR Security',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'Quishing & malicious QR protection',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -557,7 +570,7 @@ class QrStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Scanned',
                 value: stats.totalScanned.toString(),
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               _StatItem(
                 label: 'Safe',
@@ -567,7 +580,7 @@ class QrStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Flagged',
                 value: stats.threatsFlagged.toString(),
-                color: stats.threatsFlagged > 0 ? Colors.red : Colors.grey,
+                color: stats.threatsFlagged > 0 ? Colors.red : cs.onSurfaceVariant,
               ),
             ],
           ),
@@ -600,14 +613,18 @@ class _StatItem extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -685,10 +702,11 @@ class _QrManualInputState extends State<QrManualInput> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -706,7 +724,7 @@ class _QrManualInputState extends State<QrManualInput> {
           Text(
             'Paste QR code content to analyze for threats',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -716,9 +734,9 @@ class _QrManualInputState extends State<QrManualInput> {
             maxLines: 3,
             decoration: InputDecoration(
               hintText: 'Paste URL, text, or any QR content...',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
               filled: true,
-              fillColor: const Color(0xFF0A0E21),
+              fillColor: cs.onSurface.withValues(alpha: 0.05),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

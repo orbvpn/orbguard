@@ -1,5 +1,5 @@
-/// Dashboard Provider
-/// State management for dashboard data with API integration
+// Dashboard Provider
+// State management for dashboard data with API integration
 
 import 'dart:async';
 
@@ -171,7 +171,7 @@ class DashboardProvider extends ChangeNotifier {
   Future<List<RecentAlert>> _fetchRecentAlerts() async {
     try {
       final summary = await _apiClient.getDashboardSummary();
-      return summary?.recentAlerts ?? [];
+      return summary.recentAlerts;
     } catch (e) {
       debugPrint('Failed to fetch recent alerts: $e');
       return [];

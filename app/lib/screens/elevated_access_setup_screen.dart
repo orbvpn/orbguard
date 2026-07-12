@@ -32,25 +32,25 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
 
     try {
       final result = await platform.invokeMethod('checkAccessLevel');
-      print('[AccessLevel] Result: $result');
+      debugPrint('[AccessLevel] Result: $result');
       setState(() {
         _currentLevel = result['level'] ?? 'STANDARD';
         _description = result['description'] ?? '';
         _capabilities = List<String>.from(result['capabilities'] ?? []);
       });
-      print('[AccessLevel] Set level to: $_currentLevel');
+      debugPrint('[AccessLevel] Set level to: $_currentLevel');
     } catch (e) {
-      print('[AccessLevel] Error checking access: $e');
+      debugPrint('[AccessLevel] Error checking access: $e');
     } finally {
       setState(() => _isChecking = false);
     }
   }
 
   Future<void> _setupElevatedAccess() async {
-    print('[AccessLevel] Tapped Enable Shell Access');
+    debugPrint('[AccessLevel] Tapped Enable Shell Access');
     try {
       final result = await platform.invokeMethod('getSetupInstructions');
-      print('[AccessLevel] Got instructions: $result');
+      debugPrint('[AccessLevel] Got instructions: $result');
       final instructions = result as Map<dynamic, dynamic>;
 
       if (!mounted) return;
@@ -106,13 +106,13 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
       body: _isChecking
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Current Access Level Card
                   Card(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -127,7 +127,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                             'Current Access Level',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey[400],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -150,11 +150,11 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Capabilities Card
                   Card(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -202,7 +202,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                     AppIcons.infoCircle,
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Three Access Levels
                   _buildInfoSection(
@@ -237,7 +237,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                       'requiring root',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -258,7 +258,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.green),
                     ),
@@ -269,11 +269,15 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                           children: [
                             const DuotoneIcon(AppIcons.verifiedCheck, color: Colors.green),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Safety & Privacy',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                            const Expanded(
+                              child: Text(
+                                'Safety & Privacy',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
                               ),
                             ),
                           ],
@@ -298,7 +302,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
 
   Widget _buildInfoSection(String title, String content, String icon) {
     return Card(
-      color: const Color(0xFF1D1E33),
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -308,11 +312,15 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
               children: [
                 DuotoneIcon(icon, color: const Color(0xFF00D9FF)),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -354,7 +362,6 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
   List<String> get _benefits =>
       List<String>.from(widget.instructions['benefits'] ?? []);
   String get _persistence => widget.instructions['persistence'] ?? '';
-  String get _scriptPath => widget.instructions['scriptPath'] ?? '';
 
   Future<void> _verifyAccess() async {
     setState(() => _isVerifying = true);
@@ -407,13 +414,13 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
         title: const Text('Setup Shell Access'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Benefits Card
             Card(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -423,11 +430,15 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                       children: [
                         DuotoneIcon(AppIcons.star, color: Colors.blue),
                         SizedBox(width: 8),
-                        Text(
-                          'What You\'ll Get',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            'What You\'ll Get',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -455,8 +466,8 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
 
               return Card(
                 color: isActive
-                    ? const Color(0xFF00D9FF).withOpacity(0.1)
-                    : const Color(0xFF1D1E33),
+                    ? const Color(0xFF00D9FF).withValues(alpha: 0.1)
+                    : Theme.of(context).colorScheme.surface,
                 margin: const EdgeInsets.only(bottom: 16),
                 child: InkWell(
                   onTap: () => setState(() => _currentStep = index),
@@ -491,6 +502,8 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                             Expanded(
                               child: Text(
                                 step.split('\n').first,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -538,7 +551,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.orange),
               ),
@@ -549,11 +562,15 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                     children: [
                       DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
                       SizedBox(width: 8),
-                      Text(
-                        'Important Note',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
+                      Expanded(
+                        child: Text(
+                          'Important Note',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
                         ),
                       ),
                     ],

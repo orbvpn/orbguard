@@ -1,21 +1,22 @@
-/// Dashboard Screen
-/// Main dashboard with real-time threat intelligence and protection status
+// Dashboard Screen
+// Main dashboard with real-time threat intelligence and protection status
 
 import 'package:flutter/material.dart';
 
-import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../presentation/widgets/glass_app_bar.dart';
 import '../providers/dashboard_provider.dart';
-import '../providers/realtime_provider.dart';
 import '../widgets/dashboard/protection_status_card.dart';
 import '../widgets/dashboard/threat_stats_card.dart';
 import '../widgets/dashboard/recent_alerts_widget.dart';
 import '../widgets/dashboard/connection_indicator.dart';
 import '../services/realtime/websocket_service.dart';
 import '../services/realtime/connection_manager.dart';
+import '../services/security/device_scan_service.dart';
+import 'analytics/analytics_dashboard_screen.dart';
 import 'scanning_screen.dart';
+import 'settings/settings_screen.dart';
 
 /// Main dashboard screen
 class DashboardScreen extends StatefulWidget {
@@ -73,8 +74,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     final result = await Navigator.push<ScanResult>(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
-          onScan: () async => [], // Placeholder - integrate with actual scan
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            ScanningScreen(
+          // Real native scan flow (same engine as the home screen's scan),
+          // with genuine per-stage progress callbacks.
+          onScanWithProgress: (onProgress) =>
+              DeviceScanService.instance.performScan(onProgress: onProgress),
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -91,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _showConnectionSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -111,8 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? Colors.white.withAlpha(150) : Colors.black.withAlpha(100);
+    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return GlassPage(
       title: 'Dashboard',
@@ -123,9 +127,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: DuotoneIcon('wi_fi_router', size: 22, color: iconColor),
         ),
         GestureDetector(
-          onTap: () {
-            // Navigate to settings
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          ),
           child: DuotoneIcon('settings', size: 22, color: iconColor),
         ),
       ],
@@ -136,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: const Color(0xFF00D9FF),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -151,32 +156,31 @@ class _DashboardScreenState extends State<DashboardScreen>
                       isLoading: _dashboardProvider.isLoading,
                       onScanTap: _navigateToScan,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Threat Stats Card
                     ThreatStatsCard(
                       stats: _dashboardProvider.stats,
                       threatOverview: _dashboardProvider.summary?.threats,
                       isLoading: _dashboardProvider.isLoading,
-                      onTap: () {
-                        // Navigate to threat details
-                      },
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AnalyticsDashboardScreen(),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    // Recent Alerts
+                    // Recent Alerts (no dedicated "all alerts" screen exists,
+                    // so no view-all affordance is shown).
                     RecentAlertsWidget(
                       alerts: _dashboardProvider.recentAlerts,
                       isLoading: _dashboardProvider.isLoading,
-                      onViewAll: () {
-                        // Navigate to all alerts
-                      },
-                      onAlertTap: (alertId) {
-                        _dashboardProvider.markAlertAsRead(alertId);
-                        // Navigate to alert details
-                      },
+                      onAlertTap: (alertId) =>
+                          _dashboardProvider.markAlertAsRead(alertId),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Real-time Events
                     RealtimeEventsWidget(
@@ -184,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       isConnected: _dashboardProvider.isConnected,
                       onConnect: () => _dashboardProvider.connectRealtime(),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Device Health Card
                     DeviceHealthCard(
@@ -201,13 +205,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                             'Updated ${_dashboardProvider.timeSinceRefresh}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
                       ),
-
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -247,9 +249,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: bannerColor.withOpacity(0.1),
+          color: bannerColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: bannerColor.withOpacity(0.3)),
+          border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -258,6 +260,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             Expanded(
               child: Text(
                 message,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
                   color: bannerColor,
@@ -320,49 +324,6 @@ class _ConnectionBottomSheet extends StatelessWidget {
           ),
 
           const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-}
-
-/// Quick action button widget
-class _QuickActionButton extends StatelessWidget {
-  final String icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: DuotoneIcon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ],
       ),
     );

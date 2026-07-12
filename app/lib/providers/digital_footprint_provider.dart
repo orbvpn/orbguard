@@ -1,5 +1,9 @@
-/// Digital Footprint Provider
-/// State management for data broker removal and personal data exposure tracking
+// Digital Footprint Provider
+// State management for data broker removal and personal data exposure tracking
+//
+// Request/response shapes mirror the live backend in
+// orbguard.lab/internal/api/handlers/footprint.go and the
+// DigitalFootprint / DataBroker / RemovalRequest models.
 
 import 'package:flutter/foundation.dart';
 import '../services/api/orbguard_api_client.dart';
@@ -101,25 +105,39 @@ class ExposureFinding {
   });
 }
 
-/// Scan result
+/// Scan result — built from the backend DigitalFootprint response of
+/// POST /footprint/scan.
 class FootprintScanResult {
   final String id;
   final DateTime scannedAt;
+  final String status; // pending, running, completed, failed
   final int brokersFound;
   final int exposuresFound;
+  final int breachesFound;
+  final int darkWebExposures;
   final List<DataBroker> brokers;
   final List<ExposureFinding> exposures;
-  final int privacyScore;
+
+  /// Backend risk score (0-100, higher = more exposed).
+  final double riskScore;
+  final String riskLevel; // critical, high, medium, low
 
   FootprintScanResult({
     required this.id,
     required this.scannedAt,
+    this.status = 'completed',
     this.brokersFound = 0,
     this.exposuresFound = 0,
+    this.breachesFound = 0,
+    this.darkWebExposures = 0,
     this.brokers = const [],
     this.exposures = const [],
-    this.privacyScore = 100,
+    this.riskScore = 0,
+    this.riskLevel = 'low',
   });
+
+  /// Privacy score shown in the UI: inverse of the backend risk score.
+  int get privacyScore => (100 - riskScore).round().clamp(0, 100);
 }
 
 /// Digital Footprint Provider
@@ -180,34 +198,41 @@ class DigitalFootprintProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load data brokers
+  /// Load data brokers from GET /footprint/brokers.
+  ///
+  /// Each entry is a backend DataBroker:
+  /// {id, name, domain, category, description, data_types, site_url,
+  ///  opt_out_url, opt_out_method, opt_out_difficulty, processing_days, ...}.
+  /// On failure the error is surfaced — no fabricated broker list.
   Future<void> loadBrokers() async {
     try {
       final data = await _api.getDataBrokers();
-      _brokers.clear();
+      final parsed = <DataBroker>[];
 
-      for (final broker in data) {
-        _brokers.add(DataBroker(
-          id: broker['id'],
-          name: broker['name'],
-          website: broker['website'],
-          category: _parseCategory(broker['category']),
-          description: broker['description'],
-          hasOptOut: broker['has_opt_out'] ?? true,
-          optOutUrl: broker['opt_out_url'],
-          estimatedDays: broker['estimated_days'] ?? 30,
-          difficulty: (broker['difficulty'] ?? 0.5).toDouble(),
-          dataCollected: List<String>.from(broker['data_collected'] ?? []),
-        ));
+      for (final raw in data) {
+        if (raw is! Map) {
+          throw const FormatException('Unexpected broker entry in response');
+        }
+        final broker = Map<String, dynamic>.from(raw);
+        parsed.add(_parseBroker(broker));
       }
+
+      _brokers
+        ..clear()
+        ..addAll(parsed);
+      _error = null;
     } catch (e) {
-      // Load default brokers
-      _brokers.addAll(_getDefaultBrokers());
+      _error = 'Failed to load data brokers: $e';
     }
     notifyListeners();
   }
 
-  /// Scan digital footprint
+  /// Scan digital footprint via POST /footprint/scan.
+  ///
+  /// Sends the backend FootprintScanRequest shape: email, scan_type,
+  /// first_name/last_name/phone, addresses[] as objects, and the
+  /// include_dark_web/include_data_brokers/include_social_media/
+  /// include_breaches options.
   Future<FootprintScanResult?> scan({
     required String email,
     String? firstName,
@@ -221,79 +246,52 @@ class DigitalFootprintProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate progress
-      for (var i = 0; i < 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        _scanProgress = (i + 1) / 10;
-        notifyListeners();
-      }
-
       final response = await _api.scanDigitalFootprint({
         'email': email,
-        'first_name': firstName,
-        'last_name': lastName,
-        'phone': phone,
-        'address': address,
+        'scan_type': 'full',
+        if (firstName != null && firstName.isNotEmpty) 'first_name': firstName,
+        if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
+        if (firstName != null &&
+            firstName.isNotEmpty &&
+            lastName != null &&
+            lastName.isNotEmpty)
+          'full_name': '$firstName $lastName',
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (address != null && address.isNotEmpty)
+          'addresses': [
+            {'street': address},
+          ],
+        'include_dark_web': true,
+        'include_data_brokers': true,
+        'include_social_media': true,
+        'include_breaches': true,
       });
 
-      final brokers = <DataBroker>[];
-      for (final b in response['brokers'] ?? []) {
-        brokers.add(DataBroker(
-          id: b['id'],
-          name: b['name'],
-          website: b['website'],
-          category: _parseCategory(b['category']),
-          hasOptOut: b['has_opt_out'] ?? true,
-          optOutUrl: b['opt_out_url'],
-        ));
+      _lastScan = _parseScanResult(response);
+      if (_lastScan!.status == 'failed') {
+        _error = 'Footprint scan failed on the server';
       }
-
-      final exposures = <ExposureFinding>[];
-      for (final e in response['exposures'] ?? []) {
-        exposures.add(ExposureFinding(
-          id: e['id'],
-          dataType: e['data_type'],
-          source: e['source'],
-          value: e['value'],
-          riskLevel: e['risk_level'],
-          foundAt: DateTime.parse(e['found_at']),
-        ));
-      }
-
-      _lastScan = FootprintScanResult(
-        id: response['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        scannedAt: DateTime.now(),
-        brokersFound: brokers.length,
-        exposuresFound: exposures.length,
-        brokers: brokers,
-        exposures: exposures,
-        privacyScore: response['privacy_score'] ?? 100,
-      );
 
       _isScanning = false;
       _scanProgress = 1.0;
       notifyListeners();
       return _lastScan;
     } catch (e) {
-      // Return simulated result
-      _lastScan = FootprintScanResult(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        scannedAt: DateTime.now(),
-        brokersFound: 12,
-        exposuresFound: 8,
-        brokers: _brokers.take(12).toList(),
-        exposures: [],
-        privacyScore: 45,
-      );
-
+      _error = 'Footprint scan failed: $e';
       _isScanning = false;
-      _scanProgress = 1.0;
+      _scanProgress = 0.0;
       notifyListeners();
-      return _lastScan;
+      return null;
     }
   }
 
-  /// Request removal from broker
+  /// Request removal from broker via POST /footprint/removal.
+  ///
+  /// The backend persists the request, processes the opt-out asynchronously,
+  /// and returns a RemovalRequest {id, status, broker_name, created_at,
+  /// confirmation_id, ...}. Status transitions are visible through
+  /// refreshRequestStatus(). On failure the error is surfaced — no fake
+  /// local request is created.
   Future<RemovalRequest?> requestRemoval(DataBroker broker) async {
     _isSubmitting = true;
     _error = null;
@@ -302,12 +300,23 @@ class DigitalFootprintProvider extends ChangeNotifier {
     try {
       final response = await _api.requestDataRemoval(broker.id);
 
+      final id = response['id'] as String?;
+      if (id == null || id.isEmpty) {
+        throw const FormatException(
+            'Unexpected removal response: missing "id"');
+      }
+
       final request = RemovalRequest(
-        id: response['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id: id,
         broker: broker,
-        status: RemovalStatus.submitted,
-        requestedAt: DateTime.now(),
-        confirmationId: response['confirmation_id'],
+        status: _parseStatus(response['status'] as String?),
+        requestedAt:
+            DateTime.tryParse((response['created_at'] as String?) ?? '') ??
+                DateTime.now(),
+        completedAt:
+            DateTime.tryParse((response['completed_at'] as String?) ?? ''),
+        confirmationId: response['confirmation_id'] as String?,
+        notes: response['notes'] as String?,
       );
 
       _requests.add(request);
@@ -315,22 +324,15 @@ class DigitalFootprintProvider extends ChangeNotifier {
       notifyListeners();
       return request;
     } catch (e) {
-      // Create local request
-      final request = RemovalRequest(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        broker: broker,
-        status: RemovalStatus.pending,
-        requestedAt: DateTime.now(),
-      );
-
-      _requests.add(request);
+      _error = 'Removal request for ${broker.name} failed: $e';
       _isSubmitting = false;
       notifyListeners();
-      return request;
+      return null;
     }
   }
 
-  /// Request batch removal
+  /// Request batch removal. Returns the number of successfully submitted
+  /// requests; failures surface through [error].
   Future<int> requestBatchRemoval(List<DataBroker> brokers) async {
     int successCount = 0;
 
@@ -342,7 +344,9 @@ class DigitalFootprintProvider extends ChangeNotifier {
     return successCount;
   }
 
-  /// Get removal status
+  /// Refresh a removal request's status from GET /footprint/removal/{id}.
+  /// Removal requests are processed asynchronously server-side, so polling
+  /// this reflects real status transitions (pending → in_progress → ...).
   Future<void> refreshRequestStatus(String requestId) async {
     final index = _requests.indexWhere((r) => r.id == requestId);
     if (index < 0) return;
@@ -354,165 +358,206 @@ class DigitalFootprintProvider extends ChangeNotifier {
       _requests[index] = RemovalRequest(
         id: request.id,
         broker: request.broker,
-        status: _parseStatus(response['status']),
-        requestedAt: request.requestedAt,
-        completedAt: response['completed_at'] != null
-            ? DateTime.parse(response['completed_at'])
-            : null,
-        confirmationId: response['confirmation_id'],
-        notes: response['notes'],
+        status: _parseStatus(response['status'] as String?),
+        requestedAt:
+            DateTime.tryParse((response['created_at'] as String?) ?? '') ??
+                request.requestedAt,
+        completedAt:
+            DateTime.tryParse((response['completed_at'] as String?) ?? ''),
+        confirmationId:
+            (response['confirmation_id'] as String?) ?? request.confirmationId,
+        notes: (response['notes'] as String?) ??
+            (response['failure_reason'] as String?) ??
+            request.notes,
       );
 
       notifyListeners();
     } catch (e) {
-      // Keep current status
+      _error = 'Failed to refresh removal status: $e';
+      notifyListeners();
     }
+  }
+
+  /// Refresh all tracked removal requests that are not yet complete.
+  Future<void> refreshAllRequestStatuses() async {
+    final ids = pendingRequests.map((r) => r.id).toList();
+    for (final id in ids) {
+      await refreshRequestStatus(id);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Parsing helpers (live backend wire formats)
+  // ---------------------------------------------------------------------
+
+  DataBroker _parseBroker(Map<String, dynamic> broker) {
+    final id = broker['id'] as String?;
+    final name = broker['name'] as String?;
+    if (id == null || name == null) {
+      throw const FormatException('Broker entry missing "id" or "name"');
+    }
+    final optOutMethod = (broker['opt_out_method'] as String?) ?? '';
+    return DataBroker(
+      id: id,
+      name: name,
+      website: (broker['domain'] as String?) ??
+          (broker['site_url'] as String?) ??
+          '',
+      category: _parseCategory(broker['category'] as String?),
+      description: broker['description'] as String?,
+      hasOptOut: optOutMethod.isNotEmpty && optOutMethod != 'none',
+      optOutUrl: broker['opt_out_url'] as String?,
+      estimatedDays: (broker['processing_days'] as num?)?.toInt() ?? 30,
+      difficulty:
+          _difficultyScore((broker['opt_out_difficulty'] as String?) ?? ''),
+      dataCollected: (broker['data_types'] is List)
+          ? List<String>.from(
+              (broker['data_types'] as List).whereType<String>())
+          : const [],
+    );
+  }
+
+  FootprintScanResult _parseScanResult(Map<String, dynamic> response) {
+    if (response['id'] == null || response['status'] == null) {
+      throw const FormatException(
+          'Unexpected footprint scan response: missing "id"/"status"');
+    }
+
+    // Brokers where the user's data was actually found (broker_findings[]).
+    final brokers = <DataBroker>[];
+    final brokerFindings = response['broker_findings'];
+    if (brokerFindings is List) {
+      for (final raw in brokerFindings) {
+        if (raw is! Map) continue;
+        final finding = Map<String, dynamic>.from(raw);
+        if (finding['found'] != true) continue;
+        final optOutUrl = finding['opt_out_url'] as String?;
+        final optOutMethod = (finding['opt_out_method'] as String?) ?? '';
+        brokers.add(DataBroker(
+          id: (finding['broker_id'] as String?) ?? '',
+          name: (finding['broker_name'] as String?) ?? 'Unknown broker',
+          website: (finding['broker_url'] as String?) ?? '',
+          category: _parseCategory(finding['category'] as String?),
+          hasOptOut: (optOutUrl != null && optOutUrl.isNotEmpty) ||
+              (optOutMethod.isNotEmpty && optOutMethod != 'none'),
+          optOutUrl: optOutUrl,
+          estimatedDays: (finding['estimated_days'] as num?)?.toInt() ?? 30,
+          difficulty:
+              _difficultyScore((finding['opt_out_difficulty'] as String?) ?? ''),
+          dataCollected: (finding['data_types'] is List)
+              ? List<String>.from(
+                  (finding['data_types'] as List).whereType<String>())
+              : const [],
+        ));
+      }
+    }
+
+    // Individual data exposures (exposures[]).
+    final exposures = <ExposureFinding>[];
+    final rawExposures = response['exposures'];
+    if (rawExposures is List) {
+      for (final raw in rawExposures) {
+        if (raw is! Map) continue;
+        final e = Map<String, dynamic>.from(raw);
+        exposures.add(ExposureFinding(
+          id: (e['id'] as String?) ?? '',
+          dataType: (e['type'] as String?) ?? 'unknown',
+          source: (e['source_name'] as String?) ??
+              (e['source'] as String?) ??
+              'unknown',
+          value: e['exposed_value'] as String?,
+          riskLevel: (e['severity'] as String?) ?? 'info',
+          foundAt: DateTime.tryParse((e['first_seen'] as String?) ?? '') ??
+              DateTime.tryParse((e['created_at'] as String?) ?? '') ??
+              DateTime.now(),
+        ));
+      }
+    }
+
+    return FootprintScanResult(
+      id: response['id'] as String,
+      scannedAt:
+          DateTime.tryParse((response['completed_at'] as String?) ?? '') ??
+              DateTime.tryParse((response['started_at'] as String?) ?? '') ??
+              DateTime.now(),
+      status: response['status'] as String,
+      brokersFound:
+          (response['data_brokers_found'] as num?)?.toInt() ?? brokers.length,
+      exposuresFound:
+          (response['total_exposures'] as num?)?.toInt() ?? exposures.length,
+      breachesFound: (response['breaches_found'] as num?)?.toInt() ?? 0,
+      darkWebExposures:
+          (response['dark_web_exposures'] as num?)?.toInt() ?? 0,
+      brokers: brokers,
+      exposures: exposures,
+      riskScore: (response['risk_score'] as num?)?.toDouble() ?? 0,
+      riskLevel: (response['risk_level'] as String?) ?? 'low',
+    );
   }
 
   BrokerCategory _parseCategory(String? category) {
-    if (category == null) return BrokerCategory.other;
-
-    for (final cat in BrokerCategory.values) {
-      if (cat.name == category) return cat;
+    switch (category) {
+      case 'people_search':
+        return BrokerCategory.peopleSearch;
+      case 'marketing':
+      case 'advertising':
+        return BrokerCategory.marketing;
+      case 'financial':
+        return BrokerCategory.financial;
+      case 'healthcare':
+        return BrokerCategory.health;
+      case 'background':
+      case 'background_check':
+        return BrokerCategory.background;
+      default:
+        return BrokerCategory.other;
     }
-    return BrokerCategory.other;
   }
 
+  /// Maps backend RemovalStatus strings (pending, queued, in_progress,
+  /// verifying, completed, failed, rejected, partial, reappeared) onto the
+  /// UI status enum.
   RemovalStatus _parseStatus(String? status) {
-    if (status == null) return RemovalStatus.pending;
-
-    for (final s in RemovalStatus.values) {
-      if (s.name == status) return s;
+    switch (status) {
+      case 'pending':
+      case 'queued':
+        return RemovalStatus.pending;
+      case 'in_progress':
+      case 'verifying':
+      case 'partial':
+        return RemovalStatus.inProgress;
+      case 'completed':
+        return RemovalStatus.completed;
+      case 'failed':
+      case 'reappeared':
+        return RemovalStatus.failed;
+      case 'rejected':
+        return RemovalStatus.rejected;
+      default:
+        return RemovalStatus.pending;
     }
-    return RemovalStatus.pending;
+  }
+
+  /// Maps backend opt_out_difficulty (easy/medium/hard/very_hard) to the
+  /// 0-1 scale used by the UI.
+  double _difficultyScore(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return 0.25;
+      case 'medium':
+        return 0.5;
+      case 'hard':
+        return 0.75;
+      case 'very_hard':
+        return 1.0;
+      default:
+        return 0.5;
+    }
   }
 
   /// Clear error
   void clearError() {
     _error = null;
     notifyListeners();
-  }
-
-  /// Default brokers list
-  List<DataBroker> _getDefaultBrokers() {
-    return [
-      DataBroker(
-        id: '1',
-        name: 'Spokeo',
-        website: 'spokeo.com',
-        category: BrokerCategory.peopleSearch,
-        description: 'People search engine aggregating public records',
-        hasOptOut: true,
-        optOutUrl: 'https://www.spokeo.com/optout',
-        estimatedDays: 3,
-        difficulty: 0.3,
-        dataCollected: ['Name', 'Address', 'Phone', 'Email', 'Relatives'],
-      ),
-      DataBroker(
-        id: '2',
-        name: 'Whitepages',
-        website: 'whitepages.com',
-        category: BrokerCategory.peopleSearch,
-        description: 'Directory service with personal information',
-        hasOptOut: true,
-        optOutUrl: 'https://www.whitepages.com/suppression_requests',
-        estimatedDays: 7,
-        difficulty: 0.4,
-        dataCollected: ['Name', 'Address', 'Phone', 'Age', 'Associates'],
-      ),
-      DataBroker(
-        id: '3',
-        name: 'BeenVerified',
-        website: 'beenverified.com',
-        category: BrokerCategory.background,
-        description: 'Background check and people search service',
-        hasOptOut: true,
-        optOutUrl: 'https://www.beenverified.com/opt-out',
-        estimatedDays: 14,
-        difficulty: 0.5,
-        dataCollected: ['Name', 'Address', 'Criminal Records', 'Assets'],
-      ),
-      DataBroker(
-        id: '4',
-        name: 'Intelius',
-        website: 'intelius.com',
-        category: BrokerCategory.peopleSearch,
-        description: 'People search and public records',
-        hasOptOut: true,
-        optOutUrl: 'https://www.intelius.com/opt-out',
-        estimatedDays: 7,
-        difficulty: 0.4,
-        dataCollected: ['Name', 'Address', 'Phone', 'Email', 'Work History'],
-      ),
-      DataBroker(
-        id: '5',
-        name: 'Acxiom',
-        website: 'acxiom.com',
-        category: BrokerCategory.marketing,
-        description: 'Marketing data and consumer insights',
-        hasOptOut: true,
-        optOutUrl: 'https://www.acxiom.com/about-us/privacy/optout/',
-        estimatedDays: 30,
-        difficulty: 0.6,
-        dataCollected: ['Demographics', 'Interests', 'Purchase History'],
-      ),
-      DataBroker(
-        id: '6',
-        name: 'Oracle Data Cloud',
-        website: 'oracle.com',
-        category: BrokerCategory.marketing,
-        description: 'Advertising and marketing data platform',
-        hasOptOut: true,
-        estimatedDays: 45,
-        difficulty: 0.7,
-        dataCollected: ['Online Behavior', 'Purchase Intent', 'Demographics'],
-      ),
-      DataBroker(
-        id: '7',
-        name: 'Epsilon',
-        website: 'epsilon.com',
-        category: BrokerCategory.marketing,
-        description: 'Marketing services and data',
-        hasOptOut: true,
-        estimatedDays: 30,
-        difficulty: 0.5,
-        dataCollected: ['Name', 'Address', 'Email', 'Phone', 'Preferences'],
-      ),
-      DataBroker(
-        id: '8',
-        name: 'TruthFinder',
-        website: 'truthfinder.com',
-        category: BrokerCategory.background,
-        description: 'Background check service',
-        hasOptOut: true,
-        optOutUrl: 'https://www.truthfinder.com/opt-out/',
-        estimatedDays: 14,
-        difficulty: 0.5,
-        dataCollected: ['Criminal Records', 'Court Records', 'Social Media'],
-      ),
-      DataBroker(
-        id: '9',
-        name: 'PeopleFinder',
-        website: 'peoplefinder.com',
-        category: BrokerCategory.peopleSearch,
-        description: 'People search directory',
-        hasOptOut: true,
-        estimatedDays: 7,
-        difficulty: 0.3,
-        dataCollected: ['Name', 'Address', 'Phone', 'Relatives'],
-      ),
-      DataBroker(
-        id: '10',
-        name: 'Radaris',
-        website: 'radaris.com',
-        category: BrokerCategory.peopleSearch,
-        description: 'People search and public records',
-        hasOptOut: true,
-        optOutUrl: 'https://radaris.com/control/privacy',
-        estimatedDays: 14,
-        difficulty: 0.6,
-        dataCollected: ['Name', 'Address', 'Phone', 'Email', 'Property Records'],
-      ),
-    ];
   }
 }

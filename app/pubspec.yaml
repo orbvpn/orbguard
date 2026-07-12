@@ -1,4 +1,4 @@
-name: OrbGuard
+name: orbguard
 description: Anti-spyware defense system
 version: 1.0.0
 
@@ -18,6 +18,7 @@ dependencies:
      
   # Network & Security
   dio: ^5.4.0
+  http: ^1.6.0
   connectivity_plus: ^7.0.0
   web_socket_channel: ^2.4.0
   crypto: ^3.0.3
@@ -40,6 +41,24 @@ dependencies:
 
   # QR Scanner
   mobile_scanner: ^5.1.1
+
+  # File selection (forensic artifact uploads)
+  file_picker: ^10.0.0
+
+  # Device security / anti-theft agent
+  geolocator: ^14.0.0
+  workmanager: ^0.9.0
+  camera: ^0.11.0
+  audioplayers: ^6.1.0
+  sim_card_info: ^1.0.2
+  url_launcher: ^6.3.0
+  # Biometric app-lock — failed unlock attempts trigger a thief selfie.
+  # On iOS this is the platform-supported "best extent" for the selfie
+  # feature (the OS lock screen exposes no failed-attempt hooks to apps).
+  local_auth: ^2.3.0
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:

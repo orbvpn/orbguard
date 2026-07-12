@@ -1,8 +1,9 @@
-/// Threat Stream Service
-/// High-level API for managing threat event streams and notifications
+// Threat Stream Service
+// High-level API for managing threat event streams and notifications
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -194,7 +195,7 @@ class ThreatStreamService {
       try {
         callback(event);
       } catch (e) {
-        print('Error in event callback: $e');
+        developer.log('Error in event callback: $e', name: 'OrbGuard.Stream');
       }
     }
   }
@@ -205,7 +206,7 @@ class ThreatStreamService {
       try {
         callback(state);
       } catch (e) {
-        print('Error in state callback: $e');
+        developer.log('Error in state callback: $e', name: 'OrbGuard.Stream');
       }
     }
   }
@@ -217,7 +218,7 @@ class ThreatStreamService {
       await prefs.setInt(_keyEventsReceived, _eventsReceived);
       await prefs.setInt(_keyCriticalEvents, _criticalEventsReceived);
     } catch (e) {
-      print('Error persisting stats: $e');
+      developer.log('Error persisting stats: $e', name: 'OrbGuard.Stream');
     }
   }
 

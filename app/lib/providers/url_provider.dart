@@ -1,9 +1,13 @@
 /// URL Provider
 /// State management for URL/web protection features
-library url_provider;
+library;
+
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
 import '../models/api/url_reputation.dart';
 import '../models/api/threat_indicator.dart';
@@ -50,11 +54,52 @@ class UrlListEntry {
   final DateTime addedAt;
   final String? reason;
 
+  /// Server-side entry id (uuid) once synced with the backend list.
+  final String? serverId;
+
+  /// True while the entry only exists locally and still needs to be pushed
+  /// to the backend.
+  final bool pendingSync;
+
   UrlListEntry({
     required this.domain,
     required this.addedAt,
     this.reason,
+    this.serverId,
+    this.pendingSync = false,
   });
+
+  UrlListEntry copyWith({
+    String? domain,
+    DateTime? addedAt,
+    String? reason,
+    String? serverId,
+    bool? pendingSync,
+  }) {
+    return UrlListEntry(
+      domain: domain ?? this.domain,
+      addedAt: addedAt ?? this.addedAt,
+      reason: reason ?? this.reason,
+      serverId: serverId ?? this.serverId,
+      pendingSync: pendingSync ?? this.pendingSync,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'domain': domain,
+        'added_at': addedAt.toIso8601String(),
+        if (reason != null) 'reason': reason,
+        if (serverId != null) 'server_id': serverId,
+        'pending_sync': pendingSync,
+      };
+
+  factory UrlListEntry.fromJson(Map<String, dynamic> json) => UrlListEntry(
+        domain: json['domain'] as String,
+        addedAt: DateTime.parse(json['added_at'] as String),
+        reason: json['reason'] as String?,
+        serverId: json['server_id'] as String?,
+        pendingSync: json['pending_sync'] as bool? ?? false,
+      );
 }
 
 /// URL protection stats
@@ -82,17 +127,41 @@ class UrlStats {
 
 /// URL Protection Provider
 class UrlProvider extends ChangeNotifier {
+  static const _prefsHistoryKey = 'url_check_history';
+  static const _prefsWhitelistKey = 'url_whitelist';
+  static const _prefsBlacklistKey = 'url_blacklist';
+  static const _prefsPendingRemovalsKey = 'url_list_pending_removals';
+  static const _maxPersistedEntries = 100;
+
+  /// Master URL-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_url`).
+  static const _kMasterProtectionKey = 'prot_url';
+
+  static final String _whitelistPath =
+      '${ApiConfig.apiVersion}/url/whitelist';
+  static final String _blacklistPath =
+      '${ApiConfig.apiVersion}/url/blacklist';
+  static String _listEntryPath(String id) =>
+      '${ApiConfig.apiVersion}/url/list/$id';
+
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+  SharedPreferences? _prefs;
 
   // State
   final List<UrlCheckEntry> _history = [];
   final List<UrlListEntry> _whitelist = [];
   final List<UrlListEntry> _blacklist = [];
+
+  /// Server entry ids whose DELETE failed and must be retried on next sync.
+  final Set<String> _pendingRemovals = {};
+
   UrlStats _stats = UrlStats();
   DomainReputation? _currentDomainDetails;
 
   bool _isLoading = false;
   bool _isCheckingUrl = false;
+  bool _listsSynced = false;
+  String? _listSyncError;
   String? _error;
 
   // Getters
@@ -103,7 +172,33 @@ class UrlProvider extends ChangeNotifier {
   DomainReputation? get currentDomainDetails => _currentDomainDetails;
   bool get isLoading => _isLoading;
   bool get isCheckingUrl => _isCheckingUrl;
+
+  /// True once the local custom lists reflect the backend state.
+  bool get listsSynced => _listsSynced;
+
+  /// Last backend list-sync failure, if any (local cache stays usable).
+  String? get listSyncError => _listSyncError;
+
   String? get error => _error;
+
+  /// True when the user turned URL protection off in the app Settings
+  /// (`prot_url`). While set, URL checks are skipped entirely.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('UrlProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
 
   /// Recent threats from history
   List<UrlCheckEntry> get recentThreats => _history
@@ -116,11 +211,19 @@ class UrlProvider extends ChangeNotifier {
     await loadHistory();
     await loadLists();
     _updateStats();
+    notifyListeners();
+    await syncListsWithBackend();
   }
 
   /// Check a URL
   Future<UrlReputationResult?> checkUrl(String url) async {
     if (url.isEmpty) return null;
+
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'URL protection is disabled in Settings.';
+      notifyListeners();
+      return null;
+    }
 
     // Normalize URL
     final normalizedUrl = _normalizeUrl(url);
@@ -133,10 +236,9 @@ class UrlProvider extends ChangeNotifier {
         domain: domain,
         isSafe: true,
         shouldBlock: false,
-        severity: SeverityLevel.info,
-        riskScore: 0.0,
-        categories: [UrlCategory.safe],
-        threats: [],
+        category: UrlCategory.safe,
+        threatLevel: SeverityLevel.info,
+        confidence: 1.0,
         recommendation: 'This domain is on your whitelist.',
         checkedAt: DateTime.now(),
       );
@@ -149,9 +251,10 @@ class UrlProvider extends ChangeNotifier {
         domain: domain,
         isSafe: false,
         shouldBlock: true,
-        severity: SeverityLevel.high,
-        riskScore: 1.0,
-        categories: [],
+        category: UrlCategory.unknown,
+        threatLevel: SeverityLevel.high,
+        confidence: 1.0,
+        blockReason: 'This domain is on your blacklist.',
         threats: [
           UrlThreat(
             type: 'blacklisted',
@@ -190,6 +293,7 @@ class UrlProvider extends ChangeNotifier {
 
       _updateStats();
       _isCheckingUrl = false;
+      await _saveHistory();
       notifyListeners();
       return result;
     } catch (e) {
@@ -205,6 +309,12 @@ class UrlProvider extends ChangeNotifier {
   /// Check multiple URLs
   Future<List<UrlReputationResult>> checkUrls(List<String> urls) async {
     if (urls.isEmpty) return [];
+
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'URL protection is disabled in Settings.';
+      notifyListeners();
+      return [];
+    }
 
     _isCheckingUrl = true;
     notifyListeners();
@@ -225,6 +335,7 @@ class UrlProvider extends ChangeNotifier {
 
       _updateStats();
       _isCheckingUrl = false;
+      await _saveHistory();
       notifyListeners();
       return results;
     } catch (e) {
@@ -260,56 +371,199 @@ class UrlProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add domain to whitelist
-  void addToWhitelist(String domain, {String? reason}) {
+  /// Add domain to whitelist (local + live backend list).
+  Future<void> addToWhitelist(String domain, {String? reason}) async {
+    await _addToList(domain, reason: reason, isWhitelist: true);
+  }
+
+  /// Remove domain from whitelist (local + live backend list).
+  Future<void> removeFromWhitelist(String domain) async {
+    await _removeFromList(domain, isWhitelist: true);
+  }
+
+  /// Add domain to blacklist (local + live backend list).
+  Future<void> addToBlacklist(String domain, {String? reason}) async {
+    await _addToList(domain, reason: reason, isWhitelist: false);
+  }
+
+  /// Remove domain from blacklist (local + live backend list).
+  Future<void> removeFromBlacklist(String domain) async {
+    await _removeFromList(domain, isWhitelist: false);
+  }
+
+  Future<void> _addToList(
+    String domain, {
+    String? reason,
+    required bool isWhitelist,
+  }) async {
     final normalized = _extractDomain(domain);
-    if (_whitelist.any((e) => e.domain == normalized)) return;
+    final target = isWhitelist ? _whitelist : _blacklist;
+    final opposite = isWhitelist ? _blacklist : _whitelist;
+    if (target.any((e) => e.domain == normalized)) return;
 
-    // Remove from blacklist if present
-    _blacklist.removeWhere((e) => e.domain == normalized);
+    // Remove from the opposite list if present (server-side too).
+    final conflicting =
+        opposite.where((e) => e.domain == normalized).toList();
+    for (final entry in conflicting) {
+      await _removeFromList(entry.domain, isWhitelist: !isWhitelist);
+    }
 
-    _whitelist.add(UrlListEntry(
+    var entry = UrlListEntry(
       domain: normalized,
       addedAt: DateTime.now(),
       reason: reason,
-    ));
+      pendingSync: true,
+    );
+    target.add(entry);
     _updateStats();
-    _saveLists();
+    notifyListeners();
+
+    // Push to the live backend list.
+    try {
+      final created = await _api.post<Map<String, dynamic>>(
+        isWhitelist ? _whitelistPath : _blacklistPath,
+        data: {
+          'domain': normalized,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
+      );
+      entry = entry.copyWith(
+        serverId: created['id'] as String?,
+        pendingSync: false,
+      );
+      final index = target.indexWhere((e) => e.domain == normalized);
+      if (index >= 0) target[index] = entry;
+      _listSyncError = null;
+    } catch (e) {
+      // Keep the local entry marked pending; it is re-pushed on next sync.
+      _listSyncError = 'Failed to sync list entry "$normalized": $e';
+      debugPrint('UrlProvider: $_listSyncError');
+    }
+
+    await _saveLists();
     notifyListeners();
   }
 
-  /// Remove domain from whitelist
-  void removeFromWhitelist(String domain) {
-    _whitelist.removeWhere((e) => e.domain == domain);
+  Future<void> _removeFromList(
+    String domain, {
+    required bool isWhitelist,
+  }) async {
+    final target = isWhitelist ? _whitelist : _blacklist;
+    final index = target.indexWhere((e) => e.domain == domain);
+    if (index < 0) return;
+
+    final entry = target.removeAt(index);
     _updateStats();
-    _saveLists();
+    notifyListeners();
+
+    final serverId = entry.serverId;
+    if (serverId != null) {
+      try {
+        await _api.delete<dynamic>(_listEntryPath(serverId));
+        _listSyncError = null;
+      } catch (e) {
+        // Retry the server-side delete on the next sync; locally the entry
+        // is gone, and the pull during sync skips ids queued for removal.
+        _pendingRemovals.add(serverId);
+        _listSyncError =
+            'Failed to remove list entry "$domain" from the backend: $e';
+        debugPrint('UrlProvider: $_listSyncError');
+      }
+    }
+
+    await _saveLists();
     notifyListeners();
   }
 
-  /// Add domain to blacklist
-  void addToBlacklist(String domain, {String? reason}) {
-    final normalized = _extractDomain(domain);
-    if (_blacklist.any((e) => e.domain == normalized)) return;
+  /// Synchronize local custom lists with the live backend
+  /// (GET/POST /url/whitelist|blacklist, DELETE /url/list/{id}).
+  Future<void> syncListsWithBackend() async {
+    try {
+      // 1. Retry pending server-side removals.
+      for (final id in _pendingRemovals.toList()) {
+        try {
+          await _api.delete<dynamic>(_listEntryPath(id));
+          _pendingRemovals.remove(id);
+        } catch (e) {
+          final message = e.toString();
+          // A 404 means the entry is already gone server-side.
+          if (message.contains('404') || message.contains('not found')) {
+            _pendingRemovals.remove(id);
+          } else {
+            rethrow;
+          }
+        }
+      }
 
-    // Remove from whitelist if present
-    _whitelist.removeWhere((e) => e.domain == normalized);
+      // 2. Push local entries that never reached the backend.
+      for (final list in [_whitelist, _blacklist]) {
+        final isWhitelist = identical(list, _whitelist);
+        for (var i = 0; i < list.length; i++) {
+          final entry = list[i];
+          if (!entry.pendingSync && entry.serverId != null) continue;
+          final created = await _api.post<Map<String, dynamic>>(
+            isWhitelist ? _whitelistPath : _blacklistPath,
+            data: {
+              'domain': entry.domain,
+              if (entry.reason != null && entry.reason!.isNotEmpty)
+                'reason': entry.reason,
+            },
+          );
+          list[i] = entry.copyWith(
+            serverId: created['id'] as String?,
+            pendingSync: false,
+          );
+        }
+      }
 
-    _blacklist.add(UrlListEntry(
-      domain: normalized,
-      addedAt: DateTime.now(),
-      reason: reason,
-    ));
+      // 3. Pull the authoritative server state.
+      final whitelistResponse =
+          await _api.get<Map<String, dynamic>>(_whitelistPath);
+      final blacklistResponse =
+          await _api.get<Map<String, dynamic>>(_blacklistPath);
+
+      _whitelist
+        ..clear()
+        ..addAll(_entriesFromServer(whitelistResponse));
+      _blacklist
+        ..clear()
+        ..addAll(_entriesFromServer(blacklistResponse));
+
+      _listsSynced = true;
+      _listSyncError = null;
+    } catch (e) {
+      _listsSynced = false;
+      _listSyncError = 'List sync with backend failed: $e';
+      debugPrint('UrlProvider: $_listSyncError');
+    }
+
     _updateStats();
-    _saveLists();
+    await _saveLists();
     notifyListeners();
   }
 
-  /// Remove domain from blacklist
-  void removeFromBlacklist(String domain) {
-    _blacklist.removeWhere((e) => e.domain == domain);
-    _updateStats();
-    _saveLists();
-    notifyListeners();
+  List<UrlListEntry> _entriesFromServer(Map<String, dynamic> response) {
+    final entries = response['entries'] as List<dynamic>? ?? const [];
+    final result = <UrlListEntry>[];
+    for (final raw in entries) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final id = map['id'] as String?;
+      if (id != null && _pendingRemovals.contains(id)) continue;
+      if (map['is_active'] == false) continue;
+      final domain = (map['domain'] as String?)?.isNotEmpty == true
+          ? map['domain'] as String
+          : (map['url'] as String? ?? map['pattern'] as String? ?? '');
+      if (domain.isEmpty) continue;
+      result.add(UrlListEntry(
+        domain: domain,
+        addedAt: map['created_at'] != null
+            ? DateTime.tryParse(map['created_at'] as String) ?? DateTime.now()
+            : DateTime.now(),
+        reason: map['reason'] as String?,
+        serverId: id,
+      ));
+    }
+    return result;
   }
 
   /// Check if domain is whitelisted
@@ -340,24 +594,143 @@ class UrlProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load history from storage
+  /// Load history from persistent storage.
   Future<void> loadHistory() async {
-    // TODO: Load from persistent storage
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('UrlProvider: failed to open preferences: $e');
+      return;
+    }
+
+    final raw = _prefs!.getString(_prefsHistoryKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      final restored = <UrlCheckEntry>[];
+      for (final item in decoded) {
+        try {
+          final map = Map<String, dynamic>.from(item as Map);
+          final resultJson = map['result'];
+          restored.add(UrlCheckEntry(
+            id: map['id'] as String,
+            url: map['url'] as String,
+            checkedAt: DateTime.parse(map['checked_at'] as String),
+            result: resultJson != null
+                ? UrlReputationResult.fromJson(
+                    Map<String, dynamic>.from(resultJson as Map))
+                : null,
+          ));
+        } catch (e) {
+          debugPrint('UrlProvider: skipping corrupt history entry: $e');
+        }
+      }
+      _history
+        ..clear()
+        ..addAll(restored);
+    } catch (e) {
+      debugPrint('UrlProvider: failed to restore check history: $e');
+    }
   }
 
-  /// Save history to storage
+  /// Save history to persistent storage.
   Future<void> _saveHistory() async {
-    // TODO: Save to persistent storage
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    try {
+      final payload = _history
+          .where((e) => !e.isPending)
+          .take(_maxPersistedEntries)
+          .map((e) => {
+                'id': e.id,
+                'url': e.url,
+                'checked_at': e.checkedAt.toIso8601String(),
+                if (e.result != null) 'result': _resultToJson(e.result!),
+              })
+          .toList();
+      await prefs.setString(_prefsHistoryKey, jsonEncode(payload));
+    } catch (e) {
+      debugPrint('UrlProvider: failed to persist check history: $e');
+    }
   }
 
-  /// Load whitelist/blacklist from storage
+  /// Serialize a [UrlReputationResult] back to the backend wire shape so
+  /// [UrlReputationResult.fromJson] can round-trip it on restore.
+  Map<String, dynamic> _resultToJson(UrlReputationResult result) => {
+        'url': result.url,
+        'domain': result.domain,
+        'is_safe': result.isSafe,
+        'should_block': result.shouldBlock,
+        'category': result.category.value,
+        'threat_level': result.threatLevel.value,
+        'confidence': result.confidence,
+        if (result.description != null) 'description': result.description,
+        'warnings': result.warnings,
+        if (result.blockReason != null) 'block_reason': result.blockReason,
+        'allow_override': result.allowOverride,
+        if (result.campaignName != null) 'campaign_name': result.campaignName,
+        if (result.threatActorName != null)
+          'threat_actor_name': result.threatActorName,
+        'cache_hit': result.cacheHit,
+        'checked_at': result.checkedAt.toIso8601String(),
+      };
+
+  /// Load whitelist/blacklist (and pending removals) from local storage.
   Future<void> loadLists() async {
-    // TODO: Load from persistent storage
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('UrlProvider: failed to open preferences: $e');
+      return;
+    }
+
+    _whitelist
+      ..clear()
+      ..addAll(_decodeListPref(_prefsWhitelistKey));
+    _blacklist
+      ..clear()
+      ..addAll(_decodeListPref(_prefsBlacklistKey));
+    _pendingRemovals
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsPendingRemovalsKey) ?? const []);
   }
 
-  /// Save lists to storage
+  List<UrlListEntry> _decodeListPref(String key) {
+    final raw = _prefs!.getString(key);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .map((e) =>
+              UrlListEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (e) {
+      debugPrint('UrlProvider: failed to restore list "$key": $e');
+      return const [];
+    }
+  }
+
+  /// Save lists to local storage.
   Future<void> _saveLists() async {
-    // TODO: Save to persistent storage
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    try {
+      await prefs.setString(
+        _prefsWhitelistKey,
+        jsonEncode(_whitelist.map((e) => e.toJson()).toList()),
+      );
+      await prefs.setString(
+        _prefsBlacklistKey,
+        jsonEncode(_blacklist.map((e) => e.toJson()).toList()),
+      );
+      await prefs.setStringList(
+          _prefsPendingRemovalsKey, _pendingRemovals.toList());
+    } catch (e) {
+      debugPrint('UrlProvider: failed to persist lists: $e');
+    }
   }
 
   /// Update stats
@@ -375,10 +748,26 @@ class UrlProvider extends ChangeNotifier {
         safe++;
       } else {
         threats++;
-        for (final cat in entry.result!.categories) {
-          if (cat == UrlCategory.phishing) phishing++;
-          if (cat == UrlCategory.malware) malware++;
-          if (cat == UrlCategory.scam) scams++;
+        switch (entry.result!.category) {
+          case UrlCategory.phishing:
+          case UrlCategory.typosquatting:
+            phishing++;
+            break;
+          case UrlCategory.malware:
+          case UrlCategory.ransomware:
+          case UrlCategory.cryptojacking:
+          case UrlCategory.cryptomining:
+          case UrlCategory.commandAndControl:
+          case UrlCategory.botnet:
+          case UrlCategory.exploit:
+          case UrlCategory.driveByDownload:
+            malware++;
+            break;
+          case UrlCategory.scam:
+            scams++;
+            break;
+          default:
+            break;
         }
       }
     }

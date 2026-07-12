@@ -1,10 +1,12 @@
 /// Analytics Dashboard Screen
 /// Threat analytics, statistics, and reporting interface
+library;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -25,10 +27,19 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   final _numberFormat = NumberFormat('#,###');
   final _apiClient = OrbGuardApiClient.instance;
 
-  // Analytics data from dedicated API
+  // Analytics data from dedicated API.
+  // Shapes mirror the live backend (orbguard-lab handlers/analytics.go +
+  // models/analytics.go): threat analytics carries `summary` and
+  // `by_type: [{category, count, percentage}]`; alert metrics carries
+  // `total_alerts`/`open_alerts` and optional `mtta_minutes`; geo carries
+  // `countries: [{country_code, country_name, count, percentage}]`;
+  // detection metrics carries optional `detection_rate` and
+  // `false_positive_rate` (absent when the server has no tracking data).
   Map<String, dynamic>? _threatAnalytics;
   Map<String, dynamic>? _alertMetrics;
   Map<String, dynamic>? _geoData;
+  Map<String, dynamic>? _detectionMetrics;
+  String? _analyticsError;
   bool _isLoadingAnalytics = false;
 
   @override
@@ -44,24 +55,51 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() => _isLoadingAnalytics = true);
+    setState(() {
+      _isLoadingAnalytics = true;
+      _analyticsError = null;
+    });
+
+    final errors = <String>[];
+
+    Map<String, dynamic>? threats;
     try {
-      final results = await Future.wait([
-        _apiClient.getThreatAnalytics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-        _apiClient.getAlertMetrics(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-        _apiClient.getGeoDistribution(period: _selectedTimeRange).catchError((_) => <String, dynamic>{}),
-      ]);
-      if (mounted) {
-        setState(() {
-          _threatAnalytics = results[0];
-          _alertMetrics = results[1];
-          _geoData = results[2];
-          _isLoadingAnalytics = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingAnalytics = false);
+      threats = await _apiClient.getThreatAnalytics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('threats: $e');
     }
+
+    Map<String, dynamic>? alerts;
+    try {
+      alerts = await _apiClient.getAlertMetrics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('alerts: $e');
+    }
+
+    Map<String, dynamic>? geo;
+    try {
+      geo = await _apiClient.getGeoDistribution(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('geo: $e');
+    }
+
+    Map<String, dynamic>? detections;
+    try {
+      detections = await _apiClient.getDetectionMetrics(period: _selectedTimeRange);
+    } catch (e) {
+      errors.add('detections: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _threatAnalytics = threats;
+      _alertMetrics = alerts;
+      _geoData = geo;
+      _detectionMetrics = detections;
+      _analyticsError =
+          errors.isEmpty ? null : 'Failed to load analytics — ${errors.join('; ')}';
+      _isLoadingAnalytics = false;
+    });
   }
 
   void _onTimeRangeChanged(String value) {
@@ -73,6 +111,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   Widget build(BuildContext context) {
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
+        final cs = Theme.of(context).colorScheme;
         if (provider.isLoading && !provider.hasData) {
           return GlassPage(
             title: 'Analytics',
@@ -86,17 +125,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             GlassTab(
               label: 'Overview',
               iconPath: 'chart',
-              content: _buildOverviewTab(provider),
+              content: _buildOverviewTab(context, provider),
             ),
             GlassTab(
               label: 'Threats',
               iconPath: 'danger_triangle',
-              content: _buildThreatsTab(provider),
+              content: _buildThreatsTab(context, provider),
             ),
             GlassTab(
               label: 'Protection',
               iconPath: 'shield',
-              content: _buildProtectionTab(provider),
+              content: _buildProtectionTab(context, provider),
             ),
           ],
           headerContent: Padding(
@@ -105,8 +144,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 PopupMenuButton<String>(
-                  icon: const DuotoneIcon('calendar', size: 22, color: Colors.white),
-                  color: GlassTheme.gradientTop,
+                  icon: DuotoneIcon('calendar', size: 22, color: cs.onSurface),
+                  color: cs.surfaceContainerHighest,
                   onSelected: _onTimeRangeChanged,
                   itemBuilder: (context) => [
                     _buildTimeRangeItem('24h', 'Last 24 Hours'),
@@ -116,7 +155,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   ],
                 ),
                 IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                  icon: DuotoneIcon('document_add', size: 22, color: cs.onSurface),
+                  onPressed: _showReportDialog,
+                  tooltip: 'Generate Report',
+                ),
+                IconButton(
+                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
                   onPressed: provider.isLoading ? null : () => provider.refresh(),
                   tooltip: 'Refresh',
                 ),
@@ -138,32 +182,42 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           else
             const SizedBox(width: 18),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(color: Colors.white)),
+          Text(label, style: TextStyle(color: context.onSurface)),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewTab(DashboardProvider provider) {
+  Widget _buildOverviewTab(BuildContext context, DashboardProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final stats = provider.stats;
 
-    // Use analytics API data if available, fallback to dashboard provider
+    // Use analytics API data if available, fallback to dashboard provider.
+    // Live summary keys (models/analytics.go AnalyticsSummary):
+    // total_indicators, blocked_domains, blocked_ips, ... The backend does
+    // not emit threats_blocked/urls_checked/sms_analyzed.
     final summary = _threatAnalytics?['summary'] as Map<String, dynamic>?;
-    final totalIndicators = summary?['total_indicators'] as int? ?? stats?.totalIndicators ?? 0;
-    final threatsBlocked = summary?['threats_blocked'] as int? ?? provider.threatsBlockedToday;
-    final urlsChecked = summary?['urls_checked'] as int? ?? stats?.getCountByType(IndicatorType.url) ?? 0;
-    final smsAnalyzed = summary?['sms_analyzed'] as int? ?? stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
+    final totalIndicators =
+        (summary?['total_indicators'] as num?)?.toInt() ?? stats?.totalIndicators ?? 0;
+    final threatsBlocked = summary != null
+        ? ((summary['blocked_domains'] as num?)?.toInt() ?? 0) +
+            ((summary['blocked_ips'] as num?)?.toInt() ?? 0)
+        : provider.threatsBlockedToday;
+    final urlsChecked = stats?.getCountByType(IndicatorType.url) ?? 0;
+    final smsAnalyzed = stats?.getCountByType(IndicatorType.phoneNumber) ?? 0;
 
-    // Calculate threat distribution from analytics API or stats
-    final typeDistribution = (_threatAnalytics?['type_distribution'] as List?)
-        ?.cast<Map<String, dynamic>>();
+    // Threat distribution: the live backend emits
+    // by_type: [{category, count, percentage}] (CategoryCount uses the key
+    // 'category', not 'name').
+    final typeDistribution =
+        (_threatAnalytics?['by_type'] as List?)?.cast<Map<String, dynamic>>();
     final total = totalIndicators > 0 ? totalIndicators : 1;
 
     double phishingRatio = 0, malwareRatio = 0, domainRatio = 0, ipRatio = 0, otherRatio = 0;
     if (typeDistribution != null && typeDistribution.isNotEmpty) {
       for (final item in typeDistribution) {
-        final name = (item['name'] as String? ?? '').toLowerCase();
-        final count = (item['count'] as int? ?? 0).toDouble();
+        final name = (item['category'] as String? ?? '').toLowerCase();
+        final count = ((item['count'] as num?)?.toInt() ?? 0).toDouble();
         final ratio = count / total;
         if (name.contains('url') || name.contains('phish')) {
           phishingRatio += ratio;
@@ -192,15 +246,32 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       otherRatio = (total - phishingCount - malwareCount - domainCount - ipCount) / total;
     }
 
-    // Alert metrics from analytics API
-    final alertTotal = _alertMetrics?['total_alerts'] as int?;
-    final alertUnread = _alertMetrics?['unread_alerts'] as int?;
+    // Alert metrics from analytics API (live keys: total_alerts, open_alerts,
+    // acknowledged_alerts, resolved_alerts, optional mtta_minutes).
+    final alertTotal = (_alertMetrics?['total_alerts'] as num?)?.toInt();
+    final alertOpen = (_alertMetrics?['open_alerts'] as num?)?.toInt();
 
-    // Geo top countries from analytics API
-    final geoCountries = (_geoData?['countries'] as List?)?.cast<Map<String, dynamic>>().take(3).toList();
+    // Geo top countries from analytics API. Live entries carry country_name /
+    // country_code / count / percentage; there is no top-level total, so it
+    // is computed client-side from the per-country counts.
+    final geoCountries =
+        (_geoData?['countries'] as List?)?.cast<Map<String, dynamic>>();
+    final geoTotal = geoCountries?.fold<int>(
+            0, (sum, c) => sum + ((c['count'] as num?)?.toInt() ?? 0)) ??
+        0;
+    final topGeoCountries = geoCountries?.take(3).toList();
+
+    // Detection quality (live keys: detection_rate / false_positive_rate are
+    // ABSENT when the server has no tracked review data; mtta_minutes is
+    // absent when no alert was acknowledged). These render as 'n/a' rather
+    // than fabricated numbers.
+    final detectionRate = (_detectionMetrics?['detection_rate'] as num?)?.toDouble();
+    final falsePositiveRate =
+        (_detectionMetrics?['false_positive_rate'] as num?)?.toDouble();
+    final mttaMinutes = (_alertMetrics?['mtta_minutes'] as num?)?.toDouble();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -214,22 +285,46 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          if (_analyticsError != null) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              margin: EdgeInsets.zero,
+              tintColor: GlassTheme.errorColor,
+              child: Row(
+                children: [
+                  const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _analyticsError!,
+                      style: TextStyle(color: cs.onSurface, fontSize: 12),
+                    ),
+                  ),
+                  IconButton(
+                    icon: DuotoneIcon('refresh', color: cs.onSurface, size: 20),
+                    onPressed: _loadAnalytics,
+                    tooltip: 'Retry',
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
 
           // Key metrics
           Row(
             children: [
-              _buildMetricCard('Total Indicators', _numberFormat.format(totalIndicators), 'magnifer', GlassTheme.primaryAccent),
+              _buildMetricCard(context, 'Total Indicators', _numberFormat.format(totalIndicators), 'magnifer', GlassTheme.primaryAccent),
               const SizedBox(width: 12),
-              _buildMetricCard('Threats Blocked', _numberFormat.format(threatsBlocked), 'forbidden', GlassTheme.errorColor),
+              _buildMetricCard(context, 'Threats Blocked', _numberFormat.format(threatsBlocked), 'forbidden', GlassTheme.errorColor),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildMetricCard('URLs Checked', _numberFormat.format(urlsChecked), 'link', const Color(0xFF9C27B0)),
+              _buildMetricCard(context, 'URLs Checked', _numberFormat.format(urlsChecked), 'link', const Color(0xFF9C27B0)),
               const SizedBox(width: 12),
-              _buildMetricCard('Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', const Color(0xFF2196F3)),
+              _buildMetricCard(context, 'Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', const Color(0xFF2196F3)),
             ],
           ),
 
@@ -238,47 +333,94 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildMetricCard('Total Alerts', _numberFormat.format(alertTotal), 'bell', GlassTheme.warningColor),
+                _buildMetricCard(context, 'Total Alerts', _numberFormat.format(alertTotal), 'bell', GlassTheme.warningColor),
                 const SizedBox(width: 12),
-                _buildMetricCard('Unread', _numberFormat.format(alertUnread ?? 0), 'notification_unread', const Color(0xFFFF5722)),
+                _buildMetricCard(context, 'Open', _numberFormat.format(alertOpen ?? 0), 'notification_unread', const Color(0xFFFF5722)),
               ],
             ),
           ],
           const SizedBox(height: 24),
 
-          // Threat distribution chart
-          const Text(
-            'Threat Distribution',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          // Detection quality — values may legitimately be absent from the
+          // server (untracked); show 'n/a' instead of fake numbers.
+          Text(
+            'Detection Quality',
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           GlassCard(
+            margin: EdgeInsets.zero,
+            child: Row(
+              children: [
+                _buildQualityMetric(
+                  context,
+                  'Detection Rate',
+                  detectionRate != null
+                      ? '${(detectionRate * 100).toStringAsFixed(1)}%'
+                      : 'n/a',
+                  detectionRate != null ? GlassTheme.successColor : cs.onSurfaceVariant,
+                ),
+                _buildQualityMetric(
+                  context,
+                  'False Positives',
+                  falsePositiveRate != null
+                      ? '${(falsePositiveRate * 100).toStringAsFixed(1)}%'
+                      : 'n/a',
+                  falsePositiveRate != null ? GlassTheme.warningColor : cs.onSurfaceVariant,
+                ),
+                _buildQualityMetric(
+                  context,
+                  'MTTA',
+                  mttaMinutes != null ? '${mttaMinutes.toStringAsFixed(0)}m' : 'n/a',
+                  mttaMinutes != null ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Threat distribution chart
+          Text(
+            'Threat Distribution',
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            margin: EdgeInsets.zero,
             child: Column(
               children: [
-                _buildDistributionBar('URLs/Phishing', phishingRatio, GlassTheme.errorColor),
-                _buildDistributionBar('Malware Hashes', malwareRatio, const Color(0xFFFF5722)),
-                _buildDistributionBar('Domains', domainRatio, GlassTheme.warningColor),
-                _buildDistributionBar('IP Addresses', ipRatio, const Color(0xFF9C27B0)),
-                _buildDistributionBar('Other', otherRatio, Colors.grey),
+                _buildDistributionBar(context, 'URLs/Phishing', phishingRatio, GlassTheme.errorColor),
+                _buildDistributionBar(context, 'Malware Hashes', malwareRatio, const Color(0xFFFF5722)),
+                _buildDistributionBar(context, 'Domains', domainRatio, GlassTheme.warningColor),
+                _buildDistributionBar(context, 'IP Addresses', ipRatio, const Color(0xFF9C27B0)),
+                _buildDistributionBar(context, 'Other', otherRatio, cs.onSurfaceVariant),
               ],
             ),
           ),
 
-          // Geo distribution from analytics API
-          if (geoCountries != null && geoCountries.isNotEmpty) ...[
+          // Geo distribution from analytics API (live entry keys:
+          // country_name, country_code, count; total computed client-side).
+          if (topGeoCountries != null && topGeoCountries.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Top Threat Origins',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Column(
-                children: geoCountries.map((c) {
-                  final country = c['country'] as String? ?? 'Unknown';
-                  final count = c['count'] as int? ?? 0;
-                  final geoTotal = (_geoData?['total'] as int?) ?? 1;
-                  return _buildDistributionBar(country, count / geoTotal, GlassTheme.primaryAccent);
+                children: topGeoCountries.map((c) {
+                  final country = c['country_name'] as String? ??
+                      c['country_code'] as String? ??
+                      'Unknown';
+                  final count = (c['count'] as num?)?.toInt() ?? 0;
+                  return _buildDistributionBar(
+                    context,
+                    country,
+                    geoTotal > 0 ? count / geoTotal : 0,
+                    GlassTheme.primaryAccent,
+                  );
                 }).toList(),
               ),
             ),
@@ -286,9 +428,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           const SizedBox(height: 24),
 
           // Activity timeline from real alerts
-          const Text(
+          Text(
             'Recent Activity',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           if (provider.recentAlerts.isEmpty && provider.realtimeEvents.isEmpty)
@@ -298,13 +440,14 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     'No recent activity',
-                    style: TextStyle(color: Colors.white.withAlpha(128)),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ),
               ),
             )
           else ...[
             ...provider.recentAlerts.take(4).map((alert) => _buildActivityCard(
+                  context,
                   icon: _getAlertIcon(alert.type),
                   title: alert.title,
                   subtitle: alert.message,
@@ -312,6 +455,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   color: _getSeverityColorFromLevel(alert.severity),
                 )),
             ...provider.realtimeEvents.take(4 - provider.recentAlerts.length).map((event) => _buildActivityCard(
+                  context,
                   icon: _getAlertIcon(event.type),
                   title: event.type.toUpperCase(),
                   subtitle: event.description ?? event.value,
@@ -343,20 +487,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     }
   }
 
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
-      case 'high':
-        return GlassTheme.errorColor;
-      case 'medium':
-        return GlassTheme.warningColor;
-      case 'low':
-        return GlassTheme.primaryAccent;
-      default:
-        return GlassTheme.successColor;
-    }
-  }
-
   Color _getSeverityColorFromLevel(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
@@ -379,9 +509,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     return '${diff.inDays}d ago';
   }
 
-  Widget _buildMetricCard(String label, String value, String icon, Color color) {
+  Widget _buildMetricCard(BuildContext context, String label, String value, String icon, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassCard(
+        margin: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -395,11 +527,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             const SizedBox(height: 12),
             Text(
               value,
-              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             Text(
               label,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
             ),
           ],
         ),
@@ -407,7 +539,25 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildDistributionBar(String label, double value, Color color) {
+  Widget _buildQualityMetric(BuildContext context, String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDistributionBar(BuildContext context, String label, double value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -416,7 +566,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13)),
+              Expanded(
+                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+              ),
               Text('${(value * 100).toInt()}%', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
@@ -425,7 +577,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
               value: value,
-              backgroundColor: Colors.white12,
+              backgroundColor: cs.onSurface.withValues(alpha: 0.06),
               valueColor: AlwaysStoppedAnimation<Color>(color),
               minHeight: 6,
             ),
@@ -435,13 +587,15 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildActivityCard({
+  Widget _buildActivityCard(
+    BuildContext context, {
     required String icon,
     required String title,
     required String subtitle,
     required String time,
     required Color color,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Row(
         children: [
@@ -451,23 +605,24 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
                 Text(
                   subtitle,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          Text(time, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11)),
+          Text(time, style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11)),
         ],
       ),
     );
   }
 
-  Widget _buildThreatsTab(DashboardProvider provider) {
+  Widget _buildThreatsTab(BuildContext context, DashboardProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final stats = provider.stats;
     final totalThreats = stats?.activeIndicators ?? 0;
 
@@ -495,12 +650,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     final otherPercent = 100 - urlPercent - domainPercent - ipPercent;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Threat summary
           GlassCard(
+            margin: EdgeInsets.zero,
             tintColor: totalThreats > 0 ? GlassTheme.errorColor : GlassTheme.successColor,
             child: Column(
               children: [
@@ -521,11 +677,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                             totalThreats > 0
                                 ? '${_numberFormat.format(totalThreats)} Active Threats'
                                 : 'No Active Threats',
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'In the $_selectedTimeRange period',
-                            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                           ),
                         ],
                       ),
@@ -538,53 +694,54 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           const SizedBox(height: 24),
 
           // Threat types by indicator type
-          const Text(
+          Text(
             'Threat Types',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard('Phishing URLs', urlCount, 'link', GlassTheme.errorColor),
-          _buildThreatTypeCard('Malicious Domains', domainCount, 'globe', const Color(0xFFFF5722)),
-          _buildThreatTypeCard('Malicious IPs', ipCount, 'server', GlassTheme.warningColor),
-          _buildThreatTypeCard('Malware Hashes', hashCount, 'code', const Color(0xFF9C27B0)),
-          _buildThreatTypeCard('Phone/SMS Threats', phoneCount, 'chat_dots', const Color(0xFF2196F3)),
+          _buildThreatTypeCard(context, 'Phishing URLs', urlCount, 'link', GlassTheme.errorColor),
+          _buildThreatTypeCard(context, 'Malicious Domains', domainCount, 'globe', const Color(0xFFFF5722)),
+          _buildThreatTypeCard(context, 'Malicious IPs', ipCount, 'server', GlassTheme.warningColor),
+          _buildThreatTypeCard(context, 'Malware Hashes', hashCount, 'code', const Color(0xFF9C27B0)),
+          _buildThreatTypeCard(context, 'Phone/SMS Threats', phoneCount, 'chat_dots', const Color(0xFF2196F3)),
           const SizedBox(height: 24),
 
           // Threat severity breakdown
-          const Text(
+          Text(
             'By Severity',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard('Critical', criticalCount, 'danger_circle', GlassTheme.errorColor),
-          _buildThreatTypeCard('High', highCount, 'danger_triangle', const Color(0xFFFF5722)),
-          _buildThreatTypeCard('Medium', mediumCount, 'info_circle', GlassTheme.warningColor),
-          _buildThreatTypeCard('Low', lowCount, 'info_square', Colors.grey),
+          _buildThreatTypeCard(context, 'Critical', criticalCount, 'danger_circle', GlassTheme.errorColor),
+          _buildThreatTypeCard(context, 'High', highCount, 'danger_triangle', const Color(0xFFFF5722)),
+          _buildThreatTypeCard(context, 'Medium', mediumCount, 'info_circle', GlassTheme.warningColor),
+          _buildThreatTypeCard(context, 'Low', lowCount, 'info_square', cs.onSurfaceVariant),
           const SizedBox(height: 24),
 
           // Top threat sources
-          const Text(
+          Text(
             'Threat Distribution',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatSourceCard('URLs', urlPercent > 0 ? urlPercent : 0),
-          _buildThreatSourceCard('Domains', domainPercent > 0 ? domainPercent : 0),
-          _buildThreatSourceCard('IP Addresses', ipPercent > 0 ? ipPercent : 0),
-          _buildThreatSourceCard('Other', otherPercent > 0 ? otherPercent : 0),
+          _buildThreatSourceCard(context, 'URLs', urlPercent > 0 ? urlPercent : 0),
+          _buildThreatSourceCard(context, 'Domains', domainPercent > 0 ? domainPercent : 0),
+          _buildThreatSourceCard(context, 'IP Addresses', ipPercent > 0 ? ipPercent : 0),
+          _buildThreatSourceCard(context, 'Other', otherPercent > 0 ? otherPercent : 0),
         ],
       ),
     );
   }
 
-  Widget _buildThreatTypeCard(String type, int count, String icon, Color color) {
+  Widget _buildThreatTypeCard(BuildContext context, String type, int count, String icon, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Row(
         children: [
           GlassDuotoneIconBox(icon: icon, color: color),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(type, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            child: Text(type, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
           ),
           Text(
             count.toString(),
@@ -595,7 +752,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildThreatSourceCard(String source, int percentage) {
+  Widget _buildThreatSourceCard(BuildContext context, String source, int percentage) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +761,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(source, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+              Text(source, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
               Text('$percentage%', style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -612,7 +770,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
               value: percentage / 100,
-              backgroundColor: Colors.white12,
+              backgroundColor: cs.onSurface.withValues(alpha: 0.06),
               valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
               minHeight: 4,
             ),
@@ -622,7 +780,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildProtectionTab(DashboardProvider provider) {
+  Widget _buildProtectionTab(BuildContext context, DashboardProvider provider) {
+    final cs = Theme.of(context).colorScheme;
     final protectionScore = provider.protectionScore.round();
     final stats = provider.stats;
 
@@ -639,21 +798,22 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     final highSeverity = provider.highSeverityThreats;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Protection score
-          _buildProtectionScoreCard(protectionScore),
+          _buildProtectionScoreCard(context, protectionScore),
           const SizedBox(height: 24),
 
           // Protection modules
-          const Text(
+          Text(
             'Protection Status',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           _buildProtectionModuleCard(
+            context,
             'URL Protection',
             webStatus?.isEnabled ?? false,
             webStatus?.isEnabled == true
@@ -662,6 +822,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             'link',
           ),
           _buildProtectionModuleCard(
+            context,
             'SMS Protection',
             smsStatus?.isEnabled ?? false,
             smsStatus?.isEnabled == true
@@ -670,6 +831,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             'chat_dots',
           ),
           _buildProtectionModuleCard(
+            context,
             'App Security',
             appStatus?.isEnabled ?? false,
             appStatus?.isEnabled == true
@@ -678,6 +840,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             'smartphone',
           ),
           _buildProtectionModuleCard(
+            context,
             'Network Security',
             networkStatus?.isEnabled ?? false,
             networkStatus?.isEnabled == true
@@ -686,6 +849,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             'wi_fi_router',
           ),
           _buildProtectionModuleCard(
+            context,
             'VPN Protection',
             vpnStatus?.isEnabled ?? false,
             vpnStatus?.isEnabled == true
@@ -696,24 +860,24 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           const SizedBox(height: 24),
 
           // Quick stats
-          const Text(
+          Text(
             'Protection Stats',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard('Blocked', _numberFormat.format(threatsBlocked), GlassTheme.errorColor),
+              _buildQuickStatCard(context, 'Blocked', _numberFormat.format(threatsBlocked), GlassTheme.errorColor),
               const SizedBox(width: 12),
-              _buildQuickStatCard('Safe', _numberFormat.format(safeScans), GlassTheme.successColor),
+              _buildQuickStatCard(context, 'Safe', _numberFormat.format(safeScans), GlassTheme.successColor),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard('High Risk', _numberFormat.format(highSeverity), GlassTheme.warningColor),
+              _buildQuickStatCard(context, 'High Risk', _numberFormat.format(highSeverity), GlassTheme.warningColor),
               const SizedBox(width: 12),
-              _buildQuickStatCard('Score', '$protectionScore%', GlassTheme.primaryAccent),
+              _buildQuickStatCard(context, 'Score', '$protectionScore%', GlassTheme.primaryAccent),
             ],
           ),
         ],
@@ -721,7 +885,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildProtectionScoreCard(int score) {
+  Widget _buildProtectionScoreCard(BuildContext context, int score) {
+    final cs = Theme.of(context).colorScheme;
     final color = score >= 80
         ? GlassTheme.successColor
         : score >= 50
@@ -729,6 +894,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             : GlassTheme.errorColor;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: color,
       child: Row(
         children: [
@@ -741,7 +907,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                 CircularProgressIndicator(
                   value: score / 100,
                   strokeWidth: 10,
-                  backgroundColor: Colors.white12,
+                  backgroundColor: cs.onSurface.withValues(alpha: 0.06),
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Column(
@@ -753,7 +919,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                     ),
                     Text(
                       'score',
-                      style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
                     ),
                   ],
                 ),
@@ -765,9 +931,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Protection Score',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -776,7 +942,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                       : score >= 50
                           ? 'Good protection. Some improvements recommended.'
                           : 'Protection needs improvement. Enable more features.',
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                 ),
               ],
             ),
@@ -786,30 +952,31 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildProtectionModuleCard(String name, bool enabled, String status, String icon) {
+  Widget _buildProtectionModuleCard(BuildContext context, String name, bool enabled, String status, String icon) {
+    final cs = Theme.of(context).colorScheme;
     return GlassCard(
       child: Row(
         children: [
           GlassDuotoneIconBox(
             icon: icon,
-            color: enabled ? GlassTheme.successColor : Colors.grey,
+            color: enabled ? GlassTheme.successColor : cs.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(name, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
                 Text(
                   status,
-                  style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
           ),
           DuotoneIcon(
             enabled ? 'check_circle' : 'close_circle',
-            color: enabled ? GlassTheme.successColor : Colors.grey,
+            color: enabled ? GlassTheme.successColor : cs.onSurfaceVariant,
             size: 24,
           ),
         ],
@@ -817,7 +984,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
-  Widget _buildQuickStatCard(String label, String value, Color color) {
+  Widget _buildQuickStatCard(BuildContext context, String label, String value, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassContainer(
         padding: const EdgeInsets.all(16),
@@ -828,11 +996,119 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
     );
+  }
+
+  // Report types/formats offered here are exactly the ones the live backend
+  // accepts (orbguard-lab analytics_service.go supportedReportTypes /
+  // supportedReportFormats); anything else is rejected with HTTP 400.
+  static const List<MapEntry<String, String>> _reportTypes = [
+    MapEntry('threat_landscape', 'Threat Landscape'),
+    MapEntry('campaign_analysis', 'Campaign Analysis'),
+    MapEntry('source_health', 'Source Health'),
+  ];
+  static const List<String> _reportFormats = ['json', 'csv', 'html'];
+
+  Future<void> _showReportDialog() async {
+    String selectedType = _reportTypes.first.key;
+    String selectedFormat = _reportFormats.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Generate Report',
+              style: TextStyle(color: dialogContext.onSurface)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Type',
+                  style: TextStyle(
+                      color: dialogContext.onSurfaceMuted, fontSize: 12)),
+              const SizedBox(height: 4),
+              DropdownButton<String>(
+                value: selectedType,
+                isExpanded: true,
+                dropdownColor: dialogContext.colors.surfaceContainerHighest,
+                style: TextStyle(color: dialogContext.onSurface),
+                items: _reportTypes
+                    .map((t) => DropdownMenuItem(value: t.key, child: Text(t.value)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedType = v);
+                },
+              ),
+              const SizedBox(height: 12),
+              Text('Format',
+                  style: TextStyle(
+                      color: dialogContext.onSurfaceMuted, fontSize: 12)),
+              const SizedBox(height: 4),
+              DropdownButton<String>(
+                value: selectedFormat,
+                isExpanded: true,
+                dropdownColor: dialogContext.colors.surfaceContainerHighest,
+                style: TextStyle(color: dialogContext.onSurface),
+                items: _reportFormats
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f.toUpperCase())))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedFormat = v);
+                },
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Period: ${_getTimeRangeLabel()}',
+                style: TextStyle(
+                    color: dialogContext.onSurfaceMuted, fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Generate'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final report = await _apiClient.createAnalyticsReport(
+        reportType: selectedType,
+        format: selectedFormat,
+        period: _selectedTimeRange,
+      );
+      if (!mounted) return;
+      final id = report['id'] as String? ?? '';
+      final status = report['status'] as String? ?? 'unknown';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report $status${id.isNotEmpty ? ' — $id' : ''}'),
+          backgroundColor: GlassTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report generation failed: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
   }
 
   String _getTimeRangeLabel() {

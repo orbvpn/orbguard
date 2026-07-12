@@ -1,19 +1,34 @@
-/// Network Firewall Service
-///
-/// Network-level attack blocking and monitoring:
-/// - Outbound connection monitoring
-/// - Malicious domain blocking
-/// - IP reputation checking
-/// - Traffic analysis
-/// - Per-app network rules
-/// - Connection alerts
+// Network Firewall Service
+//
+// Network-level attack blocking and monitoring:
+// - Outbound connection monitoring
+// - Malicious domain blocking
+// - IP reputation checking
+// - Traffic analysis
+// - Per-app network rules
+// - Connection alerts
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/orbguard_api_client.dart';
 import '../../models/api/threat_indicator.dart';
+
+/// Availability of the native firewall engine on this build.
+enum FirewallEngineStatus {
+  /// The native engine has not been probed yet.
+  unknown,
+
+  /// The native engine responded to initialization.
+  available,
+
+  /// The native engine is not present (channel unregistered) or failed to
+  /// initialize. The firewall cannot be enabled in this state.
+  unavailable,
+}
 
 /// Connection direction
 enum ConnectionDirection {
@@ -264,11 +279,25 @@ class NetworkFirewallService {
   final List<FirewallRule> _rules = [];
   final Map<String, AppNetworkProfile> _appProfiles = {};
 
-  // Default blocked domains
+  // Blocked entries loaded from threat intelligence plus user additions.
   final Set<String> _blockedDomains = {};
   final Set<String> _blockedIps = {};
   final Set<String> _blockedCountries = {};
   final Set<String> _blockedApps = {};
+
+  // User-added blocks, persisted separately from API-loaded indicators so
+  // that threat-intel refreshes never wipe manual configuration.
+  final Set<String> _userBlockedDomains = {};
+  final Set<String> _userBlockedIps = {};
+
+  // Persistence keys
+  static const _prefsRulesKey = 'firewall_rules';
+  static const _prefsUserDomainsKey = 'firewall_user_blocked_domains';
+  static const _prefsUserIpsKey = 'firewall_user_blocked_ips';
+  static const _prefsCountriesKey = 'firewall_blocked_countries';
+  static const _prefsAppsKey = 'firewall_blocked_apps';
+
+  SharedPreferences? _prefs;
 
   StreamSubscription? _eventSubscription;
   final _connectionController = StreamController<NetworkConnection>.broadcast();
@@ -280,15 +309,100 @@ class NetworkFirewallService {
   bool _isEnabled = false;
   bool get isEnabled => _isEnabled;
 
-  /// Initialize the firewall service
+  FirewallEngineStatus _engineStatus = FirewallEngineStatus.unknown;
+  String? _engineUnavailableReason;
+
+  /// Authoritative availability of the native firewall engine.
+  FirewallEngineStatus get engineStatus => _engineStatus;
+
+  /// Human-readable reason when [engineStatus] is unavailable.
+  String? get engineUnavailableReason => _engineUnavailableReason;
+
+  /// Initialize the firewall service.
+  ///
+  /// Probes the native engine and records an explicit unavailable state when
+  /// the `com.orbvpn.orbguard/firewall` channel is not registered on this
+  /// build instead of silently pretending the firewall works.
   Future<void> initialize() async {
+    await _loadPersistedState();
+
     try {
       await _channel.invokeMethod('initialize');
-
-      // Load malicious domains and IPs from API
-      await _loadMaliciousIndicators();
+      _engineStatus = FirewallEngineStatus.available;
+      _engineUnavailableReason = null;
+    } on MissingPluginException {
+      _engineStatus = FirewallEngineStatus.unavailable;
+      _engineUnavailableReason =
+          'Firewall engine is not available on this build: the native channel '
+          '"com.orbvpn.orbguard/firewall" is not registered.';
+      debugPrint('NetworkFirewallService: $_engineUnavailableReason');
     } on PlatformException catch (e) {
-      debugPrint('Firewall initialization failed: ${e.message}');
+      _engineStatus = FirewallEngineStatus.unavailable;
+      _engineUnavailableReason =
+          'Firewall engine failed to initialize: ${e.message ?? e.code}';
+      debugPrint('NetworkFirewallService: $_engineUnavailableReason');
+    }
+
+    // Threat-intel block lists are still loaded so rules can be inspected
+    // and edited even when the enforcement engine is unavailable.
+    await _loadMaliciousIndicators();
+  }
+
+  /// Load persisted rules and user block lists.
+  Future<void> _loadPersistedState() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('NetworkFirewallService: failed to open preferences: $e');
+      return;
+    }
+
+    final rulesJson = _prefs!.getString(_prefsRulesKey);
+    if (rulesJson != null && rulesJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rulesJson) as List<dynamic>;
+        _rules
+          ..clear()
+          ..addAll(decoded.map(
+              (r) => FirewallRule.fromJson(Map<String, dynamic>.from(r as Map))));
+      } catch (e) {
+        debugPrint('NetworkFirewallService: failed to restore rules: $e');
+      }
+    }
+
+    _userBlockedDomains
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsUserDomainsKey) ?? const []);
+    _userBlockedIps
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsUserIpsKey) ?? const []);
+    _blockedCountries
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsCountriesKey) ?? const []);
+    _blockedApps
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsAppsKey) ?? const []);
+
+    _blockedDomains.addAll(_userBlockedDomains);
+    _blockedIps.addAll(_userBlockedIps);
+  }
+
+  /// Persist rules and user block lists.
+  Future<void> _persistState() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    try {
+      await prefs.setString(
+        _prefsRulesKey,
+        jsonEncode(_rules.map((r) => r.toJson()).toList()),
+      );
+      await prefs.setStringList(
+          _prefsUserDomainsKey, _userBlockedDomains.toList());
+      await prefs.setStringList(_prefsUserIpsKey, _userBlockedIps.toList());
+      await prefs.setStringList(_prefsCountriesKey, _blockedCountries.toList());
+      await prefs.setStringList(_prefsAppsKey, _blockedApps.toList());
+    } catch (e) {
+      debugPrint('NetworkFirewallService: failed to persist state: $e');
     }
   }
 
@@ -342,38 +456,73 @@ class NetworkFirewallService {
     }
   }
 
-  /// Enable firewall monitoring
+  /// Enable firewall monitoring.
+  ///
+  /// Throws a [StateError] when the native engine is missing or refuses to
+  /// start. [_isEnabled] is only set after the native side confirms, so a
+  /// caller can never observe a false "Active" state.
   Future<void> enable() async {
     if (_isEnabled) return;
 
+    if (_engineStatus == FirewallEngineStatus.unavailable) {
+      throw StateError(_engineUnavailableReason ??
+          'Firewall engine is not available on this build.');
+    }
+
     try {
       await _channel.invokeMethod('enable');
-
-      _eventSubscription = _eventChannel
-          .receiveBroadcastStream()
-          .map((event) => event as Map<dynamic, dynamic>)
-          .listen((data) {
-        _onConnectionEvent(data.cast<String, dynamic>());
-      });
-
-      _isEnabled = true;
+    } on MissingPluginException {
+      _engineStatus = FirewallEngineStatus.unavailable;
+      _engineUnavailableReason =
+          'Firewall engine is not available on this build: the native channel '
+          '"com.orbvpn.orbguard/firewall" is not registered.';
+      debugPrint('NetworkFirewallService: $_engineUnavailableReason');
+      throw StateError(_engineUnavailableReason!);
     } on PlatformException catch (e) {
-      debugPrint('Failed to enable firewall: ${e.message}');
+      final reason =
+          'Failed to enable firewall: ${e.message ?? e.code}';
+      debugPrint('NetworkFirewallService: $reason');
+      throw StateError(reason);
     }
+
+    _engineStatus = FirewallEngineStatus.available;
+    _eventSubscription = _eventChannel
+        .receiveBroadcastStream()
+        .map((event) => event as Map<dynamic, dynamic>)
+        .listen((data) {
+      _onConnectionEvent(data.cast<String, dynamic>());
+    });
+
+    _isEnabled = true;
   }
 
-  /// Disable firewall monitoring
+  /// Disable firewall monitoring.
+  ///
+  /// Throws a [StateError] if the native engine reports a failure while it is
+  /// still running, so the caller never shows "Inactive" while enforcement is
+  /// actually still on.
   Future<void> disable() async {
     if (!_isEnabled) return;
 
     try {
       await _channel.invokeMethod('disable');
-      await _eventSubscription?.cancel();
-      _eventSubscription = null;
-      _isEnabled = false;
+    } on MissingPluginException {
+      // The engine is gone entirely; nothing can still be enforcing.
+      _engineStatus = FirewallEngineStatus.unavailable;
+      _engineUnavailableReason =
+          'Firewall engine is not available on this build: the native channel '
+          '"com.orbvpn.orbguard/firewall" is not registered.';
+      debugPrint('NetworkFirewallService: $_engineUnavailableReason');
     } on PlatformException catch (e) {
-      debugPrint('Failed to disable firewall: ${e.message}');
+      final reason =
+          'Failed to disable firewall: ${e.message ?? e.code}';
+      debugPrint('NetworkFirewallService: $reason');
+      throw StateError(reason);
     }
+
+    await _eventSubscription?.cancel();
+    _eventSubscription = null;
+    _isEnabled = false;
   }
 
   /// Handle connection event
@@ -614,12 +763,14 @@ class NetworkFirewallService {
     );
 
     _rules.add(rule);
+    unawaited(_persistState());
     return rule;
   }
 
   /// Remove firewall rule
   void removeRule(String ruleId) {
     _rules.removeWhere((r) => r.id == ruleId);
+    unawaited(_persistState());
   }
 
   /// Enable/disable rule
@@ -637,47 +788,62 @@ class NetworkFirewallService {
         createdAt: rule.createdAt,
         matchCount: rule.matchCount,
       );
+      unawaited(_persistState());
     }
   }
 
   /// Block domain
   void blockDomain(String domain) {
-    _blockedDomains.add(domain.toLowerCase());
+    final normalized = domain.toLowerCase();
+    _blockedDomains.add(normalized);
+    _userBlockedDomains.add(normalized);
+    unawaited(_persistState());
   }
 
   /// Unblock domain
   void unblockDomain(String domain) {
-    _blockedDomains.remove(domain.toLowerCase());
+    final normalized = domain.toLowerCase();
+    _blockedDomains.remove(normalized);
+    _userBlockedDomains.remove(normalized);
+    unawaited(_persistState());
   }
 
   /// Block IP
   void blockIp(String ip) {
     _blockedIps.add(ip);
+    _userBlockedIps.add(ip);
+    unawaited(_persistState());
   }
 
   /// Unblock IP
   void unblockIp(String ip) {
     _blockedIps.remove(ip);
+    _userBlockedIps.remove(ip);
+    unawaited(_persistState());
   }
 
   /// Block country
   void blockCountry(String countryCode) {
     _blockedCountries.add(countryCode.toUpperCase());
+    unawaited(_persistState());
   }
 
   /// Unblock country
   void unblockCountry(String countryCode) {
     _blockedCountries.remove(countryCode.toUpperCase());
+    unawaited(_persistState());
   }
 
   /// Block app
   void blockApp(String appId) {
     _blockedApps.add(appId);
+    unawaited(_persistState());
   }
 
   /// Unblock app
   void unblockApp(String appId) {
     _blockedApps.remove(appId);
+    unawaited(_persistState());
   }
 
   /// Get all rules
@@ -770,7 +936,9 @@ class NetworkFirewallService {
 
   /// Dispose resources
   void dispose() {
-    disable();
+    unawaited(disable().catchError((e) {
+      debugPrint('NetworkFirewallService: disable during dispose failed: $e');
+    }));
     _connectionController.close();
     _alertController.close();
   }

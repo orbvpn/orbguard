@@ -200,15 +200,56 @@ class AppColors {
 
   /// Get color with opacity
   static Color withOpacity(Color color, double opacity) {
-    return color.withOpacity(opacity);
+    return color.withValues(alpha: opacity);
   }
 
   /// Semi-transparent overlay
-  static Color get overlay => Colors.black.withOpacity(0.5);
+  static Color get overlay => Colors.black.withValues(alpha: 0.5);
 
   /// Light overlay
-  static Color get overlayLight => Colors.black.withOpacity(0.2);
+  static Color get overlayLight => Colors.black.withValues(alpha: 0.2);
 
   /// Dark overlay
-  static Color get overlayDark => Colors.black.withOpacity(0.7);
+  static Color get overlayDark => Colors.black.withValues(alpha: 0.7);
+
+  // ==========================================
+  // Refined Design-System Tokens (v2 — dual mode)
+  // World-class, layered, slightly tinted neutrals. Brand cyan stays the
+  // single accent. Use these via AppTheme/ColorScheme rather than hardcoding.
+  // ==========================================
+
+  // Brand accent, mode-tuned for contrast/vibrancy
+  /// Vibrant cyan for dark surfaces
+  static const Color brandDark = Color(0xFF22D3EE);
+  /// Deeper cyan for legibility on light surfaces
+  static const Color brandLight = Color(0xFF0091A7);
+
+  // ---- Dark scheme (deep blue-black, layered) ----
+  /// App background base (deep indigo-black)
+  static const Color bgDark = Color(0xFF0A0C14);
+  /// Gradient ends for the ambient background
+  static const Color bgDarkTop = Color(0xFF141A2E);
+  static const Color bgDarkBottom = Color(0xFF07090F);
+  /// Elevated card/sheet surface
+  static const Color surfaceDarkElevated = Color(0xFF161A24);
+  static const Color surfaceDarkHigh = Color(0xFF1C2230);
+  /// Text on dark (soft white, lower eye-strain than pure #FFF)
+  static const Color onDark = Color(0xFFF4F6FB);
+  static const Color onDarkMuted = Color(0xFFA2ABBF);
+  static const Color onDarkFaint = Color(0xFF6B7488);
+  static const Color outlineDark = Color(0x1FFFFFFF); // white @ ~12%
+
+  // ---- Light scheme (soft cool neutrals, frosted glass) ----
+  /// App background base (soft blue-grey)
+  static const Color bgLight = Color(0xFFEEF1F7);
+  static const Color bgLightTop = Color(0xFFF4F7FC);
+  static const Color bgLightBottom = Color(0xFFE3E8F1);
+  /// Elevated card/sheet surface (near white)
+  static const Color surfaceLightElevated = Color(0xFFFFFFFF);
+  static const Color surfaceLightHigh = Color(0xFFF7F9FC);
+  /// Text on light (near-black, slightly warm)
+  static const Color onLight = Color(0xFF0E1422);
+  static const Color onLightMuted = Color(0xFF5B6577);
+  static const Color onLightFaint = Color(0xFF94A0B3);
+  static const Color outlineLight = Color(0x14000000); // black @ ~8%
 }

@@ -69,6 +69,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final filteredActors = _selectedCategory == 'All'
         ? _actors
         : _actors.where((a) => _getActorCategory(a) == _selectedCategory).toList();
@@ -88,12 +89,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.search, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.search, size: 22, color: cs.onSurface),
                         onPressed: () => _showSearchDialog(context),
                         tooltip: 'Search',
                       ),
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
                         onPressed: _isLoading ? null : _loadActors,
                         tooltip: 'Refresh',
                       ),
@@ -113,10 +114,11 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           label: Text(cat),
                           selected: isSelected,
                           onSelected: (_) => setState(() => _selectedCategory = cat),
-                          backgroundColor: GlassTheme.glassColorDark,
+                          backgroundColor: GlassTheme.glassColor(
+                              Theme.of(context).brightness == Brightness.dark),
                           selectedColor: GlassTheme.primaryAccent.withAlpha(77),
                           labelStyle: TextStyle(
-                            color: isSelected ? GlassTheme.primaryAccent : Colors.white70,
+                            color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
                           ),
                         ),
                       );
@@ -128,7 +130,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   child: filteredActors.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           itemCount: filteredActors.length,
                           itemBuilder: (context, index) {
                             return _buildActorCard(filteredActors[index]);
@@ -141,6 +143,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildActorCard(ThreatActor actor) {
+    final cs = Theme.of(context).colorScheme;
     final category = _getActorCategory(actor);
     final sophisticationColor = _getSophisticationColor(actor.sophisticationLevel);
 
@@ -163,8 +166,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   children: [
                     Text(
                       actor.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: cs.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -189,7 +194,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         if (actor.country != null)
                           Text(
                             actor.country!,
-                            style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                           ),
                       ],
                     ),
@@ -203,7 +208,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${actor.associatedCampaigns.length} campaigns',
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                    style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                   ),
                 ],
               ),
@@ -213,7 +218,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
             const SizedBox(height: 12),
             Text(
               actor.description!,
-              style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -222,12 +227,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           Row(
             children: [
               if (actor.aliases.isNotEmpty) ...[
-                DuotoneIcon(AppIcons.tag, size: 14, color: Colors.white.withAlpha(102)),
+                DuotoneIcon(AppIcons.tag, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     actor.aliases.take(3).join(', '),
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                    style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -260,20 +265,21 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DuotoneIcon(AppIcons.threatActor, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Threat Actors',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Threat actor profiles will appear here',
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -281,6 +287,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildErrorState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -289,14 +296,14 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           children: [
             DuotoneIcon(AppIcons.warning, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Data',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'An unexpected error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -316,6 +323,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   void _showActorDetails(BuildContext context, ThreatActor actor) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final category = _getActorCategory(actor);
 
     showModalBottomSheet(
@@ -327,13 +336,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -355,8 +366,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                       children: [
                         Text(
                           actor.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
@@ -384,7 +397,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               if (actor.description != null) ...[
                 Text(
                   actor.description!,
-                  style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 14, height: 1.5),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -410,9 +423,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Aliases
               if (actor.aliases.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Also Known As',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -420,7 +433,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   runSpacing: 8,
                   children: actor.aliases.map((alias) => GlassBadge(
                         text: alias,
-                        color: Colors.white54,
+                        color: cs.onSurfaceVariant,
                       )).toList(),
                 ),
               ],
@@ -428,9 +441,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Motivations
               if (actor.motivations.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Motivations',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -450,9 +463,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Targeted Industries
               if (actor.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Targeted Industries',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -468,9 +481,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // MITRE Techniques
               if (actor.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'MITRE ATT&CK TTPs',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -497,9 +510,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Tools
               if (actor.tools.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Known Tools',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -519,32 +532,34 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 
   void _showSearchDialog(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Search Actors', style: TextStyle(color: Colors.white)),
+        backgroundColor: cs.surface,
+        title: Text('Search Actors', style: TextStyle(color: cs.onSurface)),
         content: TextField(
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Enter actor name or alias...',
-            hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+            hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
-              child: DuotoneIcon(AppIcons.search, size: 20, color: Colors.white54),
+              child: DuotoneIcon(AppIcons.search, size: 20, color: cs.onSurfaceVariant),
             ),
           ),
           onSubmitted: (value) {

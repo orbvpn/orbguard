@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -112,12 +113,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
-              icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-              tooltip: 'Add Connection',
-              onPressed: () => _showAddConnectionDialog(context),
-            ),
-            IconButton(
-              icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               onPressed: _isLoading ? null : _loadData,
               tooltip: 'Refresh',
             ),
@@ -129,7 +125,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
 
   Widget _buildConnectionsTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
@@ -151,7 +147,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         // Active Connections
         const GlassSectionHeader(title: 'Active Connections'),
         if (_connections.isEmpty)
-          _buildEmptyState('No Connections', 'Add a SIEM connection to get started')
+          _buildEmptyState('No Connections',
+              'No SIEM integrations are configured on the server')
         else
           ..._connections.map((conn) => _buildConnectionCard(conn)),
       ],
@@ -166,7 +163,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -194,7 +191,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
             width: 90,
             margin: const EdgeInsets.only(right: 12),
             child: GlassCard(
-              onTap: () => _showAddConnectionDialog(context, siemType: siem['name'] as String),
+              margin: EdgeInsets.zero,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -202,7 +199,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   const SizedBox(height: 8),
                   Text(
                     siem['name'] as String,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: context.colors.onSurface, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -230,8 +227,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connection.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(connection.type, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(connection.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    Text(connection.type, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ),
@@ -246,7 +243,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${connection.eventsPerMinute} events/min',
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                    style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                   ),
                 ],
               ),
@@ -255,7 +252,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           const SizedBox(height: 12),
           Text(
             connection.endpoint,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11, fontFamily: 'monospace'),
+            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11, fontFamily: 'monospace'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -278,44 +275,23 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white38),
+        DuotoneIcon(icon, size: 14, color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
         const SizedBox(width: 4),
-        Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        Text(value, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11)),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(color: Colors.white.withAlpha(77), fontSize: 10)),
+        Text(label, style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
       ],
     );
   }
 
   Widget _buildForwardersTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // Add forwarder button
-        GlassCard(
-          onTap: () => _showAddForwarderDialog(context),
-          child: Row(
-            children: [
-              GlassSvgIconBox(icon: 'add_circle', color: GlassTheme.primaryAccent),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Add Event Forwarder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('Configure event forwarding rules', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const DuotoneIcon('alt_arrow_right', size: 24, color: Colors.white38),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
         const GlassSectionHeader(title: 'Active Forwarders'),
         if (_forwarders.isEmpty)
-          _buildEmptyState('No Forwarders', 'Create forwarders to send events to SIEM')
+          _buildEmptyState('No Forwarders',
+              'No event forwarders are configured on the server')
         else
           ..._forwarders.map((forwarder) => _buildForwarderCard(forwarder)),
       ],
@@ -331,15 +307,15 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
             children: [
               GlassSvgIconBox(
                 icon: 'plain',
-                color: forwarder.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
+                color: forwarder.isEnabled ? GlassTheme.primaryAccent : context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(forwarder.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('To: ${forwarder.destination}', style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+                    Text(forwarder.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    Text('To: ${forwarder.destination}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ),
@@ -360,9 +336,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text('Format: ${forwarder.format}', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11)),
+              Text('Format: ${forwarder.format}', style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11)),
               const SizedBox(width: 16),
-              Text('Batch: ${forwarder.batchSize}', style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11)),
+              Text('Batch: ${forwarder.batchSize}', style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11)),
             ],
           ),
         ],
@@ -371,24 +347,30 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
   }
 
   Widget _buildAlertsTab() {
+    final criticalCount = _alerts
+        .where((a) => a.severity.toLowerCase() == 'critical')
+        .length;
+    final forwardedCount = _alerts.where((a) => a.forwarded).length;
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
           children: [
             _buildStatCard('Total', '${_alerts.length}', GlassTheme.primaryAccent),
             const SizedBox(width: 12),
-            _buildStatCard('Critical', _alerts.where((a) => a.severity == 'Critical').length.toString(), GlassTheme.errorColor),
+            _buildStatCard('Critical', '$criticalCount', GlassTheme.errorColor),
             const SizedBox(width: 12),
-            _buildStatCard('Active', _alerts.where((a) => !a.isAcknowledged).length.toString(), GlassTheme.warningColor),
+            _buildStatCard('Forwarded', '$forwardedCount', GlassTheme.successColor),
           ],
         ),
         const SizedBox(height: 24),
 
         const GlassSectionHeader(title: 'SIEM Alerts'),
         if (_alerts.isEmpty)
-          _buildEmptyState('No Alerts', 'SIEM alerts will appear here')
+          _buildEmptyState('No Alerts',
+              'No security events have flowed through the SIEM event path yet')
         else
           ..._alerts.map((alert) => _buildAlertCard(alert)),
       ],
@@ -411,35 +393,71 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         severityColor = GlassTheme.successColor;
     }
 
+    final String forwardLabel;
+    final Color forwardColor;
+    if (alert.forwarded) {
+      forwardLabel = 'Forwarded';
+      forwardColor = GlassTheme.successColor;
+    } else if (alert.forwardError != null) {
+      forwardLabel = 'Failed';
+      forwardColor = GlassTheme.errorColor;
+    } else {
+      forwardLabel = 'Pending';
+      forwardColor = GlassTheme.warningColor;
+    }
+
     return GlassCard(
-      onTap: () => _showAlertDetails(context, alert),
-      tintColor: alert.isAcknowledged ? null : severityColor,
-      child: Row(
+      tintColor: alert.forwardError != null ? severityColor : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GlassSvgIconBox(icon: 'bell_bing', color: severityColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(alert.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                Text(alert.source, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
-                const SizedBox(height: 4),
-                Text(alert.description, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              GlassBadge(text: alert.severity, color: severityColor, fontSize: 10),
-              const SizedBox(height: 4),
-              Text(_formatTime(alert.timestamp), style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+              GlassSvgIconBox(icon: 'bell_bing', color: severityColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(alert.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    if (alert.source.isNotEmpty)
+                      Text(alert.source, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
+                    if (alert.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(alert.description, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  GlassBadge(text: _capitalize(alert.severity), color: severityColor, fontSize: 10),
+                  const SizedBox(height: 4),
+                  GlassBadge(text: forwardLabel, color: forwardColor, fontSize: 10),
+                  const SizedBox(height: 4),
+                  Text(_formatTime(alert.createdAt), style: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
+                ],
+              ),
             ],
           ),
+          if (alert.forwardError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Forward error: ${alert.forwardError}',
+              style: TextStyle(color: GlassTheme.errorColor.withAlpha(204), fontSize: 11),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1);
   }
 
   Widget _buildEmptyState(String title, String subtitle) {
@@ -450,9 +468,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             DuotoneIcon('inbox', size: 48, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title, style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(color: Colors.white.withAlpha(153))),
+            Text(subtitle, style: TextStyle(color: context.colors.onSurfaceVariant)),
           ],
         ),
       ),
@@ -468,14 +486,14 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           children: [
             DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor.withAlpha(180)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to Load Data',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               error,
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -496,157 +514,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     );
   }
 
-  void _showAddConnectionDialog(BuildContext context, {String? siemType}) {
-    final nameController = TextEditingController();
-    final endpointController = TextEditingController();
-    final tokenController = TextEditingController();
-    String selectedType = siemType ?? 'Splunk';
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Add SIEM Connection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedType,
-                  dropdownColor: GlassTheme.gradientTop,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'SIEM Type',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                  items: ['Splunk', 'Elastic', 'ArcSight', 'QRadar', 'Sentinel', 'Chronicle']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
-                  onChanged: (v) => setSheetState(() => selectedType = v!),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Connection Name',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: endpointController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Endpoint URL',
-                    hintText: 'https://your-siem.example.com:8088',
-                    hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: tokenController,
-                  style: const TextStyle(color: Colors.white),
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'API Token / HEC Token',
-                    labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
-                    enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: GlassTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (nameController.text.isNotEmpty && endpointController.text.isNotEmpty) {
-                            setState(() {
-                              _connections.add(SiemConnection(
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                name: nameController.text,
-                                type: selectedType,
-                                endpoint: endpointController.text,
-                                isConnected: true,
-                                eventsPerMinute: 0,
-                                eventsSent: 0,
-                                errors: 0,
-                                lastSync: DateTime.now(),
-                              ));
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: GlassTheme.primaryAccent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Connect'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAddForwarderDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Add Event Forwarder', style: TextStyle(color: Colors.white)),
-        content: const Text('Configure which events to forward to your SIEM.', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent, foregroundColor: Colors.white),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showConnectionDetails(BuildContext context, SiemConnection connection) {
     showModalBottomSheet(
       context: context,
@@ -657,13 +524,15 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -677,7 +546,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(connection.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(connection.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
                         GlassBadge(text: connection.type, color: GlassTheme.primaryAccent),
                       ],
                     ),
@@ -698,49 +567,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const DuotoneIcon('refresh', size: 18),
-                      label: const Text('Test Connection'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() => _connections.remove(connection));
-                        Navigator.pop(context);
-                      },
-                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
-                      label: const Text('Remove'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.errorColor,
-                        side: const BorderSide(color: GlassTheme.errorColor),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  void _showAlertDetails(BuildContext context, SiemAlert alert) {
-    // Similar to connection details
-    Navigator.pop(context);
   }
 
   Widget _buildDetailRow(String label, String value) {
@@ -749,11 +580,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -874,36 +705,47 @@ class EventForwarder {
   }
 }
 
+/// A persisted SIEM alert from GET /siem/alerts. Mirrors the server shape
+/// exactly: {id, integration_id, severity, title, description, source,
+/// created_at, forwarded, forward_error}.
 class SiemAlert {
   final String id;
+  final String? integrationId;
+  final String severity;
   final String title;
   final String description;
   final String source;
-  final String severity;
-  final DateTime timestamp;
-  bool isAcknowledged;
+  final DateTime createdAt;
+  final bool forwarded;
+  final String? forwardError;
 
   SiemAlert({
     required this.id,
+    required this.integrationId,
+    required this.severity,
     required this.title,
     required this.description,
     required this.source,
-    required this.severity,
-    required this.timestamp,
-    required this.isAcknowledged,
+    required this.createdAt,
+    required this.forwarded,
+    required this.forwardError,
   });
 
   factory SiemAlert.fromJson(Map<String, dynamic> json) {
+    final forwardError = json['forward_error']?.toString();
     return SiemAlert(
       id: json['id']?.toString() ?? '',
+      integrationId: json['integration_id']?.toString(),
+      severity: json['severity'] as String? ?? 'info',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       source: json['source'] as String? ?? '',
-      severity: json['severity'] as String? ?? 'Low',
-      timestamp: json['timestamp'] != null
-          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      isAcknowledged: json['is_acknowledged'] as bool? ?? json['isAcknowledged'] as bool? ?? false,
+      forwarded: json['forwarded'] as bool? ?? false,
+      forwardError:
+          (forwardError == null || forwardError.isEmpty) ? null : forwardError,
     );
   }
 }

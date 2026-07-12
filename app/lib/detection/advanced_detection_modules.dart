@@ -2,8 +2,9 @@
 // Location: lib/detection/
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 // ============================================================================
@@ -15,11 +16,10 @@ class BehavioralAnomalyDetector {
 
   // Baseline metrics for normal behavior
   final Map<String, dynamic> _baseline = {};
-  final List<Map<String, dynamic>> _anomalies = [];
 
   /// Establish baseline of normal device behavior
   Future<void> learnBaseline({int durationMinutes = 60}) async {
-    print('[Behavioral] Learning baseline for $durationMinutes minutes...');
+    debugPrint('[Behavioral] Learning baseline for $durationMinutes minutes...');
 
     final startTime = DateTime.now();
     final samples = <Map<String, dynamic>>[];
@@ -31,7 +31,7 @@ class BehavioralAnomalyDetector {
     }
 
     _calculateBaseline(samples);
-    print('[Behavioral] Baseline established');
+    debugPrint('[Behavioral] Baseline established');
   }
 
   Future<Map<String, dynamic>> _collectMetrics() async {
@@ -250,7 +250,7 @@ class CertificateAnalyzer {
       final result = await platform.invokeMethod('getInstalledCertificates');
       return List<Map<String, dynamic>>.from(result['certificates'] ?? []);
     } catch (e) {
-      print('Error getting certificates: $e');
+      debugPrint('Error getting certificates: $e');
       return [];
     }
   }
@@ -363,7 +363,7 @@ class PermissionAbuseDetector {
       final result = await platform.invokeMethod('getInstalledApps');
       return List<Map<String, dynamic>>.from(result['apps'] ?? []);
     } catch (e) {
-      print('Error getting installed apps: $e');
+      debugPrint('Error getting installed apps: $e');
       return [];
     }
   }
@@ -435,7 +435,7 @@ class AccessibilityAbuseDetector {
       );
       return List<Map<String, dynamic>>.from(result['services'] ?? []);
     } catch (e) {
-      print('Error getting accessibility services: $e');
+      debugPrint('Error getting accessibility services: $e');
       return [];
     }
   }
@@ -520,7 +520,7 @@ class KeystrokeLoggerDetector {
       final result = await platform.invokeMethod('getInstalledKeyboards');
       return List<Map<String, dynamic>>.from(result['keyboards'] ?? []);
     } catch (e) {
-      print('Error getting keyboards: $e');
+      debugPrint('Error getting keyboards: $e');
       return [];
     }
   }
@@ -721,71 +721,71 @@ class AdvancedDetectionManager {
   Future<List<Map<String, dynamic>>> runAllModules() async {
     final allThreats = <Map<String, dynamic>>[];
 
-    print('[Advanced] Running behavioral analysis...');
+    debugPrint('[Advanced] Running behavioral analysis...');
     try {
       final behavioral = await behavioralDetector.detectAnomalies();
       allThreats.addAll(behavioral);
-      print('[Advanced] Behavioral: ${behavioral.length} threats');
+      debugPrint('[Advanced] Behavioral: ${behavioral.length} threats');
     } catch (e) {
-      print('[Advanced] Behavioral error: $e');
+      debugPrint('[Advanced] Behavioral error: $e');
     }
 
-    print('[Advanced] Running certificate analysis...');
+    debugPrint('[Advanced] Running certificate analysis...');
     try {
       final certificates = await certificateAnalyzer.detectCertificateThreats();
       allThreats.addAll(certificates);
-      print('[Advanced] Certificates: ${certificates.length} threats');
+      debugPrint('[Advanced] Certificates: ${certificates.length} threats');
     } catch (e) {
-      print('[Advanced] Certificate error: $e');
+      debugPrint('[Advanced] Certificate error: $e');
     }
 
-    print('[Advanced] Running permission analysis...');
+    debugPrint('[Advanced] Running permission analysis...');
     try {
       final permissions = await permissionDetector.detectPermissionAbuse();
       allThreats.addAll(permissions);
-      print('[Advanced] Permissions: ${permissions.length} threats');
+      debugPrint('[Advanced] Permissions: ${permissions.length} threats');
     } catch (e) {
-      print('[Advanced] Permission error: $e');
+      debugPrint('[Advanced] Permission error: $e');
     }
 
-    print('[Advanced] Running accessibility analysis...');
+    debugPrint('[Advanced] Running accessibility analysis...');
     try {
       final accessibility =
           await accessibilityDetector.detectAccessibilityAbuse();
       allThreats.addAll(accessibility);
-      print('[Advanced] Accessibility: ${accessibility.length} threats');
+      debugPrint('[Advanced] Accessibility: ${accessibility.length} threats');
     } catch (e) {
-      print('[Advanced] Accessibility error: $e');
+      debugPrint('[Advanced] Accessibility error: $e');
     }
 
-    print('[Advanced] Running keylogger detection...');
+    debugPrint('[Advanced] Running keylogger detection...');
     try {
       final keyloggers = await keystrokeDetector.detectKeyloggers();
       allThreats.addAll(keyloggers);
-      print('[Advanced] Keyloggers: ${keyloggers.length} threats');
+      debugPrint('[Advanced] Keyloggers: ${keyloggers.length} threats');
     } catch (e) {
-      print('[Advanced] Keylogger error: $e');
+      debugPrint('[Advanced] Keylogger error: $e');
     }
 
-    print('[Advanced] Running rooting malware detection...');
+    debugPrint('[Advanced] Running rooting malware detection...');
     try {
       final rootingMalware = await rootingDetector.detectRootingMalware();
       allThreats.addAll(rootingMalware);
-      print('[Advanced] Rooting malware: ${rootingMalware.length} threats');
+      debugPrint('[Advanced] Rooting malware: ${rootingMalware.length} threats');
     } catch (e) {
-      print('[Advanced] Rooting malware error: $e');
+      debugPrint('[Advanced] Rooting malware error: $e');
     }
 
-    print('[Advanced] Running location stalker detection...');
+    debugPrint('[Advanced] Running location stalker detection...');
     try {
       final locationStalkers = await locationDetector.detectLocationStalkers();
       allThreats.addAll(locationStalkers);
-      print('[Advanced] Location stalkers: ${locationStalkers.length} threats');
+      debugPrint('[Advanced] Location stalkers: ${locationStalkers.length} threats');
     } catch (e) {
-      print('[Advanced] Location stalker error: $e');
+      debugPrint('[Advanced] Location stalker error: $e');
     }
 
-    print('[Advanced] Total threats detected: ${allThreats.length}');
+    debugPrint('[Advanced] Total threats detected: ${allThreats.length}');
     return allThreats;
   }
 

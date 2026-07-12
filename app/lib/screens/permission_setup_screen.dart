@@ -95,16 +95,18 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
   Widget _buildPermissionList() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _buildDetectionCapabilityCard(),
         const SizedBox(height: 24),
 
         // Essential Permissions
         _buildGroupHeader('Essential Permissions', AppIcons.shieldCheck),
-        const Text(
+        Text(
           'Required for basic threat detection',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13),
         ),
         const SizedBox(height: 12),
         _buildStoragePermissionCard(),
@@ -119,9 +121,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
         // Advanced Permissions
         _buildGroupHeader('Advanced Detection', AppIcons.search),
-        const Text(
+        Text(
           'Enables deep threat analysis',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13),
         ),
         const SizedBox(height: 12),
         _buildPermissionCard(
@@ -141,9 +145,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
         // Special Permissions
         _buildGroupHeader('Special Permissions', AppIcons.settings),
-        const Text(
+        Text(
           'Requires manual activation in Settings',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13),
         ),
         const SizedBox(height: 12),
         _buildSpecialPermissionCard(
@@ -163,9 +169,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
         // Enhanced Access
         _buildGroupHeader('Enhanced Access', AppIcons.codeSquare),
-        const Text(
+        Text(
           'Enables deep system scanning',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13),
         ),
         const SizedBox(height: 12),
         _buildEnhancedAccessCard(),
@@ -204,13 +212,12 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         break;
       default:
         accessIcon = AppIcons.shield;
-        accessColor = Colors.grey;
+        accessColor = Theme.of(context).colorScheme.onSurfaceVariant;
         accessLabel = 'Standard Access';
         accessDescription = 'Tap to enable deeper scanning';
     }
 
     return Card(
-      color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
@@ -246,7 +253,9 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: hasEnhancedAccess ? accessColor : Colors.white,
+                            color: hasEnhancedAccess
+                                ? accessColor
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         if (hasEnhancedAccess) ...[
@@ -267,15 +276,19 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      accessDescription,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                      accessDescription, maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
               hasEnhancedAccess
                   ? DuotoneIcon(AppIcons.checkCircle, color: accessColor)
-                  : DuotoneIcon(AppIcons.chevronRight, color: Colors.grey[600]),
+                  : DuotoneIcon(AppIcons.chevronRight,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -304,7 +317,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     }
 
     return Card(
-      color: const Color(0xFF1D1E33),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -318,14 +330,14 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Detection Capability',
+                        'Detection Capability', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        status,
+                        status, maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: color, fontSize: 14),
                       ),
                     ],
@@ -347,14 +359,19 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
               child: LinearProgressIndicator(
                 value: capability / 100,
                 minHeight: 8,
-                backgroundColor: Colors.grey[800],
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
             const SizedBox(height: 12),
             Text(
               '${_scanResult!.granted.length} of ${_scanResult!.totalPermissions} permissions granted',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -367,11 +384,15 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       children: [
         DuotoneIcon(icon, color: Colors.blue),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -383,10 +404,12 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     final isGranted = _scanResult?.granted.contains('Storage Access') ?? false;
 
     return Card(
-      color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: DuotoneIcon(AppIcons.folder, color: isGranted ? Colors.green : Colors.grey),
+        leading: DuotoneIcon(AppIcons.folder,
+            color: isGranted
+                ? Colors.green
+                : Theme.of(context).colorScheme.onSurfaceVariant),
         title: const Text('Storage Access'),
         subtitle: const Text('Scan files for malware and threats',
             style: TextStyle(fontSize: 12)),
@@ -417,10 +440,12 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         final isDenied = snapshot.data?.isPermanentlyDenied ?? false;
 
         return Card(
-          color: const Color(0xFF1D1E33),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: DuotoneIcon(icon, color: isGranted ? Colors.green : Colors.grey),
+            leading: DuotoneIcon(icon,
+                color: isGranted
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.onSurfaceVariant),
             title: Text(name),
             subtitle: Text(description, style: const TextStyle(fontSize: 12)),
             trailing: isGranted
@@ -448,7 +473,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     VoidCallback onRequest,
   ) {
     return Card(
-      color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: DuotoneIcon(
@@ -477,10 +501,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -494,7 +518,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -504,6 +528,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                   const Expanded(
                     child: Text(
                       'Grant essential permissions to enable scanning',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13),
                     ),
                   ),

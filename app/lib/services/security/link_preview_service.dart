@@ -1,14 +1,13 @@
-/// Link Preview Service
-///
-/// Safe link preview scanning:
-/// - URL expansion (short URLs)
-/// - Destination analysis
-/// - Redirect chain tracking
-/// - Preview content extraction
-/// - Threat detection before clicking
+// Link Preview Service
+//
+// Safe link preview scanning:
+// - URL expansion (short URLs)
+// - Destination analysis
+// - Redirect chain tracking
+// - Preview content extraction
+// - Threat detection before clicking
 
 import 'dart:async';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Link preview status

@@ -107,6 +107,18 @@ class GlassTheme {
       );
 
   // ============================================================================
+  // LAYOUT
+  // ============================================================================
+
+  /// Max content width on wide screens (tablet/desktop). Phones are narrower
+  /// than this, so it has no effect there.
+  static const double contentMaxWidth = 760.0;
+
+  /// Vertical space reserved for the floating pill nav (60 height + 12 margin).
+  /// Scroll viewports in tabbed shells end above this.
+  static const double bottomNavClearance = 72.0;
+
+  // ============================================================================
   // BORDER RADIUS - iOS 26 STYLE
   // ============================================================================
 
@@ -130,12 +142,12 @@ class GlassTheme {
   // ============================================================================
 
   /// Background gradient colors - dark mode
-  static const Color gradientTop = Color(0xFF1a1a2e);
-  static const Color gradientBottom = Color(0xFF0a0a14);
+  static const Color gradientTop = AppColors.bgDarkTop;
+  static const Color gradientBottom = AppColors.bgDarkBottom;
 
   /// Background gradient colors - light mode
-  static const Color gradientTopLight = Color(0xFFf0f4f8);
-  static const Color gradientBottomLight = Color(0xFFe0e5eb);
+  static const Color gradientTopLight = AppColors.bgLightTop;
+  static const Color gradientBottomLight = AppColors.bgLightBottom;
 
   /// Top gradient for frosted glass visibility (light mode only)
   /// Smooth fade from edge - no visible line
@@ -281,10 +293,10 @@ class GlassTheme {
     double opacity = 0.15,
   }) {
     return BoxDecoration(
-      color: tintColor.withOpacity(opacity),
+      color: tintColor.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: tintColor.withOpacity(0.3),
+        color: tintColor.withValues(alpha: 0.3),
         width: borderWidth,
       ),
     );
@@ -296,8 +308,8 @@ class GlassTheme {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: isDark
-          ? [gradientTop, gradientBottom]
-          : [gradientTopLight, gradientBottomLight],
+          ? [gradientTop, AppColors.bgDark, gradientBottom]
+          : [gradientTopLight, AppColors.bgLight, gradientBottomLight],
     );
   }
 

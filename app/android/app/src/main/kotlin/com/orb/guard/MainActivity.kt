@@ -35,6 +35,9 @@ class MainActivity: FlutterActivity() {
     private var spywareScanner: SpywareScanner? = null
     private var smsAnalyzer: SMSAnalyzer? = null
     private var browserMonitor: BrowserMonitor? = null
+    private var systemMetricsHandler: SystemMetricsHandler? = null
+    private var wifiChannelHandler: WifiChannelHandler? = null
+    private var supplyChainChannelHandler: SupplyChainChannelHandler? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -43,13 +46,24 @@ class MainActivity: FlutterActivity() {
         spywareScanner = SpywareScanner(this, rootAccess!!)
         smsAnalyzer = SMSAnalyzer.getInstance(this)
         browserMonitor = BrowserMonitor.getInstance(this)
+        systemMetricsHandler = SystemMetricsHandler(this, rootAccess)
 
         // Setup SMS Method Channel
         setupSmsChannel(flutterEngine)
 
         // Setup Browser Method Channel
         setupBrowserChannel(flutterEngine)
-        
+
+        // Wi-Fi inspection channel (com.orb.guard/wifi)
+        wifiChannelHandler = WifiChannelHandler(this).also {
+            it.register(flutterEngine.dartExecutor.binaryMessenger)
+        }
+
+        // Supply-chain inspection channel (com.orbguard/supply_chain)
+        supplyChainChannelHandler = SupplyChainChannelHandler(this).also {
+            it.register(flutterEngine.dartExecutor.binaryMessenger)
+        }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "checkRootAccess" -> {
@@ -218,11 +232,17 @@ class MainActivity: FlutterActivity() {
                     }
                 }
 
-                else -> result.notImplemented()
+                else -> {
+                    // Device metrics, usage stats, IME/root checks, log
+                    // capture, etc. live in SystemMetricsHandler.
+                    if (systemMetricsHandler?.handle(call, result) != true) {
+                        result.notImplemented()
+                    }
+                }
             }
         }
     }
-    
+
     // ============================================================================
     // SPECIAL PERMISSIONS HANDLING
     // ============================================================================
@@ -505,6 +525,7 @@ class MainActivity: FlutterActivity() {
         try {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
             val inputMethods = imm.inputMethodList
+            val enabledIds = imm.enabledInputMethodList.map { it.id }.toSet()
 
             // Get current default keyboard
             val defaultKeyboard = Settings.Secure.getString(
@@ -522,6 +543,24 @@ class MainActivity: FlutterActivity() {
                     val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
                     val isDefault = inputMethod.id == defaultKeyboard
 
+                    // Requested permissions (stripped of the android.permission.
+                    // prefix — the Dart keylogger detector checks for "INTERNET").
+                    val permissions = try {
+                        val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            packageManager.getPackageInfo(
+                                packageName,
+                                PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())
+                            )
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+                        }
+                        pkgInfo.requestedPermissions?.map { it.removePrefix("android.permission.") }
+                            ?: emptyList()
+                    } catch (e: Exception) {
+                        emptyList<String>()
+                    }
+
                     keyboards.add(mapOf(
                         "id" to inputMethod.id,
                         "packageName" to packageName,
@@ -529,6 +568,8 @@ class MainActivity: FlutterActivity() {
                         "appName" to (inputMethod.loadLabel(packageManager)?.toString() ?: packageName),
                         "isSystemApp" to isSystemApp,
                         "isDefault" to isDefault,
+                        "isEnabled" to enabledIds.contains(inputMethod.id),
+                        "permissions" to permissions,
                         "settingsActivity" to (inputMethod.settingsActivity ?: "")
                     ))
                 } catch (e: Exception) {

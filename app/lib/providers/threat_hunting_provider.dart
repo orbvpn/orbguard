@@ -1,5 +1,5 @@
-/// Threat Hunting Provider
-/// State management for proactive threat detection and investigation
+// Threat Hunting Provider
+// State management for proactive threat detection and investigation
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -13,7 +13,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
 
   // State
   List<ThreatHunt> _availableHunts = [];
-  Map<String, HuntResult> _huntResults = {};
+  final Map<String, HuntResult> _huntResults = {};
   List<InvestigationCase> _cases = [];
   Map<String, dynamic> _stats = {};
 
@@ -32,12 +32,14 @@ class ThreatHuntingProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _graphNodes = [];
   List<Map<String, dynamic>> _graphRelations = [];
   bool _isLoadingGraph = false;
+  String? _graphError;
 
   // Correlation and ML state
   List<Map<String, dynamic>> _correlationRules = [];
   List<Map<String, dynamic>> _mlModels = [];
   bool _isLoadingCorrelation = false;
   bool _isLoadingModels = false;
+  String? _correlationError;
 
   // Stream subscriptions
   StreamSubscription<HuntProgress>? _progressSub;
@@ -61,10 +63,16 @@ class ThreatHuntingProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get graphNodes => _graphNodes;
   List<Map<String, dynamic>> get graphRelations => _graphRelations;
   bool get isLoadingGraph => _isLoadingGraph;
+
+  /// Non-null when the last graph load failed (e.g. Neo4j unavailable, 503).
+  String? get graphError => _graphError;
   List<Map<String, dynamic>> get correlationRules => _correlationRules;
   List<Map<String, dynamic>> get mlModels => _mlModels;
   bool get isLoadingCorrelation => _isLoadingCorrelation;
   bool get isLoadingModels => _isLoadingModels;
+
+  /// Non-null when the last correlation load failed.
+  String? get correlationError => _correlationError;
 
   // Computed getters
   List<ThreatHunt> get criticalHunts =>
@@ -313,11 +321,16 @@ class ThreatHuntingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load graph data from API
+  /// Load graph data from the live graph endpoints
+  /// (GET /graph/nodes — {nodes:[{id,label,type,properties}],count} and
+  ///  GET /graph/relations — {relations:[{id,from,to,type,properties}],count}).
+  /// Failures (e.g. 503 when Neo4j is unavailable) are surfaced via
+  /// [graphError] instead of being silently rendered as an empty graph.
   Future<void> loadGraphData({String? query}) async {
     if (_isLoadingGraph) return;
 
     _isLoadingGraph = true;
+    _graphError = null;
     notifyListeners();
 
     try {
@@ -327,6 +340,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
       _graphRelations = relations;
     } catch (e) {
       debugPrint('Failed to load graph data: $e');
+      _graphError = 'Failed to load graph data: $e';
       _graphNodes = [];
       _graphRelations = [];
     } finally {
@@ -335,17 +349,21 @@ class ThreatHuntingProvider extends ChangeNotifier {
     }
   }
 
-  /// Load correlation rules from API
+  /// Load persisted correlation events from GET /correlation
+  /// ({results:[CorrelationEvent...],count}). Failures are surfaced via
+  /// [correlationError].
   Future<void> loadCorrelationRules() async {
     if (_isLoadingCorrelation) return;
 
     _isLoadingCorrelation = true;
+    _correlationError = null;
     notifyListeners();
 
     try {
       _correlationRules = await _api.getCorrelationResults();
     } catch (e) {
-      debugPrint('Failed to load correlation rules: $e');
+      debugPrint('Failed to load correlation results: $e');
+      _correlationError = 'Failed to load correlation results: $e';
       _correlationRules = [];
     } finally {
       _isLoadingCorrelation = false;

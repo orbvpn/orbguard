@@ -1,5 +1,5 @@
-/// Settings Screen
-/// Main settings and configuration screen
+// Settings Screen
+// Main settings and configuration screen
 
 import 'dart:io';
 
@@ -10,6 +10,7 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/theme_mode_selector.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 
@@ -27,8 +28,25 @@ class SettingsScreen extends StatelessWidget {
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
+              // Appearance
+              _buildSettingsSection(
+                context,
+                'Appearance',
+                'moon_stars',
+                const Color(0xFFA78BFA),
+                [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: ThemeModeSelector(
+                      current: settings.themeMode,
+                      onChanged: settings.setThemeMode,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               // Protection settings
               _buildSettingsSection(
                 context,
@@ -37,6 +55,7 @@ class SettingsScreen extends StatelessWidget {
                 const Color(0xFF00D9FF),
                 [
                   _buildSettingsTile(
+                    context,
                     'Protection Features',
                     'Enable/disable security features',
                     'shield_check',
@@ -48,6 +67,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   _buildSettingsTile(
+                    context,
                     'Scan Settings',
                     'Auto-scan and frequency',
                     'radar',
@@ -69,6 +89,7 @@ class SettingsScreen extends StatelessWidget {
                 Colors.orange,
                 [
                   _buildSettingsTile(
+                    context,
                     'Alert Preferences',
                     'Manage notification types',
                     'bell_bing',
@@ -90,6 +111,7 @@ class SettingsScreen extends StatelessWidget {
                 Colors.green,
                 [
                   _buildSettingsTile(
+                    context,
                     'VPN Settings',
                     'Auto-connect and preferences',
                     'key',
@@ -112,6 +134,7 @@ class SettingsScreen extends StatelessWidget {
                   const Color(0xFFFF6B6B),
                   [
                     _buildSettingsTile(
+                      context,
                       'Persistence Scanner',
                       'Configure startup item scanning',
                       'radar',
@@ -123,6 +146,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     _buildSettingsTile(
+                      context,
                       'Permissions',
                       'Grant required system permissions',
                       'shield_check',
@@ -145,6 +169,7 @@ class SettingsScreen extends StatelessWidget {
                 Colors.purple,
                 [
                   _buildSettingsTile(
+                    context,
                     'Privacy Settings',
                     'Data sharing and app lock',
                     'lock',
@@ -163,9 +188,10 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Advanced',
                 'settings',
-                Colors.grey,
+                Theme.of(context).colorScheme.onSurfaceVariant,
                 [
                   _buildSettingsTile(
+                    context,
                     'API Configuration',
                     'Server and connection settings',
                     'cloud_storage',
@@ -177,6 +203,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   _buildSettingsTile(
+                    context,
                     'Reset Settings',
                     'Restore default settings',
                     'refresh',
@@ -194,17 +221,20 @@ class SettingsScreen extends StatelessWidget {
                 Colors.blue,
                 [
                   _buildSettingsTile(
+                    context,
                     'App Version',
                     '1.0.0 (Build 1)',
                     'info_circle',
                   ),
                   _buildSettingsTile(
+                    context,
                     'Terms of Service',
                     'View terms and conditions',
                     'file_text',
                     onTap: () {},
                   ),
                   _buildSettingsTile(
+                    context,
                     'Privacy Policy',
                     'View privacy policy',
                     'clipboard_text',
@@ -212,7 +242,6 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
             ],
           );
         },
@@ -234,12 +263,16 @@ class SettingsScreen extends StatelessWidget {
           children: [
             DuotoneIcon(icon, color: color, size: 20),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -247,6 +280,7 @@ class SettingsScreen extends StatelessWidget {
         const SizedBox(height: 12),
         GlassCard(
           padding: EdgeInsets.zero,
+          margin: EdgeInsets.zero,
           child: Column(children: children),
         ),
       ],
@@ -254,34 +288,36 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSettingsTile(
+    BuildContext context,
     String title,
     String subtitle,
     String icon, {
     VoidCallback? onTap,
     bool isDestructive = false,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return ListTile(
       leading: DuotoneIcon(
         icon,
-        color: isDestructive ? Colors.red : Colors.grey,
+        color: isDestructive ? Colors.red : cs.onSurfaceVariant,
         size: 24,
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isDestructive ? Colors.red : Colors.white,
+          color: isDestructive ? Colors.red : cs.onSurface,
           fontWeight: FontWeight.w500,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color: Colors.grey[600],
+          color: cs.onSurfaceVariant,
           fontSize: 12,
         ),
       ),
       trailing: onTap != null
-          ? const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20)
+          ? DuotoneIcon('alt_arrow_right', color: cs.onSurfaceVariant, size: 20)
           : null,
       onTap: onTap,
     );
@@ -291,14 +327,9 @@ class SettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
-          'Reset Settings',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Reset Settings'),
         content: const Text(
           'This will reset all settings to their default values. This action cannot be undone.',
-          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -336,7 +367,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
         builder: (context, settings, child) {
           final protection = settings.protection;
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               _buildInfoCard(
                 'Configure which protection features are active. '
@@ -346,6 +377,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               _buildSwitchTile(
+                context,
                 'SMS Protection',
                 'Analyze SMS messages for threats',
                 'chat_dots',
@@ -355,6 +387,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'URL Protection',
                 'Check URLs for malicious content',
                 'link',
@@ -364,6 +397,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'QR Code Protection',
                 'Scan QR codes for threats',
                 'qr_code',
@@ -373,6 +407,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'App Security',
                 'Monitor installed apps for risks',
                 'smartphone',
@@ -382,6 +417,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Network Protection',
                 'Monitor WiFi and network security',
                 'wi_fi_router',
@@ -391,6 +427,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Dark Web Monitoring',
                 'Check for credential breaches',
                 'incognito',
@@ -399,8 +436,9 @@ class ProtectionSettingsScreen extends StatelessWidget {
                   protection.copyWith(darkWebMonitoringEnabled: value),
                 ),
               ),
-              const Divider(color: Colors.white10, height: 32),
+              const Divider(height: 32),
               _buildSwitchTile(
+                context,
                 'Real-time Alerts',
                 'Get instant threat notifications',
                 'bell_bing',
@@ -410,6 +448,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Auto-block Threats',
                 'Automatically block detected threats',
                 'forbidden',
@@ -452,6 +491,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     String icon,
@@ -459,35 +499,36 @@ class ProtectionSettingsScreen extends StatelessWidget {
     Function(bool) onChanged, {
     bool isWarning = false,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         secondary: DuotoneIcon(
           icon,
-          color: value ? const Color(0xFF00D9FF) : Colors.grey,
+          color: value ? const Color(0xFF00D9FF) : cs.onSurfaceVariant,
           size: 24,
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: cs.onSurface,
             fontWeight: FontWeight.w500,
           ),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: isWarning ? Colors.orange : const Color(0xFF00D9FF),
+        activeThumbColor: isWarning ? Colors.orange : const Color(0xFF00D9FF),
       ),
     );
   }
@@ -505,10 +546,11 @@ class NotificationSettingsScreen extends StatelessWidget {
         builder: (context, settings, child) {
           final notif = settings.notifications;
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              _buildSectionHeader('Notifications'),
+              _buildSectionHeader(context, 'Notifications'),
               _buildSwitchTile(
+                context,
                 'Push Notifications',
                 'Enable all push notifications',
                 notif.pushNotificationsEnabled,
@@ -517,8 +559,9 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader('Alert Types'),
+              _buildSectionHeader(context, 'Alert Types'),
               _buildSwitchTile(
+                context,
                 'Threat Alerts',
                 'Notify when threats are detected',
                 notif.threatAlertsEnabled,
@@ -527,6 +570,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Breach Alerts',
                 'Notify about data breaches',
                 notif.breachAlertsEnabled,
@@ -535,6 +579,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Scan Completed',
                 'Notify when scans finish',
                 notif.scanCompletedAlerts,
@@ -543,6 +588,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Weekly Report',
                 'Send weekly security summary',
                 notif.weeklyReportEnabled,
@@ -551,8 +597,9 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader('Sound & Vibration'),
+              _buildSectionHeader(context, 'Sound & Vibration'),
               _buildSwitchTile(
+                context,
                 'Sound',
                 'Play sound for notifications',
                 notif.soundEnabled,
@@ -561,6 +608,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Vibration',
                 'Vibrate for notifications',
                 notif.vibrationEnabled,
@@ -569,8 +617,9 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader('Quiet Hours'),
+              _buildSectionHeader(context, 'Quiet Hours'),
               _buildSwitchTile(
+                context,
                 'Enable Quiet Hours',
                 'Silence notifications during set hours',
                 notif.quietHoursEnabled,
@@ -583,7 +632,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -597,7 +646,9 @@ class NotificationSettingsScreen extends StatelessWidget {
                           notif.copyWith(quietHoursStart: hour),
                         ),
                       ),
-                      const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
+                      DuotoneIcon('alt_arrow_right',
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 20),
                       _buildTimeSelector(
                         context,
                         'End',
@@ -616,13 +667,13 @@ class NotificationSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
         style: TextStyle(
-          color: Colors.grey[400],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -631,32 +682,34 @@ class NotificationSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     bool value,
     Function(bool) onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -692,15 +745,15 @@ class NotificationSettingsScreen extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '${hour.toString().padLeft(2, '0')}:00',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -723,10 +776,11 @@ class PrivacySettingsScreen extends StatelessWidget {
         builder: (context, settings, child) {
           final privacy = settings.privacy;
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              _buildSectionHeader('App Security'),
+              _buildSectionHeader(context, 'App Security'),
               _buildSwitchTile(
+                context,
                 'Biometric Lock',
                 'Require fingerprint or face to open app',
                 privacy.biometricLockEnabled,
@@ -735,6 +789,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Hide Notification Content',
                 'Don\'t show details in notifications',
                 privacy.hideNotificationContent,
@@ -743,8 +798,9 @@ class PrivacySettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader('Data Collection'),
+              _buildSectionHeader(context, 'Data Collection'),
               _buildSwitchTile(
+                context,
                 'Analytics',
                 'Help improve the app with usage data',
                 privacy.analyticsEnabled,
@@ -753,6 +809,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Crash Reporting',
                 'Send crash reports to improve stability',
                 privacy.crashReportingEnabled,
@@ -761,6 +818,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Share Anonymous Data',
                 'Contribute to threat intelligence network',
                 privacy.shareAnonymousData,
@@ -769,8 +827,9 @@ class PrivacySettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader('Data Storage'),
+              _buildSectionHeader(context, 'Data Storage'),
               _buildSwitchTile(
+                context,
                 'Local Data Only',
                 'Don\'t sync data to cloud (reduces features)',
                 privacy.localDataOnly,
@@ -785,17 +844,24 @@ class PrivacySettingsScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     ListTile(
-                      leading: const DuotoneIcon('file_download', color: Colors.grey, size: 24),
-                      title: const Text(
+                      leading: DuotoneIcon('file_download',
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 24),
+                      title: Text(
                         'Export Data',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                       subtitle: Text(
                         'Download all your data',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12),
                       ),
-                      trailing:
-                          const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
+                      trailing: DuotoneIcon('alt_arrow_right',
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 20),
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -803,7 +869,7 @@ class PrivacySettingsScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1),
+                    const Divider(height: 1),
                     ListTile(
                       leading: const DuotoneIcon('trash_bin_minimalistic', color: Colors.red, size: 24),
                       title: const Text(
@@ -812,10 +878,14 @@ class PrivacySettingsScreen extends StatelessWidget {
                       ),
                       subtitle: Text(
                         'Permanently delete all stored data',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12),
                       ),
-                      trailing:
-                          const DuotoneIcon('alt_arrow_right', color: Colors.grey, size: 20),
+                      trailing: DuotoneIcon('alt_arrow_right',
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 20),
                       onTap: () => _showDeleteDialog(context),
                     ),
                   ],
@@ -828,13 +898,13 @@ class PrivacySettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
         style: TextStyle(
-          color: Colors.grey[400],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -843,32 +913,34 @@ class PrivacySettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     bool value,
     Function(bool) onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -877,14 +949,9 @@ class PrivacySettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
-          'Delete All Data',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Delete All Data'),
         content: const Text(
           'This will permanently delete all your data including scan history, monitored assets, and settings. This action cannot be undone.',
-          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -921,9 +988,10 @@ class ScanSettingsScreen extends StatelessWidget {
         builder: (context, settings, child) {
           final scan = settings.scan;
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               _buildSwitchTile(
+                context,
                 'Auto Scan',
                 'Automatically scan for threats',
                 scan.autoScanEnabled,
@@ -932,11 +1000,11 @@ class ScanSettingsScreen extends StatelessWidget {
                 ),
               ),
               if (scan.autoScanEnabled) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -945,14 +1013,14 @@ class ScanSettingsScreen extends StatelessWidget {
                       Text(
                         'Scan Frequency',
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
                       const SizedBox(height: 8),
                       DropdownButton<int>(
                         value: scan.scanFrequencyHours,
-                        dropdownColor: const Color(0xFF2A2B40),
+                        dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                         isExpanded: true,
                         underline: Container(),
                         items: const [
@@ -975,8 +1043,9 @@ class ScanSettingsScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _buildSwitchTile(
+                context,
                 'Scan on WiFi Only',
                 'Only auto-scan when connected to WiFi',
                 scan.scanOnWifiOnly,
@@ -985,6 +1054,7 @@ class ScanSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Scan New Apps',
                 'Automatically scan newly installed apps',
                 scan.scanNewApps,
@@ -993,6 +1063,7 @@ class ScanSettingsScreen extends StatelessWidget {
                 ),
               ),
               _buildSwitchTile(
+                context,
                 'Deep Scan',
                 'More thorough scanning (uses more battery)',
                 scan.deepScanEnabled,
@@ -1008,32 +1079,34 @@ class ScanSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     bool value,
     Function(bool) onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1051,9 +1124,10 @@ class VpnSettingsScreen extends StatelessWidget {
         builder: (context, settings, child) {
           final vpn = settings.vpn;
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               _buildSwitchTile(
+                context,
                 'Auto Connect',
                 'Automatically connect VPN when needed',
                 vpn.autoConnectEnabled,
@@ -1064,6 +1138,7 @@ class VpnSettingsScreen extends StatelessWidget {
               if (vpn.autoConnectEnabled) ...[
                 const SizedBox(height: 8),
                 _buildSwitchTile(
+                  context,
                   'Connect on Unsecured WiFi',
                   'Auto-connect when on open networks',
                   vpn.connectOnUnsecuredWifi,
@@ -1072,6 +1147,7 @@ class VpnSettingsScreen extends StatelessWidget {
                   ),
                 ),
                 _buildSwitchTile(
+                  context,
                   'Connect on Mobile Data',
                   'Auto-connect when using cellular',
                   vpn.connectOnMobileData,
@@ -1080,11 +1156,11 @@ class VpnSettingsScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1D1E33),
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -1093,14 +1169,14 @@ class VpnSettingsScreen extends StatelessWidget {
                     Text(
                       'Preferred Server',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 8),
                     DropdownButton<String>(
                       value: vpn.preferredServer,
-                      dropdownColor: const Color(0xFF2A2B40),
+                      dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       isExpanded: true,
                       underline: Container(),
                       items: const [
@@ -1126,8 +1202,9 @@ class VpnSettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _buildSwitchTile(
+                context,
                 'Kill Switch',
                 'Block internet if VPN disconnects',
                 vpn.killSwitchEnabled,
@@ -1143,32 +1220,34 @@ class VpnSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     bool value,
     Function(bool) onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1217,7 +1296,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
           }
 
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
@@ -1243,6 +1322,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               ),
               const SizedBox(height: 24),
               _buildSwitchTile(
+                context,
                 'Use Custom Server',
                 'Connect to a custom API server',
                 api.useCustomServer,
@@ -1251,11 +1331,11 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 ),
               ),
               if (api.useCustomServer) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -1264,19 +1344,20 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                       Text(
                         'Server URL',
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _urlController,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface),
                         decoration: InputDecoration(
                           hintText: 'https://api.example.com',
-                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           filled: true,
-                          fillColor: const Color(0xFF2A2B40),
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide.none,
@@ -1289,11 +1370,11 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D1E33),
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -1302,20 +1383,21 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                       Text(
                         'API Key',
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _apiKeyController,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface),
                         obscureText: true,
                         decoration: InputDecoration(
                           hintText: 'Enter API key',
-                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           filled: true,
-                          fillColor: const Color(0xFF2A2B40),
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide.none,
@@ -1329,8 +1411,9 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _buildSwitchTile(
+                context,
                 'WebSocket Connection',
                 'Enable real-time updates',
                 api.enableWebSocket,
@@ -1338,11 +1421,11 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   api.copyWith(enableWebSocket: value),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1D1E33),
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -1351,14 +1434,14 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     Text(
                       'Connection Timeout',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 8),
                     DropdownButton<int>(
                       value: api.connectionTimeout,
-                      dropdownColor: const Color(0xFF2A2B40),
+                      dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       isExpanded: true,
                       underline: Container(),
                       items: const [
@@ -1412,32 +1495,34 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
   }
 
   Widget _buildSwitchTile(
+    BuildContext context,
     String title,
     String subtitle,
     bool value,
     Function(bool) onChanged,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 12,
           ),
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1468,7 +1553,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
     return GlassPage(
       title: 'Persistence Scanner',
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           // Info card
           Container(
@@ -1505,17 +1590,17 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1D1E33),
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Scan Interval', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                  Text('Scan Interval', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                   const SizedBox(height: 8),
                   DropdownButton<int>(
                     value: _scanIntervalHours,
-                    dropdownColor: const Color(0xFF2A2B40),
+                    dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     isExpanded: true,
                     underline: Container(),
                     items: const [
@@ -1586,7 +1671,6 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
             _hashVerification,
             (v) => setState(() => _hashVerification = v),
           ),
-          const SizedBox(height: 32),
         ],
       ),
     );
@@ -1597,7 +1681,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: TextStyle(color: Colors.grey[400], fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -1606,15 +1690,16 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        title: Text(title,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        subtitle: Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00D9FF),
+        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1629,7 +1714,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
     return GlassPage(
       title: 'Permissions',
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           // Platform-specific permissions
           if (Platform.isMacOS) ..._buildMacOSPermissions(context),
@@ -1658,7 +1743,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: () => _openMacOSSettings('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles'),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // Automation
       _buildPermissionCard(
@@ -1675,7 +1760,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: () => _openMacOSSettings('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // Accessibility (optional)
       _buildPermissionCard(
@@ -1714,7 +1799,6 @@ class DesktopPermissionsScreen extends StatelessWidget {
           ],
         ),
       ),
-      const SizedBox(height: 32),
     ];
   }
 
@@ -1739,7 +1823,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: null,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // SELinux info
       _buildPermissionCard(
@@ -1760,7 +1844,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: null,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // File permissions
       _buildPermissionCard(
@@ -1781,7 +1865,6 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: null,
       ),
-      const SizedBox(height: 32),
     ];
   }
 
@@ -1806,7 +1889,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: null,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // Windows Security
       _buildPermissionCard(
@@ -1825,7 +1908,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: () => _openWindowsSettings('windowsdefender:'),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 24),
 
       // Registry access
       _buildPermissionCard(
@@ -1846,7 +1929,6 @@ class DesktopPermissionsScreen extends StatelessWidget {
         ],
         onGrant: null,
       ),
-      const SizedBox(height: 32),
     ];
   }
 
@@ -1861,6 +1943,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
     VoidCallback? onGrant,
   }) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1874,8 +1957,8 @@ class DesktopPermissionsScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1900,7 +1983,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             description,
-            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
           ),
           const SizedBox(height: 16),
           Container(
@@ -1915,7 +1998,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
               children: [
                 Text(
                   'Instructions:',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 ...instructions.map((instruction) => Padding(
@@ -1923,7 +2006,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
                   child: Text(
                     instruction,
                     style: TextStyle(
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                       fontFamily: instruction.startsWith('  ') ? 'monospace' : null,
                     ),

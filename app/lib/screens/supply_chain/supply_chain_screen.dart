@@ -1,10 +1,11 @@
-/// Supply Chain Monitor Screen
-/// Monitors app dependencies for vulnerabilities and trackers
+// Supply Chain Monitor Screen
+// Monitors app dependencies for vulnerabilities and trackers
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -57,11 +58,11 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                                 vertical: 8,
                               ),
                             ),
-                            icon: const DuotoneIcon('magnifier', size: 20),
+                            icon: const DuotoneIcon('magnifer', size: 20),
                             label: const Text('Scan Apps'),
                           ),
                           IconButton(
-                            icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                            icon: DuotoneIcon('refresh', size: 22, color: context.onSurface),
                             onPressed: () => _startScan(),
                             tooltip: 'Refresh',
                           ),
@@ -120,9 +121,15 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          // Critical vulnerability alerts raised during monitoring
+          if (provider.criticalAlerts.isNotEmpty) ...[
+            _buildCriticalAlertsBanner(provider),
+            const SizedBox(height: 12),
+          ],
           // Scan progress
           if (provider.isScanning)
             GlassCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   Row(
@@ -139,7 +146,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Expanded(
                         child: Text(
                           provider.scanStatus,
-                          style: const TextStyle(color: Colors.white70),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: context.onSurfaceMuted),
                         ),
                       ),
                     ],
@@ -149,7 +158,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: provider.scanProgress,
-                      backgroundColor: Colors.white10,
+                      backgroundColor: context.onSurface.withValues(alpha: 0.04),
                       color: GlassTheme.primaryAccent,
                       minHeight: 6,
                     ),
@@ -164,10 +173,90 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
     );
   }
 
+  /// Banner surfacing critical CVE alerts from [SupplyChainProvider]'s
+  /// vulnerability-alert stream. Each row opens the full CVE details.
+  Widget _buildCriticalAlertsBanner(SupplyChainProvider provider) {
+    final cs = Theme.of(context).colorScheme;
+    final alerts = provider.criticalAlerts;
+
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const DuotoneIcon(
+                'danger_circle',
+                color: GlassTheme.errorColor,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${alerts.length} critical vulnerability '
+                  'alert${alerts.length == 1 ? '' : 's'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: GlassTheme.errorColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...alerts.take(3).map(
+                (vuln) => InkWell(
+                  onTap: () => _showVulnerabilityDetails(vuln),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${vuln.cveId} — CVSS '
+                            '${vuln.cvssScore.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DuotoneIcon(
+                          'alt_arrow_right',
+                          size: 16,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          if (alerts.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+${alerts.length - 3} more in the CVEs tab',
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(SupplyChainProvider provider) {
     final hasIssues = provider.totalVulnerabilities > 0;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -178,7 +267,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   color: (hasIssues ? GlassTheme.errorColor : GlassTheme.successColor)
-                      .withOpacity(0.2),
+                      .withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: DuotoneIcon(
@@ -195,7 +284,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     Text(
                       hasIssues
                           ? '${provider.totalVulnerabilities} Vulnerabilities Found'
-                          : 'No Vulnerabilities',
+                          : 'No Vulnerabilities', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: hasIssues ? GlassTheme.errorColor : GlassTheme.successColor,
                         fontSize: 18,
@@ -204,9 +293,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${provider.totalAppsScanned} apps scanned',
+                      '${provider.totalAppsScanned} apps scanned', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: context.onSurfaceMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -246,9 +335,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -264,7 +353,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: context.onSurfaceMuted,
                 fontSize: 11,
               ),
             ),
@@ -287,13 +376,14 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: vulns.length,
       itemBuilder: (context, index) => _buildVulnerabilityCard(vulns[index]),
     );
   }
 
   Widget _buildVulnerabilityCard(Vulnerability vuln) {
+    final cs = Theme.of(context).colorScheme;
     final severityColor = _getSeverityColor(vuln.cvssScore);
 
     return GlassCard(
@@ -307,9 +397,9 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: severityColor.withOpacity(0.2),
+                  color: severityColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: severityColor.withOpacity(0.3)),
+                  border: Border.all(color: severityColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   vuln.cveId,
@@ -324,7 +414,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: severityColor.withOpacity(0.2),
+                  color: severityColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -348,30 +438,34 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           const SizedBox(height: 12),
           Text(
             vuln.description,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: TextStyle(color: cs.onSurface, fontSize: 14),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              DuotoneIcon('danger_triangle', size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('danger_triangle', size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 vuln.severity,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(width: 16),
-              DuotoneIcon('refresh', size: 14, color: Colors.white.withOpacity(0.5)),
+              DuotoneIcon('refresh', size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text(
-                'Affected: ${vuln.affectedVersions}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
+              Expanded(
+                child: Text(
+                  'Affected: ${vuln.affectedVersions}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -381,7 +475,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: GlassTheme.successColor.withOpacity(0.1),
+                color: GlassTheme.successColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -428,7 +522,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: grouped.entries.map((entry) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,8 +539,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   const SizedBox(width: 8),
                   Text(
                     entry.key.displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -455,7 +549,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: GlassTheme.warningColor.withOpacity(0.2),
+                      color: GlassTheme.warningColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -471,7 +565,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               ),
             ),
             ...entry.value.map((lib) => _buildTrackerCard(lib)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         );
       }).toList(),
@@ -487,7 +581,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: GlassTheme.warningColor.withOpacity(0.2),
+              color: GlassTheme.warningColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const DuotoneIcon(
@@ -502,17 +596,17 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  lib.name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  lib.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 if (lib.vendor != null)
                   Text(
-                    lib.vendor!,
+                    lib.vendor!, maxLines: 2, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: context.onSurfaceMuted,
                       fontSize: 12,
                     ),
                   ),
@@ -523,7 +617,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: Color(SupplyChainProvider.getRiskColor(lib.riskLevel))
-                  .withOpacity(0.2),
+                  .withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -546,12 +640,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
         'file_text',
         'No Libraries Found',
         'Scan your apps to see detected libraries',
-        Colors.white54,
+        context.colors.onSurfaceVariant,
       );
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: provider.librariesByCategory.entries.map((entry) {
         return ExpansionTile(
           tilePadding: EdgeInsets.zero,
@@ -561,12 +655,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           ),
           title: Text(
             entry.key,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold),
           ),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: GlassTheme.primaryAccent.withOpacity(0.2),
+              color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -582,12 +676,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     contentPadding: const EdgeInsets.only(left: 16),
                     title: Text(
                       lib.name,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.onSurface),
                     ),
                     subtitle: lib.vendor != null
                         ? Text(
                             lib.vendor!,
-                            style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                            style: TextStyle(color: context.onSurfaceMuted),
                           )
                         : null,
                     trailing: Row(
@@ -599,7 +693,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: GlassTheme.warningColor.withOpacity(0.2),
+                              color: GlassTheme.warningColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -634,7 +728,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+          DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -647,7 +741,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withOpacity(0.5)),
+            style: TextStyle(color: context.onSurfaceMuted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -656,10 +750,11 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
   }
 
   void _showVulnerabilityDetails(Vulnerability vuln) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GlassTheme.gradientTop,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -670,7 +765,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
         expand: false,
         builder: (context, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -681,7 +776,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: cs.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -692,7 +787,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _getSeverityColor(vuln.cvssScore).withOpacity(0.2),
+                      color: _getSeverityColor(vuln.cvssScore).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -719,7 +814,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Text(
                         vuln.severity,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -729,10 +824,10 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               ),
               const SizedBox(height: 24),
               // Description
-              const Text(
+              Text(
                 'Description',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -741,7 +836,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               Text(
                 vuln.description,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: cs.onSurfaceVariant,
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -751,18 +846,19 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               _buildDetailRow('Affected Versions', vuln.affectedVersions),
               if (vuln.fixedVersion != null)
                 _buildDetailRow('Fixed Version', vuln.fixedVersion!),
-              _buildDetailRow(
-                'Published',
-                '${vuln.publishedDate.year}-${vuln.publishedDate.month.toString().padLeft(2, '0')}-${vuln.publishedDate.day.toString().padLeft(2, '0')}',
-              ),
+              if (vuln.publishedDate != null)
+                _buildDetailRow(
+                  'Published',
+                  '${vuln.publishedDate!.year}-${vuln.publishedDate!.month.toString().padLeft(2, '0')}-${vuln.publishedDate!.day.toString().padLeft(2, '0')}',
+                ),
               if (vuln.exploitAvailable != null) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: GlassTheme.errorColor.withOpacity(0.1),
+                    color: GlassTheme.errorColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: GlassTheme.errorColor.withOpacity(0.3)),
+                    border: Border.all(color: GlassTheme.errorColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -775,6 +871,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       Expanded(
                         child: Text(
                           vuln.exploitAvailable!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: GlassTheme.errorColor,
                             fontSize: 13,
@@ -788,10 +886,10 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               // References
               if (vuln.references.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'References',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -804,14 +902,14 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                           DuotoneIcon(
                             'link',
                             size: 14,
-                            color: GlassTheme.primaryAccent.withOpacity(0.7),
+                            color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               ref,
                               style: TextStyle(
-                                color: GlassTheme.primaryAccent.withOpacity(0.7),
+                                color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
                                 fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -839,7 +937,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: context.onSurfaceMuted,
                 fontSize: 13,
               ),
             ),
@@ -847,8 +945,10 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.onSurface,
                 fontSize: 13,
               ),
             ),

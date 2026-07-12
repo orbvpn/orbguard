@@ -1,5 +1,5 @@
-/// Dark Web Widgets
-/// Reusable widgets for dark web monitoring screens
+// Dark Web Widgets
+// Reusable widgets for dark web monitoring screens
 
 import 'package:flutter/material.dart';
 
@@ -99,15 +99,16 @@ class BreachCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: cs.outline),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,13 +148,17 @@ class BreachCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         breach.domain,
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -182,20 +187,20 @@ class BreachCard extends StatelessWidget {
             Row(
               children: [
                 if (breach.breachDate != null) ...[
-                  DuotoneIcon(AppIcons.calendar, size: 14, color: Colors.grey[500]),
+                  DuotoneIcon(AppIcons.calendar, size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     _formatDate(breach.breachDate!),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
                   const SizedBox(width: 16),
                 ],
                 if (breach.pwnCount != null) ...[
-                  DuotoneIcon(AppIcons.usersGroup, size: 14, color: Colors.grey[500]),
+                  DuotoneIcon(AppIcons.usersGroup, size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     _formatCount(breach.pwnCount!),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
                 ],
               ],
@@ -267,12 +272,13 @@ class DataClassChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final iconName = DarkWebProvider.getDataClassIcon(dataClass);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(15),
+        color: cs.onSurface.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -281,13 +287,13 @@ class DataClassChip extends StatelessWidget {
           DuotoneIcon(
             _getIconString(iconName),
             size: 12,
-            color: Colors.grey[400],
+            color: cs.onSurfaceVariant,
           ),
           const SizedBox(width: 4),
           Text(
             dataClass,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 11,
             ),
           ),
@@ -339,6 +345,7 @@ class BreachAlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final color = Color(DarkWebProvider.getSeverityColor(alert.severity));
 
     return InkWell(
@@ -347,10 +354,10 @@ class BreachAlertCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: alert.isRead ? Colors.white10 : color.withAlpha(75),
+            color: alert.isRead ? cs.outline : color.withAlpha(75),
           ),
         ),
         child: Column(
@@ -380,9 +387,12 @@ class BreachAlertCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
-                                color:
-                                    alert.isRead ? Colors.grey[400] : Colors.white,
+                                color: alert.isRead
+                                    ? cs.onSurfaceVariant
+                                    : cs.onSurface,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           SeverityBadge(
@@ -393,18 +403,20 @@ class BreachAlertCard extends StatelessWidget {
                       Text(
                         '${alert.assetType.toUpperCase()}: ${alert.assetValue}',
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 if (onDismiss != null)
                   IconButton(
-                    icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey[600]),
+                    icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: cs.onSurfaceVariant),
                     onPressed: onDismiss,
-                    color: Colors.grey[600],
+                    color: cs.onSurfaceVariant,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -415,7 +427,7 @@ class BreachAlertCard extends StatelessWidget {
               Text(
                 'Exposed: ${alert.breach.dataClasses.take(3).join(', ')}${alert.breach.dataClasses.length > 3 ? '...' : ''}',
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -424,7 +436,7 @@ class BreachAlertCard extends StatelessWidget {
             Text(
               _formatTimeAgo(alert.alertedAt),
               style: TextStyle(
-                color: Colors.grey[600],
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 11,
               ),
             ),
@@ -468,18 +480,19 @@ class MonitoredAssetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: asset.breachCount > 0
                 ? Colors.red.withAlpha(75)
-                : Colors.white10,
+                : cs.outline,
           ),
         ),
         child: Row(
@@ -512,9 +525,9 @@ class MonitoredAssetCard extends StatelessWidget {
                     children: [
                       Text(
                         asset.type.displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                       if (!asset.isMonitoring) ...[
@@ -528,10 +541,10 @@ class MonitoredAssetCard extends StatelessWidget {
                             color: Colors.grey.withAlpha(40),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Paused',
                             style: TextStyle(
-                              color: Colors.grey,
+                              color: cs.onSurfaceVariant,
                               fontSize: 10,
                             ),
                           ),
@@ -545,17 +558,21 @@ class MonitoredAssetCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
-                      color: asset.isMonitoring ? Colors.white : Colors.grey,
+                      color: asset.isMonitoring ? cs.onSurface : cs.onSurfaceVariant,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (asset.lastChecked != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       'Last checked: ${_formatDate(asset.lastChecked!)}',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                         fontSize: 11,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -613,8 +630,8 @@ class MonitoredAssetCard extends StatelessWidget {
             ],
             // Actions
             PopupMenuButton<String>(
-              icon: const DuotoneIcon(AppIcons.menuDots, color: Colors.grey),
-              color: const Color(0xFF2A2B40),
+              icon: DuotoneIcon(AppIcons.menuDots, color: cs.onSurfaceVariant),
+              color: cs.surfaceContainerHighest,
               onSelected: (value) {
                 switch (value) {
                   case 'toggle':
@@ -633,7 +650,7 @@ class MonitoredAssetCard extends StatelessWidget {
                       DuotoneIcon(
                         asset.isMonitoring ? AppIcons.pause : AppIcons.play,
                         size: 18,
-                        color: Colors.white70,
+                        color: cs.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(asset.isMonitoring ? 'Pause' : 'Resume'),
@@ -693,19 +710,20 @@ class DarkWebStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Monitoring Overview',
             style: TextStyle(
-              color: Colors.white,
+              color: cs.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -716,6 +734,7 @@ class DarkWebStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Assets',
                   stats.totalAssets.toString(),
                   AppIcons.shield,
@@ -724,6 +743,7 @@ class DarkWebStatsCard extends StatelessWidget {
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Breaches',
                   stats.totalBreaches.toString(),
                   AppIcons.dangerTriangle,
@@ -737,6 +757,7 @@ class DarkWebStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Critical',
                   stats.criticalBreaches.toString(),
                   AppIcons.dangerCircle,
@@ -745,6 +766,7 @@ class DarkWebStatsCard extends StatelessWidget {
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'High',
                   stats.highBreaches.toString(),
                   AppIcons.dangerTriangle,
@@ -785,7 +807,7 @@ class DarkWebStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(
+  Widget _buildStatItem(BuildContext context,
       String label, String value, String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -807,13 +829,17 @@ class DarkWebStatsCard extends StatelessWidget {
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -856,6 +882,7 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Form(
       key: _formKey,
       child: Column(
@@ -864,20 +891,20 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
           TextFormField(
             controller: _controller,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Enter email address',
-              hintStyle: TextStyle(color: Colors.grey[600]),
-              prefixIcon: const DuotoneIcon(AppIcons.letter, color: Colors.grey),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
+              prefixIcon: DuotoneIcon(AppIcons.letter, color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF2A2B40),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white10),
+                borderSide: BorderSide(color: cs.outline),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -963,21 +990,22 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: _controller,
           obscureText: _obscureText,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Enter password to check',
-            hintStyle: TextStyle(color: Colors.grey[600]),
-            prefixIcon: const DuotoneIcon(AppIcons.password, color: Colors.grey),
+            hintStyle: TextStyle(color: cs.onSurfaceVariant),
+            prefixIcon: DuotoneIcon(AppIcons.password, color: cs.onSurfaceVariant),
             suffixIcon: IconButton(
               icon: DuotoneIcon(
                 _obscureText ? AppIcons.eyeClosed : AppIcons.eye,
-                color: Colors.grey,
+                color: cs.onSurfaceVariant,
               ),
               onPressed: () {
                 setState(() {
@@ -986,14 +1014,14 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
               },
             ),
             filled: true,
-            fillColor: const Color(0xFF2A2B40),
+            fillColor: cs.surfaceContainerHighest,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white10),
+              borderSide: BorderSide(color: cs.outline),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1006,7 +1034,7 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
         Text(
           'Your password is never sent to our servers. We use k-anonymity.',
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 11,
           ),
         ),
@@ -1051,12 +1079,13 @@ class BreachCheckResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isBreached = result.isBreached;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isBreached ? Colors.red.withAlpha(75) : Colors.green.withAlpha(75),
@@ -1094,16 +1123,18 @@ class BreachCheckResultCard extends StatelessWidget {
           Text(
             result.email,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (isBreached) ...[
             const SizedBox(height: 8),
             Text(
               'Found in ${result.breachCount} data breach${result.breachCount > 1 ? 'es' : ''}',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -1122,12 +1153,13 @@ class PasswordCheckResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isBreached = result.isBreached;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isBreached ? Colors.red.withAlpha(75) : Colors.green.withAlpha(75),
@@ -1166,7 +1198,7 @@ class PasswordCheckResultCard extends StatelessWidget {
             Text(
               'Seen ${result.exposureCount} times in data breaches',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -1198,7 +1230,7 @@ class PasswordCheckResultCard extends StatelessWidget {
             Text(
               'This password has not been found in known breaches.',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
