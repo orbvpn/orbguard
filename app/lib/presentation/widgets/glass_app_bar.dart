@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/brand.dart';
 import '../theme/glass_theme.dart';
 import '../theme/colors.dart';
 import 'duotone_icon.dart';
@@ -616,9 +617,9 @@ class GlassBottomNav extends StatelessWidget {
               children: List.generate(items.length, (index) {
                 final item = items[index];
                 final isSelected = index == currentIndex;
-                final iconColor = isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant;
+                // Kit: only the active item takes lime — ink-safe on light.
+                final iconColor =
+                    isSelected ? Brand.navActive : Brand.navInactive;
 
                 return GestureDetector(
                   onTap: () => onTap(index),
@@ -631,7 +632,7 @@ class GlassBottomNav extends StatelessWidget {
                     ),
                     decoration: isSelected
                         ? BoxDecoration(
-                            color: AppColors.accent.withAlpha(30),
+                            color: Brand.navActivePill,
                             borderRadius: BorderRadius.circular(20),
                           )
                         : null,

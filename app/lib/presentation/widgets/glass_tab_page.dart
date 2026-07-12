@@ -7,7 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/colors.dart';
+import '../theme/brand.dart';
 import '../theme/glass_theme.dart';
 import 'duotone_icon.dart';
 import 'glass_app_bar.dart';
@@ -282,10 +282,10 @@ class GlassTabPageState extends State<GlassTabPage>
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(26),
+                        // Kit: only the ACTIVE tab takes lime — pill tint +
+                        // ink-safe icon/label (deep lime on light).
                         color: isSelected
-                            ? (isDark
-                                ? AppColors.accent.withAlpha(35)
-                                : AppColors.accent.withAlpha(20))
+                            ? Brand.navActivePill
                             : Colors.transparent,
                       ),
                       child: Column(
@@ -294,8 +294,9 @@ class GlassTabPageState extends State<GlassTabPage>
                           DuotoneIcon(
                             tab.iconPath,
                             size: 22,
-                            color:
-                                isSelected ? cs.primary : cs.onSurfaceVariant,
+                            color: isSelected
+                                ? Brand.navActive
+                                : Brand.navInactive,
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -307,8 +308,9 @@ class GlassTabPageState extends State<GlassTabPage>
                               fontWeight: isSelected
                                   ? FontWeight.w600
                                   : FontWeight.w500,
-                              color:
-                                  isSelected ? cs.primary : cs.onSurfaceVariant,
+                              color: isSelected
+                                  ? Brand.navActive
+                                  : Brand.navInactive,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -365,7 +367,7 @@ class GlassTabPageState extends State<GlassTabPage>
               child: DuotoneIcon(
                 currentTab.iconPath,
                 size: 26,
-                color: Theme.of(context).colorScheme.primary,
+                color: Brand.navActive,
               ),
             ),
           ),
@@ -408,7 +410,7 @@ class GlassTabPageState extends State<GlassTabPage>
                       fontSize: 16,
                       color: textColor,
                     ),
-                    cursorColor: AppColors.accent,
+                    cursorColor: Brand.focus,
                     decoration: InputDecoration(
                       hintText: widget.searchHint ?? 'Search...',
                       hintStyle: TextStyle(
