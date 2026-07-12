@@ -174,6 +174,11 @@ class AntiSpywareApp extends StatelessWidget {
         themeMode: settings.themeMode,
         builder: (context, child) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
+          // Sync the brand token system with the active theme BEFORE any
+          // Brand.*/AppColors.* getter resolves — this is what flips every
+          // glass/ink token between light and dark.
+          AppColors.uiBrightness =
+              isDark ? Brightness.dark : Brightness.light;
           return GlassGradientBackground(
             isDark: isDark,
             child: AppLockGate(child: child ?? const SizedBox.shrink()),

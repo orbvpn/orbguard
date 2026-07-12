@@ -1,16 +1,22 @@
-/// AppTheme — OrbGuard's world-class dual-mode design system.
+/// AppTheme — OrbGuard on the 2026 OrbVPN brand kit.
 ///
-/// Two carefully tuned [ThemeData]s (light + dark) sharing one brand language:
-/// a single cyan accent, layered neutral surfaces, Inter typography, and
-/// consistent component styling. The frosted-glass components in glass_theme
-/// derive their mode from [Theme.of(context).brightness], so flipping
-/// [MaterialApp.themeMode] re-skins the entire app.
+/// Two [ThemeData]s (light + dark) sharing one brand language: Volt Lime as
+/// the single action accent (fill-only; deep-lime ink on light), Cyber Pink
+/// punctuation, obsidian/cloud surfaces, liquid glass, and the bundled
+/// Archivo / IBM Plex Sans / IBM Plex Mono type stack. The frosted-glass
+/// components in glass_theme derive their mode from
+/// [Theme.of(context).brightness]; flipping [MaterialApp.themeMode] re-skins
+/// the entire app. `AppColors.uiBrightness` is synced in MaterialApp.builder.
 library;
 
+// Cupertino import: CupertinoPageTransitionsBuilder moved from the material
+// library to cupertino in newer Flutter — importing both resolves it on every
+// SDK the app targets (CI pins 3.41.5; dev machines run newer).
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import 'brand.dart';
 import 'colors.dart';
 
 class AppTheme {
@@ -21,34 +27,64 @@ class AppTheme {
   static const double rMd = 16;
   static const double rSm = 12;
 
-  /// Build a complete Inter-based [TextTheme] tuned for a dense security UI.
+  // ---- Kit token shorthands (per-brightness; theme build is explicit) ----
+  static const Color _lime = Color(0xFFC6FF3D);
+  static const Color _onLime = Color(0xFF08080A);
+  static Color _limeHover(bool dark) =>
+      dark ? const Color(0xFFB2E82F) : const Color(0xFFABE52B);
+  static Color _limePressed(bool dark) =>
+      dark ? const Color(0xFF9CCF26) : const Color(0xFF97CC22);
+  static Color _disabledFill(bool dark) =>
+      dark ? const Color(0xFF1C1C21) : const Color(0xFFECEDE7);
+  static Color _onDisabled(bool dark) =>
+      dark ? const Color(0xFF6F717C) : const Color(0xFF8A8C96);
+  static Color _pinkInk(bool dark) =>
+      dark ? const Color(0xFFFF6CC0) : const Color(0xFFD81B86);
+  // Active accent as INK (icons/labels/indicators): raw lime fails contrast on
+  // white, so light uses deep lime.
+  static Color _activeInk(bool dark) => dark ? _lime : const Color(0xFF5C8A00);
+  static Color _activePill(bool dark) => dark
+      ? _lime.withValues(alpha: 0.14)
+      : const Color(0xFF96C414).withValues(alpha: 0.20);
+
+  /// Brand type stack (bundled — no runtime font fetch).
+  /// Display/headlines = Archivo; body/UI = IBM Plex Sans; data labels = Mono.
   static TextTheme _textTheme(Color onSurface, Color muted) {
-    final base = GoogleFonts.interTextTheme();
+    TextStyle d(double size, FontWeight w, {double? h, Color? c}) => TextStyle(
+          fontFamily: Brand.fontDisplay,
+          fontSize: size,
+          fontWeight: w,
+          height: h,
+          letterSpacing: size * -0.02,
+          color: c ?? onSurface,
+        );
     TextStyle s(double size, FontWeight w, {double? h, double? ls, Color? c}) =>
-        GoogleFonts.inter(
+        TextStyle(
+          fontFamily: Brand.fontSans,
           fontSize: size,
           fontWeight: w,
           height: h,
           letterSpacing: ls,
           color: c ?? onSurface,
         );
-    return base.copyWith(
-      // Display / hero numbers (e.g. the security score)
-      displayLarge: s(44, FontWeight.w700, h: 1.05, ls: -1.0),
-      displayMedium: s(36, FontWeight.w700, h: 1.08, ls: -0.8),
-      displaySmall: s(30, FontWeight.w700, h: 1.1, ls: -0.5),
-      // Screen titles
-      headlineMedium: s(24, FontWeight.w700, h: 1.15, ls: -0.4),
-      headlineSmall: s(20, FontWeight.w700, h: 1.2, ls: -0.2),
-      // Card / section titles
-      titleLarge: s(18, FontWeight.w600, h: 1.25, ls: -0.1),
-      titleMedium: s(16, FontWeight.w600, h: 1.3),
+    return TextTheme(
+      // Display / hero numbers (e.g. the security score) — Archivo 800/700
+      displayLarge: d(44, FontWeight.w800, h: 1.05),
+      displayMedium: d(36, FontWeight.w800, h: 1.08),
+      displaySmall: d(30, FontWeight.w700, h: 1.1),
+      // Screen titles — Archivo 700
+      headlineLarge: d(28, FontWeight.w700, h: 1.15),
+      headlineMedium: d(24, FontWeight.w700, h: 1.15),
+      headlineSmall: d(20, FontWeight.w700, h: 1.2),
+      // Card / section titles — IBM Plex Sans 600
+      titleLarge: s(18, FontWeight.w600, h: 1.25, ls: -0.2),
+      titleMedium: s(16, FontWeight.w600, h: 1.3, ls: -0.2),
       titleSmall: s(14, FontWeight.w600, h: 1.3),
-      // Body
-      bodyLarge: s(16, FontWeight.w400, h: 1.45, c: onSurface),
-      bodyMedium: s(14, FontWeight.w400, h: 1.45, c: onSurface),
+      // Body — IBM Plex Sans 400
+      bodyLarge: s(16, FontWeight.w400, h: 1.5),
+      bodyMedium: s(14, FontWeight.w400, h: 1.45),
       bodySmall: s(12.5, FontWeight.w400, h: 1.4, c: muted),
-      // Labels / buttons / chips
+      // Labels / buttons — Plex Sans 600; small data labels lean mono-ish
       labelLarge: s(14, FontWeight.w600, h: 1.2, ls: 0.1),
       labelMedium: s(12, FontWeight.w600, h: 1.2, ls: 0.2, c: muted),
       labelSmall: s(11, FontWeight.w600, h: 1.2, ls: 0.4, c: muted),
@@ -56,28 +92,29 @@ class AppTheme {
   }
 
   static ThemeData _build({required bool dark}) {
-    final brand = dark ? AppColors.brandDark : AppColors.brandLight;
+    // Lime is the scheme primary (fills); ink variants applied per-component.
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
     final surface = dark ? AppColors.surfaceDarkElevated : AppColors.surfaceLightElevated;
     final surfaceHigh = dark ? AppColors.surfaceDarkHigh : AppColors.surfaceLightHigh;
     final onSurface = dark ? AppColors.onDark : AppColors.onLight;
     final muted = dark ? AppColors.onDarkMuted : AppColors.onLightMuted;
     final outline = dark ? AppColors.outlineDark : AppColors.outlineLight;
+    final errorInk = dark ? const Color(0xFFFF5C6C) : const Color(0xFFE0354A);
 
     final scheme = ColorScheme(
       brightness: dark ? Brightness.dark : Brightness.light,
-      primary: brand,
-      onPrimary: dark ? const Color(0xFF04222A) : Colors.white,
-      primaryContainer: brand.withValues(alpha: dark ? 0.18 : 0.12),
-      onPrimaryContainer: brand,
-      secondary: AppColors.secondary,
-      onSecondary: Colors.white,
-      tertiary: AppColors.warning,
-      onTertiary: Colors.white,
-      error: dark ? AppColors.errorLight : AppColors.errorDark,
-      onError: Colors.white,
+      primary: _lime,
+      onPrimary: _onLime, // dark text on Volt Lime — kit rule 5
+      primaryContainer: _activePill(dark),
+      onPrimaryContainer: _activeInk(dark),
+      secondary: AppColors.secondary, // Cyber Pink
+      onSecondary: dark ? _onLime : Colors.white,
+      tertiary: AppColors.orbGold,
+      onTertiary: _onLime,
+      error: errorInk,
+      onError: dark ? const Color(0xFFF5F6F8) : Colors.white,
       errorContainer: AppColors.error.withValues(alpha: dark ? 0.18 : 0.12),
-      onErrorContainer: dark ? AppColors.errorLight : AppColors.errorDark,
+      onErrorContainer: errorInk,
       surface: surface,
       onSurface: onSurface,
       surfaceContainerHighest: surfaceHigh,
@@ -88,7 +125,7 @@ class AppTheme {
       scrim: Colors.black,
       inverseSurface: onSurface,
       onInverseSurface: surface,
-      inversePrimary: brand,
+      inversePrimary: _activeInk(!dark),
     );
 
     final text = _textTheme(onSurface, muted);
@@ -97,8 +134,9 @@ class AppTheme {
       useMaterial3: true,
       brightness: scheme.brightness,
       colorScheme: scheme,
-      primaryColor: brand,
-      // Transparent so the ambient gradient background shows through glass.
+      primaryColor: _lime,
+      fontFamily: Brand.fontSans,
+      // Transparent so the ambient brand background shows through glass.
       scaffoldBackgroundColor: Colors.transparent,
       canvasColor: bg,
       splashFactory: InkRipple.splashFactory,
@@ -122,66 +160,61 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLg)),
       ),
+      // Chips/tags: surface2 base, hairline; selected takes the active pill
+      // tint with active-ink label (only the active item takes lime — kit).
       chipTheme: ChipThemeData(
-        backgroundColor: dark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.black.withValues(alpha: 0.04),
-        selectedColor: brand.withValues(alpha: dark ? 0.20 : 0.14),
+        backgroundColor: _disabledFill(dark),
+        selectedColor: _activePill(dark),
+        disabledColor: _disabledFill(dark).withValues(alpha: 0.5),
         side: BorderSide(color: outline),
         labelStyle: text.labelMedium!.copyWith(color: onSurface),
-        secondaryLabelStyle: text.labelMedium!.copyWith(color: brand),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rSm)),
+        secondaryLabelStyle: text.labelMedium!.copyWith(color: _activeInk(dark)),
+        checkmarkColor: _activeInk(dark),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: brand,
-          foregroundColor: scheme.onPrimary,
-          minimumSize: const Size(0, 50),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          textStyle: text.labelLarge,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(rMd)),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: brand,
-          foregroundColor: scheme.onPrimary,
-          elevation: 0,
-          minimumSize: const Size(0, 50),
-          textStyle: text.labelLarge,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(rMd)),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: onSurface,
-          minimumSize: const Size(0, 50),
-          side: BorderSide(color: outline),
-          textStyle: text.labelLarge,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(rMd)),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: brand,
-          textStyle: text.labelLarge,
-        ),
-      ),
+      // Primary buttons = lime fill with kit hover/pressed/disabled states.
+      filledButtonTheme: FilledButtonThemeData(style: _elevatedStyle(dark, text)),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: _elevatedStyle(dark, text)),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedStyle(dark, text, onSurface, outline)),
+      textButtonTheme: TextButtonThemeData(style: _textBtnStyle(dark, text)),
+      // Switch: lime track + onLime thumb when ON (lime is a FILL here).
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? Colors.white : muted),
+        thumbColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return _onDisabled(dark);
+          if (s.contains(WidgetState.selected)) return _onLime;
+          return muted;
+        }),
         trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected)
-                ? brand
-                : (dark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.10))),
-        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+            s.contains(WidgetState.selected) ? _lime : _disabledFill(dark)),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? Colors.transparent : outline),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return _disabledFill(dark);
+          if (s.contains(WidgetState.selected)) return _lime;
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(_onLime),
+        side: BorderSide(color: muted, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return _onDisabled(dark);
+          if (s.contains(WidgetState.selected)) return _activeInk(dark);
+          return muted;
+        }),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: _lime,
+        inactiveTrackColor: _disabledFill(dark),
+        thumbColor: _lime,
+        overlayColor: _lime.withValues(alpha: 0.12),
+        valueIndicatorColor: surface,
+        valueIndicatorTextStyle: text.labelLarge!.copyWith(color: onSurface),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -201,32 +234,50 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(rMd),
-          borderSide: BorderSide(color: brand, width: 1.4),
+          // Kit focus token — lime on dark, deep lime tint on light.
+          borderSide: BorderSide(
+              color: dark ? _lime : const Color(0xFF8FBF1E), width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rMd),
+          borderSide: BorderSide(color: errorInk, width: 1.6),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rMd),
+          borderSide: BorderSide(color: errorInk, width: 1.6),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLg)),
-        titleTextStyle: text.titleLarge,
-        contentTextStyle: text.bodyMedium,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        // Dialog titles carry the display face (kit).
+        titleTextStyle: TextStyle(
+          fontFamily: Brand.fontDisplay,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: onSurface,
+        ),
+        contentTextStyle: text.bodyMedium!.copyWith(color: muted),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surface,
+        modalBackgroundColor: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(rLg)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
+        showDragHandle: false,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: dark
-            ? AppColors.surfaceDarkHigh
-            : AppColors.onLight,
-        contentTextStyle: text.bodyMedium!.copyWith(
-            color: dark ? AppColors.onDark : Colors.white),
+        backgroundColor:
+            dark ? AppColors.surfaceDarkHigh : AppColors.surfaceDark,
+        contentTextStyle:
+            text.bodyMedium!.copyWith(color: AppColors.onDark),
+        actionTextColor: _lime,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMd)),
       ),
       tooltipTheme: TooltipThemeData(
@@ -234,16 +285,103 @@ class AppTheme {
           color: dark ? AppColors.surfaceDarkHigh : AppColors.onLight,
           borderRadius: BorderRadius.circular(rSm),
         ),
-        textStyle: text.labelMedium!.copyWith(
-            color: dark ? AppColors.onDark : Colors.white),
+        textStyle: text.labelMedium!.copyWith(color: AppColors.onDark),
       ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: brand),
-      pageTransitionsTheme: const PageTransitionsTheme(builders: {
-        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      tabBarTheme: TabBarThemeData(
+        labelColor: _activeInk(dark),
+        unselectedLabelColor: muted,
+        indicatorColor: _activeInk(dark),
+        dividerColor: Colors.transparent,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        labelStyle: text.titleSmall,
+        unselectedLabelStyle: text.titleSmall!.copyWith(fontWeight: FontWeight.w500),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: _activeInk(dark),
+        linearTrackColor: _disabledFill(dark),
+        circularTrackColor: Colors.transparent,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: _lime,
+        foregroundColor: _onLime,
+        elevation: 4,
+      ),
+      pageTransitionsTheme: PageTransitionsTheme(builders: {
+        TargetPlatform.android: const CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
+      }),
+    );
+  }
+
+  /// ElevatedButton / FilledButton = primary lime with kit states.
+  static ButtonStyle _elevatedStyle(bool dark, TextTheme text) {
+    return ButtonStyle(
+      elevation: const WidgetStatePropertyAll(0),
+      minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+      padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+      shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+      textStyle: WidgetStatePropertyAll(text.labelLarge!.copyWith(fontSize: 16)),
+      backgroundColor: WidgetStateProperty.resolveWith((s) {
+        if (s.contains(WidgetState.disabled)) return _disabledFill(dark);
+        if (s.contains(WidgetState.pressed)) return _limePressed(dark);
+        if (s.contains(WidgetState.hovered)) return _limeHover(dark);
+        return _lime;
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.disabled) ? _onDisabled(dark) : _onLime),
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    );
+  }
+
+  /// OutlinedButton = secondary/ghost; neutral text + hairline, glass-like.
+  static ButtonStyle _outlinedStyle(
+      bool dark, TextTheme text, Color onSurface, Color outline) {
+    return ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+      padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+      shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+      textStyle: WidgetStatePropertyAll(text.labelLarge!.copyWith(fontSize: 16)),
+      foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.disabled) ? _onDisabled(dark) : onSurface),
+      side: WidgetStateProperty.resolveWith((s) => BorderSide(
+            color: s.contains(WidgetState.disabled)
+                ? outline.withValues(alpha: 0.5)
+                : outline,
+          )),
+      overlayColor: WidgetStateProperty.resolveWith((s) {
+        if (s.contains(WidgetState.pressed)) return onSurface.withValues(alpha: 0.10);
+        if (s.contains(WidgetState.hovered)) return onSurface.withValues(alpha: 0.05);
+        return Colors.transparent;
+      }),
+    );
+  }
+
+  /// TextButton = ghost; pink-ink label, subtle overlay on hover/press.
+  static ButtonStyle _textBtnStyle(bool dark, TextTheme text) {
+    return ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
+      padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+      shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+      textStyle: WidgetStatePropertyAll(text.labelLarge),
+      foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.disabled) ? _onDisabled(dark) : _pinkInk(dark)),
+      overlayColor: WidgetStateProperty.resolveWith((s) {
+        if (s.contains(WidgetState.pressed)) {
+          return _pinkInk(dark).withValues(alpha: 0.14);
+        }
+        if (s.contains(WidgetState.hovered)) {
+          return _pinkInk(dark).withValues(alpha: 0.08);
+        }
+        return Colors.transparent;
       }),
     );
   }
@@ -251,7 +389,9 @@ class AppTheme {
   static final ThemeData dark = _build(dark: true);
   static final ThemeData light = _build(dark: false);
 
-  /// Ambient full-screen gradient background for the given brightness.
+  /// Ambient full-screen gradient background for the given brightness —
+  /// obsidian/cloud (the BrandBed radial washes layer on top of this in
+  /// GlassGradientBackground).
   static BoxDecoration backgroundDecoration(bool dark) => BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,

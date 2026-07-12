@@ -58,7 +58,6 @@ dependencies:
   local_auth: ^2.3.0
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
-  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:
@@ -69,3 +68,34 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+
+  # Brand type stack — bundled (no runtime font fetch), shared with OrbVPN.
+  # Display = Archivo · body/UI = IBM Plex Sans · labels/data = IBM Plex Mono.
+  # RTL script families (future locales): Persian = Vazirmatn, Arabic = IBM
+  # Plex Sans Arabic.
+  fonts:
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-Variable.ttf
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Variable.ttf
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Variable.ttf
+    - family: IBM Plex Sans Arabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
