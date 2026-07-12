@@ -1,0 +1,7 @@
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# app/ and backend/ each keep their own .gitignore for language-specific artifacts
