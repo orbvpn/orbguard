@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -200,7 +201,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _loadIndicators,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
             ),
@@ -351,7 +352,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                   style: TextStyle(
                     color: cs.onSurface,
                     fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
+                    fontFamily: Brand.fontMono,
                     fontSize: 13,
                   ),
                   maxLines: 1,
@@ -416,7 +417,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _checkInputController,
-                  style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
+                  style: TextStyle(color: cs.onSurface, fontFamily: Brand.fontMono),
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'Enter indicators (one per line)\ne.g., 192.168.1.1\nmalware.com\n5d41402abc4b2a76b9719d911017c592',
@@ -424,7 +425,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                     filled: true,
                     fillColor: cs.onSurface.withValues(alpha: 0.04),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -438,13 +439,13 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Brand.onLime),
                           )
                         : const DuotoneIcon('magnifer', size: 20),
                     label: Text(_isSearching ? 'Checking...' : 'Check Indicators'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Brand.onLime,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
@@ -554,7 +555,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               children: [
                 Text(
                   result.value, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                  style: TextStyle(color: context.onSurface, fontWeight: FontWeight.bold, fontFamily: Brand.fontMono),
                 ),
                 Row(
                   children: [
@@ -626,7 +627,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: isDark),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -655,7 +657,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                             color: cs.onSurface,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       ],
@@ -742,14 +744,14 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         title: Text('Check $type', style: TextStyle(color: cs.onSurface)),
         content: TextField(
           controller: controller,
-          style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
+          style: TextStyle(color: cs.onSurface, fontFamily: Brand.fontMono),
           decoration: InputDecoration(
             hintText: 'Enter $type',
             hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
             filled: true,
             fillColor: cs.onSurface.withValues(alpha: 0.04),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               borderSide: BorderSide.none,
             ),
           ),
@@ -771,7 +773,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
             child: const Text('Check'),
           ),

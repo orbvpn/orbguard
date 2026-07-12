@@ -2,6 +2,7 @@
 // State management for supply chain vulnerability monitoring
 
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/notifications/notification_channels.dart';
 import '../services/notifications/notification_service.dart';
@@ -196,15 +197,15 @@ class SupplyChainProvider extends ChangeNotifier {
   static int getRiskColor(RiskLevel level) {
     switch (level) {
       case RiskLevel.critical:
-        return 0xFFFF1744;
+        return AppColors.severityCritical.toARGB32();
       case RiskLevel.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case RiskLevel.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case RiskLevel.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
       case RiskLevel.safe:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
     }
   }
 

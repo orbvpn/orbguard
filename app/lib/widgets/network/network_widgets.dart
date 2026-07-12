@@ -3,6 +3,9 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
 
@@ -28,7 +31,7 @@ class WifiSecurityBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(compact ? 4 : 8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -83,7 +86,7 @@ class SignalStrengthIndicator extends StatelessWidget {
               margin: const EdgeInsets.only(right: 2),
               decoration: BoxDecoration(
                 color: isActive ? color : cs.onSurfaceVariant.withAlpha(77),
-                borderRadius: BorderRadius.circular(1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
             );
           }),
@@ -103,9 +106,9 @@ class SignalStrengthIndicator extends StatelessWidget {
   }
 
   Color _getColor() {
-    if (strength > -60) return Colors.green;
-    if (strength > -70) return Colors.orange;
-    return Colors.red;
+    if (strength > -60) return AppColors.accentInk;
+    if (strength > -70) return AppColors.amberInk;
+    return AppColors.errorInk;
   }
 
   int _getBars() {
@@ -131,19 +134,19 @@ class WifiNetworkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final borderColor = network.isConnected
-        ? const Color(0xFF00D9FF).withAlpha(75)
+        ? AppColors.secondaryInk.withAlpha(75)
         : !network.security.isSecure
-            ? Colors.red.withAlpha(75)
+            ? AppColors.error.withAlpha(75)
             : cs.outline;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: borderColor),
         ),
         child: Row(
@@ -154,18 +157,18 @@ class WifiNetworkCard extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 color: network.isConnected
-                    ? const Color(0xFF00D9FF).withAlpha(40)
+                    ? AppColors.info.withAlpha(40)
                     : !network.security.isSecure
-                        ? Colors.red.withAlpha(40)
+                        ? AppColors.error.withAlpha(40)
                         : cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
               child: DuotoneIcon(
                 network.security.isSecure ? AppIcons.wifi : AppIcons.wifi,
                 color: network.isConnected
-                    ? const Color(0xFF00D9FF)
+                    ? AppColors.secondaryInk
                     : !network.security.isSecure
-                        ? Colors.red
+                        ? AppColors.errorInk
                         : cs.onSurfaceVariant,
               ),
             ),
@@ -199,13 +202,13 @@ class WifiNetworkCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00D9FF).withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppColors.info.withAlpha(40),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Connected',
                             style: TextStyle(
-                              color: Color(0xFF00D9FF),
+                              color: AppColors.secondaryInk,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
@@ -225,7 +228,7 @@ class WifiNetworkCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: cs.onSurface.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           network.is5GHz ? '5 GHz' : '2.4 GHz',
@@ -265,16 +268,16 @@ class NetworkThreatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = threat.isCritical ? Colors.red : Colors.orange;
+    final color = threat.isCritical ? AppColors.errorInk : AppColors.amberInk;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: color.withAlpha(75)),
         ),
         child: Column(
@@ -287,7 +290,7 @@ class NetworkThreatCard extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -312,10 +315,10 @@ class NetworkThreatCard extends StatelessWidget {
                       ),
                       Text(
                         threat.severity.toUpperCase(),
-                        style: TextStyle(
+                        style: BrandText.label(
                           color: color,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                          size: 10,
+                          weight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -345,7 +348,7 @@ class NetworkThreatCard extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: color.withAlpha(20),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Row(
                   children: [
@@ -399,18 +402,14 @@ class NetworkStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Network Security',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(color: cs.onSurface, size: 18),
           ),
           const SizedBox(height: 20),
           Row(
@@ -421,7 +420,7 @@ class NetworkStatsCard extends StatelessWidget {
                   'Scans',
                   stats.totalScans.toString(),
                   AppIcons.radar,
-                  const Color(0xFF00D9FF),
+                  AppColors.secondaryInk,
                 ),
               ),
               Expanded(
@@ -430,7 +429,9 @@ class NetworkStatsCard extends StatelessWidget {
                   'Threats',
                   stats.threatsDetected.toString(),
                   AppIcons.dangerTriangle,
-                  stats.threatsDetected > 0 ? Colors.red : Colors.green,
+                  stats.threatsDetected > 0
+                      ? AppColors.errorInk
+                      : AppColors.accentInk,
                 ),
               ),
             ],
@@ -444,7 +445,7 @@ class NetworkStatsCard extends StatelessWidget {
                   'Open Networks',
                   stats.openNetworksFound.toString(),
                   AppIcons.lockUnlocked,
-                  Colors.orange,
+                  AppColors.amberInk,
                 ),
               ),
               Expanded(
@@ -453,7 +454,9 @@ class NetworkStatsCard extends StatelessWidget {
                   'Rogue APs',
                   stats.rogueApsDetected.toString(),
                   AppIcons.shield,
-                  stats.rogueApsDetected > 0 ? Colors.red : Colors.purple,
+                  stats.rogueApsDetected > 0
+                      ? AppColors.errorInk
+                      : AppColors.chartColors[4],
                 ),
               ),
             ],
@@ -470,7 +473,7 @@ class NetworkStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -482,11 +485,7 @@ class NetworkStatsCard extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: BrandText.heading(color: color, size: 18),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -527,7 +526,7 @@ class CurrentNetworkCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: cs.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         ),
         child: Column(
           children: [
@@ -560,11 +559,11 @@ class CurrentNetworkCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         border: Border.all(
           color: network!.security.isSecure
-              ? Colors.green.withAlpha(75)
-              : Colors.red.withAlpha(75),
+              ? AppColors.success.withAlpha(75)
+              : AppColors.error.withAlpha(75),
         ),
       ),
       child: Column(
@@ -577,13 +576,15 @@ class CurrentNetworkCard extends StatelessWidget {
                 height: 56,
                 decoration: BoxDecoration(
                   color: network!.security.isSecure
-                      ? Colors.green.withAlpha(40)
-                      : Colors.red.withAlpha(40),
-                  borderRadius: BorderRadius.circular(14),
+                      ? AppColors.success.withAlpha(40)
+                      : AppColors.error.withAlpha(40),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                 ),
                 child: DuotoneIcon(
                   network!.security.isSecure ? AppIcons.wifi : AppIcons.wifi,
-                  color: network!.security.isSecure ? Colors.green : Colors.red,
+                  color: network!.security.isSecure
+                      ? AppColors.accentInk
+                      : AppColors.errorInk,
                   size: 28,
                 ),
               ),
@@ -616,7 +617,7 @@ class CurrentNetworkCard extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -632,18 +633,18 @@ class CurrentNetworkCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(20),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 18),
+                  DuotoneIcon(AppIcons.dangerTriangle, color: AppColors.errorInk, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'This network is not secure. Use a VPN for protection.',
                       style: TextStyle(
-                        color: Colors.red[300],
+                        color: AppColors.errorInk,
                         fontSize: 12,
                       ),
                     ),

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
 class RootInstructionsScreen extends StatefulWidget {
@@ -140,7 +143,7 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _openXdaForum,
-            icon: const DuotoneIcon(AppIcons.share, color: Colors.white),
+            icon: const DuotoneIcon(AppIcons.share, color: Brand.onLime),
             label: const Text('Visit XDA Developers Forum'),
             style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
           ),
@@ -153,14 +156,14 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.black,
+                      color: Brand.onLime,
                     ),
                   )
-                : const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
+                : const DuotoneIcon(AppIcons.checkCircle, color: Brand.onLime),
             label: Text(_isTesting ? 'Testing...' : 'Test Root Access'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: GlassTheme.primaryAccent,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.all(16),
             ),
           ),
@@ -196,12 +199,12 @@ class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Text(
                 '💡 $note',
-                style: const TextStyle(fontSize: 12, color: Colors.blue),
+                style: TextStyle(fontSize: 12, color: AppColors.secondaryInk),
               ),
             ),
           ],

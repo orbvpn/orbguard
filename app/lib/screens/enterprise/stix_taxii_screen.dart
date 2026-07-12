@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -211,7 +212,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
             const SizedBox(width: 12),
             _buildStatCard('Connected', '${_servers.where((s) => s.isConnected).length}', GlassTheme.successColor),
             const SizedBox(width: 12),
-            _buildStatCard('Collections', '${_collections.length}', const Color(0xFF9C27B0)),
+            _buildStatCard('Collections', '${_collections.length}', AppColors.chartColors[4]),
           ],
         ),
         const SizedBox(height: 24),
@@ -601,7 +602,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+                const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -659,7 +661,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -768,15 +771,15 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
       case 'malware':
         return GlassTheme.errorColor;
       case 'threat-actor':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case 'campaign':
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[3];
       case 'attack-pattern':
-        return const Color(0xFFFF5722);
+        return AppColors.severityCritical;
       case 'vulnerability':
-        return const Color(0xFFE91E63);
+        return AppColors.secondaryInk;
       case 'tool':
-        return const Color(0xFF607D8B);
+        return AppColors.severityInfo;
       default:
         return GlassTheme.primaryAccent;
     }

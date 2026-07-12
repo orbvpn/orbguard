@@ -26,6 +26,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -466,10 +467,10 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             child: TextButton.icon(
               onPressed: _isRunningAnalysis ? null : _runAnalysis,
               icon: DuotoneIcon(AppIcons.refresh, size: 16,
-                  color: GlassTheme.primaryAccent),
-              label: const Text(
+                  color: AppColors.accentInk),
+              label: Text(
                 'Check Again',
-                style: TextStyle(color: GlassTheme.primaryAccent),
+                style: TextStyle(color: AppColors.accentInk),
               ),
             ),
           ),
@@ -704,8 +705,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -799,13 +800,13 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'critical':
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case 'high':
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case 'medium':
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       default:
-        return const Color(0xFF4CAF50);
+        return AppColors.severityLow;
     }
   }
 
@@ -963,13 +964,13 @@ class MLInsight {
   Color get color {
     switch (severity.toLowerCase()) {
       case 'critical':
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case 'high':
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case 'warning':
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       default:
-        return const Color(0xFF2196F3);
+        return AppColors.severityInfo;
     }
   }
 

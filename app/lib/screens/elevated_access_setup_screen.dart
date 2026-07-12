@@ -3,6 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
 class ElevatedAccessSetupScreen extends StatefulWidget {
@@ -71,18 +74,18 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
     );
   }
 
   Color _getLevelColor() {
     switch (_currentLevel) {
       case 'ROOT':
-        return Colors.green;
+        return AppColors.accentInk;
       case 'SHELL':
-        return Colors.cyan;
+        return AppColors.secondaryInk;
       default:
-        return Colors.blue;
+        return Brand.text2;
     }
   }
 
@@ -176,8 +179,8 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: cap.startsWith('✓')
-                                      ? Colors.green
-                                      : Colors.orange,
+                                      ? AppColors.accentInk
+                                      : AppColors.secondaryInk,
                                 ),
                               ),
                             ),
@@ -223,11 +226,11 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   if (_currentLevel == 'STANDARD') ...[
                     ElevatedButton.icon(
                       onPressed: _setupElevatedAccess,
-                      icon: const DuotoneIcon(AppIcons.arrowUp, color: Colors.black),
+                      icon: const DuotoneIcon(AppIcons.arrowUp, color: Brand.onLime),
                       label: const Text('Enable Shell Access'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00D9FF),
-                        foregroundColor: Colors.black,
+                        backgroundColor: GlassTheme.primaryAccent,
+                        foregroundColor: Brand.onLime,
                         padding: const EdgeInsets.all(16),
                       ),
                     ),
@@ -244,7 +247,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   ] else ...[
                     ElevatedButton.icon(
                       onPressed: _checkCurrentAccess,
-                      icon: const DuotoneIcon(AppIcons.refresh, color: Colors.white),
+                      icon: const DuotoneIcon(AppIcons.refresh, color: Brand.onLime),
                       label: const Text('Re-check Access Level'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.all(16),
@@ -258,25 +261,25 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green),
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
+                      border: Border.all(color: AppColors.accentInk),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const DuotoneIcon(AppIcons.verifiedCheck, color: Colors.green),
+                            DuotoneIcon(AppIcons.verifiedCheck, color: AppColors.accentInk),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Safety & Privacy',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.green,
+                                  color: AppColors.accentInk,
                                 ),
                               ),
                             ),
@@ -310,7 +313,7 @@ class _ElevatedAccessSetupScreenState extends State<ElevatedAccessSetupScreen> {
           children: [
             Row(
               children: [
-                DuotoneIcon(icon, color: const Color(0xFF00D9FF)),
+                DuotoneIcon(icon, color: AppColors.accentInk),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -389,14 +392,14 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('✓ Shell access enabled successfully!'),
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
       ),
     );
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
     );
   }
 
@@ -420,17 +423,17 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
           children: [
             // Benefits Card
             Card(
-              color: Colors.blue.withValues(alpha: 0.1),
+              color: AppColors.info.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        DuotoneIcon(AppIcons.star, color: Colors.blue),
-                        SizedBox(width: 8),
-                        Expanded(
+                        DuotoneIcon(AppIcons.star, color: AppColors.secondaryInk),
+                        const SizedBox(width: 8),
+                        const Expanded(
                           child: Text(
                             'What You\'ll Get',
                             maxLines: 1,
@@ -466,7 +469,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
 
               return Card(
                 color: isActive
-                    ? const Color(0xFF00D9FF).withValues(alpha: 0.1)
+                    ? AppColors.accentPill
                     : Theme.of(context).colorScheme.surface,
                 margin: const EdgeInsets.only(bottom: 16),
                 child: InkWell(
@@ -483,8 +486,8 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                               height: 32,
                               decoration: BoxDecoration(
                                 color: isActive
-                                    ? const Color(0xFF00D9FF)
-                                    : Colors.grey,
+                                    ? AppColors.primary
+                                    : Brand.surface2,
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
@@ -492,7 +495,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                                   '${index + 1}',
                                   style: TextStyle(
                                     color:
-                                        isActive ? Colors.black : Colors.white,
+                                        isActive ? Brand.onLime : Brand.text,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -529,11 +532,11 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                                     .join('\n');
                                 _copyCommand(command);
                               },
-                              icon: const DuotoneIcon(AppIcons.copy, color: Colors.black),
+                              icon: const DuotoneIcon(AppIcons.copy, color: Brand.onLime),
                               label: const Text('Copy Command'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00D9FF),
-                                foregroundColor: Colors.black,
+                                backgroundColor: GlassTheme.primaryAccent,
+                                foregroundColor: Brand.onLime,
                               ),
                             ),
                           ],
@@ -551,17 +554,17 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
+                border: Border.all(color: AppColors.secondaryInk),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
-                      SizedBox(width: 8),
+                      DuotoneIcon(AppIcons.infoCircle, color: AppColors.secondaryInk),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Important Note',
@@ -569,7 +572,7 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: AppColors.secondaryInk,
                           ),
                         ),
                       ),
@@ -592,10 +595,11 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const DuotoneIcon(AppIcons.checkCircle, color: Colors.white),
+                  : const DuotoneIcon(AppIcons.checkCircle, color: Brand.onLime),
               label: Text(_isVerifying ? 'Verifying...' : 'Verify Access'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: AppColors.success,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.all(16),
               ),
             ),

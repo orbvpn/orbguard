@@ -49,6 +49,7 @@ import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
 
 // Glass Theme & Colors
+import 'presentation/theme/brand.dart';
 import 'presentation/theme/glass_theme.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/theme/colors.dart';
@@ -366,24 +367,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.green.withAlpha(51),
+                color: AppColors.accentPill,
               ),
-              child: const Center(
+              child: Center(
                 child: DuotoneIcon(
                   AppIcons.shieldCheck,
                   size: 48,
-                  color: Colors.green,
+                  color: AppColors.accentInk,
                 ),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'All Clear!',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
+              style: BrandText.h2(size: 24, color: AppColors.accentInk),
             ),
             const SizedBox(height: 12),
             Text(
@@ -397,15 +394,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
+              // Themed lime primary (kit states come from AppTheme).
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
                 child: const Text('Great!'),
               ),
             ),
@@ -729,7 +720,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           filter: GlassTheme.blurFilter,
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withAlpha(200) : Colors.white.withAlpha(240),
+              // Heavy glass panel over the brand bed — obsidian/white tint.
+              color: isDark
+                  ? AppColors.backgroundDark.withAlpha(200)
+                  : AppColors.surfaceLight.withAlpha(240),
               borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(24),
                 bottomRight: Radius.circular(24),
@@ -1217,9 +1211,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              color: isDark
-                  ? Colors.white.withAlpha(8)
-                  : Colors.black.withAlpha(5),
+              // Neutral row tint from the scheme (theme-aware).
+              color: cs.onSurface.withValues(alpha: 0.04),
             ),
             child: Row(
               children: [

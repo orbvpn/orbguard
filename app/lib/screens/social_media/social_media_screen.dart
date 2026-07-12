@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -60,7 +62,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                             onPressed: _showAddAccountDialog,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: GlassTheme.primaryAccent,
-                              foregroundColor: Colors.black,
+                              foregroundColor: Brand.onLime,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 8,
@@ -152,7 +154,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               decoration: BoxDecoration(
                 color: (hasAlerts ? GlassTheme.errorColor : GlassTheme.successColor)
                     .withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
               ),
               child: Center(
                 child: DuotoneIcon(
@@ -282,6 +284,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
   Widget _buildAccountCard(SocialAccount account, SocialMediaProvider provider) {
     final cs = Theme.of(context).colorScheme;
+    // vendor identity — platform brand color from provider
     final platformColor = Color(SocialMediaProvider.getPlatformColor(account.platform));
     final hasPrivacyScore = account.privacyScore != null;
 
@@ -298,7 +301,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: platformColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: DuotoneIcon(
                   _getPlatformSvgIcon(account.platform),
@@ -356,7 +359,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   decoration: BoxDecoration(
                     color: Color(SocialMediaProvider.getSeverityColor(risk.severity))
                         .withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     risk.title,
@@ -385,8 +388,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               ElevatedButton(
                 onPressed: () => provider.scanAccount(account.id),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: platformColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: platformColor, // vendor identity
+                  foregroundColor: Colors.white, // vendor identity (on platform fill)
                 ),
                 child: const Text('Scan'),
               ),
@@ -400,10 +403,9 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   Widget _buildPrivacyBadge(int score) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: _getPrivacyColor(score).withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _getPrivacyColor(score).withValues(alpha: 0.3)),
+      decoration: GlassTheme.tintedGlassDecoration(
+        tintColor: _getPrivacyColor(score),
+        radius: GlassTheme.radiusXSmall,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -446,6 +448,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
   Widget _buildAlertCard(ImpersonationAlert alert, SocialMediaProvider provider) {
     final cs = Theme.of(context).colorScheme;
+    // vendor identity — platform brand color from provider
     final platformColor = Color(SocialMediaProvider.getPlatformColor(alert.platform));
     final threatColor = _getThreatColor(alert.threatLevel);
 
@@ -461,7 +464,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 height: 44,
                 decoration: BoxDecoration(
                   color: threatColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Center(
                   child: DuotoneIcon(
@@ -497,7 +500,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: threatColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   alert.threatLevel,
@@ -515,7 +518,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: cs.onSurface.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,7 +599,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: cs.onSurface.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     indicator,
@@ -625,11 +628,9 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 onPressed: () => provider.reportImpersonator(alert.id),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.errorColor,
+                  foregroundColor: Brand.onDanger,
                 ),
-                child: const Text(
-                  'Report',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: const Text('Report'),
               ),
             ],
           ),
@@ -663,6 +664,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   Widget _buildPrivacyCard(SocialAccount account) {
     final cs = Theme.of(context).colorScheme;
     final score = account.privacyScore!;
+    // vendor identity — platform brand color from provider
     final platformColor = Color(SocialMediaProvider.getPlatformColor(account.platform));
 
     return GlassCard(
@@ -677,7 +679,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 height: 44,
                 decoration: BoxDecoration(
                   color: platformColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: DuotoneIcon(
                   _getPlatformSvgIcon(account.platform),
@@ -732,7 +734,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
           const SizedBox(height: 16),
           // Progress bar
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             child: LinearProgressIndicator(
               value: score.overallScore / 100,
               backgroundColor: cs.onSurface.withValues(alpha: 0.06),
@@ -867,7 +869,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 height: 40,
                 decoration: BoxDecoration(
                   color: severityColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Center(
                   child: DuotoneIcon(
@@ -903,7 +905,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: severityColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   exposure.severity.name.toUpperCase(),
@@ -929,7 +931,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: GlassTheme.primaryAccent.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Row(
               children: [
@@ -997,7 +999,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Padding(
@@ -1017,7 +1020,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
               ),
@@ -1037,6 +1040,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 child: Row(
                   children: SocialPlatform.values.take(6).map((platform) {
                     final isSelected = platform == _selectedPlatform;
+                    // vendor identity — platform brand color from provider
                     final color = Color(SocialMediaProvider.getPlatformColor(platform));
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -1049,7 +1053,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                             color: isSelected
                                 ? color.withValues(alpha: 0.3)
                                 : cs.onSurface.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                             border: Border.all(
                               color: isSelected ? color : Colors.transparent,
                             ),
@@ -1082,7 +1086,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   filled: true,
                   fillColor: cs.onSurface.withValues(alpha: 0.04),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -1102,17 +1106,18 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
+                    // vendor identity — platform brand color from provider
                     backgroundColor: Color(
                         SocialMediaProvider.getPlatformColor(_selectedPlatform)),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                   ),
                   child: const Text(
                     'Add Account',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.white, // vendor identity (on platform fill)
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1156,22 +1161,22 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
   Color _getPrivacyColor(int score) {
     if (score >= 80) return GlassTheme.successColor;
-    if (score >= 60) return const Color(0xFF8BC34A);
+    if (score >= 60) return AppColors.successDark;
     if (score >= 40) return GlassTheme.warningColor;
-    if (score >= 20) return const Color(0xFFFF5722);
-    return GlassTheme.errorColor;
+    if (score >= 20) return AppColors.severityHigh;
+    return AppColors.severityCritical;
   }
 
   Color _getThreatColor(String level) {
     switch (level.toLowerCase()) {
       case 'critical':
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case 'high':
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case 'medium':
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       default:
-        return const Color(0xFFFFEB3B);
+        return AppColors.severityLow;
     }
   }
 }

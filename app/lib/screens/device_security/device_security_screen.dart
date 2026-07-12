@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -45,7 +47,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: DuotoneIcon('check_circle', size: 24, color: GlassTheme.successColor),
+                        icon: DuotoneIcon('check_circle', size: 24, color: AppColors.accentInk),
                         tooltip: 'Mark as Recovered',
                         onPressed: () => provider.markAsRecovered(),
                       ),
@@ -58,28 +60,28 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               label: 'Status',
               iconPath: 'shield',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildStatusTab(provider),
             ),
             GlassTab(
               label: 'Anti-Theft',
               iconPath: 'smartphone',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildAntiTheftTab(provider),
             ),
             GlassTab(
               label: 'Location',
               iconPath: 'settings',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildLocationTab(provider),
             ),
             GlassTab(
               label: 'SIM',
               iconPath: 'chart',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildSimTab(provider),
             ),
           ],
@@ -95,6 +97,11 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
         : status.isLost
             ? GlassTheme.warningColor
             : GlassTheme.successColor;
+    final statusInk = status.isStolen
+        ? AppColors.errorInk
+        : status.isLost
+            ? AppColors.secondaryInk
+            : AppColors.accentInk;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -131,7 +138,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                                     ? 'Device Marked Lost'
                                     : 'Device Secure',
                             style: TextStyle(
-                              color: statusColor,
+                              color: statusInk,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -156,8 +163,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                           icon: DuotoneIcon('object_scan', size: 18),
                           label: const Text('Mark Lost'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: GlassTheme.warningColor,
-                            side: const BorderSide(color: GlassTheme.warningColor),
+                            foregroundColor: AppColors.secondaryInk,
+                            side: BorderSide(color: AppColors.secondaryInk),
                           ),
                         ),
                       ),
@@ -168,8 +175,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                           icon: DuotoneIcon('danger_circle', size: 18),
                           label: const Text('Mark Stolen'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: GlassTheme.errorColor,
-                            side: const BorderSide(color: GlassTheme.errorColor),
+                            foregroundColor: AppColors.errorInk,
+                            side: BorderSide(color: AppColors.errorInk),
                           ),
                         ),
                       ),
@@ -204,7 +211,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           // Quick Actions
           Text(
             'Quick Actions',
-            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+            style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 12),
 
@@ -213,7 +220,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               _buildActionButton(
                 svgIcon: 'map_point',
                 label: 'Locate',
-                color: GlassTheme.primaryAccent,
+                color: AppColors.accentInk,
                 isLoading: provider.isLocating,
                 onPressed: () => provider.locateDevice(),
               ),
@@ -221,7 +228,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               _buildActionButton(
                 svgIcon: 'lock',
                 label: 'Lock',
-                color: const Color(0xFF9C27B0),
+                color: AppColors.chartColors[4],
                 isLoading: provider.isSendingCommand,
                 onPressed: () => _showLockDialog(context, provider),
               ),
@@ -229,7 +236,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               _buildActionButton(
                 svgIcon: 'bell',
                 label: 'Ring',
-                color: GlassTheme.warningColor,
+                color: AppColors.secondaryInk,
                 isLoading: provider.isSendingCommand,
                 onPressed: () => provider.ringDevice(),
               ),
@@ -237,7 +244,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               _buildActionButton(
                 svgIcon: 'trash_bin_trash',
                 label: 'Wipe',
-                color: GlassTheme.errorColor,
+                color: AppColors.errorInk,
                 isLoading: provider.isSendingCommand,
                 onPressed: () => _showWipeDialog(context, provider),
               ),
@@ -249,7 +256,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 24),
             Text(
               'Recent Commands',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             ...provider.issuedCommands.take(5).map(_buildCommandCard),
@@ -263,7 +270,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               children: [
                 Text(
                   'OS Vulnerabilities',
-                  style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: BrandText.title(size: 18),
                 ),
                 GlassBadge(
                   text: '${status.vulnerabilities.length} found',
@@ -289,6 +296,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             : score >= 50
                 ? GlassTheme.warningColor
                 : GlassTheme.errorColor;
+    final ink = score == null
+        ? context.colors.onSurfaceVariant.withValues(alpha: 0.7)
+        : score >= 80
+            ? AppColors.accentInk
+            : score >= 50
+                ? AppColors.secondaryInk
+                : AppColors.errorInk;
 
     return GlassCard(
       margin: EdgeInsets.zero,
@@ -308,7 +322,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 ),
                 Text(
                   score == null ? '—' : '$score',
-                  style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: BrandText.heading(size: 20, color: ink),
                 ),
               ],
             ),
@@ -320,7 +334,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               children: [
                 Text(
                   'Security Score',
-                  style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: BrandText.title(),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -351,7 +365,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       tintColor: GlassTheme.errorColor,
       child: Row(
         children: [
-          DuotoneIcon('danger_circle', size: 22, color: GlassTheme.errorColor),
+          DuotoneIcon('danger_circle', size: 22, color: AppColors.errorInk),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -377,7 +391,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
         children: [
           Row(
             children: [
-              DuotoneIcon('chat_dots', size: 20, color: GlassTheme.primaryAccent),
+              DuotoneIcon('chat_dots', size: 20, color: AppColors.accentInk),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -408,6 +422,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
   Widget _buildAgentCard(DeviceSecurityProvider provider) {
     final running = provider.agentRunning;
     final color = running ? GlassTheme.successColor : GlassTheme.warningColor;
+    final ink = running ? AppColors.accentInk : AppColors.secondaryInk;
 
     Widget statusLine(String label, String? value) {
       if (value == null) return const SizedBox.shrink();
@@ -449,7 +464,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   children: [
                     Text(
                       running ? 'Anti-Theft Agent Active' : 'Anti-Theft Agent Stopped',
-                      style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: ink, fontWeight: FontWeight.bold),
                     ),
                     if (provider.agentLastPollAt != null)
                       Text(
@@ -548,10 +563,10 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildVulnerabilityCard(OSVulnerability vuln) {
     final severityColor = vuln.severity == 'critical'
-        ? GlassTheme.errorColor
+        ? AppColors.severityCritical
         : vuln.severity == 'high'
-            ? const Color(0xFFFF5722)
-            : GlassTheme.warningColor;
+            ? AppColors.severityHigh
+            : AppColors.severityMedium;
 
     return GlassCard(
       child: Column(
@@ -609,12 +624,12 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                DuotoneIcon('refresh', size: 14, color: GlassTheme.warningColor),
+                DuotoneIcon('refresh', size: 14, color: AppColors.secondaryInk),
                 const SizedBox(width: 4),
                 Text(
                   'Fixed in ${vuln.fixedVersion}',
-                  style: const TextStyle(
-                    color: GlassTheme.warningColor,
+                  style: TextStyle(
+                    color: AppColors.secondaryInk,
                     fontSize: 12,
                   ),
                 ),
@@ -636,7 +651,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
         children: [
           Text(
             'Anti-Theft Settings',
-            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+            style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 12),
 
@@ -654,7 +669,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             subtitle: 'Allow remote device locking',
             value: settings.lockEnabled,
             onChanged: (v) => provider.updateSettings(settings.copyWith(lockEnabled: v)),
-            color: const Color(0xFF9C27B0),
+            color: AppColors.chartColors[4],
           ),
           _buildSettingsTile(
             svgIcon: 'bell',
@@ -678,7 +693,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             subtitle: 'Alert when SIM card is changed',
             value: settings.simMonitoringEnabled,
             onChanged: (v) => provider.updateSettings(settings.copyWith(simMonitoringEnabled: v)),
-            color: const Color(0xFF2196F3),
+            color: AppColors.info,
           ),
           _buildSettingsTile(
             svgIcon: 'object_scan',
@@ -686,7 +701,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             subtitle: 'Take photo after failed unlock attempts',
             value: settings.thiefSelfieEnabled,
             onChanged: (v) => provider.updateSettings(settings.copyWith(thiefSelfieEnabled: v)),
-            color: const Color(0xFFFF5722),
+            color: AppColors.severityCritical,
           ),
 
           const SizedBox(height: 24),
@@ -718,7 +733,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                     ),
                     Text(
                       '${settings.maxUnlockAttempts}',
-                      style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: AppColors.accentInk, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -731,14 +746,14 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 24),
             Text(
               'Captured Photos',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             GlassCard(
               tintColor: GlassTheme.errorColor,
               child: Row(
                 children: [
-                  DuotoneIcon('camera', size: 24, color: GlassTheme.errorColor),
+                  DuotoneIcon('camera', size: 24, color: AppColors.errorInk),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -759,7 +774,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 24),
             Text(
               'Captured Photos',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             GlassCard(
@@ -828,7 +843,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           if (provider.status.lastKnownLocation != null) ...[
             Text(
               'Last Known Location',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             _buildLocationCard(provider.status.lastKnownLocation!, isCurrent: true),
@@ -844,13 +859,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Brand.onLime),
                     )
                   : DuotoneIcon('map_point', size: 20),
               label: Text(provider.isLocating ? 'Locating...' : 'Locate Now'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
@@ -861,7 +876,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 24),
             Text(
               'Location History',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             ...provider.locationHistory.take(10).map((loc) => _buildLocationCard(loc)),
@@ -941,7 +956,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               margin: EdgeInsets.zero,
               child: Row(
                 children: [
-                  DuotoneIcon('sim_card', size: 20, color: GlassTheme.primaryAccent),
+                  DuotoneIcon('sim_card', size: 20, color: AppColors.accentInk),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -959,7 +974,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           if (provider.currentSims.isNotEmpty) ...[
             Text(
               'Current SIM Cards',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 4),
             Text(
@@ -981,7 +996,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 24),
             Text(
               'SIM Change Events',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 12),
             ...provider.simEvents.map(_buildSimEventCard),
@@ -1001,10 +1016,10 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
 
   Widget _buildSimEventCard(SIMChangeEvent event) {
     final riskColor = switch (event.riskLevel) {
-      'critical' => GlassTheme.errorColor,
-      'high' => const Color(0xFFFF5722),
-      'medium' => GlassTheme.warningColor,
-      _ => GlassTheme.successColor,
+      'critical' => AppColors.severityCritical,
+      'high' => AppColors.severityHigh,
+      'medium' => AppColors.severityMedium,
+      _ => AppColors.success,
     };
     final description = switch (event.eventType) {
       'inserted' => 'SIM inserted${event.newSim?.carrier != null ? ' (${event.newSim!.carrier})' : ''}',
@@ -1110,7 +1125,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             const SizedBox(height: 16),
             Text(
               title,
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 18),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1146,7 +1161,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               decoration: InputDecoration(
                 hintText: 'e.g., "Call +1234567890 if found"',
                 hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall)),
               ),
             ),
           ],
@@ -1161,7 +1177,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Navigator.pop(context);
               provider.lockDevice(message: controller.text);
             },
-            child: const Text('Lock', style: TextStyle(color: GlassTheme.primaryAccent)),
+            child: Text('Lock', style: TextStyle(color: AppColors.accentInk)),
           ),
         ],
       ),
@@ -1175,13 +1191,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: context.colors.surface,
-        title: const Text('Wipe Device', style: TextStyle(color: GlassTheme.errorColor)),
+        title: Text('Wipe Device', style: TextStyle(color: AppColors.errorInk)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'WARNING: This will permanently erase ALL data on the device. This action cannot be undone.',
-              style: TextStyle(color: GlassTheme.errorColor),
+              style: TextStyle(color: AppColors.errorInk),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1195,7 +1211,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               decoration: InputDecoration(
                 hintText: 'WIPE',
                 hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall)),
               ),
             ),
           ],
@@ -1212,7 +1229,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 provider.wipeDevice(confirmationCode: 'WIPE');
               }
             },
-            child: const Text('Wipe Device', style: TextStyle(color: GlassTheme.errorColor)),
+            child: Text('Wipe Device', style: TextStyle(color: AppColors.errorInk)),
           ),
         ],
       ),
@@ -1236,7 +1253,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Navigator.pop(context);
               provider.markAsLost();
             },
-            child: const Text('Mark Lost', style: TextStyle(color: GlassTheme.warningColor)),
+            child: Text('Mark Lost', style: TextStyle(color: AppColors.secondaryInk)),
           ),
         ],
       ),
@@ -1260,7 +1277,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Navigator.pop(context);
               provider.markAsStolen();
             },
-            child: const Text('Mark Stolen', style: TextStyle(color: GlassTheme.errorColor)),
+            child: Text('Mark Stolen', style: TextStyle(color: AppColors.errorInk)),
           ),
         ],
       ),
@@ -1277,7 +1294,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: context.colors.surface,
-        title: const Text('Enable Remote Wipe', style: TextStyle(color: GlassTheme.errorColor)),
+        title: Text('Enable Remote Wipe', style: TextStyle(color: AppColors.errorInk)),
         content: Text(
           'WARNING: Enabling this allows remote erasure of all data. Only enable if you understand the risks.',
           style: TextStyle(color: context.colors.onSurfaceVariant),
@@ -1289,7 +1306,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
               Navigator.pop(context);
               provider.updateSettings(provider.settings.copyWith(wipeEnabled: true));
             },
-            child: const Text('Enable', style: TextStyle(color: GlassTheme.errorColor)),
+            child: Text('Enable', style: TextStyle(color: AppColors.errorInk)),
           ),
         ],
       ),
@@ -1344,7 +1361,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       try {
         final bytes = base64Decode(selfie.imageUrl.substring(dataUriPrefix.length));
         return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           child: Image.memory(bytes, fit: BoxFit.cover),
         );
       } catch (_) {

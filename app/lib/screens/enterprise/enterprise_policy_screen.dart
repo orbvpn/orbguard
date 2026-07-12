@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -219,7 +220,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(51),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         text,
@@ -289,11 +290,11 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: provider.loadPolicies,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -322,7 +323,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                   ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
                   : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,

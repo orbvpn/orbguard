@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -153,7 +155,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               onPressed: provider.isScanning ? null : () => _startScan(provider),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: Row(
@@ -163,10 +165,10 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                     const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Brand.onLime),
                     )
                   else
-                    DuotoneIcon(AppIcons.search, size: 20, color: Colors.white),
+                    DuotoneIcon(AppIcons.search, size: 20, color: Brand.onLime),
                   const SizedBox(width: 8),
                   Text(provider.isScanning ? 'Scanning...' : 'Start Scan'),
                 ],
@@ -178,7 +180,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           if (provider.isScanning) ...[
             const SizedBox(height: 16),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               child: LinearProgressIndicator(
                 value: provider.scanProgress,
                 backgroundColor:
@@ -431,7 +433,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: GlassTheme.errorColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     data,
@@ -451,7 +453,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: context.colors.onSurface.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -628,8 +630,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                       GlassTheme.gradientBottomLight,
                     ],
             ),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -705,13 +707,13 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onDanger,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      DuotoneIcon(AppIcons.trash, size: 20, color: Colors.white),
+                      DuotoneIcon(AppIcons.trash, size: 20, color: Brand.onDanger),
                       const SizedBox(width: 8),
                       const Text('Request Data Removal'),
                     ],
@@ -741,15 +743,15 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
   Color _getCategoryColor(BrokerCategory category) {
     switch (category) {
       case BrokerCategory.peopleSearch:
-        return const Color(0xFF2196F3);
+        return AppColors.secondaryInk;
       case BrokerCategory.marketing:
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case BrokerCategory.financial:
-        return const Color(0xFF4CAF50);
+        return AppColors.accentInk;
       case BrokerCategory.health:
-        return const Color(0xFFFF5722);
+        return AppColors.errorInk;
       case BrokerCategory.background:
-        return const Color(0xFFFF9800);
+        return AppColors.amberInk;
       default:
         return context.colors.onSurfaceVariant;
     }

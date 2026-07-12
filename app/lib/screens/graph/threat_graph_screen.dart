@@ -14,6 +14,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -176,7 +178,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
               onPressed: () => provider.loadGraphData(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
               child: const Text('Retry'),
             ),
@@ -379,7 +381,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
                 Text(
                   '${(node.confidence! * 100).toInt()}% conf',
                   style: TextStyle(
-                      color: GlassTheme.primaryAccent, fontSize: 10),
+                      color: AppColors.accentInk, fontSize: 10),
                 ),
             ],
           ),
@@ -407,8 +409,8 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(
                 isDark: Theme.of(context).brightness == Brightness.dark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -637,11 +639,11 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
         return GlassTheme.warningColor;
       case 'actor':
       case 'threatactor':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case 'malware':
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[2];
       case 'tool':
-        return const Color(0xFF4CAF50);
+        return AppColors.chartColors[6];
       default:
         return GlassTheme.primaryAccent;
     }

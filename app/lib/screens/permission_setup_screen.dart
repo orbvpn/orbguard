@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../permissions/permission_manager.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import 'elevated_access_setup_screen.dart';
 
@@ -194,19 +197,19 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     switch (_accessMethod) {
       case 'Root':
         accessIcon = AppIcons.crown;
-        accessColor = Colors.green;
+        accessColor = AppColors.accentInk;
         accessLabel = 'Root Access';
         accessDescription = 'Maximum protection - full system access';
         break;
       case 'Shell':
         accessIcon = AppIcons.codeSquare;
-        accessColor = Colors.cyan;
+        accessColor = AppColors.secondaryInk;
         accessLabel = 'Shell Access';
         accessDescription = 'Enhanced scanning via Shizuku/ADB';
         break;
       case 'AppProcess':
         accessIcon = AppIcons.settings;
-        accessColor = Colors.orange;
+        accessColor = AppColors.amberInk;
         accessLabel = 'Elevated Access';
         accessDescription = 'Extended monitoring capabilities';
         break;
@@ -228,7 +231,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
             ),
           ).then((_) => _checkPermissions());
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -237,7 +240,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: accessColor.withAlpha(30),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: DuotoneIcon(accessIcon, color: accessColor, size: 24),
               ),
@@ -264,7 +267,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: accessColor.withAlpha(30),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                             ),
                             child: Text(
                               '+${_hasRootAccess ? 15 : 10}%',
@@ -303,15 +306,15 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     String icon;
 
     if (capability >= 80) {
-      color = Colors.green;
+      color = AppColors.accentInk;
       status = 'Excellent';
       icon = AppIcons.checkCircle;
     } else if (capability >= 50) {
-      color = Colors.orange;
+      color = AppColors.amberInk;
       status = 'Good';
       icon = AppIcons.dangerTriangle;
     } else {
-      color = Colors.red;
+      color = AppColors.errorInk;
       status = 'Limited';
       icon = AppIcons.dangerCircle;
     }
@@ -355,7 +358,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
             ),
             const SizedBox(height: 16),
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               child: LinearProgressIndicator(
                 value: capability / 100,
                 minHeight: 8,
@@ -382,7 +385,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
   Widget _buildGroupHeader(String title, String icon) {
     return Row(
       children: [
-        DuotoneIcon(icon, color: Colors.blue),
+        DuotoneIcon(icon, color: AppColors.secondaryInk),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -408,17 +411,18 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       child: ListTile(
         leading: DuotoneIcon(AppIcons.folder,
             color: isGranted
-                ? Colors.green
+                ? AppColors.accentInk
                 : Theme.of(context).colorScheme.onSurfaceVariant),
         title: const Text('Storage Access'),
         subtitle: const Text('Scan files for malware and threats',
             style: TextStyle(fontSize: 12)),
         trailing: isGranted
-            ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
+            ? DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk)
             : ElevatedButton(
                 onPressed: () => _requestPermission(Permission.storage, 'Storage Access'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: AppColors.info,
+                  foregroundColor: Brand.onPink,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 child: const Text('Grant'),
@@ -444,18 +448,19 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           child: ListTile(
             leading: DuotoneIcon(icon,
                 color: isGranted
-                    ? Colors.green
+                    ? AppColors.accentInk
                     : Theme.of(context).colorScheme.onSurfaceVariant),
             title: Text(name),
             subtitle: Text(description, style: const TextStyle(fontSize: 12)),
             trailing: isGranted
-                ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
+                ? DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk)
                 : isDenied
-                    ? const DuotoneIcon(AppIcons.forbidden, color: Colors.red)
+                    ? DuotoneIcon(AppIcons.forbidden, color: AppColors.errorInk)
                     : ElevatedButton(
                         onPressed: () => _requestPermission(permission, name),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: AppColors.info,
+                          foregroundColor: Brand.onPink,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                         ),
                         child: const Text('Grant'),
@@ -477,16 +482,17 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       child: ListTile(
         leading: DuotoneIcon(
           AppIcons.settings,
-          color: isGranted ? Colors.green : Colors.orange,
+          color: isGranted ? AppColors.accentInk : AppColors.secondaryInk,
         ),
         title: Text(name),
         subtitle: Text(description, style: const TextStyle(fontSize: 12)),
         trailing: isGranted
-            ? const DuotoneIcon(AppIcons.checkCircle, color: Colors.green)
+            ? DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk)
             : ElevatedButton(
                 onPressed: onRequest,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Brand.onPink,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 child: const Text('Enable'),
@@ -503,8 +509,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
+          // Upward hairline shadow for the bottom bar (GlassTheme.shadow is
+          // downward ambient) — color from the overlay token.
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: AppColors.overlayLight,
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -518,12 +526,12 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
+                  DuotoneIcon(AppIcons.infoCircle, color: AppColors.secondaryInk),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
@@ -543,8 +551,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                   onPressed:
                       allEssential ? _grantAllRemaining : _grantEssential,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D9FF),
-                    foregroundColor: Colors.black,
+                    backgroundColor: GlassTheme.primaryAccent,
+                    foregroundColor: Brand.onLime,
                     padding: const EdgeInsets.all(16),
                   ),
                   child: Text(
@@ -558,7 +566,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Brand.onLime,
                     padding: const EdgeInsets.all(16),
                   ),
                   child: const Text('Continue'),
@@ -586,7 +595,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Granted $granted of $total essential permissions'),
-          backgroundColor: granted == total ? Colors.green : Colors.orange,
+          backgroundColor: granted == total ? AppColors.success : AppColors.warning,
         ),
       );
 
@@ -604,7 +613,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Granted $granted of $total advanced permissions'),
-          backgroundColor: granted == total ? Colors.green : Colors.orange,
+          backgroundColor: granted == total ? AppColors.success : AppColors.warning,
         ),
       );
 
@@ -620,7 +629,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please enable "All files access" for OrbGuard'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.warning,
           ),
         );
         // Wait for user to return from settings
@@ -644,7 +653,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           content: Text(
             status.isGranted ? '$name granted!' : '$name denied',
           ),
-          backgroundColor: status.isGranted ? Colors.green : Colors.red,
+          backgroundColor: status.isGranted ? AppColors.success : AppColors.error,
         ),
       );
 

@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
@@ -35,7 +37,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Appearance',
                 'moon_stars',
-                const Color(0xFFA78BFA),
+                AppColors.chartColors[4],
                 [
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -52,7 +54,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Protection',
                 'shield_check',
-                const Color(0xFF00D9FF),
+                AppColors.accentInk,
                 [
                   _buildSettingsTile(
                     context,
@@ -86,7 +88,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Notifications',
                 'bell',
-                Colors.orange,
+                AppColors.secondaryInk,
                 [
                   _buildSettingsTile(
                     context,
@@ -108,7 +110,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Network & VPN',
                 'shield_keyhole',
-                Colors.green,
+                AppColors.accentInk,
                 [
                   _buildSettingsTile(
                     context,
@@ -131,7 +133,7 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   'Desktop Security',
                   'laptop',
-                  const Color(0xFFFF6B6B),
+                  AppColors.errorInk,
                   [
                     _buildSettingsTile(
                       context,
@@ -166,7 +168,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Privacy & Security',
                 'eye_closed',
-                Colors.purple,
+                AppColors.chartColors[4],
                 [
                   _buildSettingsTile(
                     context,
@@ -218,7 +220,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'About',
                 'info_circle',
-                Colors.blue,
+                AppColors.secondaryInk,
                 [
                   _buildSettingsTile(
                     context,
@@ -299,13 +301,13 @@ class SettingsScreen extends StatelessWidget {
     return ListTile(
       leading: DuotoneIcon(
         icon,
-        color: isDestructive ? Colors.red : cs.onSurfaceVariant,
+        color: isDestructive ? AppColors.errorInk : cs.onSurfaceVariant,
         size: 24,
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isDestructive ? Colors.red : cs.onSurface,
+          color: isDestructive ? AppColors.errorInk : cs.onSurface,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -344,9 +346,9 @@ class SettingsScreen extends StatelessWidget {
                 const SnackBar(content: Text('Settings reset to defaults')),
               );
             },
-            child: const Text(
+            child: Text(
               'Reset',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.errorInk),
             ),
           ),
         ],
@@ -373,7 +375,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 'Configure which protection features are active. '
                 'Disabling features may reduce security.',
                 'info_circle',
-                Colors.blue,
+                AppColors.secondaryInk,
               ),
               const SizedBox(height: 24),
               _buildSwitchTile(
@@ -470,7 +472,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -504,12 +506,12 @@ class ProtectionSettingsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         secondary: DuotoneIcon(
           icon,
-          color: value ? const Color(0xFF00D9FF) : cs.onSurfaceVariant,
+          color: value ? AppColors.accentInk : cs.onSurfaceVariant,
           size: 24,
         ),
         title: Text(
@@ -528,7 +530,9 @@ class ProtectionSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: isWarning ? Colors.orange : const Color(0xFF00D9FF),
+        // Theme styles the active switch (lime track + onLime thumb);
+        // warning switches keep a pink cue.
+        activeThumbColor: isWarning ? AppColors.warning : null,
       ),
     );
   }
@@ -633,7 +637,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -693,7 +697,7 @@ class NotificationSettingsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(
@@ -709,7 +713,6 @@ class NotificationSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -729,7 +732,7 @@ class NotificationSettingsScreen extends StatelessWidget {
             return Theme(
               data: ThemeData.dark().copyWith(
                 colorScheme: const ColorScheme.dark(
-                  primary: Color(0xFF00D9FF),
+                  primary: AppColors.primary,
                 ),
               ),
               child: child!,
@@ -871,10 +874,10 @@ class PrivacySettingsScreen extends StatelessWidget {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const DuotoneIcon('trash_bin_minimalistic', color: Colors.red, size: 24),
-                      title: const Text(
+                      leading: DuotoneIcon('trash_bin_minimalistic', color: AppColors.errorInk, size: 24),
+                      title: Text(
                         'Delete All Data',
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(color: AppColors.errorInk),
                       ),
                       subtitle: Text(
                         'Permanently delete all stored data',
@@ -924,7 +927,7 @@ class PrivacySettingsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(
@@ -940,7 +943,6 @@ class PrivacySettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -965,9 +967,9 @@ class PrivacySettingsScreen extends StatelessWidget {
                 const SnackBar(content: Text('All data deleted')),
               );
             },
-            child: const Text(
+            child: Text(
               'Delete',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.errorInk),
             ),
           ),
         ],
@@ -1005,7 +1007,7 @@ class ScanSettingsScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,7 +1092,7 @@ class ScanSettingsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(
@@ -1106,7 +1108,6 @@ class ScanSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1161,7 +1162,7 @@ class VpnSettingsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1231,7 +1232,7 @@ class VpnSettingsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(
@@ -1247,7 +1248,6 @@ class VpnSettingsScreen extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1301,18 +1301,18 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.warning.withAlpha(20),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Row(
                   children: [
-                    const DuotoneIcon('danger_triangle', color: Colors.orange, size: 24),
+                    DuotoneIcon('danger_triangle', color: AppColors.secondaryInk, size: 24),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'These settings are for advanced users. Incorrect configuration may cause the app to stop working.',
                         style: TextStyle(
-                          color: Colors.orange[300],
+                          color: AppColors.secondaryInk,
                           fontSize: 12,
                         ),
                       ),
@@ -1336,7 +1336,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1359,7 +1359,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                           filled: true,
                           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -1375,7 +1375,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1399,7 +1399,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                           filled: true,
                           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -1426,7 +1426,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1476,14 +1476,14 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     );
                   }
                 },
-                icon: const DuotoneIcon('wi_fi_router', color: Colors.black, size: 20),
+                icon: const DuotoneIcon('wi_fi_router', color: Brand.onLime, size: 20),
                 label: const Text('Test Connection'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00D9FF),
-                  foregroundColor: Colors.black,
+                  backgroundColor: GlassTheme.primaryAccent,
+                  foregroundColor: Brand.onLime,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                 ),
               ),
@@ -1506,7 +1506,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(
@@ -1522,7 +1522,6 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1559,17 +1558,17 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.info.withAlpha(20),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Row(
               children: [
-                const DuotoneIcon('info_circle', color: Colors.blue, size: 20),
+                DuotoneIcon('info_circle', color: AppColors.secondaryInk, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Configure which persistence mechanisms to scan and how often to check for suspicious items.',
-                    style: TextStyle(color: Colors.blue[300], fontSize: 13),
+                    style: TextStyle(color: AppColors.secondaryInk, fontSize: 13),
                   ),
                 ),
               ],
@@ -1591,7 +1590,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1691,7 +1690,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: SwitchListTile(
         title: Text(title,
@@ -1699,7 +1698,6 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
         subtitle: Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: const Color(0xFF00D9FF),
       ),
     );
   }
@@ -1734,7 +1732,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Full Disk Access',
         description: 'Required to scan all persistence locations including protected system directories.',
         status: 'Required',
-        statusColor: Colors.orange,
+        statusColor: AppColors.amberInk,
         instructions: [
           '1. Open System Settings',
           '2. Go to Privacy & Security → Full Disk Access',
@@ -1752,7 +1750,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Automation',
         description: 'Allows scanning of Folder Actions and other AppleScript-based persistence.',
         status: 'Recommended',
-        statusColor: Colors.blue,
+        statusColor: AppColors.secondaryInk,
         instructions: [
           '1. Open System Settings',
           '2. Go to Privacy & Security → Automation',
@@ -1769,7 +1767,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Accessibility',
         description: 'Optional - enables monitoring of input methods and accessibility-based persistence.',
         status: 'Optional',
-        statusColor: Colors.grey,
+        statusColor: Brand.text3,
         instructions: [
           '1. Open System Settings',
           '2. Go to Privacy & Security → Accessibility',
@@ -1783,17 +1781,17 @@ class DesktopPermissionsScreen extends StatelessWidget {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.green.withAlpha(20),
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.success.withAlpha(20),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         ),
         child: Row(
           children: [
-            const DuotoneIcon('check_circle', color: Colors.green, size: 20),
+            DuotoneIcon('check_circle', color: AppColors.accentInk, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'OrbGuard is notarized by Apple and does not require disabling Gatekeeper.',
-                style: TextStyle(color: Colors.green[300], fontSize: 13),
+                style: TextStyle(color: AppColors.accentInk, fontSize: 13),
               ),
             ),
           ],
@@ -1811,7 +1809,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Root Access',
         description: 'Some persistence locations require root privileges to scan (e.g., /etc/systemd, /etc/cron.d).',
         status: 'Recommended',
-        statusColor: Colors.orange,
+        statusColor: AppColors.amberInk,
         instructions: [
           'Option 1: Run OrbGuard with sudo for full access',
           '  sudo orbguard',
@@ -1832,7 +1830,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'SELinux/AppArmor',
         description: 'If SELinux or AppArmor is enabled, you may need to configure a policy for OrbGuard.',
         status: 'If Enabled',
-        statusColor: Colors.blue,
+        statusColor: AppColors.secondaryInk,
         instructions: [
           'For SELinux:',
           '  Check status: getenforce',
@@ -1853,7 +1851,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'File System Access',
         description: 'OrbGuard needs read access to various system directories.',
         status: 'Required',
-        statusColor: Colors.orange,
+        statusColor: AppColors.amberInk,
         instructions: [
           'Directories that require access:',
           '  /etc/systemd/system',
@@ -1877,7 +1875,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Administrator Access',
         description: 'Required to scan system registry keys and protected persistence locations.',
         status: 'Required',
-        statusColor: Colors.orange,
+        statusColor: AppColors.amberInk,
         instructions: [
           '1. Right-click on OrbGuard',
           '2. Select "Run as administrator"',
@@ -1898,7 +1896,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Windows Security Exception',
         description: 'Add OrbGuard to Windows Security exclusions to prevent false positives.',
         status: 'Recommended',
-        statusColor: Colors.blue,
+        statusColor: AppColors.secondaryInk,
         instructions: [
           '1. Open Windows Security',
           '2. Go to Virus & threat protection',
@@ -1917,7 +1915,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
         title: 'Registry Access',
         description: 'OrbGuard scans various registry locations for persistence mechanisms.',
         status: 'Auto-granted',
-        statusColor: Colors.green,
+        statusColor: AppColors.accentInk,
         instructions: [
           'Registry locations scanned:',
           '  HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
@@ -1968,7 +1966,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: statusColor.withAlpha(30),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                       ),
                       child: Text(
                         status,
@@ -1990,8 +1988,8 @@ class DesktopPermissionsScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.black.withAlpha(40),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.overlayLight,
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2021,13 +2019,13 @@ class DesktopPermissionsScreen extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onGrant,
-                icon: const DuotoneIcon('settings', color: Colors.black, size: 18),
+                icon: const DuotoneIcon('settings', color: Brand.onLime, size: 18),
                 label: const Text('Open Settings'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00D9FF),
-                  foregroundColor: Colors.black,
+                  backgroundColor: GlassTheme.primaryAccent,
+                  foregroundColor: Brand.onLime,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall)),
                 ),
               ),
             ),

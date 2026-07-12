@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/brand.dart';
 import '../theme/glass_theme.dart';
 import 'duotone_icon.dart';
 
@@ -75,7 +76,8 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    // Kit: only the active segment takes lime — ink-safe on light.
+    final color = selected ? Brand.navActive : scheme.onSurfaceVariant;
 
     return Semantics(
       button: true,
@@ -89,13 +91,11 @@ class _Segment extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected
-                ? scheme.primary.withValues(alpha: 0.16)
-                : Colors.transparent,
+            color: selected ? Brand.navActivePill : Colors.transparent,
             borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             border: Border.all(
               color: selected
-                  ? scheme.primary.withValues(alpha: 0.45)
+                  ? Brand.navActive.withValues(alpha: 0.45)
                   : Colors.transparent,
               width: GlassTheme.borderWidth,
             ),

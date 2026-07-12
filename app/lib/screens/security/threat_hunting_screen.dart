@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -283,7 +285,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           _buildStatItem(
             'Cases',
             provider.openCases.length.toString(),
-            const Color(0xFF9C27B0),
+            AppColors.chartColors[4],
           ),
         ],
       ),
@@ -401,7 +403,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: isRunning ? null : () => _showHuntDetails(context, hunt, provider),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -414,7 +416,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: typeColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                     child: Center(
                       child: DuotoneIcon(
@@ -456,7 +458,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: badgeColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                       ),
                       child: Text(
                         badgeText,
@@ -489,14 +491,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: context.onSurface.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           id,
                           style: TextStyle(
                             color: context.onSurfaceMuted,
                             fontSize: 10,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       )),
@@ -507,7 +509,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                         : () => provider.executeHunt(hunt.id),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Brand.onLime,
                       disabledBackgroundColor: context.onSurface.withValues(alpha: 0.06),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -570,7 +572,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   height: 44,
                   decoration: BoxDecoration(
                     color: severityColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -609,12 +611,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: severityColor,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     finding.severityLevel.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Brand.text,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -649,7 +651,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       style: TextStyle(
                         color: context.onSurfaceMuted,
                         fontSize: 11,
-                        fontFamily: 'monospace',
+                        fontFamily: Brand.fontMono,
                       ),
                     ),
                   ),
@@ -667,14 +669,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                       ),
                       child: Text(
                         id,
-                        style: const TextStyle(
-                          color: GlassTheme.primaryAccent,
+                        style: TextStyle(
+                          color: AppColors.accentInk,
                           fontSize: 10,
-                          fontFamily: 'monospace',
+                          fontFamily: Brand.fontMono,
                         ),
                       ),
                     )).toList(),
@@ -749,7 +751,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   height: 44,
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -788,7 +790,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     caseItem.status.displayName,
@@ -885,14 +887,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     techniqueId,
-                    style: const TextStyle(
-                      color: GlassTheme.primaryAccent,
+                    style: TextStyle(
+                      color: AppColors.accentInk,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
+                      fontFamily: Brand.fontMono,
                     ),
                   ),
                 ),
@@ -925,7 +927,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: context.onSurface.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
                     child: Text(
                       hunt.name,
@@ -1075,7 +1077,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+                const BorderRadius.vertical(
+                    top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -1088,7 +1091,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     height: 56,
                     decoration: BoxDecoration(
                       color: typeColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                     ),
                     child: Center(
                       child: DuotoneIcon(
@@ -1303,7 +1306,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   label: const Text('Run Hunt'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onLime,
                     disabledBackgroundColor: context.onSurface.withValues(alpha: 0.06),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -1473,12 +1476,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 height: 300,
                 decoration: BoxDecoration(
                   color: context.isDark
-                      ? Colors.black26
-                      : Colors.black.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(12),
+                      ? AppColors.overlayLight
+                      : Brand.surface2,
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   child: InteractiveViewer(
                     transformationController: _graphTransform,
                     constrained: false,
@@ -1511,7 +1514,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: _getNodeColor(node.type).withAlpha(50),
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                                     border: Border.all(color: _getNodeColor(node.type)),
                                   ),
                                   child: Column(
@@ -1648,8 +1651,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
         decoration: BoxDecoration(
           gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(GlassTheme.radiusLarge)),
         ),
         child: ListView(
           shrinkWrap: true,
@@ -1732,13 +1735,13 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
       case 'threat-actor':
         return GlassTheme.errorColor;
       case 'malware':
-        return const Color(0xFFFF5722);
+        return AppColors.severityCritical;
       case 'campaign':
         return GlassTheme.warningColor;
       case 'indicator':
         return GlassTheme.primaryAccent;
       case 'tool':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       default:
         return context.onSurfaceMuted;
     }
@@ -1952,15 +1955,15 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
   Color _getCorrelationEngineColor(String engine) {
     switch (engine) {
       case 'Temporal':
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[2];
       case 'Infrastructure':
         return GlassTheme.errorColor;
       case 'TTP':
         return GlassTheme.primaryAccent;
       case 'Behavioral':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case 'Network':
-        return const Color(0xFF4CAF50);
+        return AppColors.chartColors[6];
       case 'Campaign':
         return GlassTheme.warningColor;
       default:
@@ -2182,7 +2185,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                           ? GlassTheme.primaryAccent
                           : context.onSurfaceMuted)
                       .withAlpha(40),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Center(
                   child: DuotoneIcon(
@@ -2243,7 +2246,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+                const BorderRadius.vertical(
+                    top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -2256,7 +2260,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     height: 56,
                     decoration: BoxDecoration(
                       color: GlassTheme.primaryAccent.withAlpha(40),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                     ),
                     child: const DuotoneIcon('cpu', color: GlassTheme.primaryAccent, size: 28),
                   ),

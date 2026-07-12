@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -116,7 +118,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           // Content type selector
           Text(
             'Select Content Type',
-            style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+            style: BrandText.title(color: cs.onSurface),
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(
@@ -171,13 +173,15 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Brand.onLime),
                     )
-                  : const DuotoneIcon('shield_check', size: 20, color: Colors.white),
+                  : const DuotoneIcon('shield_check',
+                      size: 20, color: Brand.onLime),
               label: Text(provider.isAnalyzing ? 'Analyzing...' : 'Analyze for Scams'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
@@ -234,7 +238,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           children: [
             Text(
               value,
-              style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
+              style: BrandText.heading(size: 28, color: color),
             ),
             const SizedBox(height: 4),
             Text(label,
@@ -483,11 +487,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                   children: [
                     Text(
                       result.isScam ? 'Scam Detected' : 'Looks Safe', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: riskColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(size: 18, color: riskColor),
                     ),
                     Text(
                       '${(result.confidence * 100).toInt()}% confidence', maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -541,7 +541,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             const SizedBox(height: 16),
             Text(
               'Indicators Found',
-              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 14, color: cs.onSurface),
             ),
             const SizedBox(height: 8),
             ...result.indicators.take(5).map((indicator) => Padding(
@@ -566,7 +566,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
             const SizedBox(height: 16),
             Text(
               'Recommendations',
-              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
+              style: BrandText.title(size: 14, color: cs.onSurface),
             ),
             const SizedBox(height: 8),
             ...result.recommendations.map((rec) => Padding(
@@ -736,7 +736,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                   children: [
                     Text(
                       pattern.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
+                      style: BrandText.title(size: 14, color: cs.onSurface),
                     ),
                     Text(
                       pattern.type.displayName, maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -761,8 +761,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Brand.glassFill,
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     keyword,
@@ -791,7 +792,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+            style: BrandText.title(size: 18, color: cs.onSurface),
           ),
           const SizedBox(height: 8),
           Text(
@@ -818,8 +819,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: isDark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(GlassTheme.radiusLarge),
+            ),
           ),
           child: ListView(
             controller: scrollController,
@@ -829,7 +831,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               const SizedBox(height: 16),
               Text(
                 'Original Content',
-                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
+                style: BrandText.title(size: 14, color: cs.onSurface),
               ),
               const SizedBox(height: 8),
               GlassContainer(
@@ -867,7 +869,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               provider.clearHistory();
               Navigator.pop(context);
             },
-            child: const Text('Clear', style: TextStyle(color: GlassTheme.errorColor)),
+            child: Text('Clear', style: TextStyle(color: AppColors.errorInk)),
           ),
         ],
       ),
@@ -877,25 +879,25 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
   Color _getScamTypeColor(ScamType type) {
     switch (type) {
       case ScamType.phishing:
-        return GlassTheme.errorColor;
+        return AppColors.errorInk;
       case ScamType.impersonation:
-        return const Color(0xFFFF5722);
+        return AppColors.severityCritical;
       case ScamType.advanceFee:
-        return const Color(0xFFFF9800);
+        return AppColors.amberInk;
       case ScamType.techSupport:
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4]; // spectrum purple
       case ScamType.romance:
-        return const Color(0xFFE91E63);
+        return AppColors.secondaryInk;
       case ScamType.investment:
-        return const Color(0xFF4CAF50);
+        return AppColors.accentInk;
       case ScamType.lottery:
-        return const Color(0xFFFFEB3B);
+        return AppColors.severityLow;
       case ScamType.jobOffer:
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[3]; // spectrum periwinkle
       case ScamType.charity:
-        return const Color(0xFF00BCD4);
+        return AppColors.chartColors[2]; // spectrum cyan
       case ScamType.government:
-        return const Color(0xFF3F51B5);
+        return AppColors.chartColors[6]; // spectrum mint
       default:
         return Theme.of(context).colorScheme.onSurfaceVariant;
     }

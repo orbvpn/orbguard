@@ -4,6 +4,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
 class ScanResultsScreen extends StatefulWidget {
@@ -123,26 +126,38 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                     ] else ...[
                       // Threat List
                       if (critical.isNotEmpty) ...[
-                        _buildSectionHeader('Critical Threats', Colors.red, critical.length),
-                        ...critical.map((t) => _buildThreatCard(t, Colors.red)),
+                        _buildSectionHeader('Critical Threats',
+                            AppColors.severityCritical, critical.length,
+                            AppColors.errorInk),
+                        ...critical.map((t) => _buildThreatCard(
+                            t, AppColors.severityCritical, AppColors.errorInk)),
                         const SizedBox(height: 24),
                       ],
 
                       if (high.isNotEmpty) ...[
-                        _buildSectionHeader('High Priority', Colors.orange, high.length),
-                        ...high.map((t) => _buildThreatCard(t, Colors.orange)),
+                        _buildSectionHeader('High Priority',
+                            AppColors.severityHigh, high.length,
+                            AppColors.errorInk),
+                        ...high.map((t) => _buildThreatCard(
+                            t, AppColors.severityHigh, AppColors.errorInk)),
                         const SizedBox(height: 24),
                       ],
 
                       if (medium.isNotEmpty) ...[
-                        _buildSectionHeader('Medium Priority', Colors.amber, medium.length),
-                        ...medium.map((t) => _buildThreatCard(t, Colors.amber)),
+                        _buildSectionHeader('Medium Priority',
+                            AppColors.severityMedium, medium.length,
+                            AppColors.secondaryInk),
+                        ...medium.map((t) => _buildThreatCard(
+                            t, AppColors.severityMedium, AppColors.secondaryInk)),
                         const SizedBox(height: 24),
                       ],
 
                       if (low.isNotEmpty) ...[
-                        _buildSectionHeader('Low Priority', Colors.blue, low.length),
-                        ...low.map((t) => _buildThreatCard(t, Colors.blue)),
+                        _buildSectionHeader('Low Priority',
+                            AppColors.severityLow, low.length,
+                            AppColors.amberInk),
+                        ...low.map((t) => _buildThreatCard(
+                            t, AppColors.severityLow, AppColors.amberInk)),
                       ],
 
                       const SizedBox(height: 24),
@@ -163,16 +178,23 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
 
   Widget _buildHeader(bool isClean, int critical, int high) {
     final bg = Theme.of(context).canvasColor;
+    // Status fill (glow/tints) + contrast-safe ink for text/icons.
+    final statusFill = isClean
+        ? AppColors.protected
+        : critical > 0
+            ? AppColors.severityCritical
+            : AppColors.warning;
+    final statusInk = isClean
+        ? AppColors.accentInk
+        : critical > 0
+            ? AppColors.errorInk
+            : AppColors.secondaryInk;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: isClean
-              ? [Colors.green.withValues(alpha: 0.3), bg]
-              : critical > 0
-                  ? [Colors.red.withValues(alpha: 0.3), bg]
-                  : [Colors.orange.withValues(alpha: 0.3), bg],
+          colors: [statusFill.withValues(alpha: 0.3), bg],
         ),
       ),
       child: SafeArea(
@@ -186,18 +208,10 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isClean
-                    ? Colors.green.withValues(alpha: 0.2)
-                    : critical > 0
-                        ? Colors.red.withValues(alpha: 0.2)
-                        : Colors.orange.withValues(alpha: 0.2),
+                color: statusFill.withValues(alpha: 0.2),
                 boxShadow: [
                   BoxShadow(
-                    color: isClean
-                        ? Colors.green.withValues(alpha: 0.3)
-                        : critical > 0
-                            ? Colors.red.withValues(alpha: 0.3)
-                            : Colors.orange.withValues(alpha: 0.3),
+                    color: statusFill.withValues(alpha: 0.3),
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -210,11 +224,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                         ? 'shield_cross'
                         : 'danger_triangle',
                 size: 50,
-                color: isClean
-                    ? Colors.green
-                    : critical > 0
-                        ? Colors.red
-                        : Colors.orange,
+                color: statusInk,
               ),
             ),
             const SizedBox(height: 16),
@@ -223,15 +233,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               isClean
                   ? 'Device Secure'
                   : '${widget.threats.length} Threat${widget.threats.length > 1 ? 's' : ''} Found',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isClean
-                    ? Colors.green
-                    : critical > 0
-                        ? Colors.red
-                        : Colors.orange,
-              ),
+              style: BrandText.heading(size: 28, color: statusInk),
             ),
             const SizedBox(height: 8),
             Text(
@@ -252,23 +254,31 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   Widget _buildStatsRow(int critical, int high, int medium, int low) {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Critical', critical, Colors.red)),
+        Expanded(
+            child: _buildStatCard('Critical', critical,
+                AppColors.severityCritical, AppColors.errorInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('High', high, Colors.orange)),
+        Expanded(
+            child: _buildStatCard(
+                'High', high, AppColors.severityHigh, AppColors.errorInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('Medium', medium, Colors.amber)),
+        Expanded(
+            child: _buildStatCard('Medium', medium, AppColors.severityMedium,
+                AppColors.secondaryInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('Low', low, Colors.blue)),
+        Expanded(
+            child: _buildStatCard(
+                'Low', low, AppColors.severityLow, AppColors.amberInk)),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, int count, Color color) {
+  Widget _buildStatCard(String label, int count, Color color, Color ink) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: count > 0
             ? Border.all(color: color.withValues(alpha: 0.5), width: 1)
             : null,
@@ -277,10 +287,11 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
         children: [
           Text(
             count.toString(),
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: count > 0 ? color : Theme.of(context).colorScheme.onSurfaceVariant,
+            style: BrandText.heading(
+              size: 28,
+              color: count > 0
+                  ? ink
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
@@ -301,7 +312,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -331,7 +342,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Expanded(
       child: Column(
         children: [
-          DuotoneIcon(icon, size: 20, color: Colors.cyan),
+          DuotoneIcon(icon, size: 20, color: AppColors.secondaryInk),
           const SizedBox(height: 8),
           Text(
             value, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -357,8 +368,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -367,18 +378,15 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.green.withValues(alpha: 0.2),
+              color: AppColors.success.withValues(alpha: 0.2),
             ),
-            child: const DuotoneIcon('check_circle', size: 32, color: Colors.green),
+            child: DuotoneIcon('check_circle',
+                size: 32, color: AppColors.accentInk),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Your Device is Clean',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
+            style: BrandText.heading(size: 20, color: AppColors.accentInk),
           ),
           const SizedBox(height: 8),
           Text(
@@ -419,13 +427,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.success.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DuotoneIcon(icon, size: 20, color: Colors.green),
+          DuotoneIcon(icon, size: 20, color: AppColors.accentInk),
           const SizedBox(height: 8),
           Text(
             title,
@@ -446,7 +454,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildSectionHeader(String title, Color color, int count) {
+  Widget _buildSectionHeader(String title, Color color, int count, Color ink) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -456,6 +464,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 20,
             decoration: BoxDecoration(
               color: color,
+              // 4px accent bar — radius kept tiny on purpose (radiusXSmall
+              // would pill a 4px-wide bar).
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -465,10 +475,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.heading(size: 18),
             ),
           ),
           const SizedBox(width: 8),
@@ -476,14 +483,14 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Text(
               count.toString(),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: ink,
               ),
             ),
           ),
@@ -492,12 +499,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildThreatCard(ThreatDetection threat, Color color) {
+  Widget _buildThreatCard(ThreatDetection threat, Color color, Color ink) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Theme(
@@ -510,20 +517,17 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 44,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: DuotoneIcon(
               _getThreatSvgIcon(threat.type),
-              color: color,
+              color: ink,
               size: 22,
             ),
           ),
           title: Text(
             threat.name,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
+            style: BrandText.title(size: 15, weight: FontWeight.w700),
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -541,8 +545,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.overlayLight,
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,22 +568,24 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                decoration: GlassTheme.tintedGlassDecoration(
+                  tintColor: AppColors.warning,
+                  radius: GlassTheme.radiusXSmall,
+                  opacity: 0.1,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DuotoneIcon('danger_triangle', color: Colors.orange, size: 18),
+                    DuotoneIcon('danger_triangle',
+                        color: AppColors.secondaryInk, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         threat.metadata['consequence'] ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.secondaryInk),
                       ),
                     ),
                   ],
@@ -591,22 +597,24 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.cyan.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+                decoration: GlassTheme.tintedGlassDecoration(
+                  tintColor: AppColors.info,
+                  radius: GlassTheme.radiusXSmall,
+                  opacity: 0.1,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DuotoneIcon('lightbulb', color: Colors.cyan, size: 18),
+                    DuotoneIcon('lightbulb',
+                        color: AppColors.secondaryInk, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         threat.metadata['recommendation'] ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: Colors.cyan),
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.secondaryInk),
                       ),
                     ),
                   ],
@@ -621,11 +629,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _dismissThreat(threat),
-                  icon: const DuotoneIcon('check_circle', size: 18, color: Colors.cyan),
+                  icon: DuotoneIcon('check_circle',
+                      size: 18, color: AppColors.secondaryInk),
                   label: const Text('Dismiss Warning'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.cyan,
-                    side: const BorderSide(color: Colors.cyan),
+                    foregroundColor: AppColors.secondaryInk,
+                    side: BorderSide(color: AppColors.secondaryInk),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
@@ -642,11 +651,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () => _removeThreat(threat),
-                  icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: Colors.white),
+                  icon: DuotoneIcon('trash_bin_minimalistic',
+                      size: 18, color: Brand.onDanger),
                   label: const Text('Remove'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
+                    // Destructive action — brand danger fill regardless of tier.
+                    backgroundColor: Brand.danger,
+                    foregroundColor: Brand.onDanger,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
@@ -662,11 +673,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _dismissThreat(threat),
-                  icon: const DuotoneIcon('check_circle', size: 18, color: Colors.cyan),
+                  icon: DuotoneIcon('check_circle',
+                      size: 18, color: AppColors.secondaryInk),
                   label: const Text('Dismiss Warning'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.cyan,
-                    side: const BorderSide(color: Colors.cyan),
+                    foregroundColor: AppColors.secondaryInk,
+                    side: BorderSide(color: AppColors.secondaryInk),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
@@ -696,15 +708,15 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   Widget _buildGuidanceRow(String text) {
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blueGrey.withValues(alpha: 0.4)),
+      decoration: GlassTheme.tintedGlassDecoration(
+        tintColor: AppColors.severityInfo,
+        radius: GlassTheme.radiusXSmall,
+        opacity: 0.15,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DuotoneIcon('info_circle', color: Colors.blueGrey, size: 18),
+          DuotoneIcon('info_circle', color: Brand.text2, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -753,14 +765,14 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showRemoveAllDialog(),
-        icon: const DuotoneIcon('trash_bin_2', size: 24, color: Colors.white),
+        icon: DuotoneIcon('trash_bin_2', size: 24, color: Brand.onDanger),
         label: const Text('Remove All Threats'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
+          backgroundColor: Brand.danger,
+          foregroundColor: Brand.onDanger,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
         ),
       ),
@@ -859,7 +871,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24),
@@ -867,9 +880,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Scan Details',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: BrandText.heading(size: 20),
             ),
             const SizedBox(height: 20),
             _buildDetailItem('Scan Stages Completed', _formatNumber(widget.itemsScanned)),
@@ -902,7 +915,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
         title: const Text('Remove Threat'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -910,7 +924,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           children: [
             Text(
               threat.name,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.errorInk),
             ),
             const SizedBox(height: 12),
             Text(
@@ -929,7 +944,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               Navigator.pop(dialogContext);
               _executeRemoval(threat);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger),
             child: const Text('Remove'),
           ),
         ],
@@ -958,7 +975,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
         title: const Text('Dismiss Warning'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -966,7 +984,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           children: [
             Text(
               threat.name,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.secondaryInk),
             ),
             const SizedBox(height: 12),
             Text(
@@ -986,7 +1005,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               Navigator.pop(dialogContext);
               _executeDismiss(threat);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: Brand.onPink),
             child: const Text('Dismiss'),
           ),
         ],
@@ -1002,7 +1023,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       const SnackBar(
         content: Row(
           children: [
-            DuotoneIcon('check_circle', color: Colors.cyan, size: 24),
+            DuotoneIcon('check_circle', color: AppColors.info, size: 24),
             SizedBox(width: 12),
             Text('Warning dismissed'),
           ],
@@ -1026,7 +1047,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              // Snackbar surface is dark in both themes (see app_theme).
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.onDark),
             ),
             const SizedBox(width: 16),
             Text('Removing ${threat.name}...'),
@@ -1059,7 +1082,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           const SnackBar(
             content: Row(
               children: [
-                DuotoneIcon('check_circle', color: Colors.green, size: 24),
+                DuotoneIcon('check_circle', color: AppColors.success, size: 24),
                 SizedBox(width: 12),
                 Text('Threat removed successfully'),
               ],
@@ -1093,7 +1116,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       SnackBar(
         content: Row(
           children: [
-            const DuotoneIcon('danger_circle', color: Colors.orange, size: 24),
+            const DuotoneIcon('danger_circle',
+                color: AppColors.warning, size: 24),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1115,7 +1139,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
         title: const Text('Remove All Threats'),
         content: const Text(
           'This removes every threat OrbGuard can act on: suspicious '
@@ -1134,7 +1159,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               HapticFeedback.heavyImpact();
               _executeRemoveAll();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger),
             child: const Text('Remove All'),
           ),
         ],
@@ -1152,7 +1179,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              // Snackbar surface is dark in both themes (see app_theme).
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.onDark),
             ),
             SizedBox(width: 16),
             Text('Removing threats...'),

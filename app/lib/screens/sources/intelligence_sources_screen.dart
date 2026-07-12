@@ -16,6 +16,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -340,7 +342,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
               if (source.updateInterval != null)
                 GlassBadge(
                   text: 'every ${_formatInterval(source.updateInterval!)}',
-                  color: const Color(0xFF9C27B0),
+                  color: AppColors.chartColors[4],
                   fontSize: 10,
                 ),
               if (source.requiresApiKey) ...[
@@ -405,12 +407,12 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
             onPressed: () => _showAddSourceDialog(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DuotoneIcon(AppIcons.addCircle, size: 18, color: Colors.white),
+                DuotoneIcon(AppIcons.addCircle, size: 18, color: Brand.onLime),
                 const SizedBox(width: 8),
                 const Text('Add Source'),
               ],
@@ -446,12 +448,12 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
             onPressed: _loadSources,
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DuotoneIcon(AppIcons.refresh, size: 18, color: Colors.white),
+                DuotoneIcon(AppIcons.refresh, size: 18, color: Brand.onLime),
                 const SizedBox(width: 8),
                 const Text('Retry'),
               ],
@@ -621,7 +623,7 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _slugController,
-              style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
+              style: TextStyle(color: cs.onSurface, fontFamily: Brand.fontMono),
               decoration: _decoration('Slug (a-z, 0-9, _, -)'),
               onChanged: (_) => _slugEdited = true,
             ),
@@ -639,7 +641,7 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _urlController,
-              style: TextStyle(color: cs.onSurface, fontFamily: 'monospace'),
+              style: TextStyle(color: cs.onSurface, fontFamily: Brand.fontMono),
               decoration: _decoration(_urlRequired ? 'Feed/API URL' : 'URL (optional)'),
             ),
             const SizedBox(height: 12),

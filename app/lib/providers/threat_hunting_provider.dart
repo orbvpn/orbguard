@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/api/orbguard_api_client.dart';
 import '../services/security/threat_hunting_service.dart';
@@ -234,21 +235,21 @@ class ThreatHuntingProvider extends ChangeNotifier {
   static int getHuntTypeColor(HuntType type) {
     switch (type) {
       case HuntType.iocSweep:
-        return 0xFF2196F3;
+        return AppColors.chartColors[2].toARGB32();
       case HuntType.behaviorAnalysis:
-        return 0xFF9C27B0;
+        return AppColors.chartColors[4].toARGB32();
       case HuntType.anomalyDetection:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case HuntType.attackPattern:
-        return 0xFFE91E63;
+        return AppColors.chartColors[1].toARGB32();
       case HuntType.dataExfiltration:
-        return 0xFFF44336;
+        return AppColors.chartColors[7].toARGB32();
       case HuntType.persistenceMechanism:
-        return 0xFF795548;
+        return AppColors.chartColors[3].toARGB32();
       case HuntType.lateralMovement:
-        return 0xFF607D8B;
+        return AppColors.chartColors[6].toARGB32();
       case HuntType.privilegeEscalation:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
     }
   }
 
@@ -256,40 +257,40 @@ class ThreatHuntingProvider extends ChangeNotifier {
   static int getPriorityColor(HuntPriority priority) {
     switch (priority) {
       case HuntPriority.critical:
-        return 0xFFB71C1C;
+        return AppColors.severityCritical.toARGB32();
       case HuntPriority.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case HuntPriority.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case HuntPriority.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
     }
   }
 
   /// Get severity color
   static int getSeverityColor(double severity) {
-    if (severity >= 0.9) return 0xFFB71C1C;
-    if (severity >= 0.7) return 0xFFFF5722;
-    if (severity >= 0.5) return 0xFFFF9800;
-    if (severity >= 0.3) return 0xFFFFEB3B;
-    return 0xFF2196F3;
+    if (severity >= 0.9) return AppColors.severityCritical.toARGB32();
+    if (severity >= 0.7) return AppColors.severityHigh.toARGB32();
+    if (severity >= 0.5) return AppColors.severityMedium.toARGB32();
+    if (severity >= 0.3) return AppColors.severityLow.toARGB32();
+    return AppColors.chartColors[2].toARGB32();
   }
 
   /// Get case status color
   static int getCaseStatusColor(CaseStatus status) {
     switch (status) {
       case CaseStatus.open:
-        return 0xFF2196F3;
+        return AppColors.chartColors[2].toARGB32();
       case CaseStatus.investigating:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case CaseStatus.pendingAction:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case CaseStatus.resolved:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
       case CaseStatus.falsePositive:
-        return 0xFF9E9E9E;
+        return AppColors.severityInfo.toARGB32();
       case CaseStatus.closed:
-        return 0xFF607D8B;
+        return AppColors.chartColors[6].toARGB32();
     }
   }
 

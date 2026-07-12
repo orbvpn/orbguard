@@ -3,6 +3,9 @@
 
 import 'package:flutter/material.dart';
 
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../presentation/widgets/glass_app_bar.dart';
@@ -98,7 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => _ConnectionBottomSheet(
         health: _dashboardProvider.connectionHealth,
@@ -138,7 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _onRefresh,
-              color: const Color(0xFF00D9FF),
+              color: AppColors.accentInk,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -221,24 +225,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     final health = _dashboardProvider.connectionHealth;
     final state = _dashboardProvider.connectionState;
 
-    Color bannerColor;
+    Color bannerColor; // tint fill/border
+    Color bannerInk; // icon + text
     String message;
     String icon;
 
     if (!health.hasNetwork) {
-      bannerColor = Colors.red;
+      bannerColor = AppColors.error;
+      bannerInk = AppColors.errorInk;
       message = 'No network connection';
       icon = 'wi_fi_router';
     } else if (state == WebSocketState.error) {
-      bannerColor = Colors.orange;
+      bannerColor = AppColors.warning;
+      bannerInk = AppColors.secondaryInk;
       message = 'Connection error. Tap to retry.';
       icon = 'danger_circle';
     } else if (state == WebSocketState.reconnecting) {
-      bannerColor = Colors.amber;
+      bannerColor = AppColors.severityLow;
+      bannerInk = AppColors.amberInk;
       message = 'Reconnecting to threat stream...';
       icon = 'refresh';
     } else {
-      bannerColor = Colors.grey;
+      bannerColor = AppColors.severityInfo;
+      bannerInk = Brand.text2;
       message = 'Not connected to live threat stream';
       icon = 'cloud_storage';
     }
@@ -248,14 +257,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: bannerColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
+        decoration: GlassTheme.tintedGlassDecoration(
+          tintColor: bannerColor,
+          radius: GlassTheme.radiusXSmall,
+          opacity: 0.1,
         ),
         child: Row(
           children: [
-            DuotoneIcon(icon, color: bannerColor, size: 20),
+            DuotoneIcon(icon, color: bannerInk, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -264,19 +273,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  color: bannerColor,
+                  color: bannerInk,
                 ),
               ),
             ),
             if (health.hasNetwork && state != WebSocketState.reconnecting)
-              DuotoneIcon('alt_arrow_right', color: bannerColor, size: 20),
+              DuotoneIcon('alt_arrow_right', color: bannerInk, size: 20),
             if (state == WebSocketState.reconnecting)
               SizedBox(
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(bannerColor),
+                  valueColor: AlwaysStoppedAnimation(bannerInk),
                 ),
               ),
           ],
@@ -310,7 +319,7 @@ class _ConnectionBottomSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[600],
+              color: Brand.text3,
               borderRadius: BorderRadius.circular(2),
             ),
           ),

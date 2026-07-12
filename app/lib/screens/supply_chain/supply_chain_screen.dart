@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -52,7 +54,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                             onPressed: _startScan,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: GlassTheme.primaryAccent,
-                              foregroundColor: Colors.black,
+                              foregroundColor: Brand.onLime,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 8,
@@ -268,7 +270,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 decoration: BoxDecoration(
                   color: (hasIssues ? GlassTheme.errorColor : GlassTheme.successColor)
                       .withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                 ),
                 child: DuotoneIcon(
                   hasIssues ? 'danger_triangle' : 'verified_check',
@@ -321,7 +323,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               _buildStatItem(
                 'High Risk',
                 provider.highRiskLibraries.length.toString(),
-                const Color(0xFFFF5722),
+                AppColors.severityCritical,
               ),
             ],
           ),
@@ -336,7 +338,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
@@ -398,7 +400,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: severityColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   border: Border.all(color: severityColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
@@ -415,7 +417,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: severityColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -476,7 +478,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: GlassTheme.successColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -550,7 +552,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: GlassTheme.warningColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                     child: Text(
                       '${entry.value.length}',
@@ -582,7 +584,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             height: 40,
             decoration: BoxDecoration(
               color: GlassTheme.warningColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: const DuotoneIcon(
               'radar',
@@ -618,7 +620,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             decoration: BoxDecoration(
               color: Color(SupplyChainProvider.getRiskColor(lib.riskLevel))
                   .withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Text(
               lib.riskLevel.displayName,
@@ -661,7 +663,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Text(
               '${entry.value.length}',
@@ -694,7 +696,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: GlassTheme.warningColor.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                             ),
                             child: const Text(
                               'TRACKER',
@@ -756,7 +758,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -788,7 +791,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: _getSeverityColor(vuln.cvssScore).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                     child: Text(
                       vuln.cveId,
@@ -857,7 +860,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: GlassTheme.errorColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     border: Border.all(color: GlassTheme.errorColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
@@ -959,10 +962,10 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
   }
 
   Color _getSeverityColor(double cvss) {
-    if (cvss >= 9.0) return GlassTheme.errorColor;
-    if (cvss >= 7.0) return const Color(0xFFFF5722);
-    if (cvss >= 4.0) return GlassTheme.warningColor;
-    return const Color(0xFFFFEB3B);
+    if (cvss >= 9.0) return AppColors.severityCritical;
+    if (cvss >= 7.0) return AppColors.severityHigh;
+    if (cvss >= 4.0) return AppColors.severityMedium;
+    return AppColors.severityLow;
   }
 
   String _getCategoryIcon(LibraryCategory category) {

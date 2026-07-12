@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -115,7 +117,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         if (provider.isLoading && !provider.hasData) {
           return GlassPage(
             title: 'Analytics',
-            body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+            body: Center(child: CircularProgressIndicator(color: AppColors.accentInk)),
           );
         }
 
@@ -178,7 +180,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       child: Row(
         children: [
           if (_selectedTimeRange == value)
-            const DuotoneIcon('check_circle', size: 18, color: GlassTheme.primaryAccent)
+            DuotoneIcon('check_circle', size: 18, color: AppColors.accentInk)
           else
             const SizedBox(width: 18),
           const SizedBox(width: 8),
@@ -281,7 +283,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               GlassBadge(text: _getTimeRangeLabel(), color: GlassTheme.primaryAccent),
               if (_isLoadingAnalytics) ...[
                 const SizedBox(width: 8),
-                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: GlassTheme.primaryAccent)),
+                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentInk)),
               ],
             ],
           ),
@@ -292,7 +294,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               tintColor: GlassTheme.errorColor,
               child: Row(
                 children: [
-                  const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+                  DuotoneIcon('danger_circle', color: AppColors.errorInk, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -322,9 +324,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildMetricCard(context, 'URLs Checked', _numberFormat.format(urlsChecked), 'link', const Color(0xFF9C27B0)),
+              _buildMetricCard(context, 'URLs Checked', _numberFormat.format(urlsChecked), 'link', AppColors.chartColors[4]),
               const SizedBox(width: 12),
-              _buildMetricCard(context, 'Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', const Color(0xFF2196F3)),
+              _buildMetricCard(context, 'Phone/SMS', _numberFormat.format(smsAnalyzed), 'chat_dots', AppColors.chartColors[2]),
             ],
           ),
 
@@ -335,7 +337,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               children: [
                 _buildMetricCard(context, 'Total Alerts', _numberFormat.format(alertTotal), 'bell', GlassTheme.warningColor),
                 const SizedBox(width: 12),
-                _buildMetricCard(context, 'Open', _numberFormat.format(alertOpen ?? 0), 'notification_unread', const Color(0xFFFF5722)),
+                _buildMetricCard(context, 'Open', _numberFormat.format(alertOpen ?? 0), 'notification_unread', AppColors.severityCritical),
               ],
             ),
           ],
@@ -358,7 +360,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   detectionRate != null
                       ? '${(detectionRate * 100).toStringAsFixed(1)}%'
                       : 'n/a',
-                  detectionRate != null ? GlassTheme.successColor : cs.onSurfaceVariant,
+                  detectionRate != null ? AppColors.accentInk : cs.onSurfaceVariant,
                 ),
                 _buildQualityMetric(
                   context,
@@ -366,13 +368,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   falsePositiveRate != null
                       ? '${(falsePositiveRate * 100).toStringAsFixed(1)}%'
                       : 'n/a',
-                  falsePositiveRate != null ? GlassTheme.warningColor : cs.onSurfaceVariant,
+                  falsePositiveRate != null ? AppColors.secondaryInk : cs.onSurfaceVariant,
                 ),
                 _buildQualityMetric(
                   context,
                   'MTTA',
                   mttaMinutes != null ? '${mttaMinutes.toStringAsFixed(0)}m' : 'n/a',
-                  mttaMinutes != null ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                  mttaMinutes != null ? AppColors.accentInk : cs.onSurfaceVariant,
                 ),
               ],
             ),
@@ -389,10 +391,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             margin: EdgeInsets.zero,
             child: Column(
               children: [
-                _buildDistributionBar(context, 'URLs/Phishing', phishingRatio, GlassTheme.errorColor),
-                _buildDistributionBar(context, 'Malware Hashes', malwareRatio, const Color(0xFFFF5722)),
-                _buildDistributionBar(context, 'Domains', domainRatio, GlassTheme.warningColor),
-                _buildDistributionBar(context, 'IP Addresses', ipRatio, const Color(0xFF9C27B0)),
+                _buildDistributionBar(context, 'URLs/Phishing', phishingRatio, AppColors.chartColors[7]),
+                _buildDistributionBar(context, 'Malware Hashes', malwareRatio, AppColors.chartColors[5]),
+                _buildDistributionBar(context, 'Domains', domainRatio, AppColors.chartColors[1]),
+                _buildDistributionBar(context, 'IP Addresses', ipRatio, AppColors.chartColors[4]),
                 _buildDistributionBar(context, 'Other', otherRatio, cs.onSurfaceVariant),
               ],
             ),
@@ -419,7 +421,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                     context,
                     country,
                     geoTotal > 0 ? count / geoTotal : 0,
-                    GlassTheme.primaryAccent,
+                    AppColors.chartColors[0],
                   );
                 }).toList(),
               ),
@@ -490,15 +492,16 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   Color _getSeverityColorFromLevel(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return GlassTheme.errorColor;
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       case SeverityLevel.low:
-        return GlassTheme.primaryAccent;
+        return AppColors.severityLow;
       case SeverityLevel.info:
       case SeverityLevel.unknown:
-        return GlassTheme.successColor;
+        return AppColors.severityInfo;
     }
   }
 
@@ -521,13 +524,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               children: [
                 GlassDuotoneIconBox(icon: icon, color: color, size: 36, iconSize: 18),
                 const Spacer(),
-                DuotoneIcon('graph_up', size: 16, color: GlassTheme.successColor),
+                DuotoneIcon('graph_up', size: 16, color: AppColors.accentInk),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               value,
-              style: TextStyle(color: cs.onSurface, fontSize: 28, fontWeight: FontWeight.bold),
+              style: BrandText.heading(color: cs.onSurface, size: 28),
             ),
             Text(
               label,
@@ -699,11 +702,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard(context, 'Phishing URLs', urlCount, 'link', GlassTheme.errorColor),
-          _buildThreatTypeCard(context, 'Malicious Domains', domainCount, 'globe', const Color(0xFFFF5722)),
-          _buildThreatTypeCard(context, 'Malicious IPs', ipCount, 'server', GlassTheme.warningColor),
-          _buildThreatTypeCard(context, 'Malware Hashes', hashCount, 'code', const Color(0xFF9C27B0)),
-          _buildThreatTypeCard(context, 'Phone/SMS Threats', phoneCount, 'chat_dots', const Color(0xFF2196F3)),
+          _buildThreatTypeCard(context, 'Phishing URLs', urlCount, 'link', AppColors.chartColors[7]),
+          _buildThreatTypeCard(context, 'Malicious Domains', domainCount, 'globe', AppColors.chartColors[5]),
+          _buildThreatTypeCard(context, 'Malicious IPs', ipCount, 'server', AppColors.chartColors[1]),
+          _buildThreatTypeCard(context, 'Malware Hashes', hashCount, 'code', AppColors.chartColors[4]),
+          _buildThreatTypeCard(context, 'Phone/SMS Threats', phoneCount, 'chat_dots', AppColors.chartColors[2]),
           const SizedBox(height: 24),
 
           // Threat severity breakdown
@@ -712,10 +715,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildThreatTypeCard(context, 'Critical', criticalCount, 'danger_circle', GlassTheme.errorColor),
-          _buildThreatTypeCard(context, 'High', highCount, 'danger_triangle', const Color(0xFFFF5722)),
-          _buildThreatTypeCard(context, 'Medium', mediumCount, 'info_circle', GlassTheme.warningColor),
-          _buildThreatTypeCard(context, 'Low', lowCount, 'info_square', cs.onSurfaceVariant),
+          _buildThreatTypeCard(context, 'Critical', criticalCount, 'danger_circle', AppColors.severityCritical),
+          _buildThreatTypeCard(context, 'High', highCount, 'danger_triangle', AppColors.severityHigh),
+          _buildThreatTypeCard(context, 'Medium', mediumCount, 'info_circle', AppColors.severityMedium),
+          _buildThreatTypeCard(context, 'Low', lowCount, 'info_square', AppColors.severityLow),
           const SizedBox(height: 24),
 
           // Top threat sources
@@ -762,7 +765,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(source, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
-              Text('$percentage%', style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold)),
+              Text('$percentage%', style: TextStyle(color: AppColors.chartColors[0], fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
@@ -771,7 +774,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             child: LinearProgressIndicator(
               value: percentage / 100,
               backgroundColor: cs.onSurface.withValues(alpha: 0.06),
-              valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.chartColors[0]),
               minHeight: 4,
             ),
           ),
@@ -867,17 +870,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard(context, 'Blocked', _numberFormat.format(threatsBlocked), GlassTheme.errorColor),
+              _buildQuickStatCard(context, 'Blocked', _numberFormat.format(threatsBlocked), AppColors.errorInk),
               const SizedBox(width: 12),
-              _buildQuickStatCard(context, 'Safe', _numberFormat.format(safeScans), GlassTheme.successColor),
+              _buildQuickStatCard(context, 'Safe', _numberFormat.format(safeScans), AppColors.accentInk),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickStatCard(context, 'High Risk', _numberFormat.format(highSeverity), GlassTheme.warningColor),
+              _buildQuickStatCard(context, 'High Risk', _numberFormat.format(highSeverity), AppColors.secondaryInk),
               const SizedBox(width: 12),
-              _buildQuickStatCard(context, 'Score', '$protectionScore%', GlassTheme.primaryAccent),
+              _buildQuickStatCard(context, 'Score', '$protectionScore%', AppColors.accentInk),
             ],
           ),
         ],
@@ -892,6 +895,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         : score >= 50
             ? GlassTheme.warningColor
             : GlassTheme.errorColor;
+    final ink = score >= 80
+        ? AppColors.accentInk
+        : score >= 50
+            ? AppColors.secondaryInk
+            : AppColors.errorInk;
 
     return GlassCard(
       margin: EdgeInsets.zero,
@@ -915,7 +923,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   children: [
                     Text(
                       '$score',
-                      style: TextStyle(color: color, fontSize: 32, fontWeight: FontWeight.bold),
+                      style: BrandText.heading(color: ink, size: 32),
                     ),
                     Text(
                       'score',
@@ -976,7 +984,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           ),
           DuotoneIcon(
             enabled ? 'check_circle' : 'close_circle',
-            color: enabled ? GlassTheme.successColor : cs.onSurfaceVariant,
+            color: enabled ? AppColors.accentInk : cs.onSurfaceVariant,
             size: 24,
           ),
         ],
@@ -993,7 +1001,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           children: [
             Text(
               value,
-              style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
+              style: BrandText.heading(color: color, size: 28),
             ),
             const SizedBox(height: 4),
             Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
@@ -1074,7 +1082,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Brand.onLime,
+              ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Generate'),
             ),

@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -37,7 +39,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 FloatingActionButton.extended(
                   onPressed: () => _showAddAssetSheet(context),
                   backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Brand.onLime,
                   icon: const DuotoneIcon('add_circle', size: 20),
                   label: const Text('Add Asset'),
                 ),
@@ -88,11 +90,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           // Email check section
           Text(
             'Check Email Breaches',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 8),
           Text(
@@ -115,11 +113,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               const SizedBox(height: 24),
               Text(
                 'Breaches Found',
-                style: TextStyle(
-                  color: cs.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.title(),
               ),
               const SizedBox(height: 12),
               ...provider.lastCheckResult!.breaches.map((breach) => Padding(
@@ -138,11 +132,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             children: [
               Text(
                 'Monitored Emails',
-                style: TextStyle(
-                  color: cs.onSurface,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.title(size: 18),
               ),
               TextButton.icon(
                 onPressed: () => _showAddAssetSheet(context,
@@ -150,7 +140,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 icon: const DuotoneIcon('add_circle', size: 18),
                 label: const Text('Add'),
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF00D9FF),
+                  foregroundColor: AppColors.secondaryInk,
                 ),
               ),
             ],
@@ -175,11 +165,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           // Password check section
           Text(
             'Check Password Breaches',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 8),
           Text(
@@ -208,15 +194,11 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               children: [
                 Row(
                   children: [
-                    const DuotoneIcon('shield_check', size: 24, color: Color(0xFF00D9FF)),
+                    DuotoneIcon('shield_check', size: 24, color: AppColors.secondaryInk),
                     const SizedBox(width: 12),
                     Text(
                       'How It Works',
-                      style: TextStyle(
-                        color: cs.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(),
                     ),
                   ],
                 ),
@@ -254,8 +236,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
         children: [
           Text(
             number,
-            style: const TextStyle(
-              color: Color(0xFF00D9FF),
+            style: TextStyle(
+              color: AppColors.secondaryInk,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -372,11 +354,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           // Monitored assets section
           Text(
             'Monitored Assets',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 12),
           if (assets.isEmpty)
@@ -463,7 +441,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Padding(
@@ -484,18 +463,14 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: cs.outline,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
               Text(
                 'Add Asset to Monitor',
-                style: TextStyle(
-                  color: cs.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.heading(size: 20),
               ),
               const SizedBox(height: 20),
               // Asset type selector
@@ -517,10 +492,10 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           }
                         },
                         backgroundColor: cs.surfaceContainerHighest,
-                        selectedColor: const Color(0xFF00D9FF).withAlpha(40),
+                        selectedColor: AppColors.accentPill,
                         labelStyle: TextStyle(
                           color: isSelected
-                              ? const Color(0xFF00D9FF)
+                              ? AppColors.accentInk
                               : cs.onSurfaceVariant,
                         ),
                       ),
@@ -548,7 +523,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   filled: true,
                   fillColor: cs.surfaceContainerHighest,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -567,11 +542,11 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D9FF),
-                    foregroundColor: Colors.black,
+                    backgroundColor: Brand.lime,
+                    foregroundColor: Brand.onLime,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                   ),
                   child: const Text(
@@ -624,7 +599,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -645,7 +621,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
                     color: cs.outline,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
               ),
@@ -656,16 +632,16 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(40),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.error.withAlpha(40),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                     ),
                     child: Center(
                       child: Text(
                         breach.name.isNotEmpty
                             ? breach.name[0].toUpperCase()
                             : '?',
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(
+                          color: AppColors.errorInk,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
@@ -681,11 +657,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           breach.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: cs.onSurface,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: BrandText.heading(size: 22),
                         ),
                         Text(
                           breach.domain,
@@ -726,18 +698,14 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                   'Sensitivity',
                   'Contains Sensitive Data',
                   'danger_triangle',
-                  color: Colors.orange,
+                  color: AppColors.secondaryInk,
                 ),
               // Description
               if (breach.description != null) ...[
                 const SizedBox(height: 24),
                 Text(
                   'About This Breach',
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: BrandText.title(),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -754,11 +722,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 const SizedBox(height: 24),
                 Text(
                   'Exposed Data Types',
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: BrandText.title(),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -774,20 +738,21 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.info.withAlpha(25),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        DuotoneIcon('lightbulb_bolt', color: Colors.blue, size: 20),
-                        SizedBox(width: 8),
+                        DuotoneIcon('lightbulb_bolt',
+                            color: AppColors.secondaryInk, size: 20),
+                        const SizedBox(width: 8),
                         Text(
                           'Recommended Actions',
                           style: TextStyle(
-                            color: Colors.blue,
+                            color: AppColors.secondaryInk,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -857,7 +822,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DuotoneIcon('check_circle', size: 16, color: Colors.blue),
+          DuotoneIcon('check_circle', size: 16, color: AppColors.secondaryInk),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -892,7 +857,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.6,
@@ -908,14 +874,15 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               height: 4,
               decoration: BoxDecoration(
                 color: cs.outline,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const DuotoneIcon('danger_triangle', color: Colors.red, size: 24),
+                  DuotoneIcon('danger_triangle',
+                      color: AppColors.errorInk, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -925,11 +892,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                           'Breaches for ${asset.displayValue}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: cs.onSurface,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: BrandText.title(),
                         ),
                         Text(
                           '${breaches.length} breaches found',
@@ -995,9 +958,9 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
               provider.removeAsset(asset.id);
               Navigator.pop(context);
             },
-            child: const Text(
+            child: Text(
               'Remove',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.errorInk),
             ),
           ),
         ],

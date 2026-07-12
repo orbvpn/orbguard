@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -55,7 +57,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     return GlassPage(
       title: 'Webhooks',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _error != null
               ? _buildErrorState()
               : Column(
@@ -88,9 +90,9 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                             // Stats
                             Row(
                               children: [
-                                _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), GlassTheme.successColor),
+                                _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), AppColors.accentInk),
                                 const SizedBox(width: 12),
-                                _buildStatCard('Total Sent', _formatSentCount(_webhooks.fold(0, (sum, w) => sum + w.sentCount)), GlassTheme.primaryAccent),
+                                _buildStatCard('Total Sent', _formatSentCount(_webhooks.fold(0, (sum, w) => sum + w.sentCount)), AppColors.accentInk),
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -117,7 +119,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text(value, style: BrandText.heading(color: color, size: 28)),
             const SizedBox(height: 4),
             Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
@@ -158,7 +160,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           const SizedBox(height: 12),
           Text(
             webhook.url,
-            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12, fontFamily: 'monospace'),
+            style: BrandText.mono(color: context.colors.onSurfaceVariant, size: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -170,7 +172,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
               _buildWebhookStat(
                 webhook.lastStatus == 'success' ? 'check_circle' : 'danger_circle',
                 webhook.lastStatus == 'success' ? 'Healthy' : 'Failed',
-                color: webhook.lastStatus == 'success' ? GlassTheme.successColor : GlassTheme.errorColor,
+                color: webhook.lastStatus == 'success' ? AppColors.accentInk : AppColors.errorInk,
               ),
             ],
           ),
@@ -205,7 +207,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon('link', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon('link', size: 64, color: AppColors.accentInk.withAlpha(128)),
           const SizedBox(height: 16),
           Text(
             'No Webhooks',
@@ -219,11 +221,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => _showAddWebhookDialog(context),
-            icon: const DuotoneIcon('add_circle', size: 18, color: Colors.white),
+            icon: const DuotoneIcon('add_circle', size: 18, color: Brand.onLime),
             label: const Text('Add Webhook'),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
           ),
         ],
@@ -238,7 +240,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon('danger_circle', size: 64, color: GlassTheme.errorColor.withAlpha(128)),
+            DuotoneIcon('danger_circle', size: 64, color: AppColors.errorInk.withAlpha(128)),
             const SizedBox(height: 16),
             Text(
               'Failed to Load Webhooks',
@@ -253,11 +255,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadWebhooks,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -351,7 +353,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 _createWebhook(nameController.text, urlController.text);
               }
             },
-            child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+            child: Text('Add', style: TextStyle(color: AppColors.accentInk)),
           ),
         ],
       ),
@@ -376,7 +378,8 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                   ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
                   : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -390,7 +393,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 padding: const EdgeInsets.all(12),
                 child: SelectableText(
                   webhook.url,
-                  style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8), fontFamily: 'monospace', fontSize: 12),
+                  style: BrandText.mono(color: context.colors.onSurface.withValues(alpha: 0.8), size: 12),
                 ),
               ),
               const SizedBox(height: 20),
@@ -421,11 +424,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                         Navigator.pop(context);
                         // Test webhook
                       },
-                      icon: const DuotoneIcon('forward', size: 18, color: GlassTheme.primaryAccent),
+                      icon: DuotoneIcon('forward', size: 18, color: AppColors.accentInk),
                       label: const Text('Test'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
+                        foregroundColor: AppColors.accentInk,
+                        side: BorderSide(color: AppColors.accentInk),
                       ),
                     ),
                   ),
@@ -436,11 +439,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                         Navigator.pop(context);
                         _deleteWebhook(webhook);
                       },
-                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: GlassTheme.errorColor),
+                      icon: DuotoneIcon('trash_bin_minimalistic', size: 18, color: AppColors.errorInk),
                       label: const Text('Delete'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.errorColor,
-                        side: const BorderSide(color: GlassTheme.errorColor),
+                        foregroundColor: AppColors.errorInk,
+                        side: BorderSide(color: AppColors.errorInk),
                       ),
                     ),
                   ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
 class JailbreakInstructionsScreen extends StatefulWidget {
@@ -172,16 +175,16 @@ class _JailbreakInstructionsScreenState
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black,
+                              color: Brand.onLime,
                             ),
                           )
                         : const DuotoneIcon(AppIcons.checkCircle,
-                            color: Colors.black),
+                            color: Brand.onLime),
                     label: Text(
                         _isTesting ? 'Testing...' : 'Test Jailbreak Status'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D9FF),
-                      foregroundColor: Colors.black,
+                      backgroundColor: GlassTheme.primaryAccent,
+                      foregroundColor: Brand.onLime,
                       padding: const EdgeInsets.all(12),
                     ),
                   ),
@@ -237,12 +240,12 @@ class _JailbreakInstructionsScreenState
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
+                color: AppColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Text(
                 '✅ $note',
-                style: const TextStyle(fontSize: 12, color: Colors.green),
+                style: TextStyle(fontSize: 12, color: AppColors.accentInk),
               ),
             ),
           ],

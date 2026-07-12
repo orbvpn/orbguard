@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -58,14 +60,14 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (provider.isScanning)
-                      const Padding(
-                        padding: EdgeInsets.all(12),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                       )
@@ -97,9 +99,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               label: 'Nearby',
               iconPath: 'wi_fi_router',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildNearbyAPsTab(provider),
@@ -108,9 +110,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               label: 'Threats',
               iconPath: 'danger_triangle',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildThreatsTab(provider),
@@ -119,9 +121,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               label: 'Trusted',
               iconPath: 'shield',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildTrustedTab(provider),
@@ -141,12 +143,12 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         children: [
           Row(
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                 ),
               ),
               const SizedBox(width: 12),
@@ -160,8 +162,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               ),
               Text(
                 '${(provider.scanProgress * 100).toInt()}%',
-                style: const TextStyle(
-                  color: GlassTheme.primaryAccent,
+                style: TextStyle(
+                  color: AppColors.accentInk,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -169,7 +171,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           ),
           const SizedBox(height: 12),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             child: LinearProgressIndicator(
               value: provider.scanProgress,
               backgroundColor: cs.onSurface.withValues(alpha: 0.06),
@@ -196,7 +198,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             height: 48,
             decoration: BoxDecoration(
               color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Center(
               child: DuotoneIcon(
@@ -232,7 +234,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                       ),
                       child: Text(
                         ap.threatLevel.displayName,
@@ -259,7 +261,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           DuotoneIcon(
             _getSignalIconName(ap.signalStrength),
             size: 24,
-            color: GlassTheme.primaryAccent,
+            color: AppColors.accentInk,
           ),
         ],
       ),
@@ -275,22 +277,22 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           _buildStatItem(
             'Total',
             stats.totalAPs.toString(),
-            GlassTheme.primaryAccent,
+            Brand.text,
           ),
           _buildStatItem(
             'Rogue',
             stats.rogueAPs.toString(),
-            GlassTheme.errorColor,
+            AppColors.errorInk,
           ),
           _buildStatItem(
             'Suspicious',
             stats.suspiciousAPs.toString(),
-            GlassTheme.warningColor,
+            AppColors.secondaryInk,
           ),
           _buildStatItem(
             'Safe',
             stats.safeAPs.toString(),
-            GlassTheme.successColor,
+            AppColors.accentInk,
           ),
         ],
       ),
@@ -307,11 +309,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           children: [
             Text(
               value,
-              style: TextStyle(
-                color: color,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.heading(size: 24, color: color),
             ),
             Text(
               label,
@@ -371,7 +369,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         subtitle: _searchQuery.isEmpty
             ? 'Your WiFi environment appears safe'
             : 'No threats match "$_searchQuery"',
-        color: GlassTheme.successColor,
+        color: AppColors.accentInk,
       );
     }
 
@@ -427,7 +425,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () => _showAPDetails(context, ap, provider),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -437,7 +435,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Stack(
                   children: [
@@ -486,10 +484,10 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                           ),
                         ),
                         if (isTrusted)
-                          const DuotoneIcon(
+                          DuotoneIcon(
                             'verified_check',
                             size: 16,
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                       ],
                     ),
@@ -528,7 +526,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                             ),
                             child: Text(
                               threat.displayName,
@@ -551,7 +549,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   ap.threatLevel.displayName,
@@ -585,7 +583,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -627,12 +625,12 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: Color(ap.threatLevel.color),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     ap.threatLevel.displayName.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Brand.onDanger,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -694,9 +692,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                 icon: const DuotoneIcon('shield_check', size: 18),
                 label: const Text('Trust'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: GlassTheme.primaryAccent,
-                  side: const BorderSide(
-                    color: GlassTheme.primaryAccent,
+                  foregroundColor: AppColors.accentInk,
+                  side: BorderSide(
+                    color: AppColors.accentInk,
                   ),
                 ),
               ),
@@ -717,13 +715,13 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           height: 44,
           decoration: BoxDecoration(
             color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
-          child: const Center(
+          child: Center(
             child: DuotoneIcon(
               'verified_check',
               size: 24,
-              color: GlassTheme.primaryAccent,
+              color: AppColors.accentInk,
             ),
           ),
         ),
@@ -742,10 +740,10 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           ),
         ),
         trailing: IconButton(
-          icon: const DuotoneIcon(
+          icon: DuotoneIcon(
             'minus_circle',
             size: 24,
-            color: GlassTheme.errorColor,
+            color: AppColors.errorInk,
           ),
           onPressed: () => _confirmRemoveTrusted(context, ap, provider),
         ),
@@ -757,12 +755,15 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     final color = security.isSecure
         ? GlassTheme.successColor
         : GlassTheme.warningColor;
+    final ink = security.isSecure
+        ? AppColors.accentInk
+        : AppColors.secondaryInk;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -770,13 +771,13 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           DuotoneIcon(
             security.isSecure ? 'lock' : 'lock_unlocked',
             size: 10,
-            color: color,
+            color: ink,
           ),
           const SizedBox(width: 4),
           Text(
             security.displayName,
             style: TextStyle(
-              color: color,
+              color: ink,
               fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
@@ -886,8 +887,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     GlassTheme.gradientBottomLight,
                   ],
           ),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(GlassTheme.radiusLarge)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -901,7 +902,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -918,11 +919,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     children: [
                       Text(
                         ap.ssid.isEmpty ? '<Hidden Network>' : ap.ssid, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: cs.onSurface,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: BrandText.heading(size: 20),
                       ),
                       Text(
                         ap.bssid, maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -967,7 +964,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: Color(ap.threatLevel.color).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
                     child: Text(
                       threat.displayName,
@@ -995,7 +992,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       label: const Text('Add to Trusted'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.primaryAccent,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Brand.onLime,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1008,7 +1005,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                       label: const Text('Already Trusted'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: GlassTheme.successColor,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Brand.onLime,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1046,7 +1043,6 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   }
 
   void _showSettings(BuildContext context, RogueAPProvider provider) {
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
@@ -1063,8 +1059,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
                     GlassTheme.gradientBottomLight,
                   ],
           ),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(GlassTheme.radiusLarge)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1073,11 +1069,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           children: [
             Text(
               'Protection Settings',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.heading(size: 20),
             ),
             const SizedBox(height: 24),
             _buildSettingSwitch(
@@ -1178,9 +1170,9 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               provider.removeTrustedAP(ap.id);
               Navigator.pop(context);
             },
-            child: const Text(
+            child: Text(
               'Remove',
-              style: TextStyle(color: GlassTheme.errorColor),
+              style: TextStyle(color: AppColors.errorInk),
             ),
           ),
         ],

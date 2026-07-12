@@ -3,6 +3,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -275,7 +277,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                 _buildCampaignStat(AppIcons.clock, _formatDate(campaign.firstSeen!)),
               const Spacer(),
               if (campaign.associatedActors.isNotEmpty)
-                GlassBadge(text: campaign.associatedActors.first, color: const Color(0xFF9C27B0), fontSize: 10),
+                GlassBadge(text: campaign.associatedActors.first, color: AppColors.chartColors[4], fontSize: 10),
             ],
           ),
           if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
@@ -285,9 +287,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               runSpacing: 6,
               children: [
                 ...campaign.targetedCountries.take(2).map((region) =>
-                    _buildTargetChip(AppIcons.global, region, const Color(0xFF2196F3))),
+                    _buildTargetChip(AppIcons.global, region, AppColors.secondaryInk)),
                 ...campaign.targetedIndustries.take(2).map((sector) =>
-                    _buildTargetChip(AppIcons.enterprise, sector, const Color(0xFFFF9800))),
+                    _buildTargetChip(AppIcons.enterprise, sector, AppColors.amberInk)),
               ],
             ),
           ],
@@ -313,7 +315,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -376,11 +378,11 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadCampaigns,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -411,7 +413,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                   ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
                   : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -508,7 +511,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: campaign.targetedCountries.map((r) =>
-                        GlassBadge(text: r, color: const Color(0xFF2196F3))).toList(),
+                        GlassBadge(text: r, color: AppColors.secondaryInk)).toList(),
                   ),
                 ],
                 if (campaign.targetedIndustries.isNotEmpty) ...[
@@ -518,7 +521,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: campaign.targetedIndustries.map((s) =>
-                        GlassBadge(text: s, color: const Color(0xFFFF9800))).toList(),
+                        GlassBadge(text: s, color: AppColors.amberInk)).toList(),
                   ),
                 ],
               ],
@@ -538,14 +541,14 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           ttp,
-                          style: const TextStyle(
-                            color: GlassTheme.primaryAccent,
+                          style: TextStyle(
+                            color: AppColors.accentInk,
                             fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       )).toList(),
@@ -581,15 +584,15 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   Color _getSeverityColor(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       case SeverityLevel.low:
-        return const Color(0xFF4CAF50);
+        return AppColors.severityLow;
       default:
-        return Colors.grey;
+        return AppColors.severityInfo;
     }
   }
 

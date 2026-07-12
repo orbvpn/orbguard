@@ -4,6 +4,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -180,7 +182,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: _getCategoryColor(category).withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                           ),
                           child: Text(
                             category,
@@ -309,11 +311,11 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadActors,
-              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: Colors.white),
+              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -344,7 +346,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
                   : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -452,10 +455,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   children: actor.motivations.map((m) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF9C27B0).withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.chartColors[4].withAlpha(40),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
-                        child: Text(m.value, style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 12)),
+                        child: Text(m.value,
+                            style: TextStyle(
+                                color: AppColors.chartColors[4], fontSize: 12)),
                       )).toList(),
                 ),
               ],
@@ -493,14 +498,14 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           ttp,
-                          style: const TextStyle(
-                            color: GlassTheme.primaryAccent,
+                          style: TextStyle(
+                            color: AppColors.accentInk,
                             fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       )).toList(),
@@ -520,7 +525,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   runSpacing: 8,
                   children: actor.tools.map((tool) => GlassBadge(
                         text: tool,
-                        color: const Color(0xFFFF5722),
+                        color: AppColors.errorInk,
                       )).toList(),
                 ),
               ],
@@ -582,11 +587,11 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
       case 'apt':
         return GlassTheme.errorColor;
       case 'cybercrime':
-        return const Color(0xFFFF9800);
+        return AppColors.chartColors[5];
       case 'hacktivism':
-        return const Color(0xFF4CAF50);
+        return AppColors.chartColors[6];
       case 'nation-state':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       default:
         return GlassTheme.primaryAccent;
     }
@@ -610,15 +615,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   Color _getSophisticationColor(SeverityLevel level) {
     switch (level) {
       case SeverityLevel.critical:
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       case SeverityLevel.low:
-        return const Color(0xFF4CAF50);
+        return AppColors.severityLow;
       default:
-        return Colors.grey;
+        return AppColors.severityInfo;
     }
   }
 

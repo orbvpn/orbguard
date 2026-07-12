@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -393,7 +395,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         color: Color(IdentityProtectionProvider.getBureauColor(
                                 bureau))
                             .withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                       ),
                       child: Center(
                         child: DuotoneIcon(
@@ -502,7 +504,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           height: 40,
           decoration: BoxDecoration(
             color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: const Center(
             child: DuotoneIcon(
@@ -597,7 +599,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           height: 44,
           decoration: BoxDecoration(
             color: statusColor.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
           child: Center(
             child: DuotoneIcon(
@@ -644,7 +646,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: GlassTheme.errorColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   '${asset.alertCount} alerts',
@@ -732,7 +734,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   height: 44,
                   decoration: BoxDecoration(
                     color: severityColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -775,16 +777,18 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     horizontal: 8,
                     vertical: 4,
                   ),
-                  decoration: BoxDecoration(
-                    color: alert.isResolved
-                        ? GlassTheme.successColor
+                  decoration: GlassTheme.badgeGlassDecoration(
+                    isDark: context.isDark,
+                    tintColor: alert.isResolved
+                        ? AppColors.success
                         : severityColor,
-                    borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     alert.isResolved ? 'RESOLVED' : alert.severity.displayName.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: alert.isResolved
+                          ? AppColors.accentInk
+                          : severityColor,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -961,15 +965,13 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
   Color _getGradeColor(String grade) {
     switch (grade) {
       case 'A':
-        return const Color(0xFF4CAF50);
       case 'B':
-        return const Color(0xFF8BC34A);
+        return AppColors.accentInk;
       case 'C':
-        return const Color(0xFFFFEB3B);
       case 'D':
-        return const Color(0xFFFF9800);
+        return AppColors.amberInk;
       default:
-        return const Color(0xFFFF5722);
+        return AppColors.errorInk;
     }
   }
 
@@ -1008,8 +1010,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       GlassTheme.gradientBottomLight,
                     ],
             ),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           padding: EdgeInsets.fromLTRB(
             24,
@@ -1058,20 +1060,19 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         _getAssetIcon(type),
                         size: 18,
                         color: isSelected
-                            ? Colors.white
-                            : GlassTheme.primaryAccent,
+                            ? Brand.onLime
+                            : AppColors.accentInk,
                       ),
                       label: Text(type == AssetType.email
                           ? '${type.displayName} • Live'
                           : type.displayName),
                       selected: isSelected,
                       selectedColor: GlassTheme.primaryAccent,
-                      backgroundColor:
-                          GlassTheme.primaryAccent.withValues(alpha: 0.2),
+                      backgroundColor: AppColors.accentPill,
                       labelStyle: TextStyle(
                         color: isSelected
-                            ? Colors.white
-                            : GlassTheme.primaryAccent,
+                            ? Brand.onLime
+                            : AppColors.accentInk,
                         fontSize: 12,
                       ),
                       onSelected: (selected) {
@@ -1127,7 +1128,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Brand.onLime,
                       disabledBackgroundColor:
                           context.colors.onSurface.withValues(alpha: 0.06),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1138,7 +1139,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: Brand.onLime,
                             ),
                           )
                         : const Text('Add for Monitoring'),

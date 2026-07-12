@@ -4,6 +4,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/mitre_provider.dart';
 
@@ -31,12 +34,12 @@ class TacticHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF00D9FF).withAlpha(51)
+              ? AppColors.info.withAlpha(51)
               : cs.surfaceContainerHighest,
           border: Border(
             bottom: BorderSide(
               color: isSelected
-                  ? const Color(0xFF00D9FF)
+                  ? AppColors.secondaryInk
                   : cs.outline,
               width: isSelected ? 2 : 1,
             ),
@@ -48,7 +51,7 @@ class TacticHeader extends StatelessWidget {
             Text(
               tactic.shortName,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF00D9FF) : cs.onSurface,
+                color: isSelected ? AppColors.secondaryInk : cs.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -59,13 +62,13 @@ class TacticHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   '$detectedCount',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Brand.onDanger,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -104,16 +107,16 @@ class TechniqueChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: isDetected
-              ? Colors.red.withAlpha(51)
+              ? AppColors.error.withAlpha(51)
               : isSelected
-                  ? const Color(0xFF00D9FF).withAlpha(51)
+                  ? AppColors.info.withAlpha(51)
                   : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           border: Border.all(
             color: isDetected
-                ? Colors.red.withAlpha(128)
+                ? AppColors.error.withAlpha(128)
                 : isSelected
-                    ? const Color(0xFF00D9FF)
+                    ? AppColors.secondaryInk
                     : Colors.transparent,
           ),
         ),
@@ -121,9 +124,9 @@ class TechniqueChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isDetected) ...[
-              const DuotoneIcon(
+              DuotoneIcon(
                 AppIcons.dangerTriangle,
-                color: Colors.red,
+                color: AppColors.errorInk,
                 size: 12,
               ),
               const SizedBox(width: 4),
@@ -133,8 +136,8 @@ class TechniqueChip extends StatelessWidget {
                 technique.id,
                 style: TextStyle(
                   color: isDetected
-                      ? Colors.red
-                      : const Color(0xFF00D9FF),
+                      ? AppColors.errorInk
+                      : AppColors.secondaryInk,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
@@ -145,7 +148,7 @@ class TechniqueChip extends StatelessWidget {
               child: Text(
                 technique.name,
                 style: TextStyle(
-                  color: isDetected ? Colors.red[100] : cs.onSurfaceVariant,
+                  color: isDetected ? AppColors.errorInk : cs.onSurfaceVariant,
                   fontSize: 10,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -189,15 +192,16 @@ class TacticColumn extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              border: Border.all(color: const Color(0xFF00D9FF).withAlpha(77)),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(GlassTheme.radiusXSmall)),
+              border: Border.all(color: AppColors.secondaryInk.withAlpha(77)),
             ),
             child: Column(
               children: [
                 Text(
                   tactic.name,
-                  style: const TextStyle(
-                    color: Color(0xFF00D9FF),
+                  style: TextStyle(
+                    color: AppColors.secondaryInk,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -221,7 +225,8 @@ class TacticColumn extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 color: cs.surface.withValues(alpha: 0.5),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(GlassTheme.radiusXSmall)),
                 border: Border.all(
                   color: cs.outline,
                 ),
@@ -270,9 +275,9 @@ class TechniqueDetailCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: detection != null
-            ? Border.all(color: Colors.red.withAlpha(128))
+            ? Border.all(color: AppColors.error.withAlpha(128))
             : null,
       ),
       child: Column(
@@ -285,13 +290,13 @@ class TechniqueDetailCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withAlpha(51),
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppColors.info.withAlpha(51),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   technique.id,
-                  style: const TextStyle(
-                    color: Color(0xFF00D9FF),
+                  style: TextStyle(
+                    color: AppColors.secondaryInk,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -326,21 +331,21 @@ class TechniqueDetailCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(51),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(51),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 16),
+                  DuotoneIcon(AppIcons.dangerTriangle, color: AppColors.errorInk, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Detected in your device',
                           style: TextStyle(
-                            color: Colors.red,
+                            color: AppColors.errorInk,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -348,7 +353,7 @@ class TechniqueDetailCard extends StatelessWidget {
                         Text(
                           'Source: ${detection!.source}',
                           style: TextStyle(
-                            color: Colors.red[200],
+                            color: AppColors.errorInk,
                             fontSize: 10,
                           ),
                           maxLines: 1,
@@ -388,14 +393,16 @@ class TechniqueDetailCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: p == 'Android'
-                          ? Colors.green.withAlpha(51)
-                          : Colors.grey.withAlpha(51),
-                      borderRadius: BorderRadius.circular(4),
+                          ? AppColors.success.withAlpha(51)
+                          : Brand.surface2,
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
                     child: Text(
                       p,
                       style: TextStyle(
-                        color: p == 'Android' ? Colors.green : cs.onSurfaceVariant,
+                        color: p == 'Android'
+                            ? AppColors.accentInk
+                            : cs.onSurfaceVariant,
                         fontSize: 10,
                       ),
                     ),
@@ -422,7 +429,7 @@ class TechniqueDetailCard extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,16 +480,16 @@ class MitreStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const DuotoneIcon(
+              DuotoneIcon(
                 AppIcons.shieldCheck,
-                color: Color(0xFF00D9FF),
+                color: AppColors.secondaryInk,
                 size: 24,
               ),
               const SizedBox(width: 8),
@@ -491,11 +498,7 @@ class MitreStatsCard extends StatelessWidget {
                   'MITRE ATT&CK Coverage',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: BrandText.title(color: cs.onSurface),
                 ),
               ),
             ],
@@ -505,14 +508,16 @@ class MitreStatsCard extends StatelessWidget {
           // Stats row
           Row(
             children: [
-              _buildStat(
-                  context, 'Total Techniques', '$totalTechniques', Colors.blue),
+              _buildStat(context, 'Total Techniques', '$totalTechniques',
+                  AppColors.secondaryInk),
               const SizedBox(width: 16),
               _buildStat(
                 context,
                 'Detected',
                 '$detectedTechniques',
-                detectedTechniques > 0 ? Colors.red : Colors.green,
+                detectedTechniques > 0
+                    ? AppColors.errorInk
+                    : AppColors.accentInk,
               ),
             ],
           ),
@@ -544,14 +549,14 @@ class MitreStatsCard extends StatelessWidget {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(51),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.red.withAlpha(77)),
+                    color: AppColors.error.withAlpha(51),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
+                    border: Border.all(color: AppColors.error.withAlpha(77)),
                   ),
                   child: Text(
                     '${tactic.shortName}: ${e.value}',
-                    style: const TextStyle(
-                      color: Colors.red,
+                    style: TextStyle(
+                      color: AppColors.errorInk,
                       fontSize: 11,
                     ),
                   ),
@@ -571,18 +576,14 @@ class MitreStatsCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: color.withAlpha(26),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               value,
-              style: TextStyle(
-                color: color,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.heading(color: color, size: 24),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -613,16 +614,16 @@ class MitreLegend extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _buildLegendItem(context, 'Normal', cs.outline),
           const SizedBox(width: 16),
-          _buildLegendItem(context, 'Selected', const Color(0xFF00D9FF)),
+          _buildLegendItem(context, 'Selected', AppColors.info),
           const SizedBox(width: 16),
-          _buildLegendItem(context, 'Detected', Colors.red),
+          _buildLegendItem(context, 'Detected', AppColors.error),
         ],
       ),
     );
@@ -637,7 +638,7 @@ class MitreLegend extends StatelessWidget {
           height: 12,
           decoration: BoxDecoration(
             color: color.withAlpha(128),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             border: Border.all(color: color),
           ),
         ),

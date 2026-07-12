@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -117,7 +118,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             subtitle: 'Get alerts when apps access microphone',
             value: provider.micMonitoringEnabled,
             onChanged: provider.setMicMonitoring,
-            color: const Color(0xFFFF5722),
+            color: AppColors.errorInk,
           ),
           _buildSettingsTile(
             icon: AppIcons.clipboard,
@@ -125,7 +126,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             subtitle: 'Scan clipboard for threats',
             value: provider.clipboardProtectionEnabled,
             onChanged: provider.setClipboardProtection,
-            color: const Color(0xFF9C27B0),
+            color: AppColors.chartColors[4],
           ),
           _buildSettingsTile(
             icon: AppIcons.forbidden,
@@ -411,7 +412,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           // Microphone Events
           Row(
             children: [
-              DuotoneIcon(AppIcons.microphone, color: const Color(0xFFFF5722), size: 24),
+              DuotoneIcon(AppIcons.microphone, color: AppColors.errorInk, size: 24),
               const SizedBox(width: 8),
               Text(
                 'Recent Microphone Access',

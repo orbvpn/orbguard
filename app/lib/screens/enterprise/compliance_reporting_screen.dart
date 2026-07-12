@@ -14,6 +14,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -388,8 +390,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -543,7 +545,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
       selectedColor: GlassTheme.primaryAccent,
       backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : context.colors.onSurfaceVariant,
+        color: selected ? Brand.onLime : context.colors.onSurfaceVariant,
         fontSize: 12,
       ),
       onSelected: (sel) {
@@ -644,8 +646,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -775,7 +777,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -852,7 +854,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 _generateReport(selectedFramework);
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: GlassTheme.primaryAccent, foregroundColor: Colors.white),
+                  backgroundColor: GlassTheme.primaryAccent, foregroundColor: Brand.onLime),
               child: const Text('Generate'),
             ),
           ],
@@ -927,18 +929,18 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   Color _getFrameworkColor(String framework) {
     switch (framework.toUpperCase()) {
       case 'SOC2':
-        return const Color(0xFF4CAF50);
+        return AppColors.accentInk;
       case 'GDPR':
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[3];
       case 'HIPAA':
-        return const Color(0xFFE91E63);
+        return AppColors.secondaryInk;
       case 'PCI_DSS':
       case 'PCI-DSS':
-        return const Color(0xFFFF9800);
+        return AppColors.amberInk;
       case 'ISO27001':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case 'CIS':
-        return const Color(0xFF00BCD4);
+        return AppColors.chartColors[2];
       default:
         return GlassTheme.primaryAccent;
     }

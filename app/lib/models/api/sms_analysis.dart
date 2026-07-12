@@ -7,6 +7,7 @@
 // - orbguard.lab/internal/api/handlers/darkweb.go (+ models/darkweb.go)
 
 import 'threat_indicator.dart';
+import '../../presentation/theme/colors.dart';
 
 /// Threat level for SMS messages.
 ///
@@ -47,13 +48,13 @@ enum SmsThreatLevel {
   int get color {
     switch (this) {
       case SmsThreatLevel.safe:
-        return 0xFF4CAF50; // Green
+        return AppColors.success.toARGB32(); // brand lime (safe)
       case SmsThreatLevel.suspicious:
-        return 0xFFFFC107; // Amber
+        return AppColors.severityLow.toARGB32(); // brand gold
       case SmsThreatLevel.dangerous:
-        return 0xFFFF9800; // Orange
+        return AppColors.severityMedium.toARGB32(); // brand pink (alert)
       case SmsThreatLevel.critical:
-        return 0xFFF44336; // Red
+        return AppColors.severityCritical.toARGB32(); // brand deep danger
     }
   }
 
@@ -758,17 +759,17 @@ enum QrThreatLevel {
   int get color {
     switch (this) {
       case QrThreatLevel.safe:
-        return 0xFF4CAF50; // Green
+        return AppColors.success.toARGB32(); // brand lime (safe)
       case QrThreatLevel.low:
-        return 0xFFFFC107; // Amber
+        return AppColors.severityLow.toARGB32(); // brand gold
       case QrThreatLevel.medium:
-        return 0xFFFF9800; // Orange
+        return AppColors.severityMedium.toARGB32(); // brand pink (alert)
       case QrThreatLevel.high:
-        return 0xFFFF5722; // Deep orange
+        return AppColors.severityHigh.toARGB32(); // brand danger
       case QrThreatLevel.critical:
-        return 0xFFF44336; // Red
+        return AppColors.severityCritical.toARGB32(); // brand deep danger
       case QrThreatLevel.unknown:
-        return 0xFF757575; // Grey
+        return AppColors.severityInfo.toARGB32(); // brand neutral
     }
   }
 

@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/security/network_firewall_service.dart';
 
@@ -289,11 +290,11 @@ class NetworkFirewallProvider extends ChangeNotifier {
   static int getStatusColor(ConnectionStatus status) {
     switch (status) {
       case ConnectionStatus.allowed:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
       case ConnectionStatus.blocked:
-        return 0xFFFF5252;
+        return AppColors.severityHigh.toARGB32();
       case ConnectionStatus.pending:
-        return 0xFFFF9800;
+        return AppColors.severityLow.toARGB32();
     }
   }
 

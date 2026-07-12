@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -171,13 +172,14 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
   }
 
   Widget _buildSupportedSiems() {
+    // vendor identity — official SIEM platform brand colors, kept verbatim
     final siems = [
-      {'name': 'Splunk', 'icon': 'chart', 'color': const Color(0xFF65A637)},
-      {'name': 'Elastic', 'icon': 'magnifer', 'color': const Color(0xFF00BFB3)},
-      {'name': 'ArcSight', 'icon': 'shield_check', 'color': const Color(0xFF00A3E0)},
-      {'name': 'QRadar', 'icon': 'radar_2', 'color': const Color(0xFF054ADA)},
-      {'name': 'Sentinel', 'icon': 'cloud_storage', 'color': const Color(0xFF0078D4)},
-      {'name': 'Chronicle', 'icon': 'history', 'color': const Color(0xFF4285F4)},
+      {'name': 'Splunk', 'icon': 'chart', 'color': const Color(0xFF65A637)}, // vendor identity
+      {'name': 'Elastic', 'icon': 'magnifer', 'color': const Color(0xFF00BFB3)}, // vendor identity
+      {'name': 'ArcSight', 'icon': 'shield_check', 'color': const Color(0xFF00A3E0)}, // vendor identity
+      {'name': 'QRadar', 'icon': 'radar_2', 'color': const Color(0xFF054ADA)}, // vendor identity
+      {'name': 'Sentinel', 'icon': 'cloud_storage', 'color': const Color(0xFF0078D4)}, // vendor identity
+      {'name': 'Chronicle', 'icon': 'history', 'color': const Color(0xFF4285F4)}, // vendor identity
     ];
 
     return SizedBox(
@@ -381,16 +383,16 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
     Color severityColor;
     switch (alert.severity.toLowerCase()) {
       case 'critical':
-        severityColor = GlassTheme.errorColor;
+        severityColor = AppColors.severityCritical;
         break;
       case 'high':
-        severityColor = const Color(0xFFFF5722);
+        severityColor = AppColors.severityHigh;
         break;
       case 'medium':
-        severityColor = GlassTheme.warningColor;
+        severityColor = AppColors.severityMedium;
         break;
       default:
-        severityColor = GlassTheme.successColor;
+        severityColor = AppColors.severityInfo;
     }
 
     final String forwardLabel;
@@ -532,7 +534,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
                   : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,

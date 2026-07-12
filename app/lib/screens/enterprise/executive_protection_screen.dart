@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -193,7 +194,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Text(
         text,
@@ -308,12 +309,10 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
   Widget _buildAttackTypeChip(ImpersonationType type, String icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: GlassTheme.primaryAccent.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: GlassTheme.primaryAccent.withValues(alpha: 0.3),
-        ),
+      decoration: GlassTheme.tintedGlassDecoration(
+        tintColor: GlassTheme.primaryAccent,
+        radius: GlassTheme.radiusLarge,
+        opacity: 0.1,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -372,7 +371,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: riskColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
@@ -418,14 +417,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         horizontal: 10,
                         vertical: 4,
                       ),
-                      decoration: BoxDecoration(
-                        color: riskColor,
-                        borderRadius: BorderRadius.circular(8),
+                      decoration: GlassTheme.badgeGlassDecoration(
+                        isDark: context.isDark,
+                        tintColor: riskColor,
                       ),
                       child: Text(
                         alert.riskLevel.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: riskColor,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -562,7 +561,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             color: exec.isHighValue
                 ? GlassTheme.warningColor.withValues(alpha: 0.2)
                 : GlassTheme.primaryAccent.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
           child: Center(
             child: Text(
@@ -596,7 +595,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: GlassTheme.warningColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: const Text(
                   'HIGH VALUE',
@@ -722,7 +721,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+                const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           padding: EdgeInsets.fromLTRB(
             24,
@@ -877,7 +877,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GlassTheme.primaryAccent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Brand.onLime,
                       disabledBackgroundColor:
                           cs.onSurface.withValues(alpha: 0.06),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -912,7 +912,8 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
         height: MediaQuery.of(context).size.height * 0.85,
         decoration: BoxDecoration(
           gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1048,14 +1049,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: Brand.onLime,
                         ),
                       )
                     : const DuotoneIcon('magnifer', size: 18),
                 label: Text(provider.isAnalyzing ? 'Analyzing...' : 'Analyze'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Brand.onLime,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
@@ -1100,14 +1101,14 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             if (result.isImpersonation) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: riskColor,
-                  borderRadius: BorderRadius.circular(8),
+                decoration: GlassTheme.badgeGlassDecoration(
+                  isDark: context.isDark,
+                  tintColor: riskColor,
                 ),
                 child: Text(
                   '${result.riskLevel.toUpperCase()} RISK - ${(result.confidenceScore * 100).toInt()}% confidence',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: riskColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

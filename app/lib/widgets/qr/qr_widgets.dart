@@ -5,6 +5,9 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
 
@@ -23,17 +26,17 @@ class QrResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final borderColor = result.threatLevel == SmsThreatLevel.safe
-        ? Colors.green.withAlpha(75)
+        ? AppColors.accentInk.withAlpha(75)
         : Color(result.threatLevel.color).withAlpha(75);
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: borderColor),
         ),
         child: Column(
@@ -119,7 +122,8 @@ class QrResultCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusXSmall),
                     child: LinearProgressIndicator(
                       value: result.riskScore,
                       backgroundColor: cs.onSurface.withValues(alpha: 0.12),
@@ -151,9 +155,10 @@ class QrResultCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {},
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.errorInk,
                       ),
-                      icon: const DuotoneIcon(AppIcons.forbidden, size: 18, color: Colors.red),
+                      icon: DuotoneIcon(AppIcons.forbidden,
+                          size: 18, color: AppColors.errorInk),
                       label: const Text('Block'),
                     ),
                   ),
@@ -185,10 +190,10 @@ class QrResultCard extends StatelessWidget {
   }
 
   Color _getRiskColor(double score) {
-    if (score >= 0.7) return Colors.red;
-    if (score >= 0.4) return Colors.orange;
-    if (score >= 0.2) return Colors.amber;
-    return Colors.green;
+    if (score >= 0.7) return AppColors.errorInk;
+    if (score >= 0.4) return AppColors.amberInk;
+    if (score >= 0.2) return AppColors.amberInk;
+    return AppColors.accentInk;
   }
 }
 
@@ -212,7 +217,7 @@ class QrThreatBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: Color(level.color).withAlpha(50),
-        borderRadius: BorderRadius.circular(compact ? 4 : 8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         border: Border.all(color: Color(level.color).withAlpha(100)),
       ),
       child: Row(
@@ -263,13 +268,13 @@ class _ContentTypeIcon extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: const Color(0xFF00D9FF).withAlpha(40),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.primary.withAlpha(40),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Center(
         child: DuotoneIcon(
           _getIcon(),
-          color: const Color(0xFF00D9FF),
+          color: AppColors.accentInk,
           size: 22,
         ),
       ),
@@ -317,8 +322,8 @@ class _ThreatsList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.red.withAlpha(25),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.error.withAlpha(25),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,12 +331,13 @@ class _ThreatsList extends StatelessWidget {
         children: [
           Row(
             children: [
-              const DuotoneIcon(AppIcons.dangerTriangle, size: 16, color: Colors.red),
+              DuotoneIcon(AppIcons.dangerTriangle,
+                  size: 16, color: AppColors.errorInk),
               const SizedBox(width: 6),
               Text(
                 '${threats.length} threat${threats.length > 1 ? 's' : ''} detected',
-                style: const TextStyle(
-                  color: Colors.red,
+                style: TextStyle(
+                  color: AppColors.errorInk,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -390,7 +396,7 @@ class QrHistoryItem extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
@@ -470,9 +476,9 @@ class QrHistoryItem extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    if (entry.isPending) return const Color(0xFF00D9FF);
-    if (entry.isSafe) return Colors.green;
-    return Colors.red;
+    if (entry.isPending) return AppColors.scanning;
+    if (entry.isSafe) return AppColors.accentInk;
+    return AppColors.errorInk;
   }
 
   String _getContentIcon() {
@@ -516,7 +522,7 @@ class QrStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,12 +533,12 @@ class QrStatsCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withAlpha(50),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppColors.primary.withAlpha(50),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
-                child: const DuotoneIcon(
+                child: DuotoneIcon(
                   AppIcons.scanner,
-                  color: Color(0xFF00D9FF),
+                  color: AppColors.accentInk,
                   size: 24,
                 ),
               ),
@@ -541,12 +547,9 @@ class QrStatsCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'QR Security',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: BrandText.title(size: 16, weight: FontWeight.w700),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -575,12 +578,14 @@ class QrStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Safe',
                 value: stats.safeScans.toString(),
-                color: Colors.green,
+                color: AppColors.accentInk,
               ),
               _StatItem(
                 label: 'Flagged',
                 value: stats.threatsFlagged.toString(),
-                color: stats.threatsFlagged > 0 ? Colors.red : cs.onSurfaceVariant,
+                color: stats.threatsFlagged > 0
+                    ? AppColors.errorInk
+                    : cs.onSurfaceVariant,
               ),
             ],
           ),
@@ -608,11 +613,7 @@ class _StatItem extends StatelessWidget {
         children: [
           Text(
             value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.heading(size: 24, color: color),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -644,7 +645,7 @@ class QrScanOverlay extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         // Darkened background
-        Container(color: Colors.black.withAlpha(100)),
+        Container(color: AppColors.overlay),
 
         // Scan area
         Container(
@@ -652,10 +653,10 @@ class QrScanOverlay extends StatelessWidget {
           height: size,
           decoration: BoxDecoration(
             border: Border.all(
-              color: const Color(0xFF00D9FF),
+              color: Brand.lime,
               width: 3,
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
           ),
         ),
 
@@ -665,7 +666,8 @@ class QrScanOverlay extends StatelessWidget {
           child: Text(
             'Scan QR Code',
             style: TextStyle(
-              color: Colors.white.withAlpha(200),
+              // On-dark text token: the camera overlay is always dark.
+              color: AppColors.textPrimaryDark.withAlpha(200),
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -707,18 +709,15 @@ class _QrManualInputState extends State<QrManualInput> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Check QR Content',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: BrandText.title(size: 16, weight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(
@@ -738,7 +737,7 @@ class _QrManualInputState extends State<QrManualInput> {
               filled: true,
               fillColor: cs.onSurface.withValues(alpha: 0.05),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 borderSide: BorderSide.none,
               ),
               contentPadding: const EdgeInsets.all(12),
@@ -750,11 +749,11 @@ class _QrManualInputState extends State<QrManualInput> {
                 ? null
                 : () => widget.onAnalyze(_controller.text),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: Brand.lime,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
             ),
             icon: widget.isAnalyzing
@@ -763,10 +762,10 @@ class _QrManualInputState extends State<QrManualInput> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.black),
+                      valueColor: AlwaysStoppedAnimation(Brand.onLime),
                     ),
                   )
-                : const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
+                : const DuotoneIcon(AppIcons.search, size: 20, color: Brand.onLime),
             label: Text(widget.isAnalyzing ? 'Analyzing...' : 'Analyze'),
           ),
         ],

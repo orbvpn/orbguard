@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/theme/colors.dart';
 
 // ============================================================================
 // PERMISSION MANAGER - Handles all app permissions
@@ -253,7 +254,7 @@ class PermissionManager {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const DuotoneIcon(AppIcons.shieldCheck, color: Colors.blue),
+            DuotoneIcon(AppIcons.shieldCheck, color: AppColors.secondaryInk),
             const SizedBox(width: 12),
             Expanded(child: Text(title)),
           ],
@@ -272,12 +273,12 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: AppColors.info.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.checkCircle, color: Colors.blue),
+                  DuotoneIcon(AppIcons.checkCircle, color: AppColors.secondaryInk),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -384,13 +385,13 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
+                color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  DuotoneIcon(AppIcons.infoCircle, color: Colors.orange),
-                  SizedBox(width: 8),
+                  DuotoneIcon(AppIcons.infoCircle, color: AppColors.secondaryInk),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'You will be taken to Settings. Find "OrbGuard" and enable access.',
@@ -446,13 +447,13 @@ class PermissionManager {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
+                color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  DuotoneIcon(AppIcons.dangerTriangle, color: Colors.orange),
-                  SizedBox(width: 8),
+                  DuotoneIcon(AppIcons.dangerTriangle, color: AppColors.secondaryInk),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'OrbGuard will NOT read your screen content. This permission is only used to detect malicious services.',

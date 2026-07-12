@@ -2,6 +2,7 @@
 // Models for threat indicators from OrbGuard Lab API
 
 import 'dart:convert';
+import '../../presentation/theme/colors.dart';
 
 /// Backend JSON-blob fields (metadata/properties) arrive in different shapes
 /// depending on server version: a JSON object, a JSON string, or — when Go
@@ -75,17 +76,17 @@ enum SeverityLevel {
   int get color {
     switch (this) {
       case SeverityLevel.critical:
-        return 0xFFD32F2F; // Red
+        return AppColors.severityCritical.toARGB32(); // brand deep danger
       case SeverityLevel.high:
-        return 0xFFF57C00; // Orange
+        return AppColors.severityHigh.toARGB32(); // brand danger
       case SeverityLevel.medium:
-        return 0xFFFBC02D; // Yellow
+        return AppColors.severityMedium.toARGB32(); // brand pink (alert)
       case SeverityLevel.low:
-        return 0xFF388E3C; // Green
+        return AppColors.severityLow.toARGB32(); // brand gold (near-benign)
       case SeverityLevel.info:
-        return 0xFF1976D2; // Blue
+        return AppColors.severityInfo.toARGB32(); // brand neutral
       case SeverityLevel.unknown:
-        return 0xFF757575; // Grey
+        return AppColors.severityInfo.toARGB32(); // brand neutral
     }
   }
 

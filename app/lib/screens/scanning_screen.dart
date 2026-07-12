@@ -15,6 +15,9 @@ import 'dart:async';
 import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../services/security/device_scan_service.dart';
 
@@ -228,11 +231,19 @@ class _ScanningScreenState extends State<ScanningScreen>
     );
   }
 
+  /// Status FILL (gradients, glow, ring) — brand threat-status tokens.
   Color get _accentColor => _scanFailed
-      ? Colors.redAccent
+      ? AppColors.threatDetected
       : _scanComplete
-          ? Colors.green
-          : Colors.cyan;
+          ? AppColors.protected
+          : AppColors.scanning;
+
+  /// Contrast-safe INK for the status icon (lime is fill-only on light).
+  Color get _accentInk => _scanFailed
+      ? AppColors.errorInk
+      : _scanComplete
+          ? AppColors.accentInk
+          : Brand.text2;
 
   Widget _buildScannerOrb() {
     return SizedBox(
@@ -255,10 +266,10 @@ class _ScanningScreenState extends State<ScanningScreen>
                       shape: BoxShape.circle,
                       gradient: SweepGradient(
                         colors: [
-                          Colors.cyan.withValues(alpha: 0),
-                          Colors.cyan.withValues(alpha: 0.3),
-                          Colors.cyan.withValues(alpha: 0.8),
-                          Colors.cyan.withValues(alpha: 0),
+                          AppColors.scanning.withValues(alpha: 0),
+                          AppColors.scanning.withValues(alpha: 0.3),
+                          AppColors.scanning.withValues(alpha: 0.8),
+                          AppColors.scanning.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -275,7 +286,7 @@ class _ScanningScreenState extends State<ScanningScreen>
             child: CircularProgressIndicator(
               value: _scanFailed ? 0 : _overallProgress,
               strokeWidth: 4,
-              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+              backgroundColor: AppColors.idle.withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
             ),
           ),
@@ -315,7 +326,7 @@ class _ScanningScreenState extends State<ScanningScreen>
                               ? 'check_circle'
                               : 'shield_check',
                       size: 60,
-                      color: _accentColor,
+                      color: _accentInk,
                     ),
                   ),
                 ),
@@ -338,20 +349,18 @@ class _ScanningScreenState extends State<ScanningScreen>
         if (_overallProgress != null)
           Text(
             '${(_overallProgress! * 100).toInt()}%',
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
+            style: BrandText.display(
+              size: 48,
               color: _scanComplete
-                  ? Colors.green
+                  ? AppColors.accentInk
                   : Theme.of(context).colorScheme.onSurface,
             ),
           )
         else
           Text(
             'Scanning device…',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+            style: BrandText.heading(
+              size: 24,
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
@@ -369,9 +378,9 @@ class _ScanningScreenState extends State<ScanningScreen>
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '$_threatsSoFar threat${_threatsSoFar == 1 ? '' : 's'} found so far',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.orange,
+                color: AppColors.secondaryInk,
               ),
             ),
           ),
@@ -389,14 +398,14 @@ class _ScanningScreenState extends State<ScanningScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
               ),
               child: Text(
                 _failureMessage,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.redAccent,
+                style: TextStyle(
+                  color: AppColors.errorInk,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -405,7 +414,8 @@ class _ScanningScreenState extends State<ScanningScreen>
             ElevatedButton(
               onPressed: () => Navigator.pop(context, null),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger,
               ),
               child: const Text('Close'),
             ),
@@ -418,8 +428,8 @@ class _ScanningScreenState extends State<ScanningScreen>
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          color: AppColors.success.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -427,15 +437,17 @@ class _ScanningScreenState extends State<ScanningScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const DuotoneIcon('check_circle',
-                    size: 20, color: Colors.green),
+                DuotoneIcon('check_circle',
+                    size: 20, color: AppColors.accentInk),
                 const SizedBox(width: 8),
                 Text(
                   _threats.isEmpty
                       ? 'No threats detected'
                       : '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found',
                   style: TextStyle(
-                    color: _threats.isEmpty ? Colors.green : Colors.orange,
+                    color: _threats.isEmpty
+                        ? AppColors.accentInk
+                        : AppColors.secondaryInk,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -451,7 +463,7 @@ class _ScanningScreenState extends State<ScanningScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.orange[300],
+                    color: AppColors.amberInk,
                   ),
                 ),
               ),
@@ -466,10 +478,10 @@ class _ScanningScreenState extends State<ScanningScreen>
         if (_stageName.isNotEmpty)
           Text(
             _stageName,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.cyan,
+              color: AppColors.secondaryInk,
             ),
           ),
         if (_stageWarnings.isNotEmpty)
@@ -479,7 +491,7 @@ class _ScanningScreenState extends State<ScanningScreen>
               _stageWarnings.last,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.orange[300],
+                color: AppColors.amberInk,
               ),
             ),
           ),

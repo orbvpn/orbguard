@@ -4,6 +4,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -87,7 +89,9 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(GlassTheme.radiusLarge),
+        ),
       ),
       isScrollControlled: true,
       builder: (context) => DraggableScrollableSheet(
@@ -111,7 +115,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                         .colorScheme
                         .onSurfaceVariant
                         .withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
               ),
@@ -134,9 +139,10 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green,
+                        foregroundColor: AppColors.accentInk,
                       ),
-                      icon: const DuotoneIcon('check_circle', size: 18, color: Colors.green),
+                      icon: DuotoneIcon('check_circle',
+                          size: 18, color: AppColors.accentInk),
                       label: const Text('Whitelist'),
                     ),
                   ),
@@ -153,9 +159,10 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.errorInk,
                       ),
-                      icon: const DuotoneIcon('forbidden', size: 18, color: Colors.red),
+                      icon: DuotoneIcon('forbidden',
+                          size: 18, color: AppColors.errorInk),
                       label: const Text('Blacklist'),
                     ),
                   ),
@@ -173,7 +180,9 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(GlassTheme.radiusLarge),
+        ),
       ),
       isScrollControlled: true,
       builder: (context) => _ListManagementSheet(
@@ -370,7 +379,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                                       _provider.clearHistory();
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
+                                      backgroundColor: AppColors.error,
+                                      foregroundColor: Brand.onDanger,
                                     ),
                                     child: const Text('Clear'),
                                   ),
@@ -416,11 +426,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
             const SizedBox(height: 16),
             Text(
               _searchQuery.isNotEmpty ? 'No Results Found' : 'No URL History',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurfaceVariant,
-              ),
+              style: BrandText.title(size: 18, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Text(
@@ -465,33 +471,30 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Protection Status',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: BrandText.title(),
           ),
           const SizedBox(height: 16),
           _StatusRow(
             icon: 'shield_check',
             label: 'URL Scanning',
             status: 'Active',
-            statusColor: Colors.green,
+            statusColor: AppColors.accentInk,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'refresh',
             label: 'Threat Intelligence',
             status: 'Connected',
-            statusColor: Colors.green,
+            statusColor: AppColors.accentInk,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'server',
             label: 'DNS Filtering',
             status: 'Via OrbNet VPN',
-            statusColor: GlassTheme.primaryAccent,
+            statusColor: AppColors.accentInk,
           ),
         ],
       ),
@@ -505,12 +508,9 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Custom Lists',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: BrandText.title(),
               ),
               const Spacer(),
               TextButton(
@@ -527,7 +527,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                   icon: 'check_circle',
                   label: 'Whitelist',
                   count: _provider.whitelist.length,
-                  color: Colors.green,
+                  color: AppColors.accentInk,
                 ),
               ),
               const SizedBox(width: 16),
@@ -536,7 +536,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
                   icon: 'forbidden',
                   label: 'Blacklist',
                   count: _provider.blacklist.length,
-                  color: Colors.red,
+                  color: AppColors.errorInk,
                 ),
               ),
             ],
@@ -551,10 +551,7 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+          style: BrandText.title(),
         ),
         const Spacer(),
         if (onViewAll != null)
@@ -603,7 +600,7 @@ class _StatusRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: statusColor.withAlpha(50),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: Text(
             status,
@@ -637,11 +634,7 @@ class _ListCountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withAlpha(50)),
-      ),
+      decoration: GlassTheme.badgeGlassDecoration(tintColor: color),
       child: Row(
         children: [
           DuotoneIcon(icon, size: 20, color: color),
@@ -741,16 +734,14 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
                         .colorScheme
                         .onSurfaceVariant
                         .withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Manage Lists',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  style: BrandText.title(size: 18),
                 ),
               ],
             ),
@@ -759,7 +750,7 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
           // Tabs
           TabBar(
             controller: _tabController,
-            indicatorColor: const Color(0xFF00D9FF),
+            indicatorColor: AppColors.accentInk,
             tabs: [
               Tab(text: 'Whitelist (${widget.provider.whitelist.length})'),
               Tab(text: 'Blacklist (${widget.provider.blacklist.length})'),
@@ -803,7 +794,8 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
                     fillColor:
                         Theme.of(context).colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius:
+                          BorderRadius.circular(GlassTheme.radiusXSmall),
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -818,7 +810,9 @@ class _ListManagementSheetState extends State<_ListManagementSheet>
                 onPressed: () => _addDomain(isWhitelist),
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
-                      isWhitelist ? Colors.green : Colors.red,
+                      isWhitelist ? AppColors.success : AppColors.error,
+                  foregroundColor:
+                      isWhitelist ? Brand.onLime : Brand.onDanger,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 14,

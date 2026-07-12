@@ -3,6 +3,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -91,8 +93,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
 
   Widget _buildPlaybooksContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildPlaybooksTab();
@@ -100,8 +102,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
 
   Widget _buildExecutionsContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildExecutionsTab();
@@ -122,9 +124,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Active', _playbooks.where((p) => p.isEnabled).length.toString(), GlassTheme.successColor),
+            _buildStatCard('Active', _playbooks.where((p) => p.isEnabled).length.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Executions', _executions.length.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Executions', _executions.length.toString(), AppColors.accentInk),
           ],
         ),
         const SizedBox(height: 24),
@@ -140,7 +142,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text(value, style: BrandText.heading(color: color, size: 28)),
             const SizedBox(height: 4),
             Text(label,
                 style: TextStyle(
@@ -308,7 +310,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: AppColors.accentInk.withAlpha(128)),
           const SizedBox(height: 16),
           Text(title, style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -332,8 +334,8 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(
                 isDark: Theme.of(context).brightness == Brightness.dark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -370,13 +372,13 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onLime,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      DuotoneIcon(AppIcons.play, size: 20, color: Colors.white),
+                      DuotoneIcon(AppIcons.play, size: 20, color: Brand.onLime),
                       const SizedBox(width: 8),
                       const Text('Run Now'),
                     ],
@@ -399,13 +401,13 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: GlassTheme.primaryAccent.withAlpha(40),
+              color: AppColors.accentPill,
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 '$number',
-                style: const TextStyle(color: GlassTheme.primaryAccent, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppColors.accentInk, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -455,7 +457,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Create', style: TextStyle(color: GlassTheme.primaryAccent)),
+            child: Text('Create', style: TextStyle(color: AppColors.accentInk)),
           ),
         ],
       ),

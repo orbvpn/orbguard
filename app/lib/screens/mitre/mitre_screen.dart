@@ -5,6 +5,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -103,7 +105,7 @@ class _MatrixTab extends StatelessWidget {
       builder: (context, provider, _) {
         if (provider.isLoading) {
           return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
+            child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
           );
         }
 
@@ -180,8 +182,8 @@ class _MatrixTab extends StatelessWidget {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: SingleChildScrollView(
             controller: scrollController,
@@ -233,7 +235,7 @@ class _DetectionsTab extends StatelessWidget {
                 DuotoneIcon(
                   'shield_check',
                   size: 64,
-                  color: Colors.green.withAlpha(128),
+                  color: AppColors.accentInk.withAlpha(128),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -272,30 +274,30 @@ class _DetectionsTab extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.red.withAlpha(26),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withAlpha(77)),
+              decoration: GlassTheme.tintedGlassDecoration(
+                tintColor: AppColors.error,
+                radius: GlassTheme.radiusSmall,
+                opacity: 0.10,
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon('danger_triangle', size: 24, color: Colors.red),
+                  DuotoneIcon('danger_triangle', size: 24, color: AppColors.errorInk),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Threat Techniques Detected', maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.red,
+                            color: AppColors.errorInk,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           '${detections.length} MITRE ATT&CK techniques found', maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.red[200],
+                            color: AppColors.errorInk.withValues(alpha: 0.85),
                             fontSize: 12,
                           ),
                         ),
@@ -332,14 +334,13 @@ class _DetectionsTab extends StatelessWidget {
                             horizontal: 8,
                             vertical: 4,
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00D9FF).withAlpha(26),
-                            borderRadius: BorderRadius.circular(4),
+                          decoration: GlassTheme.badgeGlassDecoration(
+                            tintColor: AppColors.info,
                           ),
                           child: Text(
                             tactic.name,
-                            style: const TextStyle(
-                              color: Color(0xFF00D9FF),
+                            style: TextStyle(
+                              color: AppColors.secondaryInk,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -385,8 +386,8 @@ class _DetectionsTab extends StatelessWidget {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: SingleChildScrollView(
             controller: scrollController,
@@ -430,7 +431,7 @@ class _DetectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
-      tintColor: Colors.red,
+      tintColor: AppColors.error,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -438,13 +439,13 @@ class _DetectionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.red.withAlpha(51),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.error.withAlpha(51),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
-            child: const DuotoneIcon(
+            child: DuotoneIcon(
               'danger_triangle',
               size: 20,
-              color: Colors.red,
+              color: AppColors.errorInk,
             ),
           ),
           const SizedBox(width: 12),
@@ -459,14 +460,13 @@ class _DetectionCard extends StatelessWidget {
                         horizontal: 6,
                         vertical: 2,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(51),
-                        borderRadius: BorderRadius.circular(4),
+                      decoration: GlassTheme.badgeGlassDecoration(
+                        tintColor: AppColors.error,
                       ),
                       child: Text(
                         detection.technique.id,
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(
+                          color: AppColors.errorInk,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),

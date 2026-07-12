@@ -11,6 +11,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/security/identity_theft_protection_service.dart';
 
@@ -250,15 +251,15 @@ class IdentityProtectionProvider extends ChangeNotifier {
   static int getSeverityColor(AlertSeverity severity) {
     switch (severity) {
       case AlertSeverity.critical:
-        return 0xFFB71C1C;
+        return AppColors.severityCritical.toARGB32();
       case AlertSeverity.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case AlertSeverity.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case AlertSeverity.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
       case AlertSeverity.info:
-        return 0xFF2196F3;
+        return AppColors.severityInfo.toARGB32();
     }
   }
 
@@ -308,15 +309,15 @@ class IdentityProtectionProvider extends ChangeNotifier {
   static int getStatusColor(MonitoringStatus status) {
     switch (status) {
       case MonitoringStatus.active:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
       case MonitoringStatus.paused:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case MonitoringStatus.inactive:
-        return 0xFF9E9E9E;
+        return AppColors.severityInfo.toARGB32();
       case MonitoringStatus.alertTriggered:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case MonitoringStatus.unavailable:
-        return 0xFF9E9E9E;
+        return AppColors.severityInfo.toARGB32();
     }
   }
 

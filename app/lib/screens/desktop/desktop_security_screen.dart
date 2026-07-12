@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -254,22 +256,22 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                               ),
                             ),
                             if (_isScanning || provider.isScanning)
-                              const SizedBox(
+                              SizedBox(
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
-                                  color: GlassTheme.primaryAccent,
+                                  color: AppColors.accentInk,
                                   strokeWidth: 2,
                                 ),
                               )
                             else
-                              const DuotoneIcon('play', color: GlassTheme.primaryAccent),
+                              DuotoneIcon('play', color: AppColors.accentInk),
                           ],
                         ),
                         if (provider.isScanning) ...[
                           const SizedBox(height: 12),
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                             child: LinearProgressIndicator(
                               value: progress,
                               backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
@@ -310,16 +312,16 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       ),
                     ),
                     if (_isScanning)
-                      const SizedBox(
+                      SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                          color: GlassTheme.primaryAccent,
+                          color: AppColors.accentInk,
                           strokeWidth: 2,
                         ),
                       )
                     else
-                      const DuotoneIcon('play', color: GlassTheme.primaryAccent),
+                      DuotoneIcon('play', color: AppColors.accentInk),
                   ],
                 ),
               ),
@@ -328,9 +330,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         const SizedBox(height: 24),
         Row(
           children: [
-            _buildStatCard('Suspicious', suspicious.toString(), GlassTheme.errorColor),
+            _buildStatCard('Suspicious', suspicious.toString(), AppColors.errorInk),
             const SizedBox(width: 12),
-            _buildStatCard('Safe', safe.toString(), GlassTheme.successColor),
+            _buildStatCard('Safe', safe.toString(), AppColors.accentInk),
           ],
         ),
 
@@ -342,7 +344,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             tintColor: GlassTheme.errorColor,
             child: Row(
               children: [
-                const DuotoneIcon('danger_circle', color: GlassTheme.errorColor, size: 24),
+                DuotoneIcon('danger_circle', color: AppColors.errorInk, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -446,7 +448,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text(value, style: BrandText.heading(size: 28, color: color)),
             const SizedBox(height: 4),
             Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
@@ -517,7 +519,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           ),
           DuotoneIcon(
             enabled ? 'check_circle' : 'close_circle',
-            color: enabled ? GlassTheme.successColor : context.colors.onSurfaceVariant,
+            color: enabled ? AppColors.accentInk : context.colors.onSurfaceVariant,
           ),
         ],
       ),
@@ -578,14 +580,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       ),
                     ),
                     if (provider.isVerifyingCodeSigning)
-                      const SizedBox(
+                      SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                            color: GlassTheme.primaryAccent, strokeWidth: 2),
+                            color: AppColors.accentInk, strokeWidth: 2),
                       )
                     else
-                      const DuotoneIcon('play', color: GlassTheme.primaryAccent),
+                      DuotoneIcon('play', color: AppColors.accentInk),
                   ],
                 ),
               ),
@@ -595,8 +597,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   tintColor: GlassTheme.warningColor,
                   child: Row(
                     children: [
-                      const DuotoneIcon('danger_circle',
-                          color: GlassTheme.warningColor, size: 24),
+                      DuotoneIcon('danger_circle',
+                          color: AppColors.secondaryInk, size: 24),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -611,17 +613,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               else ...[
                 Row(
                   children: [
-                    _buildStatCard('Valid', valid.toString(), GlassTheme.successColor),
+                    _buildStatCard('Valid', valid.toString(), AppColors.accentInk),
                     const SizedBox(width: 12),
-                    _buildStatCard('Invalid', invalid.toString(), GlassTheme.errorColor),
+                    _buildStatCard('Invalid', invalid.toString(), AppColors.errorInk),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _buildStatCard('Unsigned', unsigned.toString(), GlassTheme.warningColor),
+                    _buildStatCard('Unsigned', unsigned.toString(), AppColors.amberInk),
                     const SizedBox(width: 12),
-                    _buildStatCard('Verified', apps.length.toString(), GlassTheme.primaryAccent),
+                    _buildStatCard('Verified', apps.length.toString(), AppColors.secondaryInk),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -652,17 +654,17 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Valid', valid.toString(), GlassTheme.successColor),
+            _buildStatCard('Valid', valid.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Invalid', invalid.toString(), GlassTheme.errorColor),
+            _buildStatCard('Invalid', invalid.toString(), AppColors.errorInk),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            _buildStatCard('Unsigned', unsigned.toString(), GlassTheme.warningColor),
+            _buildStatCard('Unsigned', unsigned.toString(), AppColors.amberInk),
             const SizedBox(width: 12),
-            _buildStatCard('Total Apps', _signedApps.length.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Total Apps', _signedApps.length.toString(), AppColors.secondaryInk),
           ],
         ),
 
@@ -687,15 +689,15 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     String statusIcon;
 
     if (!app.isSigned) {
-      statusColor = GlassTheme.warningColor;
+      statusColor = AppColors.amberInk;
       statusText = 'Unsigned';
       statusIcon = 'danger_triangle';
     } else if (!app.isValid) {
-      statusColor = GlassTheme.errorColor;
+      statusColor = AppColors.errorInk;
       statusText = 'Invalid';
       statusIcon = 'danger_circle';
     } else {
-      statusColor = GlassTheme.successColor;
+      statusColor = AppColors.accentInk;
       statusText = 'Valid';
       statusIcon = 'verified_check';
     }
@@ -709,7 +711,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             height: 48,
             decoration: BoxDecoration(
               color: context.colors.onSurface.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Center(
               child: DuotoneIcon(
@@ -790,9 +792,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                         'Host Firewall',
                         style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                       ),
-                      const Text(
+                      Text(
                         'OS firewall control is only available on desktop platforms',
-                        style: TextStyle(color: GlassTheme.warningColor, fontSize: 12),
+                        style: TextStyle(color: AppColors.secondaryInk, fontSize: 12),
                       ),
                     ],
                   ),
@@ -805,9 +807,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         const SizedBox(height: 24),
         Row(
           children: [
-            _buildStatCard('Server Rules', enabled.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Server Rules', enabled.toString(), AppColors.secondaryInk),
             const SizedBox(width: 12),
-            _buildStatCard('Blocking', blocked.toString(), GlassTheme.errorColor),
+            _buildStatCard('Blocking', blocked.toString(), AppColors.errorInk),
           ],
         ),
 
@@ -853,7 +855,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               onPressed: () => _showAddRuleDialog(context),
               icon: const DuotoneIcon('add_circle', size: 18),
               label: const Text('Add Rule'),
-              style: TextButton.styleFrom(foregroundColor: GlassTheme.primaryAccent),
+              style: TextButton.styleFrom(foregroundColor: AppColors.accentInk),
             ),
           ],
         ),
@@ -873,11 +875,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final status = provider.hostFirewallStatus;
 
     Color color;
+    Color ink;
     String stateText;
     String icon;
     bool? switchValue;
     if (status == null) {
       color = context.colors.onSurfaceVariant;
+      ink = context.colors.onSurfaceVariant;
       stateText = 'Reading firewall state…';
       icon = 'shield';
       switchValue = null;
@@ -885,24 +889,28 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       switch (status.state) {
         case HostFirewallState.enabled:
           color = GlassTheme.successColor;
+          ink = AppColors.accentInk;
           stateText = status.detail;
           icon = 'shield_check';
           switchValue = true;
           break;
         case HostFirewallState.disabled:
           color = GlassTheme.errorColor;
+          ink = AppColors.errorInk;
           stateText = status.detail;
           icon = 'shield';
           switchValue = false;
           break;
         case HostFirewallState.unknown:
           color = GlassTheme.warningColor;
+          ink = AppColors.secondaryInk;
           stateText = status.detail;
           icon = 'danger_triangle';
           switchValue = null;
           break;
         case HostFirewallState.unavailable:
           color = context.colors.onSurfaceVariant;
+          ink = context.colors.onSurfaceVariant;
           stateText = status.detail;
           icon = 'danger_circle';
           switchValue = null;
@@ -930,7 +938,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     ),
                     Text(
                       stateText,
-                      style: TextStyle(color: color, fontSize: 12),
+                      style: TextStyle(color: ink, fontSize: 12),
                     ),
                   ],
                 ),
@@ -1141,8 +1149,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             ),
           ),
           IconButton(
-            icon: const DuotoneIcon('trash_bin_minimalistic',
-                color: GlassTheme.errorColor, size: 20),
+            icon: DuotoneIcon('trash_bin_minimalistic',
+                color: AppColors.errorInk, size: 20),
             onPressed: () => _deleteServerFirewallRule(rule),
             tooltip: 'Delete rule',
           ),
@@ -1181,7 +1189,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
 
     return ListView(
@@ -1200,7 +1208,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   children: [
                     Text(
                       '${_networkConnections.length} Active Connections',
-                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: BrandText.title(size: 18),
                     ),
                     Text(
                       'Observed on the OrbGuard Lab server host (not this device)',
@@ -1307,10 +1315,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       collecting
                           ? 'Collecting…'
                           : '${connections.length} Connections on This Device',
-                      style: TextStyle(
-                          color: context.colors.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold),
+                      style: BrandText.title(size: 18),
                     ),
                     Text(
                       provider.hostNetworkSource.isEmpty
@@ -1323,11 +1328,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
               ),
               if (collecting)
-                const SizedBox(
+                SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                      color: GlassTheme.primaryAccent, strokeWidth: 2),
+                      color: AppColors.accentInk, strokeWidth: 2),
                 )
               else
                 IconButton(
@@ -1421,8 +1426,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 if (tags.isNotEmpty)
                   Text(
                     tags.join(', '),
-                    style: const TextStyle(
-                        color: GlassTheme.errorColor, fontSize: 11),
+                    style: TextStyle(
+                        color: AppColors.errorInk, fontSize: 11),
                   ),
               ],
             ),
@@ -1459,7 +1464,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
     return _buildBrowserContent(
       scanResult: _browserScanResult,
@@ -1507,7 +1512,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   children: [
                     Text(
                       collecting ? 'Scanning…' : '$totalExt Extensions Found',
-                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: BrandText.title(size: 18),
                     ),
                     Text(
                       highRisk > 0 ? '$highRisk high-risk extension${highRisk > 1 ? 's' : ''} detected' : 'No high-risk extensions',
@@ -1522,11 +1527,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 ),
               ),
               if (collecting)
-                const SizedBox(
+                SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                      color: GlassTheme.primaryAccent, strokeWidth: 2),
+                      color: AppColors.accentInk, strokeWidth: 2),
                 )
               else
                 IconButton(
@@ -1563,11 +1568,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
         // Browser breakdown
         if (byBrowser.isNotEmpty) ...[
-          Text('By Browser',
-              style: TextStyle(
-                  color: context.colors.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
+          Text('By Browser', style: BrandText.title()),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -1668,11 +1669,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       children: [
                         Text(
                           'Quarantine',
-                          style: TextStyle(
-                            color: context.colors.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: BrandText.title(size: 18),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1703,7 +1700,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               margin: EdgeInsets.zero,
               child: Row(
                 children: [
-                  DuotoneIcon('info_circle', color: GlassTheme.primaryAccent, size: 20),
+                  DuotoneIcon('info_circle', color: AppColors.accentInk, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -1738,7 +1735,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: context.colors.onSurface.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
                     child: Row(
                       children: [
@@ -1771,17 +1768,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     children: [
                       DuotoneIcon(
                         'check_circle',
-                        color: GlassTheme.successColor,
+                        color: AppColors.accentInk,
                         size: 64,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No Quarantined Items',
-                        style: TextStyle(
-                          color: context.colors.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: BrandText.title(size: 18),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -1796,11 +1789,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             else ...[
               Text(
                 'Quarantined Items',
-                style: TextStyle(
-                  color: context.colors.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.title(),
               ),
               const SizedBox(height: 12),
               ...quarantinedItems.map((item) => _buildQuarantinedItemCard(item)),
@@ -1860,7 +1849,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   Text(
                     'Quarantined $dateStr',
                     style: TextStyle(
-                      color: GlassTheme.warningColor.withAlpha(179),
+                      color: AppColors.secondaryInk,
                       fontSize: 11,
                     ),
                   ),
@@ -1886,7 +1875,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 // Restore button
                 if (item.canAutoRestore)
                   IconButton(
-                    icon: DuotoneIcon('refresh', color: GlassTheme.successColor, size: 20),
+                    icon: DuotoneIcon('refresh', color: AppColors.accentInk, size: 20),
                     onPressed: () => _restoreQuarantinedItem(item),
                     tooltip: 'Restore',
                   )
@@ -1902,7 +1891,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   ),
                 // Delete permanently button
                 IconButton(
-                  icon: DuotoneIcon('trash_bin_minimalistic', color: GlassTheme.errorColor, size: 20),
+                  icon: DuotoneIcon('trash_bin_minimalistic', color: AppColors.errorInk, size: 20),
                   onPressed: () => _deleteQuarantinedItem(item),
                   tooltip: 'Delete Permanently',
                 ),
@@ -1940,7 +1929,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: context.colors.onSurface.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   item.originalPath,
@@ -1955,7 +1944,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             const SizedBox(height: 12),
             Text(
               'This will re-enable the persistence mechanism.',
-              style: TextStyle(color: GlassTheme.warningColor.withAlpha(179), fontSize: 12),
+              style: TextStyle(color: AppColors.secondaryInk, fontSize: 12),
             ),
           ],
         ),
@@ -2087,7 +2076,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             backgroundColor: GlassTheme.successColor,
             action: SnackBarAction(
               label: 'Open Folder',
-              textColor: Colors.white,
+              textColor: Brand.onLime,
               onPressed: () {
                 if (Platform.isMacOS) {
                   Process.run('open', ['-R', exportPath]);
@@ -2206,7 +2195,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       GlassTheme.gradientBottomLight
                     ],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -2224,7 +2214,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: BrandText.heading(size: 20)),
                         const SizedBox(height: 4),
                         GlassBadge(
                           text: item.isSuspicious ? 'Suspicious' : 'Safe',
@@ -2275,7 +2265,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 2),
                               child: Text(
                                 '• $r',
-                                style: TextStyle(color: GlassTheme.errorColor.withAlpha(230)),
+                                style: TextStyle(color: AppColors.errorInk),
                               ),
                             ))
                         .toList(),
@@ -2332,7 +2322,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   label: const Text('Quarantine'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onDanger,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
@@ -2364,13 +2354,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                       GlassTheme.gradientBottomLight
                     ],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(24),
             children: [
-              Text(app.name, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(app.name, style: BrandText.heading(size: 20)),
               const SizedBox(height: 8),
               Text(app.bundleId, style: TextStyle(color: context.colors.onSurfaceVariant, fontFamily: 'monospace')),
               const SizedBox(height: 16),
@@ -2417,7 +2408,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   label: const Text('Check Hash on VirusTotal'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.primaryAccent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onLime,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -2469,8 +2460,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                   '$detections of $total engines flagged this file.',
                   style: TextStyle(
                     color: malicious || detections > 0
-                        ? GlassTheme.errorColor
-                        : GlassTheme.successColor,
+                        ? AppColors.errorInk
+                        : AppColors.accentInk,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2671,7 +2662,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                     appPath: appPathController.text.trim(),
                   );
                 },
-                child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+                child: Text('Add', style: TextStyle(color: AppColors.accentInk)),
               ),
             ],
           );
@@ -2857,11 +2848,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             const SizedBox(height: 16),
             Text(
               title,
-              style: TextStyle(
-                color: context.colors.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.title(),
             ),
             const SizedBox(height: 8),
             Text(

@@ -13,6 +13,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -309,11 +311,11 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: GlassTheme.errorColor.withAlpha(40),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
                     child: Text(
                       indicator,
-                      style: const TextStyle(color: GlassTheme.errorColor, fontSize: 10, fontFamily: 'monospace'),
+                      style: TextStyle(color: AppColors.errorInk, fontSize: 10, fontFamily: Brand.fontMono),
                     ),
                   )).toList(),
             ),
@@ -357,12 +359,12 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
             onPressed: _runCorrelation,
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DuotoneIcon(AppIcons.play, size: 18, color: Colors.white),
+                DuotoneIcon(AppIcons.play, size: 18, color: Brand.onLime),
                 const SizedBox(width: 8),
                 const Text('Run Correlation'),
               ],
@@ -422,8 +424,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             gradient: GlassTheme.backgroundGradient(isDark: context.isDark),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -462,7 +464,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                               indicator,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: context.onSurface, fontFamily: 'monospace', fontSize: 12),
+                              style: TextStyle(color: context.onSurface, fontFamily: Brand.fontMono, fontSize: 12),
                             ),
                           ),
                         ],
@@ -501,15 +503,15 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   Color _getEngineColor(BuildContext context, String engine) {
     switch (engine) {
       case 'Temporal':
-        return const Color(0xFF2196F3);
+        return AppColors.chartColors[2];
       case 'Infrastructure':
         return GlassTheme.errorColor;
       case 'TTP':
         return GlassTheme.primaryAccent;
       case 'Behavioral':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case 'Network':
-        return const Color(0xFF4CAF50);
+        return AppColors.chartColors[6];
       case 'Campaign':
         return GlassTheme.warningColor;
       default:

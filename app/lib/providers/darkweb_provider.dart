@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
@@ -642,16 +643,16 @@ class DarkWebProvider extends ChangeNotifier {
   static int getSeverityColor(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
-        return 0xFFFF1744;
+        return AppColors.severityCritical.toARGB32();
       case SeverityLevel.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case SeverityLevel.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case SeverityLevel.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
       case SeverityLevel.info:
       case SeverityLevel.unknown:
-        return 0xFF2196F3;
+        return AppColors.severityInfo.toARGB32();
     }
   }
 

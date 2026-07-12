@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -97,11 +99,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           // Analysis options
           Text(
             'Choose Analysis Type',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18, color: cs.onSurface),
           ),
           const SizedBox(height: 12),
 
@@ -123,7 +121,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               icon: 'power',
               title: 'Shutdown Log Analysis',
               description: 'Check iOS shutdown.log for Pegasus indicators',
-              color: Colors.orange,
+              color: AppColors.amberInk,
               onTap: provider.isAnalyzing
                   ? null
                   : () => _showShutdownLogInput(context, provider),
@@ -133,7 +131,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               icon: 'cloud_storage',
               title: 'Backup Analysis',
               description: 'Upload an iOS backup (.zip) for spyware analysis',
-              color: Colors.blue,
+              color: AppColors.secondaryInk,
               onTap: provider.isAnalyzing
                   ? null
                   : () => _pickAndUpload(
@@ -150,7 +148,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               title: 'Sysdiagnose Analysis',
               description:
                   'Upload a sysdiagnose archive (.tar.gz/.tgz/.zip) for deep analysis',
-              color: Colors.purple,
+              color: AppColors.chartColors[4], // spectrum purple
               onTap: provider.isAnalyzing
                   ? null
                   : () => _pickAndUpload(
@@ -168,7 +166,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               description:
                   "Capture OrbGuard's own process logs and analyze them "
                   '(full-device logs require ADB export)',
-              color: Colors.lightGreen,
+              color: AppColors.chartColors[6], // spectrum mint
               onTap: provider.isAnalyzing
                   ? null
                   : () => provider.captureAndAnalyzeLogcat(),
@@ -178,7 +176,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               icon: 'file_text',
               title: 'Logcat Analysis',
               description: 'Analyze Android system logs for malware',
-              color: Colors.green,
+              color: AppColors.accentInk,
               onTap: provider.isAnalyzing
                   ? null
                   : () => _showLogcatInput(context, provider),
@@ -189,7 +187,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               title: 'Bugreport Analysis',
               description:
                   'Upload an Android bugreport (.zip/.txt) for malware analysis',
-              color: Colors.teal,
+              color: AppColors.chartColors[2], // spectrum cyan
               onTap: provider.isAnalyzing
                   ? null
                   : () => _pickAndUpload(
@@ -215,11 +213,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                     const SizedBox(width: 12),
                     Text(
                       'About Forensic Analysis',
-                      style: TextStyle(
-                        color: cs.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(color: cs.onSurface),
                     ),
                   ],
                 ),
@@ -263,11 +257,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                   children: [
                     Text(
                       'Analyzing...',
-                      style: TextStyle(
-                        color: cs.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(color: cs.onSurface),
                     ),
                     Text(
                       provider.currentPhase,
@@ -280,7 +270,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           ),
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             child: LinearProgressIndicator(
               value: provider.progress,
               backgroundColor: cs.onSurface.withValues(alpha: 0.08),
@@ -307,11 +297,12 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.orange.withAlpha(40),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.warning.withAlpha(40),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
-              child: const Center(
-                child: DuotoneIcon('danger_circle', color: Colors.orange, size: 28),
+              child: Center(
+                child: DuotoneIcon('danger_circle',
+                    color: AppColors.secondaryInk, size: 28),
               ),
             ),
             const SizedBox(width: 16),
@@ -321,11 +312,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 children: [
                   Text(
                     '${result.type.displayName} Failed',
-                    style: const TextStyle(
-                      color: Colors.orange,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: BrandText.title(color: AppColors.secondaryInk),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -348,7 +335,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     }
 
     final hasThreats = result.hasThreat;
-    final color = hasThreats ? Colors.red : Colors.green;
+    final color = hasThreats ? AppColors.errorInk : AppColors.accentInk;
 
     return GlassCard(
       margin: EdgeInsets.zero,
@@ -362,7 +349,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: color.withAlpha(40),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Center(
                   child: DuotoneIcon(
@@ -379,11 +366,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                   children: [
                     Text(
                       hasThreats ? 'Threats Detected!' : 'No Threats Found',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(size: 18, color: color),
                     ),
                     Text(
                       '${result.findings.length} finding(s) from ${result.type.displayName}',
@@ -414,7 +397,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 onPressed: () => _showAllFindings(context, result),
                 child: Text(
                   'View all ${result.findings.length} findings',
-                  style: TextStyle(color: GlassTheme.primaryAccent),
+                  style: TextStyle(color: AppColors.accentInk),
                 ),
               ),
           ],
@@ -459,7 +442,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: Color(finding.severity.color).withAlpha(30),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: Text(
             finding.severity.displayName,
@@ -492,7 +475,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             height: 48,
             decoration: BoxDecoration(
               color: color.withAlpha(30),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Center(
               child: DuotoneIcon(icon, color: color, size: 24),
@@ -505,11 +488,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: BrandText.title(color: cs.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -577,14 +556,18 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: (hasThreats ? Colors.red : Colors.green)
-                        .withAlpha(30),
-                    borderRadius: BorderRadius.circular(12),
+                    color:
+                        (hasThreats ? AppColors.errorInk : AppColors.accentInk)
+                            .withAlpha(30),
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusSmall),
                   ),
                   child: Center(
                     child: DuotoneIcon(
                       hasThreats ? 'danger_triangle' : 'check_circle',
-                      color: hasThreats ? Colors.red : Colors.green,
+                      color: hasThreats
+                          ? AppColors.errorInk
+                          : AppColors.accentInk,
                       size: 24,
                     ),
                   ),
@@ -596,11 +579,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                     children: [
                       Text(
                         result.type.displayName,
-                        style: TextStyle(
-                          color: cs.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: BrandText.title(color: cs.onSurface),
                       ),
                       Text(
                         '${result.findings.length} findings - ${_formatDate(result.startedAt)}',
@@ -641,11 +620,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                     const SizedBox(width: 12),
                     Text(
                       'IOC Database',
-                      style: TextStyle(
-                        color: cs.onSurface,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(size: 18, color: cs.onSurface),
                     ),
                   ],
                 ),
@@ -661,7 +636,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                     _buildStatItem(
                       'Last Updated',
                       _formatDate(stats.lastUpdated),
-                      Colors.green,
+                      AppColors.accentInk,
                     ),
                   ],
                 ),
@@ -673,39 +648,35 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           // Breakdown
           Text(
             'IOC Categories',
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18, color: cs.onSurface),
           ),
           const SizedBox(height: 12),
 
           _buildIOCCategory(
             'Pegasus (NSO Group)',
             stats.pegasusIOCs,
-            Colors.red,
+            AppColors.errorInk,
             'bug',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Predator (Cytrox)',
             stats.predatorIOCs,
-            Colors.orange,
+            AppColors.amberInk,
             'bug_minimalistic',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Stalkerware',
             stats.stalkerwareIOCs,
-            Colors.purple,
+            AppColors.chartColors[4], // spectrum purple
             'eye',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
             'Other Spyware',
             stats.otherIOCs,
-            Colors.blue,
+            AppColors.secondaryInk,
             'danger_triangle',
           ),
 
@@ -718,11 +689,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               children: [
                 Text(
                   'Intelligence Sources',
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: BrandText.title(color: cs.onSurface),
                 ),
                 const SizedBox(height: 12),
                 _buildSourceRow('Citizen Lab', 'University of Toronto'),
@@ -742,11 +709,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       children: [
         Text(
           value,
-          style: TextStyle(
-            color: color,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+          style: BrandText.heading(size: 24, color: color),
         ),
         const SizedBox(height: 4),
         Text(
@@ -769,7 +732,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             height: 40,
             decoration: BoxDecoration(
               color: color.withAlpha(30),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Center(
               child: DuotoneIcon(icon, color: color, size: 22),
@@ -786,11 +749,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           ),
           Text(
             count.toString(),
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.heading(size: 18, color: color),
           ),
         ],
       ),
@@ -803,7 +762,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          DuotoneIcon('check_circle', color: Colors.green, size: 16),
+          DuotoneIcon('check_circle', color: AppColors.accentInk, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -861,7 +820,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(GlassTheme.radiusLarge),
+        ),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -876,7 +837,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               height: 4,
               decoration: BoxDecoration(
                 color: cs.outline,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
             ),
             Padding(
@@ -885,18 +846,16 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 children: [
                   DuotoneIcon(
                     result.hasThreat ? 'danger_triangle' : 'check_circle',
-                    color: result.hasThreat ? Colors.red : Colors.green,
+                    color: result.hasThreat
+                        ? AppColors.errorInk
+                        : AppColors.accentInk,
                     size: 24,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       '${result.type.displayName} Results',
-                      style: TextStyle(
-                        color: cs.onSurface,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: BrandText.title(size: 18, color: cs.onSurface),
                     ),
                   ),
                 ],
@@ -932,7 +891,8 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                                       decoration: BoxDecoration(
                                         color: Color(finding.severity.color)
                                             .withAlpha(30),
-                                        borderRadius: BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(
+                                            GlassTheme.radiusXSmall),
                                       ),
                                       child: Text(
                                         finding.severity.displayName,
@@ -961,11 +921,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                                   finding.title,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: cs.onSurface,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: BrandText.title(color: cs.onSurface),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -984,16 +940,15 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: cs.onSurface
-                                              .withValues(alpha: 0.04),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: Brand.glassFill,
+                                          borderRadius: BorderRadius.circular(
+                                              GlassTheme.radiusXSmall),
                                         ),
                                         child: Text(
                                           ioc,
-                                          style: TextStyle(
+                                          style: BrandText.mono(
+                                            size: 11,
                                             color: cs.onSurfaceVariant,
-                                            fontSize: 11,
-                                            fontFamily: 'monospace',
                                           ),
                                         ),
                                       );
@@ -1021,7 +976,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(GlassTheme.radiusLarge),
+        ),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1033,11 +990,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           children: [
             Text(
               'Shutdown Log Analysis',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.title(size: 20, color: cs.onSurface),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1054,9 +1007,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 hintStyle: TextStyle(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                 filled: true,
-                fillColor: cs.onSurface.withValues(alpha: 0.06),
+                fillColor: Brand.glassFill,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -1073,7 +1026,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Brand.onLime,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: const Text('Analyze'),
@@ -1123,7 +1076,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               'Unsupported file type "$lowerName" — expected: '
               '${serverAcceptedSuffixes.join(', ')}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -1141,7 +1094,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(GlassTheme.radiusLarge),
+        ),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1153,11 +1108,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           children: [
             Text(
               'Logcat Analysis',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: BrandText.title(size: 20, color: cs.onSurface),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1174,9 +1125,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 hintStyle: TextStyle(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                 filled: true,
-                fillColor: cs.onSurface.withValues(alpha: 0.06),
+                fillColor: Brand.glassFill,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -1193,7 +1144,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Brand.onLime,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: const Text('Analyze'),

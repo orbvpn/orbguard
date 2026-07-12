@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -136,7 +138,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: context.colors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(GlassTheme.radiusLarge),
+            ),
           ),
           child: Column(
             children: [
@@ -147,7 +151,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 height: 4,
                 decoration: BoxDecoration(
                   color: context.colors.outline,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
               ),
               // Content
@@ -193,8 +197,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               icon: const DuotoneIcon('qr_code', size: 18),
                               label: const Text('Scan Again'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00D9FF),
-                                foregroundColor: Colors.black,
+                                backgroundColor: Brand.lime,
+                                foregroundColor: Brand.onLime,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
                               ),
@@ -211,8 +215,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             icon: const DuotoneIcon('flag', size: 18),
                             label: const Text('Report False Positive'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange.withAlpha(51),
-                              foregroundColor: Colors.orange,
+                              backgroundColor: AppColors.warning.withAlpha(51),
+                              foregroundColor: AppColors.secondaryInk,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
@@ -339,7 +343,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             children: [
               if (_isCameraActive && _scannerController != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                   child: MobileScanner(
                     controller: _scannerController!,
                     onDetect: _onQrDetected,
@@ -347,7 +351,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 )
               else
                 Container(
-                  color: Colors.black,
+                  // Camera-off viewport stays obsidian in both themes.
+                  color: AppColors.backgroundDark,
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -355,7 +360,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         DuotoneIcon(
                           'camera',
                           size: 64,
-                          color: Colors.white.withAlpha(61),
+                          color: AppColors.textPrimaryDark.withAlpha(61),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -363,8 +368,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           icon: const DuotoneIcon('camera', size: 18),
                           label: const Text('Start Camera'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00D9FF),
-                            foregroundColor: Colors.black,
+                            backgroundColor: Brand.lime,
+                            foregroundColor: Brand.onLime,
                           ),
                         ),
                       ],
@@ -376,18 +381,18 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               // Loading indicator
               if (provider.isScanning)
                 Container(
-                  color: Colors.black54,
+                  color: AppColors.overlay,
                   child: const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          color: Color(0xFF00D9FF),
+                          color: Brand.lime,
                         ),
                         SizedBox(height: 16),
                         Text(
                           'Analyzing QR code...',
-                          style: TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppColors.textPrimaryDark),
                         ),
                       ],
                     ),
@@ -496,9 +501,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             provider.clearHistory();
                             Navigator.pop(context);
                           },
-                          child: const Text(
+                          child: Text(
                             'Clear',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(color: AppColors.errorInk),
                           ),
                         ),
                       ],
@@ -558,10 +563,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           if (recentThreats.isNotEmpty) ...[
             Text(
               'Recent Threats',
-              style: TextStyle(
+              style: BrandText.title(
+                size: 18,
                 color: context.colors.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 12),
@@ -584,7 +588,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     DuotoneIcon(
                       'shield_check',
                       size: 48,
-                      color: Colors.green.withAlpha(179),
+                      color: AppColors.accentInk.withAlpha(179),
                     ),
                     const SizedBox(height: 12),
                     Text(
