@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_LAB_ROOT = Path("/Users/nima/Developments/orbguard.lab")
+DEFAULT_LAB_ROOT = APP_ROOT.parent / "backend"
 
 API_CONFIG = APP_ROOT / "lib" / "services" / "api" / "api_config.dart"
 API_CLIENT = APP_ROOT / "lib" / "services" / "api" / "orbguard_api_client.dart"

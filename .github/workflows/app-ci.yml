@@ -1,15 +1,27 @@
-name: CI
+name: App CI
 
 on:
   push:
     branches:
       - main
       - production-hardening
+    paths:
+      - "app/**"
+      # Backend route changes must re-run the API contract gate.
+      - "backend/internal/api/**"
+      - ".github/workflows/app-ci.yml"
   pull_request:
+    paths:
+      - "app/**"
+      - "backend/internal/api/**"
+      - ".github/workflows/app-ci.yml"
 
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,15 +46,7 @@ jobs:
         run: flutter test
 
       # API contract gate. tools/check_api_contract.py cross-checks the app's
-      # endpoint calls against the orbguard.lab chi router. That backend repo
-      # is NOT checked out in this standalone APP CI, so the step runs ONLY
-      # when ../orbguard.lab is present (i.e. in a local/monorepo checkout
-      # where both repos sit side by side). It is intentionally NOT faked in
-      # CI — when the sibling repo is absent the step is skipped with a notice.
-      - name: API contract gate (if backend repo present)
-        run: |
-          if [ -d "../orbguard.lab" ]; then
-            python3 tools/check_api_contract.py --lab-root ../orbguard.lab
-          else
-            echo "::notice::orbguard.lab not checked out alongside this repo; skipping API contract gate (runs in the local/monorepo context)."
-          fi
+      # endpoint calls against the backend chi router. In the monorepo both
+      # sides are always present, so this gate always runs.
+      - name: API contract gate
+        run: python3 tools/check_api_contract.py --lab-root ../backend
