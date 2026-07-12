@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # OrbGuard Lab API - Threat Intelligence Platform
+  orbguard-lab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orbguard-lab
+    ports:
+      - "8090:8090"   # REST API
+      - "9002:9002"   # gRPC (OrbNet integration)
+    environment:
+      # Application
+      - ORBGUARD_APP_ENVIRONMENT=development
+      - ORBGUARD_APP_NAME=orbguard-lab
+      - ORBGUARD_APP_VERSION=1.0.0
+      # Database
+      - ORBGUARD_DATABASE_HOST=postgres
+      - ORBGUARD_DATABASE_PORT=5432
+      - ORBGUARD_DATABASE_USER=orbguard
+      - ORBGUARD_DATABASE_PASSWORD=orbguard_secret
+      - ORBGUARD_DATABASE_DBNAME=orbguard_lab
+      - ORBGUARD_DATABASE_SCHEMA=orbguard_lab
+      # Cache
+      - ORBGUARD_REDIS_HOST=redis
+      - ORBGUARD_REDIS_PORT=6379
+      # Graph Database
+      - ORBGUARD_NEO4J_ENABLED=true
+      - ORBGUARD_NEO4J_URI=bolt://neo4j:7687
+      - ORBGUARD_NEO4J_USERNAME=neo4j
+      - ORBGUARD_NEO4J_PASSWORD=neo4j_secret
+      # Event Streaming
+      - ORBGUARD_NATS_ENABLED=true
+      - ORBGUARD_NATS_URL=nats://nats:4222
+      # Security
+      - ORBGUARD_JWT_SECRET=dev-jwt-secret-change-in-production
+      # STIX/TAXII
+      - ORBGUARD_STIX_ENABLED=true
+      - ORBGUARD_STIX_TAXII_ENABLED=true
+      # Aggregation
+      - ORBGUARD_AGGREGATION_ENABLED=true
+      - ORBGUARD_AGGREGATION_INTERVAL=15m
+      # Premium Sources - API Keys from .env
+      - ORBGUARD_SOURCES_KOODOUS_ENABLED=true
+      - ORBGUARD_SOURCES_KOODOUS_API_KEY=${ORBGUARD_SOURCES_KOODOUS_API_KEY}
+      - ORBGUARD_SOURCES_ALIENVAULT_OTX_ENABLED=true
+      - ORBGUARD_SOURCES_ALIENVAULT_OTX_API_KEY=${ORBGUARD_SOURCES_ALIENVAULT_OTX_API_KEY}
+      - ORBGUARD_SOURCES_GREYNOISE_ENABLED=true
+      - ORBGUARD_SOURCES_GREYNOISE_API_KEY=${ORBGUARD_SOURCES_GREYNOISE_API_KEY}
+      - ORBGUARD_SOURCES_ABUSEIPDB_ENABLED=true
+      - ORBGUARD_SOURCES_ABUSEIPDB_API_KEY=${ORBGUARD_SOURCES_ABUSEIPDB_API_KEY}
+      - ORBGUARD_SOURCES_VIRUSTOTAL_ENABLED=true
+      - ORBGUARD_SOURCES_VIRUSTOTAL_API_KEY=${ORBGUARD_SOURCES_VIRUSTOTAL_API_KEY}
+      - ORBGUARD_SOURCES_GOOGLE_SAFEBROWSING_ENABLED=true
+      - ORBGUARD_SOURCES_GOOGLE_SAFEBROWSING_API_KEY=${ORBGUARD_SOURCES_GOOGLE_SAFEBROWSING_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - orbguard-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: orbguard-postgres
+    environment:
+      - POSTGRES_USER=orbguard
+      - POSTGRES_PASSWORD=orbguard_secret
+      - POSTGRES_DB=orbguard_lab
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbguard -d orbguard_lab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orbguard-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: orbguard-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orbguard-network
+    restart: unless-stopped
+
+  # Neo4j Graph Database (optional, for threat graph)
+  neo4j:
+    image: neo4j:5-community
+    container_name: orbguard-neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/neo4j_secret
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    ports:
+      - "7474:7474"   # HTTP
+      - "7687:7687"   # Bolt
+    networks:
+      - orbguard-network
+    restart: unless-stopped
+
+  # NATS JetStream (for event streaming)
+  nats:
+    image: nats:2-alpine
+    container_name: orbguard-nats
+    command: "--jetstream --store_dir /data"
+    volumes:
+      - nats-data:/data
+    ports:
+      - "4222:4222"   # Client
+      - "8222:8222"   # Monitoring
+    networks:
+      - orbguard-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  neo4j-data:
+  neo4j-logs:
+  nats-data:
+
+networks:
+  orbguard-network:
+    driver: bridge
