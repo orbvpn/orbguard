@@ -40,7 +40,7 @@ dependencies:
   provider: ^6.1.1
 
   # QR Scanner
-  mobile_scanner: ^5.1.1
+  mobile_scanner: ^7.2.0
 
   # File selection (forensic artifact uploads)
   file_picker: ^10.0.0
@@ -65,6 +65,10 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  # CocoaPods-only iOS build: Flutter's Swift Package Manager migration pulls
+  # Firebase via SPM, which demands iOS >= 15 while this app targets 14.
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/icons/
