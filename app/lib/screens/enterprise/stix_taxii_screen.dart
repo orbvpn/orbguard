@@ -11,6 +11,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/api/orbguard_api_client.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 
 class StixTaxiiScreen extends StatefulWidget {
   const StixTaxiiScreen({super.key});
@@ -77,9 +78,18 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // TAXII/STIX is an optional, server-config-gated feature (the backend only
+      // mounts /taxii2 when STIX is enabled), so a 404 means "not provisioned on
+      // this server", not an error — degrade to the normal empty state.
+      final notProvisioned = e is ApiError && e.statusCode == 404;
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        _error = notProvisioned ? null : e.toString();
+        if (notProvisioned) {
+          _servers.clear();
+          _collections.clear();
+          _stixObjects.clear();
+        }
       });
     }
   }

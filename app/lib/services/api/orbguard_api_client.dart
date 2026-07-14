@@ -948,7 +948,7 @@ class OrbGuardApiClient {
         },
       );
 
-      final results = response.data['results'] as List<dynamic>;
+      final results = _asList(response.data, 'results');
       return results
           .map((r) => IndicatorCheckResult.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -996,7 +996,7 @@ class OrbGuardApiClient {
         },
       );
 
-      final results = response.data['results'] as List<dynamic>;
+      final results = _asList(response.data, 'results');
       return results
           .map((r) => SmsAnalysisResult.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -1013,7 +1013,7 @@ class OrbGuardApiClient {
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlLong}),
       );
 
-      final patterns = response.data['patterns'] as List<dynamic>;
+      final patterns = _asList(response.data, 'patterns');
       return patterns
           .map((p) => PhishingPattern.fromJson(p as Map<String, dynamic>))
           .toList();
@@ -1047,7 +1047,7 @@ class OrbGuardApiClient {
         data: {'urls': urls},
       );
 
-      final results = response.data['results'] as List<dynamic>;
+      final results = _asList(response.data, 'results');
       return results
           .map((r) => UrlReputationResult.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -1186,7 +1186,7 @@ class OrbGuardApiClient {
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlLong}),
       );
 
-      final trackers = response.data['trackers'] as List<dynamic>;
+      final trackers = _asList(response.data, 'trackers');
       return trackers
           .map((t) => TrackerInfo.fromJson(t as Map<String, dynamic>))
           .toList();
@@ -1229,8 +1229,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getTrustedAPs() async {
     try {
       final response = await _dio.get(ApiEndpoints.rogueApTrusted);
-      return (response.data['trusted_aps'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'trusted_aps').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1287,7 +1286,7 @@ class OrbGuardApiClient {
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlLong}),
       );
 
-      final tactics = response.data['tactics'] as List<dynamic>;
+      final tactics = _asList(response.data, 'tactics');
       return tactics
           .map((t) => MitreTactic.fromJson(t as Map<String, dynamic>))
           .toList();
@@ -1308,7 +1307,7 @@ class OrbGuardApiClient {
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlLong}),
       );
 
-      final techniques = response.data['techniques'] as List<dynamic>;
+      final techniques = _asList(response.data, 'techniques');
       return techniques
           .map((t) => MitreTechnique.fromJson(t as Map<String, dynamic>))
           .toList();
@@ -1413,7 +1412,7 @@ class OrbGuardApiClient {
         data: {'domains': domains},
       );
 
-      final results = response.data['results'] as List<dynamic>;
+      final results = _asList(response.data, 'results');
       return results
           .map((r) => DnsBlockResult.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -1656,8 +1655,7 @@ class OrbGuardApiClient {
         ApiEndpoints.complianceFrameworks,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['frameworks'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'frameworks').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1667,8 +1665,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getComplianceReports() async {
     try {
       final response = await _dio.get(ApiEndpoints.complianceReports);
-      return (response.data['reports'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'reports').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1731,8 +1728,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getSiemConnections() async {
     try {
       final response = await _dio.get(ApiEndpoints.siemConnections);
-      return (response.data['connections'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'connections').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1742,8 +1738,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getSiemForwarders() async {
     try {
       final response = await _dio.get(ApiEndpoints.siemForwarders);
-      return (response.data['forwarders'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'forwarders').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1767,8 +1762,7 @@ class OrbGuardApiClient {
           if (severity != null && severity.isNotEmpty) 'severity': severity,
         },
       );
-      return (response.data['alerts'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'alerts').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1779,11 +1773,19 @@ class OrbGuardApiClient {
   // ============================================
 
   /// Get webhooks
+  /// Extracts a list from a response body that may be a bare JSON array or an
+  /// envelope like {"key": [...]}. Returns const [] when absent or wrong-shaped
+  /// — never throws "String is not a subtype of int of index" on a bare array.
+  static List<dynamic> _asList(dynamic data, String key) {
+    if (data is List) return data;
+    if (data is Map && data[key] is List) return data[key] as List<dynamic>;
+    return const [];
+  }
+
   Future<List<Map<String, dynamic>>> getWebhooks() async {
     try {
       final response = await _dio.get(ApiEndpoints.webhooks);
-      return (response.data['webhooks'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'webhooks').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1867,8 +1869,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getIntegrations() async {
     try {
       final response = await _dio.get(ApiEndpoints.integrations);
-      return (response.data['integrations'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'integrations').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1963,8 +1964,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getPlaybooks() async {
     try {
       final response = await _dio.get(ApiEndpoints.playbooks);
-      return (response.data['playbooks'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'playbooks').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -1974,8 +1974,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getPlaybookExecutions() async {
     try {
       final response = await _dio.get(ApiEndpoints.playbookExecutions);
-      return (response.data['executions'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'executions').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2062,8 +2061,7 @@ class OrbGuardApiClient {
         ApiEndpoints.vpnServers,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['servers'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'servers').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2156,8 +2154,7 @@ class OrbGuardApiClient {
         ApiEndpoints.yaraRules,
         options: Options(extra: {'cacheTtl': ApiConfig.cacheTtlMedium}),
       );
-      return (response.data['rules'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'rules').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2171,8 +2168,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getTaxiiServers() async {
     try {
       final response = await _dio.get(ApiEndpoints.taxiiDiscovery);
-      return (response.data['servers'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'servers').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2182,8 +2178,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getTaxiiCollections() async {
     try {
       final response = await _dio.get(ApiEndpoints.taxiiCollections);
-      return (response.data['collections'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'collections').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -2193,8 +2188,7 @@ class OrbGuardApiClient {
   Future<List<Map<String, dynamic>>> getStixObjects(String collectionId) async {
     try {
       final response = await _dio.get(ApiEndpoints.taxiiCollectionObjects(collectionId));
-      return (response.data['objects'] as List<dynamic>?)
-          ?.cast<Map<String, dynamic>>() ?? [];
+      return _asList(response.data, 'objects').cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
