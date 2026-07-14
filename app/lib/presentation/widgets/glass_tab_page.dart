@@ -39,6 +39,13 @@ class GlassTabPage extends StatefulWidget {
   /// When true, skips the outer GlassPage wrapper (for embedding in other screens)
   final bool embedded;
 
+  /// Forwarded to the standalone GlassPage header: whether to show the round
+  /// leading button, its icon (e.g. AppIcons.home to act as "go home"), and the
+  /// tap handler.
+  final bool showBackButton;
+  final String? leadingIcon;
+  final VoidCallback? onBack;
+
   const GlassTabPage({
     super.key,
     required this.title,
@@ -50,6 +57,9 @@ class GlassTabPage extends StatefulWidget {
     this.headerContent,
     this.initialIndex = 0,
     this.embedded = false,
+    this.showBackButton = true,
+    this.leadingIcon,
+    this.onBack,
   });
 
   @override
@@ -146,6 +156,9 @@ class GlassTabPageState extends State<GlassTabPage>
       title: widget.title,
       actions: widget.actions,
       embedded: widget.embedded,
+      showBackButton: widget.showBackButton,
+      leadingIcon: widget.leadingIcon,
+      onBack: widget.onBack,
       body: widget.embedded ? _buildEmbeddedLayout() : _buildStandaloneLayout(),
     );
   }
@@ -250,7 +263,6 @@ class GlassTabPageState extends State<GlassTabPage>
   }
 
   Widget _buildTabsContainer(bool isDark, Color textColor) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       height: 60,
       decoration: BoxDecoration(

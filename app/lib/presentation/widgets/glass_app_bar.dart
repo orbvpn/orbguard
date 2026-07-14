@@ -444,6 +444,9 @@ class GlassPage extends StatelessWidget {
   final List<Widget>? actions;
   final VoidCallback? onAction;
   final bool showBackButton;
+  /// Icon for the round leading button. Defaults to the back chevron; pass e.g.
+  /// [AppIcons.home] to make the leading act as a "go home" button instead.
+  final String? leadingIcon;
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   /// When true, returns just the body without Scaffold/header (for embedding in other screens)
@@ -457,6 +460,7 @@ class GlassPage extends StatelessWidget {
     this.actions,
     this.onAction,
     this.showBackButton = true,
+    this.leadingIcon,
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.embedded = false,
@@ -519,7 +523,7 @@ class GlassPage extends StatelessWidget {
                     filter: GlassTheme.blurFilter,
                     child: Center(
                       child: DuotoneIcon(
-                        AppIcons.chevronLeft,
+                        leadingIcon ?? AppIcons.chevronLeft,
                         size: 22,
                         color: textColor,
                       ),

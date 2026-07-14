@@ -482,6 +482,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final textColor = cs.onSurface;
     final iconColor = cs.onSurfaceVariant;
 
+    // The Intel tab owns the whole screen: its Browse/Check/History selector is
+    // the single bottom bar, with a Home button top-left (no shell header/nav) —
+    // avoids stacking two navigation bars.
+    if (_currentNavIndex == 2) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        drawer: _buildNavigationDrawer(),
+        body: IntelligenceCoreScreen(
+          asMainTab: true,
+          onHome: () => setState(() => _currentNavIndex = 0),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: backgroundColor,
       drawer: _buildNavigationDrawer(),

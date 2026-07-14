@@ -20,7 +20,18 @@ class IntelligenceCoreScreen extends StatefulWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
   final bool embedded;
 
-  const IntelligenceCoreScreen({super.key, this.embedded = false});
+  /// When true, this is the app's Intel bottom-nav tab. Rendered standalone so
+  /// its Browse/Check/History selector is the single bottom bar (the shell hides
+  /// its own bottom nav), with a Home button (via [onHome]) top-left to return.
+  final bool asMainTab;
+  final VoidCallback? onHome;
+
+  const IntelligenceCoreScreen({
+    super.key,
+    this.embedded = false,
+    this.asMainTab = false,
+    this.onHome,
+  });
 
   @override
   State<IntelligenceCoreScreen> createState() => _IntelligenceCoreScreenState();
@@ -97,7 +108,12 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
       title: 'Intelligence Core',
       hasSearch: true,
       searchHint: 'Search IOCs...',
-      embedded: widget.embedded,
+      // As the Intel tab: render standalone (tabs at bottom) with a Home button
+      // that returns to the Home tab. Otherwise honour the embedded flag.
+      embedded: widget.asMainTab ? false : widget.embedded,
+      showBackButton: widget.asMainTab || !widget.embedded,
+      leadingIcon: widget.asMainTab ? AppIcons.home : null,
+      onBack: widget.asMainTab ? widget.onHome : null,
       actions: [
         IconButton(
           icon: DuotoneIcon('database', size: 22, color: context.onSurface),
