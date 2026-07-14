@@ -4,7 +4,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
@@ -106,7 +106,11 @@ class WebSocketService {
       // Build headers
       final headers = <String, String>{
         'X-Client-Version': '1.0.0',
-        'X-Platform': Platform.isIOS ? 'ios' : 'android',
+        'X-Platform': PlatformInfo.isIOS
+            ? 'ios'
+            : PlatformInfo.isWeb
+                ? 'web'
+                : 'android',
       };
 
       if (token != null) {
@@ -116,12 +120,16 @@ class WebSocketService {
         headers['X-Device-ID'] = deviceId;
       }
 
-      // Create WebSocket connection
-      _channel = IOWebSocketChannel.connect(
-        Uri.parse(_wsUrl),
-        headers: headers,
-        pingInterval: Duration(seconds: _pingIntervalSeconds),
-      );
+      // Create WebSocket connection. Browsers cannot set custom headers on
+      // a WebSocket upgrade, so on web the platform-neutral channel is used
+      // as-is; natively the IO channel carries the auth/identity headers.
+      _channel = PlatformInfo.isWeb
+          ? WebSocketChannel.connect(Uri.parse(_wsUrl))
+          : IOWebSocketChannel.connect(
+              Uri.parse(_wsUrl),
+              headers: headers,
+              pingInterval: Duration(seconds: _pingIntervalSeconds),
+            );
 
       // Listen to messages
       _subscription = _channel!.stream.listen(

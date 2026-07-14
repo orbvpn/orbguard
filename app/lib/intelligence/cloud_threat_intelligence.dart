@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../utils/platform_info.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -358,6 +359,9 @@ class LocalIntelligenceCache {
   static const String _lastUpdateKey = 'threat_intel_last_update';
 
   Future<void> saveIntelligence(ThreatIntelligenceData data) async {
+    // No file system in the browser sandbox — web keeps intelligence
+    // in memory only and refetches over HTTPS on the next launch.
+    if (PlatformInfo.isWeb) return;
     try {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/$_cacheFileName');
@@ -374,6 +378,7 @@ class LocalIntelligenceCache {
   }
 
   Future<ThreatIntelligenceData?> loadIntelligence() async {
+    if (PlatformInfo.isWeb) return null; // no on-disk cache in the browser
     try {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/$_cacheFileName');
@@ -413,6 +418,7 @@ class LocalIntelligenceCache {
   }
 
   Future<void> clearCache() async {
+    if (PlatformInfo.isWeb) return; // no on-disk cache in the browser
     try {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/$_cacheFileName');
@@ -588,8 +594,8 @@ class ThreatIntelligenceManager {
   Future<Map<String, dynamic>> _getDeviceInfo() async {
     // Anonymized device info for context
     return {
-      'platform': Platform.operatingSystem,
-      'version': Platform.operatingSystemVersion,
+      'platform': PlatformInfo.operatingSystem,
+      'version': PlatformInfo.operatingSystemVersion,
       // Don't include identifying info
     };
   }

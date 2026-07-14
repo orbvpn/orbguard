@@ -13,6 +13,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import '../../utils/platform_info.dart';
 
 /// Result of a host-local collection pass. `items` are JSON-shaped maps,
 /// `errors` are honest per-step failures (missing tool, permission denied,
@@ -500,7 +501,7 @@ Future<HostCollection> collectChromiumExtensions(
     try {
       await for (final e in root.list()) {
         if (e is! Directory) continue;
-        final name = e.path.split(Platform.pathSeparator).last;
+        final name = e.path.split(PlatformInfo.pathSeparator).last;
         if (name == 'Default' || name.startsWith('Profile ')) profiles.add(e);
       }
     } on FileSystemException catch (e) {
@@ -514,7 +515,7 @@ Future<HostCollection> collectChromiumExtensions(
       try {
         await for (final extDir in extRoot.list()) {
           if (extDir is! Directory) continue;
-          final extId = extDir.path.split(Platform.pathSeparator).last;
+          final extId = extDir.path.split(PlatformInfo.pathSeparator).last;
           if (extId == 'Temp') continue;
           // Pick the latest version directory containing a manifest.
           Directory? versionDir;

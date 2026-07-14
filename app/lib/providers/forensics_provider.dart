@@ -5,7 +5,7 @@
 // orbguard.lab/internal/api/handlers/forensics.go and the
 // ForensicResult / QuickCheckResult models.
 
-import 'dart:io' show Platform;
+import '../utils/platform_info.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -371,7 +371,7 @@ class ForensicsProvider extends ChangeNotifier {
   Future<ForensicAnalysisResult?> captureAndAnalyzeLogcat({
     int lines = 500,
   }) async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       _error = 'Logcat capture is only available on Android';
       notifyListeners();
       return null;
@@ -685,10 +685,10 @@ class ForensicsProvider extends ChangeNotifier {
     if (cached != null && cached.isNotEmpty) return cached;
     try {
       final deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
+      if (PlatformInfo.isAndroid) {
         final info = await deviceInfo.androidInfo;
         _cachedDeviceId = info.id;
-      } else if (Platform.isIOS) {
+      } else if (PlatformInfo.isIOS) {
         final info = await deviceInfo.iosInfo;
         _cachedDeviceId = info.identifierForVendor ?? '';
       } else {
@@ -701,9 +701,9 @@ class ForensicsProvider extends ChangeNotifier {
   }
 
   String _platformName() {
-    if (Platform.isIOS) return 'ios';
-    if (Platform.isAndroid) return 'android';
-    return Platform.operatingSystem;
+    if (PlatformInfo.isIOS) return 'ios';
+    if (PlatformInfo.isAndroid) return 'android';
+    return PlatformInfo.operatingSystem;
   }
 
   FindingSeverity _parseSeverity(String? severity) {

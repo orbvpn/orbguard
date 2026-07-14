@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
+import '../utils/platform_info.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/theme/colors.dart';
 
@@ -88,7 +88,7 @@ class PermissionManager {
     for (final group in permissionGroups.values) {
       for (final permInfo in group.permissions) {
         // For storage, use native check on Android 11+
-        if (permInfo.permission == Permission.storage && Platform.isAndroid) {
+        if (permInfo.permission == Permission.storage && PlatformInfo.isAndroid) {
           final hasStorage = await _checkStoragePermission();
           if (hasStorage) {
             result.granted.add(permInfo.name);
@@ -189,7 +189,7 @@ class PermissionManager {
     final results = <Permission, PermissionStatus>{};
 
     // Request storage permission via native method (Android 11+)
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       await requestStoragePermission();
       final hasStorage = await _checkStoragePermission();
       results[Permission.storage] = hasStorage
@@ -213,7 +213,7 @@ class PermissionManager {
     ];
 
     // Request location with explanation
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       // Android 10+ requires background location separately
       final locationStatus = await Permission.location.request();
 
@@ -317,7 +317,7 @@ class PermissionManager {
 
   /// Check if Storage permission is granted (Android 11+ uses MANAGE_EXTERNAL_STORAGE)
   Future<bool> _checkStoragePermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       final result = await platform.invokeMethod('checkStoragePermission');
@@ -331,7 +331,7 @@ class PermissionManager {
 
   /// Request storage permission (uses native method for Android 11+)
   Future<bool> requestStoragePermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       await platform.invokeMethod('requestStoragePermission');
@@ -344,7 +344,7 @@ class PermissionManager {
 
   /// Check if Usage Stats permission is granted
   Future<bool> _checkUsageStatsPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       final result = await platform.invokeMethod('checkUsageStatsPermission');
@@ -356,7 +356,7 @@ class PermissionManager {
 
   /// Check if Accessibility permission is granted
   Future<bool> _checkAccessibilityPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       final result =

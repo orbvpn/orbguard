@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
+import '../utils/platform_info.dart';
 import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/brand.dart';
@@ -21,10 +21,10 @@ class SpecialPermissionsManager {
 
   /// Check all special permissions status
   Future<void> checkPermissions() async {
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       _hasUsageStats = await checkUsageStatsPermission();
       _hasAccessibility = await checkAccessibilityPermission();
-    } else if (Platform.isIOS) {
+    } else if (PlatformInfo.isIOS) {
       // iOS doesn't have these exact permissions
       // We check for equivalent capabilities
       _hasUsageStats = false; // Not available on iOS
@@ -34,7 +34,7 @@ class SpecialPermissionsManager {
 
   /// Check if Usage Stats permission is granted
   Future<bool> checkUsageStatsPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       final result = await platform.invokeMethod('checkUsageStatsPermission');
@@ -47,7 +47,7 @@ class SpecialPermissionsManager {
 
   /// Check if Accessibility permission is granted
   Future<bool> checkAccessibilityPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       final result =
@@ -61,7 +61,7 @@ class SpecialPermissionsManager {
 
   /// Request Usage Stats permission (opens Settings)
   Future<bool> requestUsageStatsPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       await platform.invokeMethod('requestUsageStatsPermission');
@@ -77,7 +77,7 @@ class SpecialPermissionsManager {
 
   /// Request Accessibility permission (opens Settings)
   Future<bool> requestAccessibilityPermission() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
 
     try {
       await platform.invokeMethod('requestAccessibilityPermission');

@@ -16,6 +16,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../utils/platform_info.dart';
+import 'desktop_scan_config.dart';
 
 import 'desktop_host_collector.dart';
 
@@ -325,66 +327,70 @@ class MacOSPersistenceScannerService {
   /// Run full persistence scan
   Future<PersistenceScanResult> runFullScan({
     void Function(String phase, double progress)? onProgress,
+    DesktopScanConfig? config,
   }) async {
+    final cfg = config ?? const DesktopScanConfig();
     final scanId = 'scan_${DateTime.now().millisecondsSinceEpoch}';
     final startTime = DateTime.now();
     final items = <PersistenceItem>[];
     final itemsByType = <PersistenceType, int>{};
 
-    // Scan all persistence locations with progress reporting
-    onProgress?.call('Scanning Launch Agents...', 0.05);
-    items.addAll(await _scanLaunchAgents());
+    // Scan the enabled persistence locations (Desktop Scanner settings).
+    if (cfg.scanLaunchAgents) {
+      onProgress?.call('Scanning Launch Agents...', 0.05);
+      items.addAll(await _scanLaunchAgents());
+    }
+    if (cfg.scanLaunchDaemons) {
+      onProgress?.call('Scanning Launch Daemons...', 0.15);
+      items.addAll(await _scanLaunchDaemons());
+    }
+    if (cfg.scanLoginItems) {
+      onProgress?.call('Scanning Login Items...', 0.25);
+      items.addAll(await _scanLoginItems());
+    }
+    if (cfg.scanKernelExtensions) {
+      onProgress?.call('Scanning Kernel Extensions...', 0.35);
+      items.addAll(await _scanKernelExtensions());
+    }
+    if (cfg.scanBrowserExtensions) {
+      onProgress?.call('Scanning Browser Extensions...', 0.45);
+      items.addAll(await _scanBrowserExtensions());
+    }
+    if (cfg.scanCronJobs) {
+      onProgress?.call('Scanning Cron Jobs...', 0.55);
+      items.addAll(await _scanCronJobs());
+    }
 
-    onProgress?.call('Scanning Launch Daemons...', 0.15);
-    items.addAll(await _scanLaunchDaemons());
+    // Advanced/less-common persistence surfaces — only in Deep Scan.
+    if (cfg.deepScan) {
+      onProgress?.call('Scanning Auth Plugins...', 0.65);
+      items.addAll(await _scanAuthPlugins());
+      onProgress?.call('Scanning Directory Plugins...', 0.70);
+      items.addAll(await _scanDirectoryPlugins());
+      onProgress?.call('Scanning Spotlight Importers...', 0.75);
+      items.addAll(await _scanSpotlightImporters());
+      onProgress?.call('Scanning Scripting Additions...', 0.80);
+      items.addAll(await _scanScriptingAdditions());
+      onProgress?.call('Scanning Startup Items...', 0.85);
+      items.addAll(await _scanStartupItems());
+      onProgress?.call('Scanning Periodic Tasks...', 0.88);
+      items.addAll(await _scanPeriodicTasks());
+      onProgress?.call('Scanning Event Monitor Rules...', 0.89);
+      items.addAll(await _scanEmond());
+      onProgress?.call('Scanning Quick Look Plugins...', 0.90);
+      items.addAll(await _scanQuickLookPlugins());
+      onProgress?.call('Scanning Screen Savers...', 0.92);
+      items.addAll(await _scanScreenSavers());
+      onProgress?.call('Scanning Folder Actions...', 0.94);
+      items.addAll(await _scanFolderActions());
+      onProgress?.call('Scanning Input Methods...', 0.95);
+      items.addAll(await _scanInputMethods());
+    }
 
-    onProgress?.call('Scanning Login Items...', 0.25);
-    items.addAll(await _scanLoginItems());
-
-    onProgress?.call('Scanning Kernel Extensions...', 0.35);
-    items.addAll(await _scanKernelExtensions());
-
-    onProgress?.call('Scanning Browser Extensions...', 0.45);
-    items.addAll(await _scanBrowserExtensions());
-
-    onProgress?.call('Scanning Cron Jobs...', 0.55);
-    items.addAll(await _scanCronJobs());
-
-    onProgress?.call('Scanning Auth Plugins...', 0.65);
-    items.addAll(await _scanAuthPlugins());
-
-    onProgress?.call('Scanning Directory Plugins...', 0.70);
-    items.addAll(await _scanDirectoryPlugins());
-
-    onProgress?.call('Scanning Spotlight Importers...', 0.75);
-    items.addAll(await _scanSpotlightImporters());
-
-    onProgress?.call('Scanning Scripting Additions...', 0.80);
-    items.addAll(await _scanScriptingAdditions());
-
-    onProgress?.call('Scanning Startup Items...', 0.85);
-    items.addAll(await _scanStartupItems());
-
-    onProgress?.call('Scanning Periodic Tasks...', 0.90);
-    items.addAll(await _scanPeriodicTasks());
-
-    onProgress?.call('Scanning Event Monitor Rules...', 0.88);
-    items.addAll(await _scanEmond());
-
-    onProgress?.call('Scanning Quick Look Plugins...', 0.90);
-    items.addAll(await _scanQuickLookPlugins());
-
-    onProgress?.call('Scanning Screen Savers...', 0.92);
-    items.addAll(await _scanScreenSavers());
-
-    onProgress?.call('Scanning Folder Actions...', 0.94);
-    items.addAll(await _scanFolderActions());
-
-    onProgress?.call('Scanning Input Methods...', 0.95);
-    items.addAll(await _scanInputMethods());
-
-    onProgress?.call('Computing file hashes...', 0.97);
-    await _computeHashesAndCheckThreatIntel(items);
+    if (cfg.hashVerification) {
+      onProgress?.call('Computing file hashes...', 0.97);
+      await _computeHashesAndCheckThreatIntel(items);
+    }
 
     onProgress?.call('Analyzing results...', 0.99);
 
@@ -418,7 +424,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/LaunchAgents',
-      '${Platform.environment['HOME']}/Library/LaunchAgents',
+      '${PlatformInfo.environment['HOME']}/Library/LaunchAgents',
       '/System/Library/LaunchAgents',
     ];
 
@@ -528,7 +534,7 @@ class MacOSPersistenceScannerService {
   /// Scan Browser Extensions
   Future<List<PersistenceItem>> _scanBrowserExtensions() async {
     final items = <PersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     // Safari extensions
     final safariExtDir = Directory('$home/Library/Safari/Extensions');
@@ -705,7 +711,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/Spotlight',
-      '${Platform.environment['HOME']}/Library/Spotlight',
+      '${PlatformInfo.environment['HOME']}/Library/Spotlight',
     ];
 
     for (final location in locations) {
@@ -734,7 +740,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/ScriptingAdditions',
-      '${Platform.environment['HOME']}/Library/ScriptingAdditions',
+      '${PlatformInfo.environment['HOME']}/Library/ScriptingAdditions',
     ];
 
     for (final location in locations) {
@@ -841,7 +847,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/QuickLook',
-      '${Platform.environment['HOME']}/Library/QuickLook',
+      '${PlatformInfo.environment['HOME']}/Library/QuickLook',
     ];
 
     for (final location in locations) {
@@ -886,7 +892,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/Screen Savers',
-      '${Platform.environment['HOME']}/Library/Screen Savers',
+      '${PlatformInfo.environment['HOME']}/Library/Screen Savers',
       '/System/Library/Screen Savers',
     ];
 
@@ -917,7 +923,7 @@ class MacOSPersistenceScannerService {
   /// Scan Folder Actions
   Future<List<PersistenceItem>> _scanFolderActions() async {
     final items = <PersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     final locations = [
       '$home/Library/Workflows/Applications/Folder Actions',
@@ -981,7 +987,7 @@ class MacOSPersistenceScannerService {
     final items = <PersistenceItem>[];
     final locations = [
       '/Library/Input Methods',
-      '${Platform.environment['HOME']}/Library/Input Methods',
+      '${PlatformInfo.environment['HOME']}/Library/Input Methods',
     ];
 
     for (final location in locations) {
@@ -1272,7 +1278,7 @@ class MacOSPersistenceScannerService {
   /// Collect browser extensions installed in this Mac's browser profiles
   /// (Chrome, Edge, Brave, Chromium, Firefox).
   Future<HostCollection> collectBrowserExtensions() async {
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
     final chromium = await collectChromiumExtensions({
       'Chrome': '$home/Library/Application Support/Google/Chrome',
       'Edge': '$home/Library/Application Support/Microsoft Edge',

@@ -15,7 +15,7 @@
 // the same.
 
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,10 +57,10 @@ class SimMonitor {
 
   /// Reads the current SIM subscriptions, or an explicit unavailable state.
   Future<SimReadResult> read() async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       return SimReadResult.unavailable(
         'SIM information is not exposed to third-party apps on '
-        '${Platform.operatingSystem}',
+        '${PlatformInfo.operatingSystem}',
       );
     }
 

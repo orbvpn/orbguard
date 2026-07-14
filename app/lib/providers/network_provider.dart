@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import '../utils/platform_info.dart';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -557,6 +558,16 @@ class NetworkProvider extends ChangeNotifier {
   /// device_id from it), so no device_id needs to be embedded in the body.
   Future<void> runDnsCheck() async {
     if (_isCheckingDns) return;
+    if (PlatformInfo.isWeb) {
+      // Browsers expose no resolver: InternetAddress.lookup and the native
+      // DNS-server hint are unavailable, so the check cannot measure
+      // anything real on web.
+      _dnsCheckError =
+          'The DNS hijack/leak check requires the mobile or desktop app — '
+          'browsers do not expose the local resolver.';
+      notifyListeners();
+      return;
+    }
     if (!await _isProtectionEnabledByUser()) {
       _dnsCheckError = 'Network protection is disabled in Settings.';
       notifyListeners();

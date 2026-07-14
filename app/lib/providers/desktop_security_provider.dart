@@ -4,6 +4,8 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import '../utils/platform_info.dart';
+import '../services/security/desktop_scan_config.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -262,14 +264,14 @@ class DesktopSecurityProvider extends ChangeNotifier {
   bool get isVerifyingCodeSigning => _isVerifyingCodeSigning;
 
   String get currentPlatform {
-    if (Platform.isMacOS) return 'macOS';
-    if (Platform.isWindows) return 'Windows';
-    if (Platform.isLinux) return 'Linux';
+    if (PlatformInfo.isMacOS) return 'macOS';
+    if (PlatformInfo.isWindows) return 'Windows';
+    if (PlatformInfo.isLinux) return 'Linux';
     return 'Unknown';
   }
 
   bool get isDesktopPlatform =>
-      Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+      PlatformInfo.isMacOS || PlatformInfo.isWindows || PlatformInfo.isLinux;
 
   int get criticalCount => _items.where((i) => i.risk == DesktopItemRisk.critical).length;
   int get highRiskCount => _items.where((i) => i.risk == DesktopItemRisk.high).length;
@@ -322,8 +324,10 @@ class DesktopSecurityProvider extends ChangeNotifier {
     final errors = <String>[];
 
     try {
-      if (Platform.isMacOS) {
+      final cfg = await DesktopScanConfig.load();
+      if (PlatformInfo.isMacOS) {
         final result = await _macosScanner.runFullScan(
+          config: cfg,
           onProgress: (phase, progress) {
             _currentPhase = phase;
             _scanProgress = progress;
@@ -331,8 +335,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
           },
         );
         items.addAll(_convertMacOSItems(result.items));
-      } else if (Platform.isWindows) {
+      } else if (PlatformInfo.isWindows) {
         final result = await _windowsScanner.runFullScan(
+          config: cfg,
           onProgress: (phase, progress) {
             _currentPhase = phase;
             _scanProgress = progress;
@@ -341,8 +346,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
         );
         items.addAll(_convertWindowsItems(result.items));
         errors.addAll(result.errors);
-      } else if (Platform.isLinux) {
+      } else if (PlatformInfo.isLinux) {
         final result = await _linuxScanner.runFullScan(
+          config: cfg,
           onProgress: (phase, progress) {
             _currentPhase = phase;
             _scanProgress = progress;
@@ -593,7 +599,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   /// Get cache file path
   Future<File> _getCacheFile() async {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? PlatformInfo.environment['USERPROFILE'] ?? '';
     final cacheDir = Directory('$home/.orbguard/cache');
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
@@ -619,11 +625,11 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// Disable/quarantine a persistence item
   Future<bool> disableItem(DesktopPersistenceItem item) async {
     try {
-      if (Platform.isMacOS) {
+      if (PlatformInfo.isMacOS) {
         return await _disableMacOSItem(item);
-      } else if (Platform.isLinux) {
+      } else if (PlatformInfo.isLinux) {
         return await _disableLinuxItem(item);
-      } else if (Platform.isWindows) {
+      } else if (PlatformInfo.isWindows) {
         return await _disableWindowsItem(item);
       }
     } catch (e) {
@@ -852,7 +858,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   /// Get quarantine directory
   Future<Directory> _getQuarantineDir() async {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? PlatformInfo.environment['USERPROFILE'] ?? '';
     final quarantineDir = Directory('$home/.orbguard/quarantine');
     if (!await quarantineDir.exists()) {
       await quarantineDir.create(recursive: true);
@@ -968,14 +974,14 @@ class DesktopSecurityProvider extends ChangeNotifier {
       if (isService) {
         // Re-enable service
         ProcessResult? result;
-        if (Platform.isLinux) {
+        if (PlatformInfo.isLinux) {
           result = await Process.run(
               'systemctl', ['--user', 'enable', quarantinedFileName]);
           if (result.exitCode != 0) {
             result =
                 await Process.run('systemctl', ['enable', quarantinedFileName]);
           }
-        } else if (Platform.isWindows) {
+        } else if (PlatformInfo.isWindows) {
           result = await Process.run(
               'sc', ['config', quarantinedFileName, 'start=', 'auto'],
               runInShell: true);
@@ -992,7 +998,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
         return true;
       }
 
-      if (isTask && Platform.isWindows) {
+      if (isTask && PlatformInfo.isWindows) {
         // Re-enable scheduled task
         final result = await Process.run(
             'schtasks', ['/Change', '/TN', quarantinedFileName, '/Enable'],
@@ -1008,7 +1014,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
         return true;
       }
 
-      if (isRegistry && Platform.isWindows) {
+      if (isRegistry && PlatformInfo.isWindows) {
         // Restore the registry key from the reg export backup taken before
         // deletion.
         final backupPath = itemMeta?['registry_backup'] as String? ?? '';
@@ -1045,7 +1051,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
         }
 
         // Reload if it's a launch agent/daemon on macOS
-        if (Platform.isMacOS && (restorePath.contains('LaunchAgents') || restorePath.contains('LaunchDaemons'))) {
+        if (PlatformInfo.isMacOS && (restorePath.contains('LaunchAgents') || restorePath.contains('LaunchDaemons'))) {
           final load = await Process.run('launchctl', ['load', restorePath]);
           if (load.exitCode != 0) {
             debugPrint(
@@ -1105,7 +1111,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
             continue;
           }
           if (registryBackups.contains(entity.path)) continue;
-          final fileName = entity.path.split(Platform.pathSeparator).last;
+          final fileName = entity.path.split(PlatformInfo.pathSeparator).last;
           if (metadata.containsKey(fileName)) continue;
           items.add(QuarantinedItem(
             fileName: fileName,
@@ -1164,11 +1170,11 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// Read the REAL OS firewall state from platform tooling.
   Future<HostFirewallStatus> refreshHostFirewallStatus() async {
     HostFirewallStatus status;
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       status = await _readMacFirewallStatus();
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       status = await _readWindowsFirewallStatus();
-    } else if (Platform.isLinux) {
+    } else if (PlatformInfo.isLinux) {
       status = await _readLinuxFirewallStatus();
     } else {
       status = const HostFirewallStatus(
@@ -1469,13 +1475,13 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// the UI reflects what actually happened, not what was requested.
   Future<FirewallActionResult> setHostFirewallEnabled(bool enable) async {
     FirewallActionResult result;
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       result = await _runMacAdminCommand(
           '$_macFirewallTool --setglobalstate ${enable ? 'on' : 'off'}');
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       result = await _runNetshElevated(
           ['advfirewall', 'set', 'allprofiles', 'state', enable ? 'on' : 'off']);
-    } else if (Platform.isLinux) {
+    } else if (PlatformInfo.isLinux) {
       result = await _setLinuxFirewallEnabled(enable);
     } else {
       result = const FirewallActionResult(
@@ -1514,10 +1520,10 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// Quick action: block all incoming connections.
   Future<FirewallActionResult> setBlockAllIncoming(bool enable) async {
     FirewallActionResult result;
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       result = await _runMacAdminCommand(
           '$_macFirewallTool --setblockall ${enable ? 'on' : 'off'}');
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       result = await _runNetshElevated([
         'advfirewall', 'set', 'allprofiles', 'firewallpolicy',
         enable ? 'blockinboundalways,allowoutbound' : 'blockinbound,allowoutbound',
@@ -1537,7 +1543,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   /// Quick action: stealth mode (only macOS exposes a real toggle).
   Future<FirewallActionResult> setStealthMode(bool enable) async {
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       final result = await _runMacAdminCommand(
           '$_macFirewallTool --setstealthmode ${enable ? 'on' : 'off'}');
       await refreshHostFirewallStatus();
@@ -1546,7 +1552,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
     return FirewallActionResult(
       success: false,
       unsupported: true,
-      message: Platform.isWindows
+      message: PlatformInfo.isWindows
           ? 'Windows Defender Firewall does not respond to unsolicited probes '
               'while enabled; there is no separate stealth toggle.'
           : 'Linux firewalls drop unsolicited probes when enabled; there is '
@@ -1556,7 +1562,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   /// Read macOS stealth mode state (no elevation needed).
   Future<bool?> getMacStealthMode() async {
-    if (!Platform.isMacOS) return null;
+    if (!PlatformInfo.isMacOS) return null;
     try {
       final result = await Process.run(_macFirewallTool, ['--getstealthmode']);
       if (result.exitCode != 0) return null;
@@ -1587,7 +1593,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
     final isBlock = action.toLowerCase() == 'block';
     final isInbound = direction.toLowerCase() != 'outbound';
 
-    if (Platform.isWindows) {
+    if (PlatformInfo.isWindows) {
       final args = [
         'advfirewall', 'firewall', 'add', 'rule',
         'name=$name',
@@ -1611,7 +1617,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
       return _runNetshElevated(args);
     }
 
-    if (Platform.isLinux) {
+    if (PlatformInfo.isLinux) {
       if ((port == null || port.isEmpty) &&
           (remoteAddress == null || remoteAddress.isEmpty)) {
         return const FirewallActionResult(
@@ -1639,7 +1645,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
       return _runPkexec(args);
     }
 
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       if (appPath == null || appPath.isEmpty) {
         return const FirewallActionResult(
           success: false,
@@ -1668,14 +1674,14 @@ class DesktopSecurityProvider extends ChangeNotifier {
     try {
       ProcessResult result;
       String what;
-      if (Platform.isMacOS) {
+      if (PlatformInfo.isMacOS) {
         what = 'System Settings → Network → Firewall';
         result = await Process.run('open',
             ['x-apple.systempreferences:com.apple.preference.security?Firewall']);
-      } else if (Platform.isWindows) {
+      } else if (PlatformInfo.isWindows) {
         what = 'Windows Defender Firewall control panel';
         result = await Process.run('control', ['firewall.cpl'], runInShell: true);
-      } else if (Platform.isLinux) {
+      } else if (PlatformInfo.isLinux) {
         what = 'GUFW firewall settings';
         result = await Process.run('gufw', []);
       } else {
@@ -1723,9 +1729,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     HostCollection collection;
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       collection = await _macosScanner.collectNetworkConnections();
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       collection = await _windowsScanner.collectNetworkConnections();
     } else {
       collection = await _linuxScanner.collectNetworkConnections();
@@ -1802,9 +1808,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     HostCollection collection;
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       collection = await _macosScanner.collectBrowserExtensions();
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       collection = await _windowsScanner.collectBrowserExtensions();
     } else {
       collection = await _linuxScanner.collectBrowserExtensions();
@@ -1857,7 +1863,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// Verify code signatures of executables referenced by the last
   /// persistence scan (plus /Applications bundles on macOS), LOCALLY.
   Future<void> verifyLocalCodeSigning({int maxItems = 50}) async {
-    if (Platform.isLinux) {
+    if (PlatformInfo.isLinux) {
       _codeSigningUnavailableReason =
           'Linux has no platform code-signing infrastructure for arbitrary '
           'executables (no Authenticode/codesign equivalent). Package '
@@ -1866,7 +1872,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (!Platform.isMacOS && !Platform.isWindows) {
+    if (!PlatformInfo.isMacOS && !PlatformInfo.isWindows) {
       _codeSigningUnavailableReason =
           'Local code-signing verification is desktop-only';
       _localSignedApps = [];
@@ -1884,12 +1890,12 @@ class DesktopSecurityProvider extends ChangeNotifier {
     for (final item in _items) {
       final exe = _extractExecutablePath(item.command);
       if (exe == null) continue;
-      final looksAbsolute = Platform.isWindows
+      final looksAbsolute = PlatformInfo.isWindows
           ? RegExp(r'^[A-Za-z]:[\\/]').hasMatch(exe)
           : exe.startsWith('/');
       if (looksAbsolute) candidates.add(exe);
     }
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       try {
         await for (final e in Directory('/Applications').list()) {
           if (e is Directory && e.path.endsWith('.app')) candidates.add(e.path);
@@ -1902,7 +1908,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
     final results = <Map<String, dynamic>>[];
     for (final path in candidates.take(maxItems)) {
-      if (Platform.isMacOS) {
+      if (PlatformInfo.isMacOS) {
         final r = await _verifyMacCodeSigning(path);
         if (r != null) results.add(r);
       } else {
@@ -2027,7 +2033,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
 
   Future<String> _computeSha256(String path) async {
     ProcessResult result;
-    if (Platform.isWindows) {
+    if (PlatformInfo.isWindows) {
       result = await Process.run(
           'certutil', ['-hashfile', path, 'SHA256'],
           runInShell: true);
@@ -2045,12 +2051,12 @@ class DesktopSecurityProvider extends ChangeNotifier {
     }
     // macOS bundles: hash the main binary inside the bundle.
     var target = path;
-    if (Platform.isMacOS && path.endsWith('.app')) {
+    if (PlatformInfo.isMacOS && path.endsWith('.app')) {
       final name = path.split('/').last.replaceAll('.app', '');
       final mainBinary = File('$path/Contents/MacOS/$name');
       if (await mainBinary.exists()) target = mainBinary.path;
     }
-    result = Platform.isMacOS
+    result = PlatformInfo.isMacOS
         ? await Process.run('shasum', ['-a', '256', target])
         : await Process.run('sha256sum', [target]);
     if (result.exitCode != 0) {

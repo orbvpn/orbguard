@@ -28,7 +28,7 @@ library;
 ///     and set aps-environment=production in Runner.entitlements.
 
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 // --- FIREBASE BLOCK: imports ---
 import 'package:firebase_core/firebase_core.dart';
@@ -75,6 +75,14 @@ class DevicePushService {
   /// Safe to call on every app start (idempotent).
   Future<void> init() async {
     if (_initialized) return;
+    if (PlatformInfo.isWeb) {
+      developer.log(
+        'push disabled on web: FCM wake-ups require a native platform '
+        '(no Firebase web config in this build).',
+        name: _logName,
+      );
+      return;
+    }
     if (!kFirebaseEnabled) {
       developer.log(
         'push disabled (kFirebaseEnabled=false): Firebase Cloud Messaging is '
@@ -104,11 +112,11 @@ class DevicePushService {
       return true;
     }
     try {
-      final platform = Platform.isIOS
+      final platform = PlatformInfo.isIOS
           ? 'ios'
-          : Platform.isAndroid
+          : PlatformInfo.isAndroid
               ? 'android'
-              : Platform.operatingSystem;
+              : PlatformInfo.operatingSystem;
       final ok = await _api.registerPushToken(token, platform: platform);
       if (ok) {
         _lastRegisteredToken = token;
@@ -167,7 +175,7 @@ class DevicePushService {
 
     // iOS: ensure an APNs token exists before asking for the FCM token,
     // otherwise getToken() can return null on a cold start.
-    if (Platform.isIOS) {
+    if (PlatformInfo.isIOS) {
       await messaging.getAPNSToken();
     }
 

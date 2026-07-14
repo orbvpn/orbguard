@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -89,6 +89,16 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
+    // Web: flutter_local_notifications has no browser implementation. Mark
+    // the service initialized-but-disabled so every show* entry point
+    // (they all check _suppressed()) is an honest no-op instead of a
+    // MissingPluginException.
+    if (PlatformInfo.isWeb) {
+      _enabled = false;
+      _initialized = true;
+      return;
+    }
+
     // Load settings
     await _loadSettings();
 
@@ -113,7 +123,7 @@ class NotificationService {
     );
 
     // Create Android notification channels
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       await _createAndroidChannels();
     }
 
@@ -122,7 +132,7 @@ class NotificationService {
 
   /// Request notification permissions
   Future<bool> requestPermissions() async {
-    if (Platform.isIOS) {
+    if (PlatformInfo.isIOS) {
       final result = await _notifications
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
@@ -133,7 +143,7 @@ class NotificationService {
             critical: _criticalAlertsEnabled,
           );
       return result ?? false;
-    } else if (Platform.isAndroid) {
+    } else if (PlatformInfo.isAndroid) {
       final result = await _notifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
@@ -145,7 +155,7 @@ class NotificationService {
 
   /// Check if permissions are granted
   Future<bool> hasPermissions() async {
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       final result = await _notifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
@@ -514,17 +524,19 @@ class NotificationService {
 
   /// Cancel notification by ID
   Future<void> cancel(int id) async {
+    if (PlatformInfo.isWeb) return;
     await _notifications.cancel(id);
   }
 
   /// Cancel all notifications
   Future<void> cancelAll() async {
+    if (PlatformInfo.isWeb) return;
     await _notifications.cancelAll();
   }
 
   /// Update badge count (iOS)
   Future<void> updateBadgeCount(int count) async {
-    if (Platform.isIOS) {
+    if (PlatformInfo.isIOS) {
       // Badge is set via notification, or use a dedicated package
     }
   }

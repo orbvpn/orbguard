@@ -9,7 +9,7 @@
 // - Dependency risk scoring
 
 import 'dart:async';
-import 'dart:io' show Platform;
+import '../../utils/platform_info.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
@@ -422,7 +422,7 @@ class SupplyChainMonitorService {
 
   /// Scan an installed app for dependencies
   Future<DependencyScanResult> scanApp(String packageName) async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!PlatformInfo.isAndroid && !PlatformInfo.isIOS) {
       throw UnsupportedError('Supply chain scanning only supported on mobile');
     }
 
@@ -751,7 +751,7 @@ class SupplyChainMonitorService {
   Future<List<DependencyScanResult>> scanAllApps({
     bool userAppsOnly = true,
   }) async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       throw UnsupportedError('Full app scan only supported on Android');
     }
 

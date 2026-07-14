@@ -55,7 +55,6 @@ Icon
 ._*
 
 # Web
-lib/generated_plugin_registrant.dart
 node_modules/
 npm-debug.log
 yarn-error.log

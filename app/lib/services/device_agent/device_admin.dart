@@ -7,7 +7,7 @@
 // been granted. It never fakes success.
 
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:flutter/services.dart';
 
@@ -33,7 +33,7 @@ class DeviceAdminBridge {
   /// granted device-administrator privileges. False (with logging) in every
   /// other case — including when the native channel is simply not wired.
   Future<bool> isAdminActive() async {
-    if (!Platform.isAndroid) return false;
+    if (!PlatformInfo.isAndroid) return false;
     try {
       final active = await _channel.invokeMethod<bool>('isAdminActive');
       return active ?? false;
@@ -55,9 +55,9 @@ class DeviceAdminBridge {
 
   /// Locks the device immediately (DevicePolicyManager.lockNow on Android).
   Future<DeviceAdminResult> lockNow() async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       return DeviceAdminResult.failure(
-        'remote lock is not supported on ${Platform.operatingSystem}',
+        'remote lock is not supported on ${PlatformInfo.operatingSystem}',
       );
     }
     try {
@@ -81,9 +81,9 @@ class DeviceAdminBridge {
 
   /// Factory-resets the device (DevicePolicyManager.wipeData on Android).
   Future<DeviceAdminResult> wipe({bool wipeSdCard = false}) async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       return DeviceAdminResult.failure(
-        'remote wipe is not supported on ${Platform.operatingSystem}',
+        'remote wipe is not supported on ${PlatformInfo.operatingSystem}',
       );
     }
     try {

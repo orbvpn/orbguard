@@ -1,7 +1,7 @@
 // Forensics Screen
 // iOS/Android forensic analysis for Pegasus/spyware detection
 
-import 'dart:io';
+import '../../utils/platform_info.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
@@ -116,7 +116,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           const SizedBox(height: 12),
 
           // Platform-specific options
-          if (Platform.isIOS) ...[
+          if (PlatformInfo.isIOS) ...[
             _buildAnalysisButton(
               icon: 'power',
               title: 'Shutdown Log Analysis',
@@ -159,7 +159,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                         upload: provider.uploadSysdiagnose,
                       ),
             ),
-          ] else if (Platform.isAndroid) ...[
+          ] else if (PlatformInfo.isAndroid) ...[
             _buildAnalysisButton(
               icon: 'clipboard_text',
               title: 'Capture & Analyze Logs',
@@ -1075,7 +1075,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     final path = picked?.files.single.path;
     if (path == null) return; // user cancelled
 
-    final lowerName = path.split(Platform.pathSeparator).last.toLowerCase();
+    final lowerName = path.split(PlatformInfo.pathSeparator).last.toLowerCase();
     final accepted =
         serverAcceptedSuffixes.any((suffix) => lowerName.endsWith(suffix));
     if (!accepted) {

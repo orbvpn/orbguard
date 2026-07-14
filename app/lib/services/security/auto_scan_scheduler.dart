@@ -40,6 +40,10 @@ class AutoScanScheduler {
   Future<void> runIfDue() async {
     if (_running) return;
 
+    // Device scanning needs native platform access (MethodChannels, file
+    // system) — none of it exists in the browser sandbox.
+    if (kIsWeb) return;
+
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool('scan_auto') ?? true)) return;
 

@@ -11,7 +11,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:geolocator/geolocator.dart';
 
@@ -122,7 +122,7 @@ class LocationReporter {
       'speed': position.speed,
       'bearing': position.heading,
       'provider':
-          providerOverride ?? (Platform.isAndroid ? 'fused' : 'gps'),
+          providerOverride ?? (PlatformInfo.isAndroid ? 'fused' : 'gps'),
       'timestamp': position.timestamp.toUtc().toIso8601String(),
     };
   }

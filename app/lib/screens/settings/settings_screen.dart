@@ -2,6 +2,7 @@
 // Main settings and configuration screen
 
 import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +17,7 @@ import '../../presentation/widgets/theme_mode_selector.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
+import '../../services/security/desktop_scan_config.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -129,7 +131,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               // Desktop Security (only show on desktop platforms)
-              if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+              if (PlatformInfo.isMacOS || PlatformInfo.isWindows || PlatformInfo.isLinux)
                 _buildSettingsSection(
                   context,
                   'Desktop Security',
@@ -162,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-              if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+              if (PlatformInfo.isMacOS || PlatformInfo.isWindows || PlatformInfo.isLinux)
                 const SizedBox(height: 24),
               // Privacy
               _buildSettingsSection(
@@ -1617,6 +1619,43 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
   int _scanIntervalHours = 24;
 
   @override
+  void initState() {
+    super.initState();
+    DesktopScanConfig.load().then((c) {
+      if (!mounted) return;
+      setState(() {
+        _autoScanOnStartup = c.autoScanOnStartup;
+        _scanIntervalHours = c.scanIntervalHours;
+        _scanLaunchAgents = c.scanLaunchAgents;
+        _scanLaunchDaemons = c.scanLaunchDaemons;
+        _scanLoginItems = c.scanLoginItems;
+        _scanKernelExtensions = c.scanKernelExtensions;
+        _scanBrowserExtensions = c.scanBrowserExtensions;
+        _scanCronJobs = c.scanCronJobs;
+        _deepScan = c.deepScan;
+        _hashVerification = c.hashVerification;
+      });
+    });
+  }
+
+  /// Apply a change and persist the whole config so the scanner honors it.
+  void _setAndSave(VoidCallback change) {
+    setState(change);
+    DesktopScanConfig(
+      autoScanOnStartup: _autoScanOnStartup,
+      scanIntervalHours: _scanIntervalHours,
+      scanLaunchAgents: _scanLaunchAgents,
+      scanLaunchDaemons: _scanLaunchDaemons,
+      scanLoginItems: _scanLoginItems,
+      scanKernelExtensions: _scanKernelExtensions,
+      scanBrowserExtensions: _scanBrowserExtensions,
+      scanCronJobs: _scanCronJobs,
+      deepScan: _deepScan,
+      hashVerification: _hashVerification,
+    ).save();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Persistence Scanner',
@@ -1651,7 +1690,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
             'Auto Scan on Startup',
             'Scan when app launches',
             _autoScanOnStartup,
-            (v) => setState(() => _autoScanOnStartup = v),
+            (v) => _setAndSave(() => _autoScanOnStartup = v),
           ),
           if (_autoScanOnStartup) ...[
             const SizedBox(height: 8),
@@ -1677,7 +1716,7 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
                       DropdownMenuItem(value: 24, child: Text('Daily')),
                       DropdownMenuItem(value: 168, child: Text('Weekly')),
                     ],
-                    onChanged: (v) => setState(() => _scanIntervalHours = v ?? 24),
+                    onChanged: (v) => _setAndSave(() => _scanIntervalHours = v ?? 24),
                   ),
                 ],
               ),
@@ -1691,37 +1730,37 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
             'Launch Agents',
             'User and system launch agents',
             _scanLaunchAgents,
-            (v) => setState(() => _scanLaunchAgents = v),
+            (v) => _setAndSave(() => _scanLaunchAgents = v),
           ),
           _buildSwitchTile(
             'Launch Daemons',
             'System launch daemons',
             _scanLaunchDaemons,
-            (v) => setState(() => _scanLaunchDaemons = v),
+            (v) => _setAndSave(() => _scanLaunchDaemons = v),
           ),
           _buildSwitchTile(
             'Login Items',
             'Apps that open at login',
             _scanLoginItems,
-            (v) => setState(() => _scanLoginItems = v),
+            (v) => _setAndSave(() => _scanLoginItems = v),
           ),
           _buildSwitchTile(
             'Kernel Extensions',
             'System extensions and drivers',
             _scanKernelExtensions,
-            (v) => setState(() => _scanKernelExtensions = v),
+            (v) => _setAndSave(() => _scanKernelExtensions = v),
           ),
           _buildSwitchTile(
             'Browser Extensions',
             'Safari, Chrome, Firefox extensions',
             _scanBrowserExtensions,
-            (v) => setState(() => _scanBrowserExtensions = v),
+            (v) => _setAndSave(() => _scanBrowserExtensions = v),
           ),
           _buildSwitchTile(
             'Cron Jobs',
             'Scheduled tasks',
             _scanCronJobs,
-            (v) => setState(() => _scanCronJobs = v),
+            (v) => _setAndSave(() => _scanCronJobs = v),
           ),
           const SizedBox(height: 24),
 
@@ -1731,13 +1770,13 @@ class _DesktopScannerSettingsScreenState extends State<DesktopScannerSettingsScr
             'Deep Scan',
             'More thorough scanning (slower)',
             _deepScan,
-            (v) => setState(() => _deepScan = v),
+            (v) => _setAndSave(() => _deepScan = v),
           ),
           _buildSwitchTile(
             'Hash Verification',
             'Compute file hashes for threat intel',
             _hashVerification,
-            (v) => setState(() => _hashVerification = v),
+            (v) => _setAndSave(() => _hashVerification = v),
           ),
         ],
       ),
@@ -1784,9 +1823,9 @@ class DesktopPermissionsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           // Platform-specific permissions
-          if (Platform.isMacOS) ..._buildMacOSPermissions(context),
-          if (Platform.isLinux) ..._buildLinuxPermissions(context),
-          if (Platform.isWindows) ..._buildWindowsPermissions(context),
+          if (PlatformInfo.isMacOS) ..._buildMacOSPermissions(context),
+          if (PlatformInfo.isLinux) ..._buildLinuxPermissions(context),
+          if (PlatformInfo.isWindows) ..._buildWindowsPermissions(context),
         ],
       ),
     );

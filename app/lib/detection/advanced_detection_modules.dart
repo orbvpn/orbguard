@@ -2,7 +2,7 @@
 // Location: lib/detection/
 
 import 'dart:async';
-import 'dart:io';
+import '../utils/platform_info.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -561,7 +561,7 @@ class RootingMalwareDetector {
     final threats = <Map<String, dynamic>>[];
 
     // Check for suspicious root binaries
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isAndroid) {
       final rootBinaries = await _checkSuspiciousRootBinaries();
       threats.addAll(rootBinaries);
 
@@ -570,7 +570,7 @@ class RootingMalwareDetector {
       threats.addAll(modifiedFiles);
     }
 
-    if (Platform.isIOS) {
+    if (PlatformInfo.isIOS) {
       // Check for malicious jailbreak tweaks
       final maliciousTweaks = await _checkMaliciousTweaks();
       threats.addAll(maliciousTweaks);

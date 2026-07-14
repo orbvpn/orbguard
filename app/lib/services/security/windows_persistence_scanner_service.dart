@@ -16,6 +16,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../utils/platform_info.dart';
+import 'desktop_scan_config.dart';
 
 import 'desktop_host_collector.dart';
 
@@ -239,8 +241,10 @@ class WindowsPersistenceScannerService {
   /// Run full Windows persistence scan
   Future<WindowsScanResult> runFullScan({
     void Function(String phase, double progress)? onProgress,
+    DesktopScanConfig? config,
   }) async {
-    if (!Platform.isWindows) {
+    final cfg = config ?? const DesktopScanConfig();
+    if (!PlatformInfo.isWindows) {
       return WindowsScanResult(
         scannedAt: DateTime.now(),
         scanDuration: Duration.zero,
@@ -327,8 +331,10 @@ class WindowsPersistenceScannerService {
       items.addAll(await _scanActiveSetup());
 
       // Compute file hashes for suspicious items
-      onProgress?.call('Computing file hashes...', 0.97);
-      await _computeHashes(items);
+if (cfg.hashVerification) {
+        onProgress?.call('Computing file hashes...', 0.97);
+        await _computeHashes(items);
+      }
 
       // Analyze all items
       onProgress?.call('Analyzing results...', 0.99);
@@ -519,8 +525,8 @@ class WindowsPersistenceScannerService {
     final items = <WindowsPersistenceItem>[];
 
     final startupPaths = [
-      Platform.environment['APPDATA'] != null
-          ? '${Platform.environment['APPDATA']}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup'
+      PlatformInfo.environment['APPDATA'] != null
+          ? '${PlatformInfo.environment['APPDATA']}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup'
           : null,
       'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup',
     ].whereType<String>();
@@ -590,7 +596,7 @@ class WindowsPersistenceScannerService {
   /// Scan browser extensions
   Future<List<WindowsPersistenceItem>> _scanBrowserExtensions() async {
     final items = <WindowsPersistenceItem>[];
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
+    final userProfile = PlatformInfo.environment['USERPROFILE'] ?? '';
 
     // Chrome extensions
     final chromePath = '$userProfile\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions';
@@ -1146,7 +1152,7 @@ class WindowsPersistenceScannerService {
   /// Scan Microsoft Office Add-ins
   Future<List<WindowsPersistenceItem>> _scanOfficeAddins() async {
     final items = <WindowsPersistenceItem>[];
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
+    final userProfile = PlatformInfo.environment['USERPROFILE'] ?? '';
 
     // Office add-in locations
     final addinPaths = [
@@ -1245,8 +1251,8 @@ class WindowsPersistenceScannerService {
   /// Scan PowerShell Profiles
   Future<List<WindowsPersistenceItem>> _scanPowerShellProfiles() async {
     final items = <WindowsPersistenceItem>[];
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
-    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    final userProfile = PlatformInfo.environment['USERPROFILE'] ?? '';
+    final systemRoot = PlatformInfo.environment['SystemRoot'] ?? r'C:\Windows';
 
     // PowerShell profile locations
     final profilePaths = [
@@ -1478,8 +1484,8 @@ class WindowsPersistenceScannerService {
   /// Collect browser extensions installed in this PC's browser profiles
   /// (Chrome, Edge, Brave, Firefox).
   Future<HostCollection> collectBrowserExtensions() async {
-    final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
-    final appData = Platform.environment['APPDATA'] ?? '';
+    final localAppData = PlatformInfo.environment['LOCALAPPDATA'] ?? '';
+    final appData = PlatformInfo.environment['APPDATA'] ?? '';
     final chromium = await collectChromiumExtensions({
       if (localAppData.isNotEmpty) ...{
         'Chrome': '$localAppData\\Google\\Chrome\\User Data',

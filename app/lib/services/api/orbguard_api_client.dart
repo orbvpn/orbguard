@@ -4,10 +4,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import '../../utils/platform_info.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 import 'api_interceptors.dart';
@@ -87,7 +90,24 @@ class OrbGuardApiClient {
       // App version is optional metadata; registration proceeds without it.
     }
 
-    if (Platform.isAndroid) {
+    if (PlatformInfo.isWeb) {
+      // Browsers expose no hardware ID, so a random install ID is generated
+      // once and persisted (localStorage via SharedPreferences). This lets
+      // the browser register like any other device and get an api_key, which
+      // is what the HTTPS threat-intelligence endpoints authenticate with.
+      final browser = await deviceInfo.webBrowserInfo;
+      return {
+        'device_id': await _webInstallId(),
+        'device_name': 'OrbGuard Web (${browser.browserName.name})',
+        'platform': 'web',
+        'os_version': browser.platform ?? '',
+        'app_version': appVersion,
+        'model': browser.browserName.name,
+        'manufacturer': browser.vendor ?? '',
+      };
+    }
+
+    if (PlatformInfo.isAndroid) {
       final info = await deviceInfo.androidInfo;
       return {
         'device_id': info.id,
@@ -98,7 +118,7 @@ class OrbGuardApiClient {
         'model': info.model,
         'manufacturer': info.manufacturer,
       };
-    } else if (Platform.isIOS) {
+    } else if (PlatformInfo.isIOS) {
       final info = await deviceInfo.iosInfo;
       return {
         'device_id': info.identifierForVendor ?? '',
@@ -109,7 +129,7 @@ class OrbGuardApiClient {
         'model': info.model,
         'manufacturer': 'Apple',
       };
-    } else if (Platform.isMacOS) {
+    } else if (PlatformInfo.isMacOS) {
       final info = await deviceInfo.macOsInfo;
       return {
         'device_id': info.systemGUID ?? '',
@@ -120,7 +140,7 @@ class OrbGuardApiClient {
         'model': info.model,
         'manufacturer': 'Apple',
       };
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       final info = await deviceInfo.windowsInfo;
       return {
         'device_id': info.deviceId,
@@ -131,7 +151,7 @@ class OrbGuardApiClient {
         'model': info.productName,
         'manufacturer': '',
       };
-    } else if (Platform.isLinux) {
+    } else if (PlatformInfo.isLinux) {
       final info = await deviceInfo.linuxInfo;
       return {
         'device_id': info.machineId ?? '',
@@ -146,13 +166,31 @@ class OrbGuardApiClient {
 
     return {
       'device_id': '',
-      'device_name': Platform.localHostname,
-      'platform': Platform.operatingSystem,
-      'os_version': Platform.operatingSystemVersion,
+      'device_name': PlatformInfo.localHostname,
+      'platform': PlatformInfo.operatingSystem,
+      'os_version': PlatformInfo.operatingSystemVersion,
       'app_version': appVersion,
       'model': '',
       'manufacturer': '',
     };
+  }
+
+  /// Stable per-browser-install device ID: generated once with a secure RNG
+  /// and persisted, so re-registration on every page load is avoided.
+  Future<String> _webInstallId() async {
+    const key = 'orbguard_web_install_id';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getString(key);
+      if (existing != null && existing.isNotEmpty) return existing;
+      final rng = Random.secure();
+      final id = 'web-${List.generate(16, (_) => rng.nextInt(16).toRadixString(16)).join()}';
+      await prefs.setString(key, id);
+      return id;
+    } catch (_) {
+      // Storage unavailable (private mode) — session-scoped fallback.
+      return 'web-${DateTime.now().millisecondsSinceEpoch}';
+    }
   }
 
   /// Persist the credentials returned by POST /api/v1/auth/device:
@@ -528,13 +566,13 @@ class OrbGuardApiClient {
         'device_id': _authInterceptor.deviceId ?? '',
       };
 
-      if (Platform.isAndroid) {
+      if (PlatformInfo.isAndroid) {
         final info = await deviceInfo.androidInfo;
         payload['platform'] = 'android';
         payload['os_version'] = info.version.release;
         payload['security_patch'] = info.version.securityPatch ?? '';
         payload['api_level'] = info.version.sdkInt;
-      } else if (Platform.isIOS) {
+      } else if (PlatformInfo.isIOS) {
         final info = await deviceInfo.iosInfo;
         payload['platform'] = 'ios';
         payload['os_version'] = info.systemVersion;
@@ -575,7 +613,7 @@ class OrbGuardApiClient {
         ApiEndpoints.devicePushToken(_requiredDeviceId),
         data: {
           'token': token,
-          'platform': platform ?? Platform.operatingSystem,
+          'platform': platform ?? PlatformInfo.operatingSystem,
         },
       );
       return true;
@@ -687,7 +725,7 @@ class OrbGuardApiClient {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
           filePath,
-          filename: filePath.split(Platform.pathSeparator).last,
+          filename: filePath.split(PlatformInfo.pathSeparator).last,
         ),
         'device_id': id,
       });

@@ -1,7 +1,7 @@
 // Privacy Provider
 // State management for privacy protection: camera/mic monitoring, clipboard, trackers
 
-import 'dart:io';
+import '../utils/platform_info.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -449,15 +449,15 @@ class PrivacyProvider extends ChangeNotifier {
   Future<String?> _resolveDeviceId() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
+      if (PlatformInfo.isAndroid) {
         return (await deviceInfo.androidInfo).id;
-      } else if (Platform.isIOS) {
+      } else if (PlatformInfo.isIOS) {
         return (await deviceInfo.iosInfo).identifierForVendor;
-      } else if (Platform.isMacOS) {
+      } else if (PlatformInfo.isMacOS) {
         return (await deviceInfo.macOsInfo).systemGUID;
-      } else if (Platform.isWindows) {
+      } else if (PlatformInfo.isWindows) {
         return (await deviceInfo.windowsInfo).deviceId;
-      } else if (Platform.isLinux) {
+      } else if (PlatformInfo.isLinux) {
         return (await deviceInfo.linuxInfo).machineId;
       }
     } catch (e) {

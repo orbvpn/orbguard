@@ -1,7 +1,7 @@
 // App Security Provider
 // State management for app security and privacy analysis
 
-import 'dart:io';
+import '../utils/platform_info.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -221,7 +221,7 @@ class AppSecurityProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       _apps.clear();
       _updateStats();
       _error =

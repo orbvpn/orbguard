@@ -10,7 +10,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import '../../utils/platform_info.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -814,7 +814,7 @@ class ThreatHuntingService {
   Future<List<Map<String, dynamic>>> _getInstalledApps() async {
     if (_installedAppsCache != null) return _installedAppsCache!;
 
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       throw _CapabilityUnavailable(
           'Installed-app inventory is only available on Android');
     }

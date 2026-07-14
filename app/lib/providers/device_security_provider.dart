@@ -9,7 +9,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../utils/platform_info.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -449,6 +449,14 @@ class DeviceSecurityProvider extends ChangeNotifier {
   /// Initialize provider: register the device, load all device-security
   /// state and start the on-device agent.
   Future<void> init() async {
+    if (PlatformInfo.isWeb) {
+      // Anti-theft (locate/lock/wipe/ring/selfie, SIM monitoring) needs a
+      // real device agent — none of it can run in a browser sandbox.
+      _error = 'Device security / anti-theft is not available in the browser. '
+          'Use the OrbGuard mobile or desktop app.';
+      notifyListeners();
+      return;
+    }
     if (_initialized) {
       // Re-entered from screen initState; refresh quietly.
       unawaited(refreshAll());
@@ -527,7 +535,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
     final info = <String, dynamic>{'device_id': id};
     final deviceInfo = DeviceInfoPlugin();
     try {
-      if (Platform.isAndroid) {
+      if (PlatformInfo.isAndroid) {
         final a = await deviceInfo.androidInfo;
         info.addAll({
           'name': '${a.manufacturer} ${a.model}',
@@ -539,7 +547,7 @@ class DeviceSecurityProvider extends ChangeNotifier {
           'api_level': a.version.sdkInt,
         });
         info['is_rooted'] = await _checkRootedAndroid();
-      } else if (Platform.isIOS) {
+      } else if (PlatformInfo.isIOS) {
         final i = await deviceInfo.iosInfo;
         info.addAll({
           'name': i.name,
@@ -550,9 +558,9 @@ class DeviceSecurityProvider extends ChangeNotifier {
         });
       } else {
         info.addAll({
-          'name': Platform.localHostname,
-          'platform': Platform.operatingSystem,
-          'os_version': Platform.operatingSystemVersion,
+          'name': PlatformInfo.localHostname,
+          'platform': PlatformInfo.operatingSystem,
+          'os_version': PlatformInfo.operatingSystemVersion,
         });
       }
     } catch (e) {

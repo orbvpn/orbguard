@@ -17,6 +17,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../utils/platform_info.dart';
+import 'desktop_scan_config.dart';
 
 import 'desktop_host_collector.dart';
 
@@ -237,8 +239,10 @@ class LinuxPersistenceScannerService {
   /// Run full Linux persistence scan
   Future<LinuxScanResult> runFullScan({
     void Function(String phase, double progress)? onProgress,
+    DesktopScanConfig? config,
   }) async {
-    if (!Platform.isLinux) {
+    final cfg = config ?? const DesktopScanConfig();
+    if (!PlatformInfo.isLinux) {
       return LinuxScanResult(
         scannedAt: DateTime.now(),
         scanDuration: Duration.zero,
@@ -341,8 +345,10 @@ class LinuxPersistenceScannerService {
       items.addAll(await _scanTcpWrappers());
 
       // Compute file hashes for suspicious items
-      onProgress?.call('Computing file hashes...', 0.97);
-      await _computeHashes(items);
+      if (cfg.hashVerification) {
+        onProgress?.call('Computing file hashes...', 0.97);
+        await _computeHashes(items);
+      }
 
       onProgress?.call('Analyzing results...', 0.99);
 
@@ -377,7 +383,7 @@ class LinuxPersistenceScannerService {
     ];
 
     // User services
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
     final userPath = '$home/.config/systemd/user';
 
     for (final basePath in [...systemPaths, userPath]) {
@@ -599,7 +605,7 @@ class LinuxPersistenceScannerService {
   /// Scan shell RC files
   Future<List<LinuxPersistenceItem>> _scanShellRcFiles() async {
     final items = <LinuxPersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     final rcFiles = [
       '$home/.bashrc',
@@ -651,7 +657,7 @@ class LinuxPersistenceScannerService {
   /// Scan XDG autostart
   Future<List<LinuxPersistenceItem>> _scanXdgAutostart() async {
     final items = <LinuxPersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     final autostartPaths = [
       '$home/.config/autostart',
@@ -776,7 +782,7 @@ class LinuxPersistenceScannerService {
     }
 
     // Check environment
-    final ldPreloadEnv = Platform.environment['LD_PRELOAD'];
+    final ldPreloadEnv = PlatformInfo.environment['LD_PRELOAD'];
     if (ldPreloadEnv != null && ldPreloadEnv.isNotEmpty) {
       items.add(LinuxPersistenceItem(
         id: 'ldpreload_env',
@@ -794,7 +800,7 @@ class LinuxPersistenceScannerService {
   /// Scan SSH authorized keys
   Future<List<LinuxPersistenceItem>> _scanSshKeys() async {
     final items = <LinuxPersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     try {
       final authKeys = File('$home/.ssh/authorized_keys');
@@ -1079,7 +1085,7 @@ class LinuxPersistenceScannerService {
   /// Scan desktop entries (autostart)
   Future<List<LinuxPersistenceItem>> _scanDesktopEntries() async {
     final items = <LinuxPersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     final desktopPaths = [
       '$home/.local/share/applications',
@@ -1140,7 +1146,7 @@ class LinuxPersistenceScannerService {
   /// Scan D-Bus services
   Future<List<LinuxPersistenceItem>> _scanDbusServices() async {
     final items = <LinuxPersistenceItem>[];
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
 
     final dbusPaths = [
       '$home/.local/share/dbus-1/services',
@@ -1566,7 +1572,7 @@ class LinuxPersistenceScannerService {
   /// (Chrome, Chromium, Brave, Edge, Firefox — including snap/flatpak
   /// Firefox locations).
   Future<HostCollection> collectBrowserExtensions() async {
-    final home = Platform.environment['HOME'] ?? '';
+    final home = PlatformInfo.environment['HOME'] ?? '';
     final chromium = await collectChromiumExtensions({
       'Chrome': '$home/.config/google-chrome',
       'Chromium': '$home/.config/chromium',

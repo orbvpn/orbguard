@@ -1,7 +1,7 @@
 // lib/main.dart - OrbGuard with iOS 26 Liquid Glass Design
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
+import 'utils/platform_info.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -118,7 +118,9 @@ void main() async {
   // once the device is registered) handles foreground messages + token
   // registration. Guarded so a missing/invalid Firebase config never blocks
   // app startup — the device agent still works via HTTP polling.
-  if (kFirebaseEnabled) {
+  // Web: background isolates/FCM background handlers don't exist in the
+  // browser sandbox — skip registration entirely.
+  if (kFirebaseEnabled && !PlatformInfo.isWeb) {
     try {
       FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
     } catch (_) {
@@ -323,6 +325,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _calculateDetectionCapability() async {
+    // Browser sandbox: no device permissions, MethodChannels or scanning —
+    // report the honest base capability instead of probing unavailable
+    // plugins.
+    if (PlatformInfo.isWeb) {
+      setState(() => _detectionCapability = 25.0);
+      return;
+    }
+
     // Base capability from standard APIs
     double capability = 25.0;
 
@@ -723,7 +733,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Scan tab content
   Widget _buildScanContent() {
     // On desktop platforms, show the DesktopSecurityScreen directly (embedded mode)
-    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    if (PlatformInfo.isMacOS || PlatformInfo.isWindows || PlatformInfo.isLinux) {
       return const DesktopSecurityScreen(embedded: true);
     }
 

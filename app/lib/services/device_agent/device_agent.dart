@@ -25,7 +25,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
@@ -558,8 +558,8 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
 
         case 'get_status':
           detail = jsonEncode({
-            'platform': Platform.operatingSystem,
-            'os_version': Platform.operatingSystemVersion,
+            'platform': PlatformInfo.operatingSystem,
+            'os_version': PlatformInfo.operatingSystemVersion,
             'agent_running': true,
             'remote_locate_enabled': _policy.remoteLocateEnabled,
             'sim_alert_enabled': _policy.simAlertEnabled,
@@ -621,9 +621,9 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
   // -------------------------------------------------------------------
 
   Future<void> _registerBackgroundTask() async {
-    if (!Platform.isAndroid) {
+    if (!PlatformInfo.isAndroid) {
       _backgroundStatus =
-          'background polling unavailable on ${Platform.operatingSystem}: '
+          'background polling unavailable on ${PlatformInfo.operatingSystem}: '
           'iOS/desktop background scheduling requires native registration '
           'not present in this build; the agent polls while the app is open '
           'and on every app resume';

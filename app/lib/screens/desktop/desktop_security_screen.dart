@@ -4,6 +4,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +17,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/desktop_security_provider.dart';
+import '../../services/security/desktop_scan_config.dart';
 import '../../services/api/orbguard_api_client.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
@@ -40,12 +42,12 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   Map<String, dynamic>? _browserScanResult;
 
   bool get _isDesktopPlatform =>
-      Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+      PlatformInfo.isMacOS || PlatformInfo.isWindows || PlatformInfo.isLinux;
 
   String _getPlatformName() {
-    if (Platform.isMacOS) return 'macOS';
-    if (Platform.isWindows) return 'Windows';
-    if (Platform.isLinux) return 'Linux';
+    if (PlatformInfo.isMacOS) return 'macOS';
+    if (PlatformInfo.isWindows) return 'Windows';
+    if (PlatformInfo.isLinux) return 'Linux';
     return 'Desktop';
   }
 
@@ -54,8 +56,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     super.initState();
     _loadData();
     if (_isDesktopPlatform) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
         context.read<DesktopSecurityProvider>().init();
+        // Auto-scan on startup when enabled (Desktop Scanner settings).
+        final cfg = await DesktopScanConfig.load();
+        if (cfg.autoScanOnStartup && mounted && !_isScanning) {
+          _runScan();
+        }
       });
     }
   }
@@ -392,7 +400,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   List<Widget> _buildPlatformCoverage() {
-    if (Platform.isMacOS) {
+    if (PlatformInfo.isMacOS) {
       return [
         _buildCoverageRow('play_circle', 'Launch Agents & Daemons', true),
         _buildCoverageRow('user', 'Login Items', true),
@@ -405,7 +413,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         _buildCoverageRow('folder', 'Startup Items', true),
         _buildCoverageRow('settings', 'Spotlight Importers', true),
       ];
-    } else if (Platform.isWindows) {
+    } else if (PlatformInfo.isWindows) {
       return [
         _buildCoverageRow('key', 'Registry Run Keys', true),
         _buildCoverageRow('clock_circle', 'Scheduled Tasks', true),
@@ -418,7 +426,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         _buildCoverageRow('cpu', 'AppInit DLLs & LSA Packages', true),
         _buildCoverageRow('link_round', 'Netsh Helpers & Print Monitors', true),
       ];
-    } else if (Platform.isLinux) {
+    } else if (PlatformInfo.isLinux) {
       return [
         _buildCoverageRow('settings', 'Systemd Services & Timers', true),
         _buildCoverageRow('play_circle', 'Init Scripts & RC Local', true),
@@ -568,9 +576,9 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                           Text(
                             provider.isVerifyingCodeSigning
                                 ? 'Verifying signatures on this device…'
-                                : Platform.isMacOS
+                                : PlatformInfo.isMacOS
                                     ? 'codesign verification of installed apps and persistence executables'
-                                    : Platform.isWindows
+                                    : PlatformInfo.isWindows
                                         ? 'Authenticode verification of persistence executables'
                                         : 'Verification of persistence executables',
                             style: TextStyle(
@@ -821,7 +829,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           _buildQuickAction(
             'forbidden',
             'Block All Incoming',
-            Platform.isLinux
+            PlatformInfo.isLinux
                 ? 'Not supported by ufw/firewalld (incoming is denied by default)'
                 : 'Block all incoming connections at the OS firewall',
             () => _runQuickFirewallAction('block_all'),
@@ -829,7 +837,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           _buildQuickAction(
             'eye_closed',
             'Stealth Mode',
-            Platform.isMacOS
+            PlatformInfo.isMacOS
                 ? 'Do not respond to probes (socketfilterfw stealth mode)'
                 : 'No separate stealth toggle on this OS — enabled firewalls already drop probes',
             () => _runQuickFirewallAction('stealth'),
@@ -1799,7 +1807,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   }
 
   String _getQuarantinePath() {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '~';
+    final home = PlatformInfo.environment['HOME'] ?? PlatformInfo.environment['USERPROFILE'] ?? '~';
     return '$home/.orbguard/quarantine';
   }
 
@@ -2062,7 +2070,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     try {
       final jsonStr = const JsonEncoder.withIndent('  ').convert(results);
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+      final home = PlatformInfo.environment['HOME'] ?? PlatformInfo.environment['USERPROFILE'] ?? '';
       final exportPath = '$home/orbguard_scan_$timestamp.json';
 
       await File(exportPath).writeAsString(jsonStr);
@@ -2076,11 +2084,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               label: 'Open Folder',
               textColor: Brand.onLime,
               onPressed: () {
-                if (Platform.isMacOS) {
+                if (PlatformInfo.isMacOS) {
                   Process.run('open', ['-R', exportPath]);
-                } else if (Platform.isWindows) {
+                } else if (PlatformInfo.isWindows) {
                   Process.run('explorer', ['/select,', exportPath]);
-                } else if (Platform.isLinux) {
+                } else if (PlatformInfo.isLinux) {
                   Process.run('xdg-open', [home]);
                 }
               },
@@ -2512,7 +2520,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
-          final isMacLocal = target == 'local' && Platform.isMacOS;
+          final isMacLocal = target == 'local' && PlatformInfo.isMacOS;
           final dialogBg = dialogContext.isDark
               ? GlassTheme.gradientTop
               : GlassTheme.gradientTopLight;

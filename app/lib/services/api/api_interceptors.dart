@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
+import '../../utils/platform_info.dart';
 
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -82,7 +82,11 @@ class AuthInterceptor extends Interceptor {
 
     // Add common headers
     options.headers['X-Client-Version'] = '1.0.0';
-    options.headers['X-Platform'] = Platform.isIOS ? 'ios' : 'android';
+    options.headers['X-Platform'] = PlatformInfo.isIOS
+        ? 'ios'
+        : PlatformInfo.isWeb
+            ? 'web'
+            : 'android';
 
     handler.next(options);
   }
