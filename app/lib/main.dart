@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
@@ -114,6 +115,21 @@ void main() async {
     } catch (_) {
       // Firebase not configured for this build — polling remains the fallback.
     }
+  }
+
+  // Apply a user-set custom server URL (Settings) before the client inits —
+  // otherwise the setting persists but is silently ignored. Validated + falls
+  // back to the default on empty/malformed input.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final customUrl = prefs.getString('api_url')?.trim();
+    if (customUrl != null &&
+        customUrl.isNotEmpty &&
+        (Uri.tryParse(customUrl)?.hasScheme ?? false)) {
+      ApiConfig.setBaseUrl(customUrl);
+    }
+  } catch (_) {
+    // Prefs unavailable — keep the default base URL.
   }
 
   // Initialize OrbGuard API Client first

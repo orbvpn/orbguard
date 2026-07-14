@@ -111,20 +111,20 @@ import OSLog
             // Basic initialization - always succeed
             result(true)
 
+        // iOS sandboxes third-party apps from other processes' sockets, memory,
+        // process table and data, so these deep stages genuinely cannot run
+        // (short of a jailbreak). Report them UNAVAILABLE so the Dart scan marks
+        // them as skipped/limited rather than silently reporting an all-clear —
+        // returning empty threats here would overstate what was actually scanned.
         case "scanNetwork":
-            // Return empty threats for now
-            DispatchQueue.global(qos: .userInitiated).async {
-                DispatchQueue.main.async {
-                    result(["threats": []])
-                }
-            }
+            result(FlutterError(code: "UNAVAILABLE",
+                message: "Network-connection inspection is not available on iOS (the OS does not expose other processes' sockets to apps).",
+                details: nil))
 
         case "scanProcesses":
-            DispatchQueue.global(qos: .userInitiated).async {
-                DispatchQueue.main.async {
-                    result(["threats": []])
-                }
-            }
+            result(FlutterError(code: "UNAVAILABLE",
+                message: "Running-process inspection is not available on iOS (apps cannot enumerate other processes).",
+                details: nil))
 
         case "scanFileSystem":
             DispatchQueue.global(qos: .userInitiated).async {
@@ -135,18 +135,14 @@ import OSLog
             }
 
         case "scanDatabases":
-            DispatchQueue.global(qos: .userInitiated).async {
-                DispatchQueue.main.async {
-                    result(["threats": []])
-                }
-            }
+            result(FlutterError(code: "UNAVAILABLE",
+                message: "App-database inspection is not available on iOS (apps are sandboxed from each other's data).",
+                details: nil))
 
         case "scanMemory":
-            DispatchQueue.global(qos: .userInitiated).async {
-                DispatchQueue.main.async {
-                    result(["threats": []])
-                }
-            }
+            result(FlutterError(code: "UNAVAILABLE",
+                message: "Memory inspection is not available on iOS without a jailbreak.",
+                details: nil))
 
         case "removeThreat":
             // Threat removal not supported without jailbreak
