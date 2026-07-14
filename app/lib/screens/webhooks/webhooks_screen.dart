@@ -153,7 +153,6 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
               Switch(
                 value: webhook.isEnabled,
                 onChanged: (v) => setState(() => webhook.isEnabled = v),
-                activeThumbColor: GlassTheme.successColor,
               ),
             ],
           ),

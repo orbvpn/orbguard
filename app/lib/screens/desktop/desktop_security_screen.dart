@@ -947,8 +947,6 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 Switch(
                   value: switchValue,
                   onChanged: (v) => _toggleHostFirewall(v),
-                  activeTrackColor: GlassTheme.successColor.withAlpha(128),
-                  activeThumbColor: GlassTheme.successColor,
                 )
               else
                 IconButton(

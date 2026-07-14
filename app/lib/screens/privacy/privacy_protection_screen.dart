@@ -360,7 +360,6 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
@@ -595,7 +594,6 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           Switch(
             value: tracker.isBlocked,
             onChanged: (_) => provider.toggleTrackerBlocking(tracker.id),
-            activeThumbColor: GlassTheme.successColor,
           ),
         ],
       ),

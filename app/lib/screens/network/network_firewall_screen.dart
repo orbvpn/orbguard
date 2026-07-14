@@ -196,7 +196,6 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
             Switch(
               value: provider.isEnabled,
               onChanged: (_) => provider.toggle(),
-              activeThumbColor: GlassTheme.successColor,
             ),
           ],
         ),
@@ -676,7 +675,6 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           Switch(
             value: rule.isEnabled,
             onChanged: (enabled) => provider.toggleRule(rule.id, enabled),
-            activeThumbColor: GlassTheme.primaryAccent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           IconButton(

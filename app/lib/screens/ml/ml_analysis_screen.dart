@@ -347,7 +347,6 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 child: Switch(
                   value: model.isReady,
                   onChanged: null,
-                  activeThumbColor: GlassTheme.successColor,
                 ),
               ),
             ],

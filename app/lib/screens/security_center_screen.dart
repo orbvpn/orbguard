@@ -829,8 +829,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               HapticFeedback.selectionClick();
               onChanged(value);
             },
-            activeTrackColor: AppColors.success.withAlpha(150),
-            activeThumbColor: AppColors.success,
           ),
         ],
       ),

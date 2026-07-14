@@ -182,7 +182,6 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               Switch(
                 value: playbook.isEnabled,
                 onChanged: (v) => setState(() => playbook.isEnabled = v),
-                activeThumbColor: GlassTheme.successColor,
               ),
             ],
           ),

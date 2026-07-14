@@ -452,7 +452,6 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     ),
                     Switch(
                       value: isFrozen,
-                      activeThumbColor: GlassTheme.successColor,
                       onChanged: (value) =>
                           provider.setSelfReportedFreeze(bureau, value),
                     ),

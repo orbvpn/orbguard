@@ -88,6 +88,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
                     // Status card
                     _buildStatusCard(provider),
                     const SizedBox(height: 16),

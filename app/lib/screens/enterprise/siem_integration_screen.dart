@@ -324,8 +324,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
               Switch(
                 value: forwarder.isEnabled,
                 onChanged: (v) => setState(() => forwarder.isEnabled = v),
-                activeTrackColor: GlassTheme.successColor.withAlpha(128),
-                activeThumbColor: GlassTheme.successColor,
               ),
             ],
           ),

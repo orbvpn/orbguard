@@ -285,7 +285,6 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                 Switch(
                   value: source.isEnabled,
                   onChanged: (v) => _toggleSource(source, v),
-                  activeThumbColor: GlassTheme.successColor,
                 ),
             ],
           ),

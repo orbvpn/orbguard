@@ -732,7 +732,6 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                         min: 3,
                         max: 10,
                         divisions: 7,
-                        activeColor: GlassTheme.primaryAccent,
                         inactiveColor: context.colors.outline,
                         onChanged: (v) => provider.updateSettings(
                           settings.copyWith(maxUnlockAttempts: v.toInt()),

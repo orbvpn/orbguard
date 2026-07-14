@@ -1136,7 +1136,6 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: GlassTheme.primaryAccent,
           ),
         ],
       ),
