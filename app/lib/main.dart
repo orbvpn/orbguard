@@ -76,6 +76,11 @@ import 'providers/rogue_ap_provider.dart' show RogueAPProvider;
 import 'providers/enterprise_policy_provider.dart';
 import 'providers/desktop_security_provider.dart';
 import 'providers/device_security_provider.dart';
+import 'providers/dashboard_provider.dart';
+import 'providers/digital_footprint_provider.dart';
+import 'providers/forensics_provider.dart';
+import 'providers/privacy_provider.dart';
+import 'providers/scam_detection_provider.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
@@ -165,6 +170,14 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DesktopSecurityProvider()),
         ChangeNotifierProvider(
             lazy: false, create: (_) => DeviceSecurityProvider()..init()),
+        // These screens read their provider via Consumer/context.read but the
+        // providers were never registered — navigating to them threw
+        // ProviderNotFoundError. Registered here like the rest.
+        ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => DigitalFootprintProvider()),
+        ChangeNotifierProvider(create: (_) => ForensicsProvider()),
+        ChangeNotifierProvider(create: (_) => PrivacyProvider()),
+        ChangeNotifierProvider(create: (_) => ScamDetectionProvider()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) => MaterialApp(
