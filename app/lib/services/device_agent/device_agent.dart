@@ -34,6 +34,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../api/orbguard_api_client.dart';
 import '../notifications/notification_service.dart';
+import '../security/auto_scan_scheduler.dart';
 import 'agent_api.dart';
 import 'device_admin.dart';
 import 'location_reporter.dart';
@@ -708,6 +709,10 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
       agent._running = true;
       await agent._runCycle(api, foreground: false);
       await agent._ringer.stop();
+
+      // Piggyback the automatic security scan on the same background cycle
+      // (self-throttled to the user's scan frequency).
+      await AutoScanScheduler.instance.runIfDue();
       return true;
     } catch (e) {
       developer.log('background cycle failed: $e', name: 'DeviceAgent');

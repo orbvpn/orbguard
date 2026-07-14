@@ -65,7 +65,11 @@ import 'providers/url_provider.dart';
 import 'providers/app_security_provider.dart';
 import 'providers/network_provider.dart';
 import 'providers/darkweb_provider.dart';
+import 'dart:async';
+
 import 'providers/settings_provider.dart';
+import 'services/security/auto_scan_scheduler.dart';
+import 'services/telemetry/telemetry_service.dart';
 import 'providers/mitre_provider.dart';
 import 'providers/identity_protection_provider.dart';
 import 'providers/executive_protection_provider.dart';
@@ -102,6 +106,11 @@ late SpecialPermissionsManager specialPermissions;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize telemetry first so Crashlytics captures startup errors. It
+  // reads the Privacy opt-out toggles and no-ops when they're off (and always
+  // in debug for crash reporting).
+  await TelemetryService.instance.init();
 
   // Register the FCM background/terminated-state handler before runApp so a
   // remote anti-theft command (locate/lock/wipe/ring/selfie) wakes the device
@@ -212,6 +221,11 @@ class AntiSpywareApp extends StatelessWidget {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: settings.themeMode,
+        // Automatic screen-view analytics (no-op when analytics is disabled).
+        navigatorObservers: [
+          if (TelemetryService.instance.navigatorObserver != null)
+            TelemetryService.instance.navigatorObserver!,
+        ],
         builder: (context, child) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
           // Sync the brand token system with the active theme BEFORE any
@@ -280,6 +294,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _checkSystemAccess();
     await _checkAllPermissions();
     await _calculateDetectionCapability();
+    // Foreground catch-up for the automatic scan: runs only if enabled and
+    // due (self-throttled). Covers iOS/desktop where OS background scheduling
+    // is unavailable; on Android the WorkManager cycle also drives it.
+    unawaited(AutoScanScheduler.instance.runIfDue());
   }
 
   Future<void> _checkSystemAccess() async {

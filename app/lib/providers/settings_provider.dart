@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/notifications/notification_service.dart';
+import '../services/telemetry/telemetry_service.dart';
 
 /// Protection feature settings
 class ProtectionSettings {
@@ -466,6 +467,12 @@ class SettingsProvider extends ChangeNotifier {
 
     // Hide-notification-content is enforced by NotificationService.
     await _syncNotificationService();
+
+    // Analytics/crash opt-out toggles gate the telemetry SDKs live.
+    await TelemetryService.instance.applyPrivacySettings(
+      analyticsEnabled: settings.analyticsEnabled,
+      crashEnabled: settings.crashReportingEnabled,
+    );
   }
 
   /// Update scan settings

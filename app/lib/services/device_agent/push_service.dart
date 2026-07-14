@@ -163,7 +163,10 @@ class DevicePushService {
     }
 
     // --- FIREBASE BLOCK ---
-    await Firebase.initializeApp();
+    // Idempotent: telemetry may have already initialized the default app.
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
     final messaging = FirebaseMessaging.instance;
 
     // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
@@ -207,7 +210,9 @@ class DevicePushService {
 ///   FirebaseMessaging.onBackgroundMessage(orbGuardFirebaseBackgroundHandler);
 @pragma('vm:entry-point')
 Future<void> orbGuardFirebaseBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp();
+  }
   // In the background isolate there is no provider tree; run one headless
   // agent cycle directly (re-reads device id + policy from prefs).
   await DeviceAgent.runHeadlessCycle();
