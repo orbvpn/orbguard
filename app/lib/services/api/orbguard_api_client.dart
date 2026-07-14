@@ -1810,6 +1810,29 @@ class OrbGuardApiClient {
     }
   }
 
+  /// Enable or disable a webhook
+  /// POST /api/v1/webhooks/{id}/enable | /disable
+  Future<void> setWebhookEnabled(String id, bool enabled) async {
+    try {
+      await _dio.post(
+        enabled ? ApiEndpoints.webhookEnable(id) : ApiEndpoints.webhookDisable(id),
+      );
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Send a test delivery for a webhook
+  /// POST /api/v1/webhooks/{id}/test — returns the backend's delivery result
+  Future<Map<String, dynamic>> testWebhook(String id) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.webhookTest(id));
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
   // ============================================
   // INTELLIGENCE SOURCES
   // ============================================
@@ -1985,6 +2008,18 @@ class OrbGuardApiClient {
     try {
       final response = await _dio.post(ApiEndpoints.playbookExecute(id));
       return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  /// Enable or disable a playbook
+  /// POST /api/v1/playbooks/{id}/enable | /disable
+  Future<void> setPlaybookEnabled(String id, bool enabled) async {
+    try {
+      await _dio.post(
+        enabled ? ApiEndpoints.playbookEnable(id) : ApiEndpoints.playbookDisable(id),
+      );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }

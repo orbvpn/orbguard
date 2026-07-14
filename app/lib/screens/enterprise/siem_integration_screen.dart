@@ -333,9 +333,13 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   ],
                 ),
               ),
+              // Read-only: forwarder enablement is owned and enforced
+              // server-side. There is no app-side endpoint to change it (the
+              // backend only exposes GET /siem/forwarders), so this reflects
+              // the server's state rather than pretending to toggle it.
               Switch(
                 value: forwarder.isEnabled,
-                onChanged: (v) => setState(() => forwarder.isEnabled = v),
+                onChanged: null,
               ),
             ],
           ),

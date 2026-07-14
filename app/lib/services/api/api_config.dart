@@ -441,6 +441,18 @@ class ApiEndpoints {
   /// DELETE /api/v1/webhooks/{id}
   static String webhookDelete(String id) => '$_v1/webhooks/$id';
 
+  /// Enable webhook
+  /// POST /api/v1/webhooks/{id}/enable
+  static String webhookEnable(String id) => '$_v1/webhooks/$id/enable';
+
+  /// Disable webhook
+  /// POST /api/v1/webhooks/{id}/disable
+  static String webhookDisable(String id) => '$_v1/webhooks/$id/disable';
+
+  /// Send a test delivery for a webhook
+  /// POST /api/v1/webhooks/{id}/test
+  static String webhookTest(String id) => '$_v1/webhooks/$id/test';
+
   // ============================================
   // INTELLIGENCE SOURCES
   // ============================================
@@ -518,6 +530,14 @@ class ApiEndpoints {
   /// Execute playbook
   /// POST /api/v1/playbooks/{id}/execute
   static String playbookExecute(String id) => '$_v1/playbooks/$id/execute';
+
+  /// Enable playbook
+  /// POST /api/v1/playbooks/{id}/enable
+  static String playbookEnable(String id) => '$_v1/playbooks/$id/enable';
+
+  /// Disable playbook
+  /// POST /api/v1/playbooks/{id}/disable
+  static String playbookDisable(String id) => '$_v1/playbooks/$id/disable';
 
   // ============================================
   // DESKTOP SECURITY

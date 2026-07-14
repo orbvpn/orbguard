@@ -634,7 +634,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                       AppColors.accentInk,
                     ),
                     _buildStatItem(
-                      'Last Updated',
+                      'Retrieved',
                       _formatDate(stats.lastUpdated),
                       AppColors.accentInk,
                     ),
@@ -645,39 +645,49 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Breakdown
+          // Breakdown by IOC type — the real per-type counts returned by
+          // GET /forensics/iocs/stats (domains, ips, hashes, path_patterns,
+          // process_patterns). The backend does not break IOCs down by
+          // campaign (Pegasus/Predator/...), so that breakdown is not shown.
           Text(
-            'IOC Categories',
+            'IOC Breakdown',
             style: BrandText.title(size: 18, color: cs.onSurface),
           ),
           const SizedBox(height: 12),
 
           _buildIOCCategory(
-            'Pegasus (NSO Group)',
-            stats.pegasusIOCs,
-            AppColors.errorInk,
-            'bug',
+            'Domains',
+            stats.domains,
+            AppColors.accentInk,
+            'global',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
-            'Predator (Cytrox)',
-            stats.predatorIOCs,
-            AppColors.amberInk,
-            'bug_minimalistic',
+            'IP Addresses',
+            stats.ips,
+            AppColors.chartColors[2], // spectrum cyan
+            'server',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
-            'Stalkerware',
-            stats.stalkerwareIOCs,
+            'File Hashes',
+            stats.hashes,
             AppColors.chartColors[4], // spectrum purple
-            'eye',
+            'hashtag',
           ),
           const SizedBox(height: 12),
           _buildIOCCategory(
-            'Other Spyware',
-            stats.otherIOCs,
+            'Path Patterns',
+            stats.pathPatterns,
+            AppColors.amberInk,
+            'folder',
+          ),
+          const SizedBox(height: 12),
+          _buildIOCCategory(
+            'Process Patterns',
+            stats.processPatterns,
             AppColors.secondaryInk,
-            'danger_triangle',
+            'cpu',
           ),
 
           // Sources

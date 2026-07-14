@@ -2121,10 +2121,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       children: [
                         DuotoneIcon('check_circle', size: 14, color: AppColors.accentInk),
                         const SizedBox(width: 4),
-                        Text('Healthy', style: TextStyle(color: AppColors.accentInk, fontSize: 12)),
+                        Text(models.any((m) => m.isActive) ? 'Active' : 'Idle', style: TextStyle(color: AppColors.accentInk, fontSize: 12)),
                         const SizedBox(width: 16),
                         Text(
-                          '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)} anomalies today',
+                          '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)} anomalies detected',
                           style: TextStyle(color: context.onSurfaceMuted, fontSize: 12),
                         ),
                       ],

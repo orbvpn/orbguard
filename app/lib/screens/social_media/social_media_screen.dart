@@ -220,9 +220,16 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
           const SizedBox(width: 12),
           _buildStatCard(
             'Privacy Score',
-            '${provider.averagePrivacyScore}%',
+            // A backend privacy audit only runs with a configured social API
+            // key; without one there is no measured score, so show N/A rather
+            // than a misleading "0%".
+            provider.privacyAnalysisAvailable
+                ? '${provider.averagePrivacyScore}%'
+                : 'N/A',
             'shield_check',
-            _getPrivacyColor(provider.averagePrivacyScore),
+            provider.privacyAnalysisAvailable
+                ? _getPrivacyColor(provider.averagePrivacyScore)
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
           _buildStatCard(

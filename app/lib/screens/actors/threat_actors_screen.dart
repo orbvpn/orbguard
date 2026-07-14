@@ -25,6 +25,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   String? _errorMessage;
   List<ThreatActor> _actors = [];
   String _selectedCategory = 'All';
+  String _searchQuery = '';
 
   final List<String> _categories = ['All', 'APT', 'Cybercrime', 'Hacktivism', 'Nation-State'];
 
@@ -72,9 +73,17 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final filteredActors = _selectedCategory == 'All'
+    final categoryActors = _selectedCategory == 'All'
         ? _actors
         : _actors.where((a) => _getActorCategory(a) == _selectedCategory).toList();
+    final query = _searchQuery.trim().toLowerCase();
+    final filteredActors = query.isEmpty
+        ? categoryActors
+        : categoryActors
+            .where((a) =>
+                a.name.toLowerCase().contains(query) ||
+                a.aliases.any((alias) => alias.toLowerCase().contains(query)))
+            .toList();
 
     return GlassPage(
       title: 'Threat Actors',
@@ -552,12 +561,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
 
   void _showSearchDialog(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: _searchQuery);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text('Search Actors', style: TextStyle(color: cs.onSurface)),
         content: TextField(
+          controller: controller,
+          autofocus: true,
           style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Enter actor name or alias...',
@@ -569,13 +581,20 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           ),
           onSubmitted: (value) {
             Navigator.pop(context);
-            // Implement search
+            setState(() => _searchQuery = value.trim());
           },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _searchQuery = controller.text.trim());
+            },
+            child: const Text('Search'),
           ),
         ],
       ),

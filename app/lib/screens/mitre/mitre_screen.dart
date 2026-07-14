@@ -248,7 +248,7 @@ class _DetectionsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your device appears to be clean.\nNo MITRE ATT&CK techniques have been detected.',
+                  'No MITRE ATT&CK techniques have been recorded yet.\nTechniques flagged by device scans will appear here.',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,

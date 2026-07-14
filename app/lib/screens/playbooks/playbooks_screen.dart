@@ -181,7 +181,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
               ),
               Switch(
                 value: playbook.isEnabled,
-                onChanged: (v) => setState(() => playbook.isEnabled = v),
+                onChanged: (v) => _setPlaybookEnabled(playbook, v),
               ),
             ],
           ),
@@ -448,19 +448,38 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
             style:
                 TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         content: Text(
-          'Use the playbook builder to create custom automated responses.',
+          'In-app playbook authoring is not available yet. Playbooks configured '
+          'on the server appear here automatically.',
           style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Create', style: TextStyle(color: AppColors.accentInk)),
+            child: Text('Close', style: TextStyle(color: AppColors.accentInk)),
           ),
         ],
       ),
     );
+  }
+
+  /// Persist the enable/disable toggle to the backend. Optimistically flips the
+  /// switch, then reverts and surfaces an error if the API call fails.
+  Future<void> _setPlaybookEnabled(Playbook playbook, bool enabled) async {
+    final previous = playbook.isEnabled;
+    setState(() => playbook.isEnabled = enabled);
+    try {
+      await _apiClient.setPlaybookEnabled(playbook.id, enabled);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => playbook.isEnabled = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update playbook: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
   }
 
   Future<void> _executePlaybook(Playbook playbook) async {

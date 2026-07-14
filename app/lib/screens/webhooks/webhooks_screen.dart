@@ -152,7 +152,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
               ),
               Switch(
                 value: webhook.isEnabled,
-                onChanged: (v) => setState(() => webhook.isEnabled = v),
+                onChanged: (v) => _setWebhookEnabled(webhook, v),
               ),
             ],
           ),
@@ -306,6 +306,47 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     }
   }
 
+  /// Persist the enable/disable toggle to the backend. Optimistically flips the
+  /// switch, then reverts and surfaces an error if the API call fails.
+  Future<void> _setWebhookEnabled(Webhook webhook, bool enabled) async {
+    final previous = webhook.isEnabled;
+    setState(() => webhook.isEnabled = enabled);
+    try {
+      await _api.setWebhookEnabled(webhook.id, enabled);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => webhook.isEnabled = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update webhook: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  /// Trigger a real test delivery via the backend and report the outcome.
+  Future<void> _testWebhook(Webhook webhook) async {
+    try {
+      await _api.testWebhook(webhook.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Test delivery sent to ${webhook.name}'),
+          backgroundColor: GlassTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to test ${webhook.name}: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
+  }
+
   void _showAddWebhookDialog(BuildContext context) {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
@@ -421,7 +462,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        // Test webhook
+                        _testWebhook(webhook);
                       },
                       icon: DuotoneIcon('forward', size: 18, color: AppColors.accentInk),
                       label: const Text('Test'),

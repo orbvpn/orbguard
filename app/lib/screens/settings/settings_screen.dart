@@ -228,19 +228,21 @@ class SettingsScreen extends StatelessWidget {
                     '1.0.0 (Build 1)',
                     'info_circle',
                   ),
+                  // No in-app Terms/Privacy content or canonical URL is wired
+                  // yet, so these are shown as plain info rows rather than
+                  // tappable links that go nowhere (a null onTap also removes
+                  // the misleading navigation chevron).
                   _buildSettingsTile(
                     context,
                     'Terms of Service',
                     'View terms and conditions',
                     'file_text',
-                    onTap: () {},
                   ),
                   _buildSettingsTile(
                     context,
                     'Privacy Policy',
                     'View privacy policy',
                     'clipboard_text',
-                    onTap: () {},
                   ),
                 ],
               ),
@@ -856,19 +858,19 @@ class PrivacySettingsScreen extends StatelessWidget {
                             color: Theme.of(context).colorScheme.onSurface),
                       ),
                       subtitle: Text(
-                        'Download all your data',
+                        'Not available yet',
                         style: TextStyle(
                             color:
                                 Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 12),
                       ),
-                      trailing: DuotoneIcon('alt_arrow_right',
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          size: 20),
+                      // No real data-export pipeline exists, so this reports
+                      // honestly instead of faking an "export started" toast.
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text('Data export started...')),
+                              content: Text(
+                                  'Data export is not available yet')),
                         );
                       },
                     ),
@@ -961,10 +963,16 @@ class PrivacySettingsScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('All data deleted')),
+            onPressed: () async {
+              // Actually clear the locally persisted store (settings, scan
+              // history, monitored assets, freeze status — everything kept in
+              // SharedPreferences) instead of only claiming to.
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              await context.read<SettingsProvider>().resetAllSettings();
+              navigator.pop();
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Local data cleared')),
               );
             },
             child: Text(

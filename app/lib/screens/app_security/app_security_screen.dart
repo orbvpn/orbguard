@@ -163,32 +163,40 @@ class _AppsTab extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Surface the provider's real reason (e.g. the inventory is Android-only,
+    // or a native load error) instead of implying an empty app list.
+    final reason = provider.error ??
+        'No user-installed apps were found on this device.';
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          DuotoneIcon(
-            'smartphone',
-            size: 64,
-            color: cs.onSurface.withValues(alpha: 0.12),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No apps found',
-            style: TextStyle(
-              color: cs.onSurfaceVariant,
-              fontSize: 16,
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon(
+              'smartphone',
+              size: 64,
+              color: cs.onSurface.withValues(alpha: 0.12),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Pull down to refresh',
-            style: TextStyle(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-              fontSize: 14,
+            const SizedBox(height: 16),
+            Text(
+              'No apps found',
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: 16,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              reason,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -341,45 +341,12 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // Filter options
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildFilterChip('All', true),
-              _buildFilterChip('Subscribed', false),
-              _buildFilterChip('Published', false),
-              _buildFilterChip('Read Only', false),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
         // Collections
         if (_collections.isEmpty)
           _buildEmptyState('No Collections', 'The TAXII server exposes no collections')
         else
           ..._collections.map((collection) => _buildCollectionCard(collection)),
       ],
-    );
-  }
-
-  Widget _buildFilterChip(String label, bool selected) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (v) {},
-        backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
-        selectedColor: GlassTheme.primaryAccent.withAlpha(50),
-        labelStyle: TextStyle(
-            color: selected
-                ? AppColors.accentInk
-                : context.colors.onSurfaceVariant,
-            fontSize: 12),
-        checkmarkColor: AppColors.accentInk,
-      ),
     );
   }
 
