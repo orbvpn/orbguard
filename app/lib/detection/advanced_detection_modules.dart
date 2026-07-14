@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -62,7 +63,7 @@ class BehavioralAnomalyDetector {
       final variance =
           values.map((v) => (v - avg) * (v - avg)).reduce((a, b) => a + b) /
               values.length;
-      final stdDev = sqrt(variance);
+      final stdDev = math.sqrt(variance);
 
       _baseline[metric] = {
         'average': avg,
@@ -75,7 +76,12 @@ class BehavioralAnomalyDetector {
   /// Detect anomalies by comparing current metrics to baseline
   Future<List<Map<String, dynamic>>> detectAnomalies() async {
     if (_baseline.isEmpty) {
-      throw Exception('Baseline not established. Call learnBaseline() first.');
+      // Behavioral anomaly detection compares live metrics against a baseline
+      // learned over time; that learning period is not enabled in this build,
+      // so report the stage as honestly unavailable rather than "failed".
+      throw UnsupportedError(
+          'Behavioral analysis needs an on-device learning period and is not '
+          'available in this build yet.');
     }
 
     final current = await _collectMetrics();
@@ -172,8 +178,6 @@ class BehavioralAnomalyDetector {
       return 0.0;
     }
   }
-
-  double sqrt(double value) => value >= 0 ? (value).toDouble() : 0.0;
 }
 
 // ============================================================================
