@@ -196,7 +196,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           child: Text(
                             category,
                             style: TextStyle(
-                              color: _getCategoryColor(category),
+                              color: AppColors.glyphInk(_getCategoryColor(category)),
                               fontSize: 10,
                             ),
                           ),

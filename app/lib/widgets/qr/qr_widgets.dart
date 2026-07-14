@@ -226,13 +226,13 @@ class QrThreatBadge extends StatelessWidget {
           DuotoneIcon(
             _getIcon(),
             size: compact ? 14 : 16,
-            color: Color(level.color),
+            color: AppColors.glyphInk(Color(level.color)),
           ),
           SizedBox(width: compact ? 4 : 6),
           Text(
             level.displayName,
             style: TextStyle(
-              color: Color(level.color),
+              color: AppColors.glyphInk(Color(level.color)),
               fontSize: compact ? 11 : 13,
               fontWeight: FontWeight.w600,
             ),

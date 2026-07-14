@@ -417,7 +417,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
               Text(
                 'Risk: ${(result.riskScore * 100).toInt()}%',
                 style: TextStyle(
-                  color: Color(result.threatLevel.color),
+                  color: AppColors.glyphInk(Color(result.threatLevel.color)),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -437,7 +437,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 children: [
                   DuotoneIcon(
                     'lightbulb',
-                    color: Color(result.threatLevel.color),
+                    color: AppColors.glyphInk(Color(result.threatLevel.color)),
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -920,7 +920,7 @@ class _ThreatListItem extends StatelessWidget {
                 child: DuotoneIcon(
                   _getThreatIcon(),
                   size: 16,
-                  color: Color(message.threatLevel.color),
+                  color: AppColors.glyphInk(Color(message.threatLevel.color)),
                 ),
               ),
             ),

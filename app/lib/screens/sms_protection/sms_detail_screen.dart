@@ -563,7 +563,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               Text(
                 'Risk: ${(analysis.riskScore * 100).toInt()}%',
                 style: TextStyle(
-                  color: Color(analysis.threatLevel.color),
+                  color: AppColors.glyphInk(Color(analysis.threatLevel.color)),
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -577,7 +577,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               children: [
                 DuotoneIcon(
                   'lightbulb',
-                  color: Color(analysis.threatLevel.color),
+                  color: AppColors.glyphInk(Color(analysis.threatLevel.color)),
                   size: 18,
                 ),
                 const SizedBox(width: 8),

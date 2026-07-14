@@ -756,7 +756,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   child: Center(
                     child: DuotoneIcon(
                       'folder',
-                      color: statusColor,
+                      color: AppColors.glyphInk(statusColor),
                       size: 22,
                     ),
                   ),
@@ -795,7 +795,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   child: Text(
                     caseItem.status.displayName,
                     style: TextStyle(
-                      color: statusColor,
+                      color: AppColors.glyphInk(statusColor),
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1521,7 +1521,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      DuotoneIcon(_getNodeIcon(node.type), size: 16, color: _getNodeColor(node.type)),
+                                      DuotoneIcon(_getNodeIcon(node.type), size: 16, color: AppColors.glyphInk(_getNodeColor(node.type))),
                                       const SizedBox(height: 2),
                                       Text(
                                         node.label,
@@ -1660,7 +1660,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           children: [
             Row(
               children: [
-                DuotoneIcon(_getNodeIcon(node.type), color: _getNodeColor(node.type), size: 32),
+                DuotoneIcon(_getNodeIcon(node.type), color: AppColors.glyphInk(_getNodeColor(node.type)), size: 32),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(node.label,

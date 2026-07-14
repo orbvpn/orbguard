@@ -339,7 +339,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
         icon: 'check_circle',
         title: 'No Alerts',
         subtitle: 'No impersonation attempts detected',
-        color: GlassTheme.successColor,
+        color: AppColors.accentInk,
       );
     }
 

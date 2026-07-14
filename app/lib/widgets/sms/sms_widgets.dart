@@ -42,13 +42,13 @@ class ThreatLevelBadge extends StatelessWidget {
           DuotoneIcon(
             _getIcon(),
             size: compact ? 12 : 14,
-            color: Color(level.color),
+            color: AppColors.glyphInk(Color(level.color)),
           ),
           SizedBox(width: compact ? 2 : 4),
           Text(
             level.displayName,
             style: TextStyle(
-              color: Color(level.color),
+              color: AppColors.glyphInk(Color(level.color)),
               fontSize: compact ? 10 : 12,
               fontWeight: FontWeight.w600,
             ),
@@ -238,13 +238,13 @@ class SmsCard extends StatelessWidget {
               DuotoneIcon(
                 AppIcons.dangerTriangle,
                 size: 16,
-                color: Color(message.threatLevel.color),
+                color: AppColors.glyphInk(Color(message.threatLevel.color)),
               ),
               const SizedBox(width: 6),
               Text(
                 'Detected Threats',
                 style: TextStyle(
-                  color: Color(message.threatLevel.color),
+                  color: AppColors.glyphInk(Color(message.threatLevel.color)),
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
