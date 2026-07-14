@@ -1067,7 +1067,7 @@ class BreachCheckResult {
       recommendations:
           (json['recommendations'] as List<dynamic>?)?.cast<String>() ?? [],
       checkedAt: json['checked_at'] != null
-          ? DateTime.parse(json['checked_at'] as String)
+          ? DateTime.tryParse(json['checked_at'] as String) ?? DateTime.now()
           : DateTime.now(),
     );
   }
@@ -1242,7 +1242,7 @@ class BreachAlert {
       dataExposed: dataExposed,
       severity:
           SeverityLevel.fromString(json['severity'] as String? ?? 'unknown'),
-      alertedAt: DateTime.parse(detectedAtRaw),
+      alertedAt: DateTime.tryParse(detectedAtRaw) ?? DateTime.now(),
       ackedAt: json['acked_at'] != null
           ? DateTime.tryParse(json['acked_at'] as String)
           : null,

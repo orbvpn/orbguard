@@ -5,6 +5,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../services/api/api_interceptors.dart' show ApiError;
 import '../services/security/enterprise/policy_management_service.dart';
 
 class EnterprisePolicyProvider extends ChangeNotifier {
@@ -41,7 +42,16 @@ class EnterprisePolicyProvider extends ChangeNotifier {
           (a.priority ?? 1 << 30).compareTo(b.priority ?? 1 << 30));
       _policies = policies;
     } catch (e) {
-      _error = e.toString();
+      // GET /enterprise/policies is an optional, config-gated enterprise
+      // feature; a 404 means it isn't provisioned on this server — degrade to
+      // the normal "No Policies" empty state instead of a scary error.
+      final gone = e is ApiError && e.statusCode == 404;
+      if (gone) {
+        _policies = [];
+        _error = null;
+      } else {
+        _error = e.toString();
+      }
       debugPrint('Failed to load conditional access policies: $e');
     } finally {
       _isLoading = false;

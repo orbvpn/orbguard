@@ -9,6 +9,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 import '../../services/api/orbguard_api_client.dart';
 
 class IntegrationsScreen extends StatefulWidget {
@@ -45,8 +46,15 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // Integrations is an optional enterprise feature — when the backend does
+      // not expose it the endpoint 404s. Treat that as an empty state (the
+      // normal "Available Integrations" list, just empty) rather than a scary
+      // error. Non-404 errors are real and still surface.
+      final gone = e is ApiError && e.statusCode == 404;
       setState(() {
-        _errorMessage = 'Failed to load integrations: ${e.toString()}';
+        if (gone) _integrations.clear();
+        _errorMessage =
+            gone ? null : 'Failed to load integrations: ${e.toString()}';
         _isLoading = false;
       });
     }
@@ -448,7 +456,7 @@ class Integration {
       description: json['description'] as String? ?? '',
       color: _parseColor(json['color']),
       features: (json['features'] as List<dynamic>?)
-              ?.map((e) => e as String)
+              ?.map((e) => e.toString())
               .toList() ??
           [],
       isConnected: json['is_connected'] as bool? ?? false,
@@ -462,7 +470,10 @@ class Integration {
       // Handle hex color strings like "#FF5500" or "0xFFFF5500"
       String hex = colorValue.replaceAll('#', '').replaceAll('0x', '');
       if (hex.length == 6) hex = 'FF$hex'; // Add alpha if missing
-      return Color(int.parse(hex, radix: 16));
+      // Tolerate a non-hex color string (e.g. a named color) instead of
+      // throwing and failing the whole integrations parse.
+      final parsed = int.tryParse(hex, radix: 16);
+      if (parsed != null) return Color(parsed);
     }
     return AppColors.severityInfo;
   }

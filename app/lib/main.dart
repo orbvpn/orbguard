@@ -154,7 +154,7 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QrProvider()),
         ChangeNotifierProvider(create: (_) => SmsProvider()..init()),
         ChangeNotifierProvider(create: (_) => UrlProvider()),
-        ChangeNotifierProvider(create: (_) => AppSecurityProvider()),
+        ChangeNotifierProvider(create: (_) => AppSecurityProvider()..init()),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
         ChangeNotifierProvider(create: (_) => DarkWebProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),

@@ -490,9 +490,9 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
           status: result['status'] as String? ?? 'success',
           triggeredBy: exec.triggeredBy,
           startedAt: exec.startedAt,
-          stepsCompleted: result['steps_completed'] as int? ?? exec.totalSteps,
+          stepsCompleted: (result['steps_completed'] as num?)?.toInt() ?? exec.totalSteps,
           totalSteps: exec.totalSteps,
-          duration: result['duration'] as int? ?? 0,
+          duration: (result['duration'] as num?)?.toInt() ?? 0,
         );
       });
     } catch (e) {
@@ -567,7 +567,7 @@ class Playbook {
               ?.map((s) => PlaybookStep.fromJson(s as Map<String, dynamic>))
               .toList() ??
           [],
-      executionCount: json['execution_count'] as int? ?? 0,
+      executionCount: (json['execution_count'] as num?)?.toInt() ?? 0,
       isEnabled: json['is_enabled'] as bool? ?? true,
     );
   }
@@ -614,12 +614,12 @@ class PlaybookExecution {
       playbookName: json['playbook_name'] as String? ?? '',
       status: json['status'] as String? ?? 'unknown',
       triggeredBy: json['triggered_by'] as String? ?? '',
-      startedAt: json['started_at'] != null
-          ? DateTime.parse(json['started_at'] as String)
+      startedAt: json['started_at'] is String
+          ? (DateTime.tryParse(json['started_at'] as String) ?? DateTime.now())
           : DateTime.now(),
-      stepsCompleted: json['steps_completed'] as int? ?? 0,
-      totalSteps: json['total_steps'] as int? ?? 0,
-      duration: json['duration'] as int? ?? 0,
+      stepsCompleted: (json['steps_completed'] as num?)?.toInt() ?? 0,
+      totalSteps: (json['total_steps'] as num?)?.toInt() ?? 0,
+      duration: (json['duration'] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -20,6 +20,7 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 import '../../services/api/orbguard_api_client.dart';
 
 class ComplianceReportingScreen extends StatefulWidget {
@@ -85,9 +86,20 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // Compliance reporting is an optional, config-gated enterprise feature;
+      // a 404 means it isn't provisioned on this server — degrade to the tabs'
+      // normal empty states instead of a scary "Failed to Load Data".
+      final gone = e is ApiError && e.statusCode == 404;
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        if (gone) {
+          _error = null;
+          _frameworks.clear();
+          _reports.clear();
+          _controls.clear();
+        } else {
+          _error = e.toString();
+        }
       });
     }
   }

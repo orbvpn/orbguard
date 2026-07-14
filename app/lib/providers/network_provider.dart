@@ -471,7 +471,8 @@ class NetworkProvider extends ChangeNotifier {
           description: threatJson['description'] as String? ?? '',
           severity: threatJson['severity'] as String? ?? 'medium',
           detectedAt: threatJson['detected_at'] != null
-              ? DateTime.parse(threatJson['detected_at'] as String)
+              ? DateTime.tryParse(threatJson['detected_at'] as String) ??
+                  DateTime.now()
               : DateTime.now(),
           isActive: threatJson['is_active'] as bool? ?? true,
           recommendation: threatJson['recommendation'] as String?,

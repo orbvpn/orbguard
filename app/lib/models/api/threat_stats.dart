@@ -412,8 +412,10 @@ class ThreatTrend {
 
   factory ThreatTrend.fromJson(Map<String, dynamic> json) {
     return ThreatTrend(
-      date: DateTime.parse(json['date'] as String),
-      count: json['count'] as int? ?? 0,
+      date: json['date'] is String
+          ? (DateTime.tryParse(json['date'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      count: (json['count'] as num?)?.toInt() ?? 0,
       category: json['category'] as String?,
     );
   }
@@ -485,13 +487,15 @@ class RecentScan {
 
   factory RecentScan.fromJson(Map<String, dynamic> json) {
     return RecentScan(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       type: json['type'] as String? ?? 'unknown',
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: json['timestamp'] is String
+          ? (DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now())
+          : DateTime.now(),
       status: json['status'] as String? ?? 'unknown',
-      itemsScanned: json['items_scanned'] as int? ?? 0,
-      threatsFound: json['threats_found'] as int? ?? 0,
-      duration: json['duration'] as int? ?? 0,
+      itemsScanned: (json['items_scanned'] as num?)?.toInt() ?? 0,
+      threatsFound: (json['threats_found'] as num?)?.toInt() ?? 0,
+      duration: (json['duration'] as num?)?.toInt() ?? 0,
     );
   }
 

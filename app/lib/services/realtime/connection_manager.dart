@@ -57,9 +57,14 @@ class ConnectionManager {
 
     _isInitialized = true;
 
-    // Auto-connect if enabled and we have network
+    // Auto-connect if enabled and we have network. Fire-and-forget: the
+    // WebSocket handshake can stall on a slow or unreachable network, and no
+    // caller (e.g. DashboardProvider.init) should block its first render on
+    // it — connection status is surfaced via the state stream + banner.
     if (_autoConnect && _hasNetwork()) {
-      await connect();
+      unawaited(connect().catchError((Object e) {
+        developer.log('Auto-connect failed: $e', name: 'OrbGuard.Conn');
+      }));
     }
   }
 

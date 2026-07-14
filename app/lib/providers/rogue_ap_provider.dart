@@ -211,7 +211,7 @@ class RogueAPProvider extends ChangeNotifier {
         ssid: data['ssid'] as String? ?? '',
         bssid: data['bssid'] as String? ?? '',
         addedAt: data['added_at'] != null
-            ? DateTime.parse(data['added_at'] as String)
+            ? DateTime.tryParse(data['added_at'] as String) ?? DateTime.now()
             : DateTime.now(),
       )).toList();
     } catch (e) {
@@ -265,12 +265,12 @@ class RogueAPProvider extends ChangeNotifier {
           id: apData['id'] as String? ?? '',
           ssid: apData['ssid'] as String? ?? 'Unknown',
           bssid: apData['bssid'] as String? ?? '',
-          signalStrength: apData['signal_strength'] as int? ?? -100,
+          signalStrength: (apData['signal_strength'] as num?)?.toInt() ?? -100,
           security: _parseWifiSecurity(apData['security'] as String?),
           threatLevel: _parseThreatLevel(apData['threat_level'] as String?),
           threats: _parseThreats(apData['threats'] as List<dynamic>?),
           vendor: apData['vendor'] as String?,
-          channel: apData['channel'] as int? ?? 0,
+          channel: (apData['channel'] as num?)?.toInt() ?? 0,
           isConnected: apData['is_connected'] as bool? ?? false,
           detectedAt: DateTime.now(),
           lastSeen: DateTime.now(),

@@ -218,7 +218,11 @@ class SupplyChainMonitorService {
   /// Initialize the service
   Future<void> initialize() async {
     await _loadSDKDatabase();
-    await _loadTrackerSignatures();
+    // Tracker signatures only enrich later scans; they are not needed for the
+    // Supply Chain screen's first render. Fetch them in the background so a
+    // stalled/retrying network call can never pin the screen on its loading
+    // spinner (the provider's initialize() awaits this method).
+    unawaited(_loadTrackerSignatures());
   }
 
   /// Load SDK signature database

@@ -96,8 +96,12 @@ class DashboardProvider extends ChangeNotifier {
 
     _connectionState = _connectionManager.connectionState;
 
-    // Load initial data
-    await refresh();
+    // Load initial data in the background so the first render is never blocked
+    // on the network. refresh() is self-contained (each fetch swallows its own
+    // errors) and notifies listeners when data arrives; awaiting it here would
+    // stall the dashboard for minutes when requests retry on timeout (30s ×
+    // retries). Cards render their own loading state until data lands.
+    unawaited(refresh());
 
     // Start auto-refresh
     _startAutoRefresh();

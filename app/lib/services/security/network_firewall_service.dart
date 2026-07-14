@@ -343,9 +343,12 @@ class NetworkFirewallService {
       debugPrint('NetworkFirewallService: $_engineUnavailableReason');
     }
 
-    // Threat-intel block lists are still loaded so rules can be inspected
-    // and edited even when the enforcement engine is unavailable.
-    await _loadMaliciousIndicators();
+    // Threat-intel block lists only feed the enforcement matchers; the
+    // firewall screen (connections/alerts/rules/apps) renders without them.
+    // Load them in the background so a slow or retry-stalled threat-intel
+    // fetch never holds initialize() — and thus the screen's gated first
+    // render — on an indefinite spinner. Self-contained (own try/catch).
+    unawaited(_loadMaliciousIndicators());
   }
 
   /// Load persisted rules and user block lists.

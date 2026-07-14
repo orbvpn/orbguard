@@ -15,6 +15,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 import '../../services/api/orbguard_api_client.dart';
 
 class EnterpriseOverviewScreen extends StatefulWidget {
@@ -61,8 +62,19 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // /enterprise/stats and /enterprise/policies are optional, config-gated
+      // enterprise features; a 404 means they aren't provisioned on this
+      // server — degrade to the dashboard's "—" empty state, not an error.
+      final gone = e is ApiError && e.statusCode == 404;
       setState(() {
-        _errorMessage = 'Failed to load enterprise data: ${e.toString()}';
+        if (gone) {
+          _errorMessage = null;
+          _stats = EnterpriseStats.empty();
+          _policyCount = null;
+          _enabledPolicyCount = null;
+        } else {
+          _errorMessage = 'Failed to load enterprise data: ${e.toString()}';
+        }
         _isLoading = false;
       });
     }

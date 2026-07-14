@@ -171,8 +171,8 @@ class ThreatIndicator {
 
   factory ThreatIndicator.fromJson(Map<String, dynamic> json) {
     return ThreatIndicator(
-      id: json['id'] as String,
-      value: json['value'] as String,
+      id: json['id'] as String? ?? '',
+      value: json['value'] as String? ?? '',
       type: IndicatorType.fromString(json['type'] as String? ?? 'unknown'),
       severity: SeverityLevel.fromString(json['severity'] as String? ?? 'unknown'),
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
@@ -186,14 +186,18 @@ class ThreatIndicator {
       sourceName: json['source_name'] as String?,
       campaignId: json['campaign_id'] as String?,
       campaignName: json['campaign_name'] as String?,
-      firstSeen: json['first_seen'] != null
-          ? DateTime.parse(json['first_seen'] as String)
+      firstSeen: json['first_seen'] is String
+          ? DateTime.tryParse(json['first_seen'] as String)
           : null,
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'] as String)
+      lastSeen: json['last_seen'] is String
+          ? DateTime.tryParse(json['last_seen'] as String)
           : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] is String
+          ? (DateTime.tryParse(json['created_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] is String
+          ? (DateTime.tryParse(json['updated_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
       metadata: parseJsonBlob(json['metadata']),
       mitreTechniques:
           (json['mitre_techniques'] as List<dynamic>?)?.cast<String>(),
@@ -308,7 +312,7 @@ class IndicatorCheckResult {
 
   factory IndicatorCheckResult.fromJson(Map<String, dynamic> json) {
     return IndicatorCheckResult(
-      value: json['value'] as String,
+      value: json['value'] as String? ?? '',
       isThreat: json['is_threat'] as bool? ?? false,
       type: json['type'] != null
           ? IndicatorType.fromString(json['type'] as String)

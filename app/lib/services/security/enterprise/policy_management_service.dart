@@ -52,7 +52,7 @@ class ConditionalAccessPolicy {
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       enabled: json['enabled'] as bool? ?? false,
-      priority: json['priority'] as int?,
+      priority: (json['priority'] as num?)?.toInt(),
       conditions: PolicyConditions.fromJson(
           json['conditions'] as Map<String, dynamic>? ?? const {}),
       grantControls: PolicyGrantControls.fromJson(
@@ -111,7 +111,7 @@ class PolicyConditions {
   factory PolicyConditions.fromJson(Map<String, dynamic> json) {
     return PolicyConditions(
       minTrustLevel: json['min_trust_level']?.toString(),
-      minPostureScore: json['min_posture_score'] as int?,
+      minPostureScore: (json['min_posture_score'] as num?)?.toInt(),
       requireCompliance: json['require_compliance'] as bool? ?? false,
       requireManaged: json['require_managed'] as bool? ?? false,
       requireVpn: json['require_vpn'] as bool? ?? false,

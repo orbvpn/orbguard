@@ -2057,9 +2057,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         accuracy: (data['accuracy'] as num?)?.toDouble() ?? 0.0,
         isActive: data['is_active'] as bool? ?? false,
         lastTrained: data['last_trained'] != null
-            ? DateTime.tryParse(data['last_trained'] as String) ?? DateTime.now()
+            ? DateTime.tryParse(data['last_trained'].toString()) ?? DateTime.now()
             : DateTime.now(),
-        anomaliesDetected: data['anomalies_detected'] as int? ?? 0,
+        anomaliesDetected: (data['anomalies_detected'] as num?)?.toInt() ?? 0,
       );
     }).toList();
 

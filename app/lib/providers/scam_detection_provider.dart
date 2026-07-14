@@ -308,7 +308,17 @@ class ScamDetectionProvider extends ChangeNotifier {
     } on FormatException catch (e) {
       _error = 'Failed to parse scam patterns: ${e.message}';
     } catch (e) {
-      _error = 'Failed to load scam patterns: ${_describeError(e)}';
+      // The scam-patterns catalog is optional/config-gated on some backends.
+      // An absent endpoint (404/501/503) means "no patterns available", not a
+      // failure worth splashing a red error card across the default Analyze
+      // tab on screen entry — degrade to the normal empty state. Genuine
+      // errors (network, 5xx other than 503) still surface.
+      final gone = e is ApiError &&
+          (e.statusCode == 404 ||
+              e.statusCode == 501 ||
+              e.statusCode == 503);
+      _error =
+          gone ? null : 'Failed to load scam patterns: ${_describeError(e)}';
     }
 
     _isLoadingPatterns = false;

@@ -10,6 +10,7 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 import '../../services/api/orbguard_api_client.dart';
 
 class SiemIntegrationScreen extends StatefulWidget {
@@ -68,9 +69,20 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // SIEM integration is an optional, config-gated enterprise feature; a
+      // 404 means it isn't provisioned on this server — degrade to the tabs'
+      // normal empty states instead of a scary "Failed to Load Data".
+      final gone = e is ApiError && e.statusCode == 404;
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        if (gone) {
+          _error = null;
+          _connections.clear();
+          _forwarders.clear();
+          _alerts.clear();
+        } else {
+          _error = e.toString();
+        }
       });
     }
   }
@@ -657,9 +669,13 @@ class SiemConnection {
       type: json['type'] as String? ?? '',
       endpoint: json['endpoint'] as String? ?? '',
       isConnected: json['is_connected'] as bool? ?? json['isConnected'] as bool? ?? false,
-      eventsPerMinute: json['events_per_minute'] as int? ?? json['eventsPerMinute'] as int? ?? 0,
-      eventsSent: json['events_sent'] as int? ?? json['eventsSent'] as int? ?? 0,
-      errors: json['errors'] as int? ?? 0,
+      eventsPerMinute: (json['events_per_minute'] as num?)?.toInt() ??
+          (json['eventsPerMinute'] as num?)?.toInt() ??
+          0,
+      eventsSent: (json['events_sent'] as num?)?.toInt() ??
+          (json['eventsSent'] as num?)?.toInt() ??
+          0,
+      errors: (json['errors'] as num?)?.toInt() ?? 0,
       lastSync: json['last_sync'] != null
           ? DateTime.tryParse(json['last_sync'].toString()) ?? DateTime.now()
           : json['lastSync'] != null
@@ -700,7 +716,9 @@ class EventForwarder {
       destination: json['destination'] as String? ?? '',
       eventTypes: eventTypes,
       format: json['format'] as String? ?? 'JSON',
-      batchSize: json['batch_size'] as int? ?? json['batchSize'] as int? ?? 100,
+      batchSize: (json['batch_size'] as num?)?.toInt() ??
+          (json['batchSize'] as num?)?.toInt() ??
+          100,
       isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? false,
     );
   }

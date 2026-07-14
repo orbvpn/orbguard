@@ -47,16 +47,16 @@ class Campaign {
 
   factory Campaign.fromJson(Map<String, dynamic> json) {
     return Campaign(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       objective: json['objective'] as String?,
       aliases: (json['aliases'] as List<dynamic>?)?.cast<String>() ?? [],
-      firstSeen: json['first_seen'] != null
-          ? DateTime.parse(json['first_seen'] as String)
+      firstSeen: json['first_seen'] is String
+          ? DateTime.tryParse(json['first_seen'] as String)
           : null,
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'] as String)
+      lastSeen: json['last_seen'] is String
+          ? DateTime.tryParse(json['last_seen'] as String)
           : null,
       isActive: json['is_active'] as bool? ?? false,
       targetedPlatforms:
@@ -69,11 +69,15 @@ class Campaign {
           (json['mitre_techniques'] as List<dynamic>?)?.cast<String>() ?? [],
       associatedActors:
           (json['associated_actors'] as List<dynamic>?)?.cast<String>() ?? [],
-      indicatorCount: json['indicator_count'] as int? ?? 0,
+      indicatorCount: (json['indicator_count'] as num?)?.toInt() ?? 0,
       severity:
           SeverityLevel.fromString(json['severity'] as String? ?? 'unknown'),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] is String
+          ? (DateTime.tryParse(json['created_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] is String
+          ? (DateTime.tryParse(json['updated_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
       metadata: parseJsonBlob(json['metadata']),
     );
   }
@@ -218,7 +222,7 @@ class ThreatActor {
 
   factory ThreatActor.fromJson(Map<String, dynamic> json) {
     return ThreatActor(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       type: ActorType.fromString(json['type'] as String? ?? 'unknown'),
@@ -228,11 +232,11 @@ class ThreatActor {
               .toList() ??
           [],
       country: json['country'] as String?,
-      firstSeen: json['first_seen'] != null
-          ? DateTime.parse(json['first_seen'] as String)
+      firstSeen: json['first_seen'] is String
+          ? DateTime.tryParse(json['first_seen'] as String)
           : null,
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'] as String)
+      lastSeen: json['last_seen'] is String
+          ? DateTime.tryParse(json['last_seen'] as String)
           : null,
       isActive: json['is_active'] as bool? ?? false,
       targetedPlatforms:
@@ -247,12 +251,16 @@ class ThreatActor {
           (json['associated_campaigns'] as List<dynamic>?)?.cast<String>() ??
               [],
       tools: (json['tools'] as List<dynamic>?)?.cast<String>() ?? [],
-      indicatorCount: json['indicator_count'] as int? ?? 0,
+      indicatorCount: (json['indicator_count'] as num?)?.toInt() ?? 0,
       sophisticationLevel: SeverityLevel.fromString(
           json['sophistication_level'] as String? ?? 'unknown'),
       references: (json['references'] as List<dynamic>?)?.cast<String>(),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] is String
+          ? (DateTime.tryParse(json['created_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] is String
+          ? (DateTime.tryParse(json['updated_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
     );
   }
 
@@ -315,11 +323,11 @@ class MitreTactic {
 
   factory MitreTactic.fromJson(Map<String, dynamic> json) {
     return MitreTactic(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       shortName: json['short_name'] as String?,
-      techniqueCount: json['technique_count'] as int? ?? 0,
+      techniqueCount: (json['technique_count'] as num?)?.toInt() ?? 0,
       domain: json['domain'] as String? ?? 'mobile-attack',
     );
   }
@@ -357,7 +365,7 @@ class MitreTechnique {
 
   factory MitreTechnique.fromJson(Map<String, dynamic> json) {
     return MitreTechnique(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       tacticId: json['tactic_id'] as String? ?? '',
