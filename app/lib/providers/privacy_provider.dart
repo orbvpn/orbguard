@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api/orbguard_api_client.dart';
 
@@ -108,6 +109,13 @@ class PrivacyAuditResult {
 /// Privacy Provider
 class PrivacyProvider extends ChangeNotifier {
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
+  SharedPreferences? _prefs;
+
+  // Persistence keys for the monitoring toggles.
+  static const _kCameraMonitor = 'priv_camera_monitor';
+  static const _kMicMonitor = 'priv_mic_monitor';
+  static const _kClipboardProtect = 'priv_clipboard_protect';
+  static const _kTrackerBlock = 'priv_tracker_block';
 
   // State
   final List<PrivacyEvent> _events = [];
@@ -169,6 +177,13 @@ class PrivacyProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Restore persisted monitoring toggles before loading data.
+      _prefs = await SharedPreferences.getInstance();
+      _cameraMonitoringEnabled = _prefs?.getBool(_kCameraMonitor) ?? true;
+      _micMonitoringEnabled = _prefs?.getBool(_kMicMonitor) ?? true;
+      _clipboardProtectionEnabled = _prefs?.getBool(_kClipboardProtect) ?? true;
+      _trackerBlockingEnabled = _prefs?.getBool(_kTrackerBlock) ?? true;
+
       await Future.wait([
         loadTrackers(),
         loadRecentEvents(),
@@ -472,24 +487,29 @@ class PrivacyProvider extends ChangeNotifier {
     }
   }
 
-  /// Update monitoring settings
+  /// Update monitoring settings. Each toggle is persisted so it survives an
+  /// app restart (tracker blocking also gates [blockTracker] at runtime).
   void setCameraMonitoring(bool enabled) {
     _cameraMonitoringEnabled = enabled;
+    _prefs?.setBool(_kCameraMonitor, enabled);
     notifyListeners();
   }
 
   void setMicMonitoring(bool enabled) {
     _micMonitoringEnabled = enabled;
+    _prefs?.setBool(_kMicMonitor, enabled);
     notifyListeners();
   }
 
   void setClipboardProtection(bool enabled) {
     _clipboardProtectionEnabled = enabled;
+    _prefs?.setBool(_kClipboardProtect, enabled);
     notifyListeners();
   }
 
   void setTrackerBlocking(bool enabled) {
     _trackerBlockingEnabled = enabled;
+    _prefs?.setBool(_kTrackerBlock, enabled);
     notifyListeners();
   }
 

@@ -9,10 +9,21 @@ class ApiConfig {
   /// API version prefix
   static const String apiVersion = '/api/v1';
 
-  /// Request timeout in milliseconds
-  static const int connectTimeout = 30000;
-  static const int receiveTimeout = 30000;
-  static const int sendTimeout = 30000;
+  /// Request timeout in milliseconds. Mutable so the API settings screen's
+  /// "Connection Timeout" can override the default before the client inits.
+  static int connectTimeout = 30000;
+  static int receiveTimeout = 30000;
+  static int sendTimeout = 30000;
+
+  /// Apply a user-selected connection timeout (seconds) to all Dio timeouts.
+  /// Ignores non-positive values so a missing/invalid setting keeps defaults.
+  static void setTimeoutSeconds(int seconds) {
+    if (seconds <= 0) return;
+    final ms = seconds * 1000;
+    connectTimeout = ms;
+    receiveTimeout = ms;
+    sendTimeout = ms;
+  }
 
   /// Retry configuration
   static const int maxRetries = 3;

@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/notifications/notification_service.dart';
+
 /// Protection feature settings
 class ProtectionSettings {
   final bool smsProtectionEnabled;
@@ -294,6 +296,7 @@ class SettingsProvider extends ChangeNotifier {
       _prefs = await SharedPreferences.getInstance();
       _themeMode = _parseThemeMode(_prefs!.getString(_kThemeMode));
       await _loadSettings();
+      await _syncNotificationService();
     } catch (e) {
       _error = 'Failed to load settings: $e';
     }
@@ -417,6 +420,33 @@ class SettingsProvider extends ChangeNotifier {
       await _prefs!.setInt('notif_quiet_start', settings.quietHoursStart);
       await _prefs!.setInt('notif_quiet_end', settings.quietHoursEnd);
     }
+
+    await _syncNotificationService();
+  }
+
+  /// Push notification-related settings into [NotificationService] — the
+  /// service owns the actual send gate, so without this the Notifications and
+  /// Privacy toggles would persist but never change delivery behavior.
+  Future<void> _syncNotificationService() async {
+    try {
+      final n = NotificationService.instance;
+      await n.setEnabled(_notifications.pushNotificationsEnabled);
+      await n.setSoundEnabled(_notifications.soundEnabled);
+      await n.setVibrationEnabled(_notifications.vibrationEnabled);
+      await n.setQuietHours(
+        enabled: _notifications.quietHoursEnabled,
+        start: _notifications.quietHoursStart,
+        end: _notifications.quietHoursEnd,
+      );
+      await n.setCategoryPreferences(
+        threatAlerts: _notifications.threatAlertsEnabled,
+        breachAlerts: _notifications.breachAlertsEnabled,
+        scanAlerts: _notifications.scanCompletedAlerts,
+      );
+      await n.setHideContent(_privacy.hideNotificationContent);
+    } catch (_) {
+      // NotificationService unavailable (e.g. tests) — settings still persist.
+    }
   }
 
   /// Update privacy settings
@@ -433,6 +463,9 @@ class SettingsProvider extends ChangeNotifier {
       await _prefs!.setInt('priv_lock_timeout', settings.autoLockTimeout);
       await _prefs!.setBool('priv_hide_notif', settings.hideNotificationContent);
     }
+
+    // Hide-notification-content is enforced by NotificationService.
+    await _syncNotificationService();
   }
 
   /// Update scan settings

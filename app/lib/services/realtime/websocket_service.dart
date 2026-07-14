@@ -83,6 +83,18 @@ class WebSocketService {
       return;
     }
 
+    // Honor the "WebSocket Connection" setting (API settings screen). When
+    // disabled, real-time streaming stays off (the app falls back to polling).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('api_websocket') ?? true)) {
+        _setState(WebSocketState.disconnected);
+        return;
+      }
+    } catch (_) {
+      // Prefs unavailable — default to connecting.
+    }
+
     _setState(WebSocketState.connecting);
 
     try {

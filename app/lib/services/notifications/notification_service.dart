@@ -38,6 +38,19 @@ class NotificationService {
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _criticalAlertsEnabled = true;
+
+  // Quiet hours + content privacy (bridged from SettingsProvider so the
+  // Notifications/Privacy settings screens actually take effect).
+  bool _quietHoursEnabled = false;
+  int _quietHoursStart = 22; // hour of day, inclusive
+  int _quietHoursEnd = 7; // hour of day, exclusive
+  bool _hideContent = false;
+
+  // Per-category toggles (Notifications settings screen). Defaults match
+  // SettingsProvider's NotificationSettings defaults.
+  bool _threatAlerts = true;
+  bool _breachAlerts = true;
+  bool _scanAlerts = false;
   Set<SeverityLevel> _enabledSeverities = {
     SeverityLevel.critical,
     SeverityLevel.high,
@@ -151,7 +164,7 @@ class NotificationService {
   /// Show threat notification
   Future<void> showThreatNotification(ThreatEvent event) async {
     if (!_initialized) await init();
-    if (!_enabled) return;
+    if (_suppressed() || !_threatAlerts) return;
     if (!_enabledSeverities.contains(event.severity)) return;
 
     final channel = _getChannelForSeverity(event.severity);
@@ -198,10 +211,14 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(
-      id,
+    final (privTitle, privBody) = _privatize(
       _getThreatTitle(event),
       event.description ?? 'Tap to view details',
+    );
+    await _notifications.show(
+      id,
+      privTitle,
+      privBody,
       details,
       payload: jsonEncode({
         'type': 'threat',
@@ -221,7 +238,7 @@ class NotificationService {
     SeverityLevel severity = SeverityLevel.high,
   }) async {
     if (!_initialized) await init();
-    if (!_enabled) return;
+    if (_suppressed() || !_breachAlerts) return;
 
     final channel = NotificationChannels.breach;
     final id = _getNextNotificationId();
@@ -262,10 +279,11 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final (privTitle, privBody) = _privatize(title, body);
     await _notifications.show(
       id,
-      title,
-      body,
+      privTitle,
+      privBody,
       details,
       payload: jsonEncode({
         'type': 'breach',
@@ -282,7 +300,7 @@ class NotificationService {
     required int duration,
   }) async {
     if (!_initialized) await init();
-    if (!_enabled) return;
+    if (_suppressed() || !_scanAlerts) return;
 
     final channel = threatsFound > 0
         ? NotificationChannels.scanThreats
@@ -318,10 +336,11 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final (privTitle, privBody) = _privatize(title, body);
     await _notifications.show(
       id,
-      title,
-      body,
+      privTitle,
+      privBody,
       details,
       payload: jsonEncode({
         'type': 'scan',
@@ -338,7 +357,7 @@ class NotificationService {
     required SeverityLevel severity,
   }) async {
     if (!_initialized) await init();
-    if (!_enabled) return;
+    if (_suppressed()) return;
     if (!_enabledSeverities.contains(severity)) return;
 
     final channel = _getChannelForSeverity(severity);
@@ -379,10 +398,14 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(
-      id,
+    final (privTitle, privBody) = _privatize(
       'Suspicious SMS Blocked',
       'Message from $sender detected as $threatType',
+    );
+    await _notifications.show(
+      id,
+      privTitle,
+      privBody,
       details,
       payload: jsonEncode({
         'type': 'sms',
@@ -400,7 +423,7 @@ class NotificationService {
     required SeverityLevel severity,
   }) async {
     if (!_initialized) await init();
-    if (!_enabled) return;
+    if (_suppressed()) return;
 
     final channel = NotificationChannels.urlBlocked;
     final id = _getNextNotificationId();
@@ -430,10 +453,14 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(
-      id,
+    final (privTitle, privBody) = _privatize(
       'Dangerous Site Blocked',
       '$domain blocked: $reason',
+    );
+    await _notifications.show(
+      id,
+      privTitle,
+      privBody,
       details,
       payload: jsonEncode({
         'type': 'url',
@@ -451,7 +478,7 @@ class NotificationService {
     String? payload,
     NotificationChannel? channel,
   }) async {
-    if (!_enabled) return;
+    if (_suppressed()) return;
     // Ensure the plugin + Android channels are initialized; init() is
     // idempotent. Without this, calling show() before init throws a native
     // NPE because the channel/plugin state isn't set up.
@@ -481,7 +508,8 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(id, title, body, details, payload: payload);
+    final (privTitle, privBody) = _privatize(title, body);
+    await _notifications.show(id, privTitle, privBody, details, payload: payload);
   }
 
   /// Cancel notification by ID
@@ -520,6 +548,58 @@ class NotificationService {
     _vibrationEnabled = enabled;
     await _saveSettings();
   }
+
+  /// Configure the quiet-hours window (from the Notifications settings screen).
+  Future<void> setQuietHours({
+    required bool enabled,
+    required int start,
+    required int end,
+  }) async {
+    _quietHoursEnabled = enabled;
+    _quietHoursStart = start;
+    _quietHoursEnd = end;
+    await _saveSettings();
+  }
+
+  /// Enable/disable hiding notification content (from the Privacy settings
+  /// screen). When on, the visible title/body are replaced with a generic
+  /// placeholder so sensitive detail never lands on a lock screen.
+  Future<void> setHideContent(bool hide) async {
+    _hideContent = hide;
+    await _saveSettings();
+  }
+
+  /// Configure per-category delivery (Notifications settings screen).
+  Future<void> setCategoryPreferences({
+    required bool threatAlerts,
+    required bool breachAlerts,
+    required bool scanAlerts,
+  }) async {
+    _threatAlerts = threatAlerts;
+    _breachAlerts = breachAlerts;
+    _scanAlerts = scanAlerts;
+    await _saveSettings();
+  }
+
+  /// Whether the current local time falls inside the user's quiet-hours
+  /// window. Handles windows that wrap past midnight (e.g. 22:00–07:00).
+  bool _inQuietHours() {
+    if (!_quietHoursEnabled || _quietHoursStart == _quietHoursEnd) return false;
+    final hour = DateTime.now().hour;
+    if (_quietHoursStart < _quietHoursEnd) {
+      return hour >= _quietHoursStart && hour < _quietHoursEnd;
+    }
+    return hour >= _quietHoursStart || hour < _quietHoursEnd;
+  }
+
+  /// Central gate for every send path: honors the master switch and quiet
+  /// hours so one check keeps all notification types consistent.
+  bool _suppressed() => !_enabled || _inQuietHours();
+
+  /// Apply the "Hide notification content" privacy setting to a title/body.
+  (String, String) _privatize(String title, String body) => _hideContent
+      ? ('OrbGuard', 'New security alert — tap to view')
+      : (title, body);
 
   /// Enable/disable critical alerts
   Future<void> setCriticalAlertsEnabled(bool enabled) async {
@@ -632,6 +712,16 @@ class NotificationService {
     _criticalAlertsEnabled = prefs.getBool(_keyCriticalEnabled) ?? true;
     _notificationId = prefs.getInt(_keyNotificationId) ?? 0;
 
+    // Quiet hours + content privacy share the SettingsProvider key namespace
+    // (notif_*/priv_*) so the settings screens and this service agree.
+    _quietHoursEnabled = prefs.getBool('notif_quiet') ?? false;
+    _quietHoursStart = prefs.getInt('notif_quiet_start') ?? 22;
+    _quietHoursEnd = prefs.getInt('notif_quiet_end') ?? 7;
+    _hideContent = prefs.getBool('priv_hide_notif') ?? false;
+    _threatAlerts = prefs.getBool('notif_threats') ?? true;
+    _breachAlerts = prefs.getBool('notif_breaches') ?? true;
+    _scanAlerts = prefs.getBool('notif_scan') ?? false;
+
     final severitiesJson = prefs.getString(_keySeverities);
     if (severitiesJson != null) {
       final list = jsonDecode(severitiesJson) as List;
@@ -652,6 +742,13 @@ class NotificationService {
       _keySeverities,
       jsonEncode(_enabledSeverities.map((s) => s.value).toList()),
     );
+    await prefs.setBool('notif_quiet', _quietHoursEnabled);
+    await prefs.setInt('notif_quiet_start', _quietHoursStart);
+    await prefs.setInt('notif_quiet_end', _quietHoursEnd);
+    await prefs.setBool('priv_hide_notif', _hideContent);
+    await prefs.setBool('notif_threats', _threatAlerts);
+    await prefs.setBool('notif_breaches', _breachAlerts);
+    await prefs.setBool('notif_scan', _scanAlerts);
   }
 
   void _onNotificationTap(NotificationResponse response) {

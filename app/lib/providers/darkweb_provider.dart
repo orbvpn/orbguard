@@ -244,6 +244,17 @@ class DarkWebProvider extends ChangeNotifier {
     _updateStats();
   }
 
+  /// Reads the Dark Web Monitoring master toggle (Settings → `prot_darkweb`).
+  /// Fails open (enabled) when preferences are unavailable.
+  Future<bool> _isMonitoringEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      return _prefs?.getBool('prot_darkweb') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   /// Check email for breaches
   Future<BreachCheckResult?> checkEmail(String email) async {
     if (email.isEmpty) return null;
@@ -439,6 +450,15 @@ class DarkWebProvider extends ChangeNotifier {
 
   /// Refresh alerts
   Future<void> refreshAlerts() async {
+    // Honor the Dark Web Monitoring master toggle (Settings → prot_darkweb):
+    // when off, skip automatic breach-alert polling. Explicit user checks
+    // (checkEmail/checkPassword) remain available. Fails open.
+    if (!await _isMonitoringEnabledByUser()) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     notifyListeners();
 

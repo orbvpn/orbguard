@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api/orbguard_api_client.dart';
 import '../models/api/url_reputation.dart';
@@ -285,6 +286,11 @@ class AppSecurityProvider extends ChangeNotifier {
   Future<void> scanAllApps() async {
     if (_isScanning) return;
 
+    // Honor the App Security master toggle (Settings → prot_app). Fails open
+    // (scans) when the preference is unreadable — an unreadable flag is not a
+    // user opt-out.
+    if (!await _isProtectionEnabledByUser()) return;
+
     _isScanning = true;
     _scanProgress = 0.0;
     notifyListeners();
@@ -301,6 +307,17 @@ class AppSecurityProvider extends ChangeNotifier {
     _isScanning = false;
     _updateStats();
     notifyListeners();
+  }
+
+  /// Reads the App Security master toggle (Settings → `prot_app`). Fails open
+  /// (enabled) when preferences are unavailable.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool('prot_app') ?? true;
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Analyze single app

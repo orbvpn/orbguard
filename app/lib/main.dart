@@ -122,14 +122,24 @@ void main() async {
   // back to the default on empty/malformed input.
   try {
     final prefs = await SharedPreferences.getInstance();
+    // Only override the base URL when the user has explicitly enabled the
+    // "Use Custom Server" toggle — otherwise a stored URL would silently win
+    // even after the toggle is switched back off.
+    final useCustom = prefs.getBool('api_custom') ?? false;
     final customUrl = prefs.getString('api_url')?.trim();
-    if (customUrl != null &&
+    if (useCustom &&
+        customUrl != null &&
         customUrl.isNotEmpty &&
         (Uri.tryParse(customUrl)?.hasScheme ?? false)) {
       ApiConfig.setBaseUrl(customUrl);
     }
+    // Apply the user's connection-timeout setting before the client inits.
+    final timeoutSeconds = prefs.getInt('api_timeout');
+    if (timeoutSeconds != null) {
+      ApiConfig.setTimeoutSeconds(timeoutSeconds);
+    }
   } catch (_) {
-    // Prefs unavailable — keep the default base URL.
+    // Prefs unavailable — keep the default base URL and timeouts.
   }
 
   // Initialize OrbGuard API Client first
@@ -331,12 +341,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _lastScanItemsScanned = 0;
   Duration _lastScanDuration = Duration.zero;
 
-  Future<void> _startScan({bool deepScan = false}) async {
+  Future<void> _startScan({bool? deepScan}) async {
     // Check if we have enough permissions
     if (_detectionCapability < 50) {
       _showPermissionWarning();
       return;
     }
+
+    // Honor the Deep Scan setting unless a caller explicitly overrides it.
+    final effectiveDeepScan =
+        deepScan ?? context.read<SettingsProvider>().scan.deepScanEnabled;
 
     // Navigate to scanning screen
     final scanResult = await Navigator.push<ScanResult>(
@@ -345,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
           onScanWithProgress: (onProgress) =>
               DeviceScanService.instance.performScan(
-            deepScan: deepScan,
+            deepScan: effectiveDeepScan,
             hasRoot: _hasRootAccess,
             onProgress: onProgress,
           ),
