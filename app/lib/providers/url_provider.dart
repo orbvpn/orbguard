@@ -2,6 +2,7 @@
 /// State management for URL/web protection features
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -212,7 +213,11 @@ class UrlProvider extends ChangeNotifier {
     await loadLists();
     _updateStats();
     notifyListeners();
-    await syncListsWithBackend();
+    // Fire-and-forget: the local data above is ready and the screen can render
+    // now. The backend sync makes several network calls that (with retry-on-
+    // timeout) can stall for minutes — never block the initial render on it.
+    // It is self-contained (own try/catch) and notifies when it completes.
+    unawaited(syncListsWithBackend());
   }
 
   /// Check a URL
