@@ -440,7 +440,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                       tooltip: 'Open ${bureau.displayName}\'s official '
                           'freeze page',
                       icon: DuotoneIcon(
-                        'link',
+                        'link_round',
                         size: 18,
                         color: AppColors.accentInk,
                       ),

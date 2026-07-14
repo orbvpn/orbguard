@@ -1858,7 +1858,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            DuotoneIcon('link', color: context.onSurfaceMuted, size: 64),
+            DuotoneIcon('link_round', color: context.onSurfaceMuted, size: 64),
             const SizedBox(height: 16),
             Text('No correlations recorded yet', style: TextStyle(color: context.onSurfaceMuted)),
             const SizedBox(height: 16),
@@ -1986,7 +1986,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         children: [
           Row(
             children: [
-              DuotoneIcon('link', color: engineColor, size: 24),
+              DuotoneIcon('link_round', color: engineColor, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

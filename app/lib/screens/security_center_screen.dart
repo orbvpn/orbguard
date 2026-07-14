@@ -436,7 +436,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             const SizedBox(width: 12),
             Expanded(
               child: _buildQuickActionCard(
-                icon: 'link',
+                icon: 'link_round',
                 label: 'Check URL',
                 color: AppColors.amberInk,
                 isDark: isDark,
@@ -740,7 +740,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             _buildProtectionRow(
               'URL Protection',
               'Blocks malicious links',
-              'link',
+              'link_round',
               prot.urlProtectionEnabled,
               (value) => settings.updateProtection(
                   prot.copyWith(urlProtectionEnabled: value)),
@@ -922,7 +922,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   String _getAlertIcon(String type) {
     switch (type) {
       case 'sms': return 'chat_dots';
-      case 'url': return 'link';
+      case 'url': return 'link_round';
       case 'qr': return 'qr_code';
       case 'app': return 'widget';
       case 'network': return 'wi_fi_router';

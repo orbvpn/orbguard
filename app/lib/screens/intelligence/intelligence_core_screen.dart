@@ -484,7 +484,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildQuickCheckButton('link', 'URL', 'Check URL safety'),
+              _buildQuickCheckButton('link_round', 'URL', 'Check URL safety'),
               const SizedBox(width: 12),
               _buildQuickCheckButton('object_scan', 'File Hash', 'Check file hash'),
             ],
@@ -819,7 +819,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
       case 'domain':
         return 'server';
       case 'url':
-        return 'link';
+        return 'link_round';
       case 'hash (md5)':
       case 'hash (sha256)':
         return 'object_scan';

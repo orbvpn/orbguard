@@ -392,7 +392,7 @@ class ProtectionSettingsScreen extends StatelessWidget {
                 context,
                 'URL Protection',
                 'Check URLs for malicious content',
-                'link',
+                'link_round',
                 protection.urlProtectionEnabled,
                 (value) => settings.updateProtection(
                   protection.copyWith(urlProtectionEnabled: value),

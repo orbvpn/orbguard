@@ -428,7 +428,7 @@ class QrProvider extends ChangeNotifier {
   static String getContentTypeIcon(String contentType) {
     switch (contentType.toLowerCase()) {
       case 'url':
-        return 'link';
+        return 'link_round';
       case 'text':
         return 'text_fields';
       case 'email':

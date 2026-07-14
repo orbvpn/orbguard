@@ -832,7 +832,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   },
                 ),
                 _buildDrawerItem(
-                  svgIcon: 'link',
+                  svgIcon: 'link_round',
                   title: 'URL Protection',
                   subtitle: 'Malicious link scanner',
                   onTap: () {
