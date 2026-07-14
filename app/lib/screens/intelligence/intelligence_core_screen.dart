@@ -41,7 +41,9 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   bool _isLoading = false;
   bool _isSearching = false;
   String? _error;
-  final TextEditingController _searchController = TextEditingController();
+  /// Browse-list filter text, driven by the GlassTabPage nav-bar search (there
+  /// is no separate in-content search field — the nav search is the one search).
+  String _browseQuery = '';
   final TextEditingController _checkInputController = TextEditingController();
   final List<api.ThreatIndicator> _indicators = [];
   final List<api.ThreatIndicator> _searchResults = [];
@@ -67,7 +69,6 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
     _checkInputController.dispose();
     super.dispose();
   }
@@ -107,7 +108,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
     return GlassTabPage(
       title: 'Intelligence Core',
       hasSearch: true,
-      searchHint: 'Search IOCs...',
+      searchHint: 'Search indicators...',
+      onSearchChanged: (q) => setState(() => _browseQuery = q.trim().toLowerCase()),
       // As the Intel tab: render standalone (tabs at bottom) with a Home button
       // that returns to the Home tab. Otherwise honour the embedded flag.
       embedded: widget.asMainTab ? false : widget.embedded,
@@ -233,42 +235,11 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
 
     return Column(
       children: [
-        // Search and Filter Bar
+        // Type-filter chips (search is the nav-bar search — see onSearchChanged).
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Search
-              GlassContainer(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    DuotoneIcon('magnifer', size: 20, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: TextStyle(color: cs.onSurface),
-                        decoration: InputDecoration(
-                          hintText: 'Search indicators...',
-                          hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
-                          border: InputBorder.none,
-                        ),
-                        onChanged: (value) => setState(() {}),
-                      ),
-                    ),
-                    if (_searchController.text.isNotEmpty)
-                      IconButton(
-                        icon: DuotoneIcon('close_circle', size: 20, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
               // Type Filter
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -319,8 +290,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
             itemCount: filteredIndicators.length,
             itemBuilder: (context, index) {
               final indicator = filteredIndicators[index];
-              if (_searchController.text.isNotEmpty &&
-                  !indicator.value.toLowerCase().contains(_searchController.text.toLowerCase())) {
+              if (_browseQuery.isNotEmpty &&
+                  !indicator.value.toLowerCase().contains(_browseQuery)) {
                 return const SizedBox.shrink();
               }
               return _buildIndicatorCard(indicator);
