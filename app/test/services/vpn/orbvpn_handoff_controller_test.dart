@@ -23,7 +23,7 @@ void main() {
       controller.dispose();
     });
 
-    test('falls back to a store URL when the deep link is unavailable',
+    test('falls back to the download page when the deep link is unavailable',
         () async {
       final launched = <Uri>[];
       final controller = OrbVpnHandoffController(
@@ -37,7 +37,8 @@ void main() {
       await controller.connect();
 
       expect(launched, hasLength(1));
-      expect(launched.single.scheme, anyOf('https', 'market'));
+      expect(launched.single.scheme, 'https');
+      expect(launched.single.host, 'orbvpn.com');
       controller.dispose();
     });
 

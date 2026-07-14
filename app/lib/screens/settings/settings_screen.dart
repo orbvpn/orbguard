@@ -15,6 +15,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/theme_mode_selector.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
+import '../../services/vpn/orbvpn_handoff_controller.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -1135,6 +1136,8 @@ class VpnSettingsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
+              _buildOrbVpnHandoffCard(context),
+              const SizedBox(height: 20),
               _buildSwitchTile(
                 context,
                 'Auto Connect',
@@ -1224,6 +1227,64 @@ class VpnSettingsScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Interim VPN hand-off: OrbGuard has no bundled tunnel yet, so it opens the
+  /// OrbVPN app (or its download page). See docs/VPN_PORT_PLAN.md.
+  Widget _buildOrbVpnHandoffCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.vpn_lock_rounded, color: cs.onSurface, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'VPN by OrbVPN',
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'OrbGuard uses the OrbVPN app for the VPN tunnel. Open OrbVPN to '
+            "connect — or download it if you don't have it yet. The options "
+            'below apply once the VPN is active.',
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final controller = OrbVpnHandoffController();
+                await controller.connect();
+                controller.dispose();
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              label: const Text('Open OrbVPN'),
+            ),
+          ),
+        ],
       ),
     );
   }

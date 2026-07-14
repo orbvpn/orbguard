@@ -6,33 +6,25 @@
 // entry point honest today instead of presenting dead controls.
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'vpn_controller.dart';
 
-/// OrbVPN app identifiers used for the hand-off.
-///
-/// TODO(vpn): confirm these against the shipping OrbVPN apps before relying on
-/// the deep link in production. The Android package is known
-/// (`com.orbvpn.android`); the iOS App Store id and the deep-link scheme should
-/// be verified with the OrbVPN team.
+/// OrbVPN app identifiers used for the hand-off. Both are confirmed against the
+/// shipping OrbVPN apps: the `orbvpn` custom scheme is registered on iOS
+/// (CFBundleURLSchemes) and Android, and the download page routes to every
+/// platform's store.
 class OrbVpnLinks {
   OrbVpnLinks._();
 
-  /// Custom-scheme deep link that opens the OrbVPN app (and, ideally, starts a
-  /// connection). Confirm the exact scheme/host with the OrbVPN app.
-  static const String deepLink = 'orbvpn://connect';
+  /// Custom-scheme deep link that opens the OrbVPN app when installed.
+  static const String deepLink = 'orbvpn://';
 
-  static const String androidPackage = 'com.orbvpn.android';
-
-  static const String androidStore =
-      'https://play.google.com/store/apps/details?id=$androidPackage';
-
-  /// iOS App Store page. TODO(vpn): replace with the real numeric app id.
-  static const String iosStore = 'https://apps.apple.com/app/orbvpn/id0000000000';
+  /// Official cross-platform download page — the fallback when OrbVPN isn't
+  /// installed (covers iOS, Android, and desktop stores).
+  static const String downloadPage = 'https://orbvpn.com/en/download';
 }
 
 /// Interim [VpnController] that defers the actual tunnel to the OrbVPN app.
@@ -60,9 +52,9 @@ class OrbVpnHandoffController implements VpnController {
     if (!_statusController.isClosed) _statusController.add(s);
   }
 
-  /// Opens the OrbVPN app (deep link), falling back to the platform store.
-  /// Status stays [VpnStatus.unavailable] because OrbGuard itself is not the
-  /// tunnel here — the OrbVPN app owns the connection.
+  /// Opens the OrbVPN app (deep link), falling back to the official download
+  /// page when it isn't installed. Status stays [VpnStatus.unavailable] because
+  /// OrbGuard itself is not the tunnel here — the OrbVPN app owns the connection.
   @override
   Future<void> connect() async {
     try {
@@ -71,11 +63,16 @@ class OrbVpnHandoffController implements VpnController {
         await _launch(deep, mode: LaunchMode.externalApplication);
         return;
       }
-      final store = Uri.parse(
-          Platform.isIOS ? OrbVpnLinks.iosStore : OrbVpnLinks.androidStore);
-      await _launch(store, mode: LaunchMode.externalApplication);
     } catch (e) {
-      debugPrint('OrbVpnHandoffController: hand-off failed: $e');
+      // canLaunch/launch of the custom scheme failed — fall through to the
+      // download page below.
+      debugPrint('OrbVpnHandoffController: deep link unavailable: $e');
+    }
+    try {
+      await _launch(Uri.parse(OrbVpnLinks.downloadPage),
+          mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('OrbVpnHandoffController: download page failed: $e');
       _setStatus(VpnStatus.error);
     }
   }

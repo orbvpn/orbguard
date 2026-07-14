@@ -162,6 +162,12 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
+
+        <!-- Detect/launch the OrbVPN app for the VPN hand-off (orbvpn:// scheme). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="orbvpn" />
+        </intent>
     </queries>
 
 </manifest>

@@ -107,5 +107,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Allow canLaunchUrl() to detect the OrbVPN app for the VPN hand-off. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>orbvpn</string>
+	</array>
 </dict>
 </plist>
