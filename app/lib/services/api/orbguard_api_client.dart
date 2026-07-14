@@ -560,10 +560,9 @@ class OrbGuardApiClient {
   /// POST /api/v1/device/{device_id}/push-token
   /// Body: { "token", "platform" }
   ///
-  /// [platform] defaults to the current OS ("android"/"ios"). This is only
-  /// invoked once Firebase Cloud Messaging hands the app a real token (see
-  /// DevicePushService and docs/FCM_SETUP.md); with no Firebase dependency in
-  /// the current build it is never called.
+  /// [platform] defaults to the current OS ("android"/"ios"). Invoked by
+  /// DevicePushService once Firebase Cloud Messaging hands the app a token
+  /// (on init and on every token refresh).
   Future<bool> registerPushToken(String token, {String? platform}) async {
     if (token.isEmpty) {
       throw ApiError(

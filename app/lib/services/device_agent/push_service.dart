@@ -5,34 +5,27 @@
 library;
 
 /// WHY THIS EXISTS:
-/// WHY THIS EXISTS NOW, BUILD-SAFE:
-/// The device agent (device_agent.dart) has NO push channel today — remote
-/// commands are HTTP-polled (60s foreground timer + poll-on-resume; Android
-/// adds a 15-min WorkManager cycle). A high-priority FCM/APNs *data* push would
-/// let the backend wake the agent immediately so a locate/lock/wipe is acted on
-/// in seconds, not minutes.
+/// The device agent (device_agent.dart) is HTTP-polled (60s foreground timer +
+/// poll-on-resume; Android adds a 15-min WorkManager cycle). A high-priority
+/// FCM/APNs *data* push lets the backend wake the agent immediately so a
+/// locate/lock/wipe is acted on in seconds, not minutes. Polling remains the
+/// fallback whenever push is unavailable.
 ///
-/// Adding `firebase_core` + `firebase_messaging` to pubspec AND applying the
-/// `com.google.gms.google-services` Gradle plugin REQUIRES
-/// `android/app/google-services.json`, which this repo does NOT ship. Adding
-/// those now BREAKS `flutter build apk`. So this file is written to COMPILE
-/// WITH ZERO FIREBASE IMPORTS: the Firebase-specific code path is present but
-/// unreachable, guarded by [kFirebaseEnabled] (false) and kept inside a clearly
-/// marked block. Everything that needs no Firebase dependency — backend token
-/// registration and the "push received → poll the agent now" hook — is real and
-/// works today.
+/// STATUS: the client integration is fully wired and ACTIVE ([kFirebaseEnabled]
+/// = true): firebase_core + firebase_messaging are in pubspec, the config files
+/// (GoogleService-Info.plist / google-services.json for project `orb-guard`) are
+/// present, and [DevicePushService.init] initializes Firebase, requests
+/// permission, retrieves + registers the token, and wires foreground /
+/// opened-app / background handlers.
 ///
-/// ACTIVATION (full steps in docs/FCM_SETUP.md):
-///   1. Add google-services.json (Android) / GoogleService-Info.plist (iOS).
-///   2. Add firebase_core + firebase_messaging to pubspec; apply the gms plugin.
-///   3. Uncomment the single block marked `--- FIREBASE BLOCK ---` below and add
-///      the two marked imports at the top of this file.
-///   4. Set [kFirebaseEnabled] = true.
-///   5. Backend: set ORBGUARD_FCM_PROJECT_ID + ORBGUARD_FCM_SERVICE_ACCOUNT_JSON,
-///      run migration 022.
-///
-/// Until then iOS/Android both rely on the already-implemented polling, which is
-/// correct (just higher-latency than push).
+/// REMAINING (provisioning, outside this file):
+///   - Backend: set ORBGUARD_FCM_PROJECT_ID=orb-guard and
+///     ORBGUARD_FCM_SERVICE_ACCOUNT_JSON (an orb-guard service-account key) on
+///     the Azure Container App, and apply migration 022 (device_push_tokens).
+///     Until then the backend push sender is a logged no-op and delivery falls
+///     back to polling.
+///   - iOS release: upload an APNs auth key to the orb-guard Firebase project
+///     and set aps-environment=production in Runner.entitlements.
 
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -45,10 +38,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../api/orbguard_api_client.dart';
 import 'device_agent.dart';
 
-/// Master switch for the Firebase Cloud Messaging integration. Stays `false`
-/// until the Firebase dependencies + config files are added (see file header
-/// and docs/FCM_SETUP.md). While `false`, [DevicePushService.init] is a
-/// logged no-op and the app falls back to the existing HTTP polling.
+/// Master switch for the Firebase Cloud Messaging integration. Active (`true`):
+/// the Firebase dependencies + config files are present. While `false`,
+/// [DevicePushService.init] is a logged no-op and the app falls back to the
+/// existing HTTP polling.
 const bool kFirebaseEnabled = true;
 
 /// On-device push abstraction for the anti-theft agent. Singleton so the app
