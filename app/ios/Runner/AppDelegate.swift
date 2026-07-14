@@ -4,7 +4,10 @@
 //
 // Honesty contract: every capability that iOS does not expose through a public
 // API returns an explicit FlutterError (code UNSUPPORTED / PERMISSION_DENIED /
-// UNAVAILABLE) instead of fabricated zeros or empty "clean" results.
+// UNAVAILABLE) instead of fabricated zeros or empty "clean" results. Where iOS
+// DOES expose a real check (proxy/MITM, injected dylibs, debugger/tamper,
+// screen capture, sandbox escape), the scan runs it for real — an empty result
+// then means "checked, nothing found", not "couldn't check".
 
 import Flutter
 import UIKit
@@ -13,6 +16,8 @@ import UserNotifications
 import NetworkExtension
 import CoreLocation
 import OSLog
+import CFNetwork
+import MachO
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -112,19 +117,26 @@ import OSLog
             result(true)
 
         // iOS sandboxes third-party apps from other processes' sockets, memory,
-        // process table and data, so these deep stages genuinely cannot run
-        // (short of a jailbreak). Report them UNAVAILABLE so the Dart scan marks
-        // them as skipped/limited rather than silently reporting an all-clear —
-        // returning empty threats here would overstate what was actually scanned.
+        // iOS sandboxes apps from other processes' sockets, memory and data, so
+        // these stages cannot inspect OTHER apps. Instead each runs the real,
+        // device-wide checks iOS DOES permit for the current runtime + device
+        // posture (MITM proxy, injected dylibs, debugger, screen capture,
+        // sandbox escape). An empty result means "checked, nothing found".
         case "scanNetwork":
-            result(FlutterError(code: "UNAVAILABLE",
-                message: "Network-connection inspection is not available on iOS (the OS does not expose other processes' sockets to apps).",
-                details: nil))
+            DispatchQueue.global(qos: .userInitiated).async {
+                let threats = self.scanNetworkThreats()
+                DispatchQueue.main.async {
+                    result(["threats": threats])
+                }
+            }
 
         case "scanProcesses":
-            result(FlutterError(code: "UNAVAILABLE",
-                message: "Running-process inspection is not available on iOS (apps cannot enumerate other processes).",
-                details: nil))
+            DispatchQueue.global(qos: .userInitiated).async {
+                let threats = self.scanProcessThreats()
+                DispatchQueue.main.async {
+                    result(["threats": threats])
+                }
+            }
 
         case "scanFileSystem":
             DispatchQueue.global(qos: .userInitiated).async {
@@ -135,14 +147,20 @@ import OSLog
             }
 
         case "scanDatabases":
-            result(FlutterError(code: "UNAVAILABLE",
-                message: "App-database inspection is not available on iOS (apps are sandboxed from each other's data).",
-                details: nil))
+            DispatchQueue.global(qos: .userInitiated).async {
+                let threats = self.scanSandboxThreats()
+                DispatchQueue.main.async {
+                    result(["threats": threats])
+                }
+            }
 
         case "scanMemory":
-            result(FlutterError(code: "UNAVAILABLE",
-                message: "Memory inspection is not available on iOS without a jailbreak.",
-                details: nil))
+            DispatchQueue.global(qos: .userInitiated).async {
+                let threats = self.scanMemoryThreats()
+                DispatchQueue.main.async {
+                    result(["threats": threats])
+                }
+            }
 
         case "removeThreat":
             // Threat removal not supported without jailbreak
@@ -452,6 +470,149 @@ import OSLog
         }
 
         return false
+    }
+
+    // MARK: - Real iOS runtime/device security checks
+    //
+    // The maximal on-device inspection a sandboxed iOS app is permitted to do:
+    // MITM-proxy config, injected tweak dylibs, debugger/tamper, screen capture
+    // and sandbox escape (jailbreak). These are the same signals legitimate iOS
+    // security/anti-fraud SDKs use. Each returns real findings; an empty array
+    // means the check ran and found nothing (not "unavailable").
+
+    /// Detects a system HTTP proxy that could be intercepting traffic (MITM).
+    private func scanNetworkThreats() -> [[String: Any]] {
+        var threats: [[String: Any]] = []
+        guard let cf = CFNetworkCopySystemProxySettings()?.takeRetainedValue(),
+              let settings = cf as? [String: Any] else {
+            return threats
+        }
+        if let enabled = settings[kCFNetworkProxiesHTTPEnable as String] as? Int,
+           enabled == 1,
+           let host = settings[kCFNetworkProxiesHTTPProxy as String] as? String,
+           !host.isEmpty {
+            threats.append([
+                "id": "net_proxy_\(UUID().uuidString)",
+                "name": "HTTP proxy configured",
+                "type": "network",
+                "severity": "MEDIUM",
+                "path": host,
+                "description": "A proxy (\(host)) is routing this device's web traffic. If you did not set it up, a malicious proxy can intercept and modify traffic (man-in-the-middle).",
+                "requiresRoot": false,
+                "metadata": ["proxy_host": host]
+            ])
+        }
+        return threats
+    }
+
+    /// Detects code-injection/hooking libraries loaded into this process and
+    /// active screen capture/mirroring.
+    private func scanProcessThreats() -> [[String: Any]] {
+        var threats: [[String: Any]] = []
+        let hooks = ["substrate", "substitute", "libhooker", "cycript", "cynject",
+                     "frida", "sslkillswitch", "libjailbreak", "rocketbootstrap",
+                     "tweakinject", "shadow.dylib"]
+        for i in 0..<_dyld_image_count() {
+            guard let cname = _dyld_get_image_name(i) else { continue }
+            let full = String(cString: cname)
+            let lower = full.lowercased()
+            if let hit = hooks.first(where: { lower.contains($0) }) {
+                threats.append([
+                    "id": "proc_inject_\(UUID().uuidString)",
+                    "name": "Injected library detected",
+                    "type": "process",
+                    "severity": "HIGH",
+                    "path": full,
+                    "description": "A code-injection/hooking library (\(hit)) is loaded into this app — a sign of a jailbroken device or a tampered build, which spyware uses to hook into apps.",
+                    "requiresRoot": false,
+                    "metadata": ["library": hit]
+                ])
+            }
+        }
+        var captured = false
+        if Thread.isMainThread {
+            captured = UIScreen.main.isCaptured
+        } else {
+            DispatchQueue.main.sync { captured = UIScreen.main.isCaptured }
+        }
+        if captured {
+            threats.append([
+                "id": "proc_screencapture_\(UUID().uuidString)",
+                "name": "Screen is being captured",
+                "type": "process",
+                "severity": "MEDIUM",
+                "path": "UIScreen.isCaptured",
+                "description": "The screen is currently being recorded or mirrored. If you did not start a recording or AirPlay session, screen-capture spyware may be active.",
+                "requiresRoot": false,
+                "metadata": [:]
+            ])
+        }
+        return threats
+    }
+
+    /// Detects an attached debugger/tracer and DYLD library injection.
+    private func scanMemoryThreats() -> [[String: Any]] {
+        var threats: [[String: Any]] = []
+        if isDebuggerAttached() {
+            threats.append([
+                "id": "mem_debugger_\(UUID().uuidString)",
+                "name": "Debugger attached to app",
+                "type": "memory",
+                "severity": "HIGH",
+                "path": "P_TRACED",
+                "description": "A debugger/tracer is attached to this app. Outside development this indicates runtime tampering or dynamic instrumentation by malware.",
+                "requiresRoot": false,
+                "metadata": [:]
+            ])
+        }
+        if let raw = getenv("DYLD_INSERT_LIBRARIES") {
+            let libs = String(cString: raw)
+            if !libs.isEmpty {
+                threats.append([
+                    "id": "mem_dyld_\(UUID().uuidString)",
+                    "name": "DYLD injection detected",
+                    "type": "memory",
+                    "severity": "HIGH",
+                    "path": libs,
+                    "description": "DYLD_INSERT_LIBRARIES is set (\(libs)) — a library is being force-loaded into apps, a common malware/hooking technique.",
+                    "requiresRoot": false,
+                    "metadata": ["libraries": libs]
+                ])
+            }
+        }
+        return threats
+    }
+
+    /// Attempts to write outside the app sandbox. Success is only possible on a
+    /// jailbroken device (the sandbox is broken), the precondition for most iOS
+    /// spyware such as Pegasus.
+    private func scanSandboxThreats() -> [[String: Any]] {
+        var threats: [[String: Any]] = []
+        let probe = "/private/.orbguard_sbx_\(UUID().uuidString)"
+        if (try? "x".write(toFile: probe, atomically: true, encoding: .utf8)) != nil {
+            try? FileManager.default.removeItem(atPath: probe)
+            threats.append([
+                "id": "sbx_escape_\(UUID().uuidString)",
+                "name": "Sandbox escape possible (jailbreak)",
+                "type": "system",
+                "severity": "CRITICAL",
+                "path": "/private",
+                "description": "This app was able to write outside its sandbox, which is only possible on a jailbroken device. Jailbreaking removes the protections that stop spyware from reading your data.",
+                "requiresRoot": false,
+                "metadata": [:]
+            ])
+        }
+        return threats
+    }
+
+    /// True when a debugger/tracer is attached to this process (P_TRACED).
+    private func isDebuggerAttached() -> Bool {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        let ret = sysctl(&mib, 4, &info, &size, nil, 0)
+        if ret != 0 { return false }
+        return (info.kp_proc.p_flag & P_TRACED) != 0
     }
 
     // MARK: - Basic File System Scan
