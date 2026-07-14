@@ -190,81 +190,23 @@ import OSLog
                 "lastSync": 0
             ])
 
-        case "getThreatStats":
-            result([
-                "totalIndicators": 0,
-                "activeCampaigns": 0,
-                "threatActors": 0,
-                "sources": 0,
-                "healthyFeeds": 0
-            ])
-
         // ============================================================
-        // API METHODS (Return not implemented for now)
+        // Threat-intel / analysis are served by the backend API
+        // (guard.orbai.world), NOT the native layer. These handlers used to
+        // return fabricated "safe"/zero results; they now fail honestly so a
+        // caller can never be silently told "you're safe".
         // ============================================================
 
-        case "syncThreatIntelligence":
-            result([
-                "newIndicators": 0,
-                "updatedIndicators": 0,
-                "deletedIndicators": 0,
-                "success": true
-            ])
-
-        case "checkURLReputation":
-            guard let args = call.arguments as? [String: Any],
-                  let url = args["url"] as? String else {
-                result(FlutterError(code: "INVALID_ARGS", message: "URL required", details: nil))
-                return
-            }
-            // Return safe by default
-            result([
-                "domain": url,
-                "riskScore": 0,
-                "riskLevel": "low",
-                "isMalicious": false,
-                "isPhishing": false,
-                "categories": []
-            ])
-
-        case "analyzeSMS":
-            guard let args = call.arguments as? [String: Any],
-                  let _ = args["content"] as? String else {
-                result(FlutterError(code: "INVALID_ARGS", message: "Content required", details: nil))
-                return
-            }
-            // Return safe by default
-            result([
-                "isPhishing": false,
-                "riskScore": 0,
-                "riskLevel": "low",
-                "threatCount": 0,
-                "urlCount": 0,
-                "recommendations": []
-            ])
-
-        case "scanQRCode":
-            guard let args = call.arguments as? [String: Any],
-                  let _ = args["content"] as? String else {
-                result(FlutterError(code: "INVALID_ARGS", message: "Content required", details: nil))
-                return
-            }
-            // Return safe by default
-            result([
-                "contentType": "url",
-                "threatLevel": "safe",
-                "shouldBlock": false,
-                "threatCount": 0,
-                "warnings": [],
-                "recommendations": []
-            ])
-
-        case "checkIndicators":
-            result([
-                "totalChecked": 0,
-                "totalFound": 0,
-                "foundIndicators": []
-            ])
+        case "getThreatStats",
+             "syncThreatIntelligence",
+             "checkURLReputation",
+             "analyzeSMS",
+             "scanQRCode",
+             "checkIndicators":
+            result(FlutterError(
+                code: "UNAVAILABLE",
+                message: "\(call.method) is served by the OrbGuard backend API, not the native layer",
+                details: nil))
 
         // ============================================================
         // SETTINGS METHODS
