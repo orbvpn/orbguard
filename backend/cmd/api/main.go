@@ -365,6 +365,14 @@ func main() {
 		}
 	}
 
+	// Keep the threat graph populated automatically. SyncFromPostgres is a full
+	// re-sync (campaigns, actors, all indicators), so it runs in the background
+	// on a long interval instead of on demand — otherwise the graph stays empty
+	// until someone manually calls POST /graph/sync.
+	if graphService != nil && cfg.Neo4j.AutoSync {
+		go runGraphAutoSync(ctx, graphService, cfg.Neo4j, log)
+	}
+
 	// Initialize digital footprint scanner
 	footprintScanner := digital_footprint.NewScanner(redisCache, log, digital_footprint.DefaultScannerConfig())
 	if repos != nil {
@@ -625,13 +633,13 @@ func buildScamDetectorConfig(cfg *config.Config, log *logger.Logger) ai.ScamDete
 		AzureOpenAIAPIVersion: sc.AzureOpenAIAPIVersion,
 
 		AzureOpenAITranscribeDeployment: sc.AzureOpenAITranscribeDeployment,
-		EnableLLM:             enableLLM,
-		EnablePatternDB:       sc.EnablePatternDB,
-		EnablePhoneRep:        sc.EnablePhoneRep,
-		EnableVision:          enableVision,
-		EnableSpeech:          enableSpeech,
-		ScamThreshold:         sc.ScamThreshold,
-		SuspiciousThresh:      sc.SuspiciousThresh,
+		EnableLLM:                       enableLLM,
+		EnablePatternDB:                 sc.EnablePatternDB,
+		EnablePhoneRep:                  sc.EnablePhoneRep,
+		EnableVision:                    enableVision,
+		EnableSpeech:                    enableSpeech,
+		ScamThreshold:                   sc.ScamThreshold,
+		SuspiciousThresh:                sc.SuspiciousThresh,
 	}
 }
 
@@ -703,6 +711,46 @@ func runMLAutoTrain(
 			return
 		case <-ticker.C:
 			train()
+		}
+	}
+}
+
+// runGraphAutoSync periodically mirrors PostgreSQL data into Neo4j so the
+// threat-graph endpoints have a populated graph. The sync walks the full
+// indicator/campaign/actor set, so it runs off the request hot path: an initial
+// pass a short delay after boot, then once per configured interval.
+func runGraphAutoSync(ctx context.Context, svc *services.GraphService, cfg config.Neo4jConfig, log *logger.Logger) {
+	interval := time.Duration(cfg.SyncIntervalMinutes) * time.Minute
+	if interval <= 0 {
+		interval = 12 * time.Hour
+	}
+
+	sync := func() {
+		start := time.Now()
+		log.Info().Msg("graph auto-sync: starting PostgreSQL -> Neo4j sync")
+		if err := svc.SyncFromPostgres(ctx); err != nil {
+			log.Warn().Err(err).Msg("graph auto-sync failed")
+			return
+		}
+		log.Info().Dur("duration", time.Since(start)).Msg("graph auto-sync complete")
+	}
+
+	// Delay the first sync so it does not compete with startup work.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(2 * time.Minute):
+	}
+	sync()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sync()
 		}
 	}
 }

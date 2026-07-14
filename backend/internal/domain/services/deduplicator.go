@@ -35,9 +35,9 @@ func NewDeduplicator(cache *cache.RedisCache, log *logger.Logger) *Deduplicator 
 
 // DeduplicationResult represents the result of deduplication
 type DeduplicationResult struct {
-	NewIndicators     []*models.Indicator
+	NewIndicators      []*models.Indicator
 	ExistingIndicators []*models.Indicator
-	DuplicateCount    int
+	DuplicateCount     int
 }
 
 // Deduplicate checks for duplicates and returns unique indicators
@@ -102,22 +102,25 @@ func (d *Deduplicator) MarkSeen(ctx context.Context, hash string) {
 	}
 }
 
-// MarkSeenBatch marks multiple hashes as seen
+// MarkSeenBatch marks multiple hashes as seen in one Redis round-trip.
 func (d *Deduplicator) MarkSeenBatch(ctx context.Context, hashes []string) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+
 	pipe := d.cache.Pipeline()
 
 	d.mu.Lock()
 	for _, hash := range hashes {
 		d.seenHashes[hash] = true
-		key := "dedup:" + hash
-		pipe.Set(ctx, d.cache.Client().Options().Addr, "1", d.cacheTTL)
-		_ = key // Used in actual pipeline
+		pipe.Set(ctx, "dedup:"+hash, "1", d.cacheTTL)
 	}
 	d.mu.Unlock()
 
-	// Note: This is a simplified version. In production, you'd use the pipeline properly
-	for _, hash := range hashes {
-		d.MarkSeen(ctx, hash)
+	// Best-effort cache write (like MarkSeen): the in-memory set above is the
+	// source of truth, so a Redis failure is logged, not propagated.
+	if _, err := pipe.Exec(ctx); err != nil {
+		d.logger.Warn().Err(err).Int("count", len(hashes)).Msg("failed to mark hashes as seen in cache")
 	}
 
 	return nil

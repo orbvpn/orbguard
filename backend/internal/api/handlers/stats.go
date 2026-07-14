@@ -22,16 +22,26 @@ type StatsHandler struct {
 	// netRepo reads per-device protection state (DNS/VPN configs, audits,
 	// anti-theft settings, SMS/app analysis activity).
 	netRepo *repository.NetworkSecurityRepository
+
+	// reports counts user-submitted community threat reports; shares the
+	// indicator repository's pool (as IntelligenceHandler does).
+	reports *repository.ThreatReportRepository
 }
 
 // NewStatsHandler creates a new StatsHandler
 func NewStatsHandler(repos *repository.Repositories, c *cache.RedisCache, log *logger.Logger) *StatsHandler {
-	return &StatsHandler{
+	h := &StatsHandler{
 		repos:   repos,
 		cache:   c,
 		logger:  log.WithComponent("stats"),
 		netRepo: repository.NewNetworkSecurityRepositoryFromRepos(repos),
 	}
+	if repos != nil && repos.Indicators != nil {
+		if pool := repos.Indicators.Pool(); pool != nil {
+			h.reports = repository.NewThreatReportRepository(pool)
+		}
+	}
+	return h
 }
 
 // Get handles GET /api/v1/stats
@@ -133,6 +143,18 @@ func (h *StatsHandler) computeStats() models.Stats {
 		if _, total, err := h.repos.Campaigns.List(ctx, false, 1, 0); err == nil {
 			stats.TotalCampaigns = int(total)
 		}
+
+		// Fetch community threat-report counts
+		if h.reports != nil {
+			if total, err := h.reports.CountAll(ctx); err == nil {
+				stats.TotalReports = int(total)
+			} else {
+				h.logger.Warn().Err(err).Msg("failed to count threat reports")
+			}
+			if pending, err := h.reports.CountByStatus(ctx, "pending"); err == nil {
+				stats.PendingReports = int(pending)
+			}
+		}
 	}
 
 	return stats
@@ -226,7 +248,7 @@ func (h *StatsHandler) computeProtectionStatus(ctx context.Context, deviceID str
 			IsActive: false,
 			Score:    0,
 			Grade:    calculateGrade(0),
-			Features: models.FeatureSet{SMS: off, Web: off, App: off, Network: off, VPN: off},
+			Features: models.FeatureSet{SMS: off, Web: off, App: off, Network: off, VPN: off, AntiTheft: off},
 			LastScan: time.Now(),
 		}, nil
 	}
@@ -257,11 +279,12 @@ func (h *StatsHandler) computeProtectionStatus(ctx context.Context, deviceID str
 		Score:    score,
 		Grade:    calculateGrade(score),
 		Features: models.FeatureSet{
-			SMS:     models.FeatureStatus{Enabled: smsEnabled, Status: featureState(smsEnabled)},
-			Web:     models.FeatureStatus{Enabled: webEnabled, Status: featureState(webEnabled)},
-			App:     models.FeatureStatus{Enabled: appEnabled, Status: featureState(appEnabled)},
-			Network: models.FeatureStatus{Enabled: networkEnabled, Status: featureState(networkEnabled)},
-			VPN:     models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
+			SMS:       models.FeatureStatus{Enabled: smsEnabled, Status: featureState(smsEnabled)},
+			Web:       models.FeatureStatus{Enabled: webEnabled, Status: featureState(webEnabled)},
+			App:       models.FeatureStatus{Enabled: appEnabled, Status: featureState(appEnabled)},
+			Network:   models.FeatureStatus{Enabled: networkEnabled, Status: featureState(networkEnabled)},
+			VPN:       models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
+			AntiTheft: models.FeatureStatus{Enabled: antiTheftEnabled, Status: featureState(antiTheftEnabled)},
 		},
 		LastScan: time.Now(),
 	}, nil

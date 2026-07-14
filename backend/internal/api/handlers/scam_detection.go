@@ -198,7 +198,11 @@ func (h *ScamDetectionHandler) Report(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
-		h.logger.Warn().Err(err).Msg("failed to process scam report")
+		h.logger.Error().Err(err).Msg("failed to process scam report")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "failed to record scam report"})
+		return
 	}
 
 	h.logger.Info().
@@ -289,7 +293,11 @@ func (h *ScamDetectionHandler) ReportPhone(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
-		h.logger.Warn().Err(err).Msg("failed to process phone report")
+		h.logger.Error().Err(err).Msg("failed to process phone report")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "failed to record phone report"})
+		return
 	}
 
 	h.logger.Info().

@@ -98,23 +98,23 @@ func (c *Config) EffectiveSafeBrowsingKey() string {
 // corresponding API keys are configured; pattern and phone reputation
 // databases are local and have no external dependency.
 type ScamDetectorConfig struct {
-	EnableLLM        bool    `mapstructure:"enable_llm"`
-	EnablePatternDB  bool    `mapstructure:"enable_pattern_db"`
-	EnablePhoneRep   bool    `mapstructure:"enable_phone_rep"`
-	EnableVision     bool    `mapstructure:"enable_vision"`
-	EnableSpeech     bool    `mapstructure:"enable_speech"`
-	LLMProvider      string  `mapstructure:"llm_provider"`
-	LLMBaseURL       string  `mapstructure:"llm_base_url"`
-	LLMModel         string  `mapstructure:"llm_model"`
+	EnableLLM       bool   `mapstructure:"enable_llm"`
+	EnablePatternDB bool   `mapstructure:"enable_pattern_db"`
+	EnablePhoneRep  bool   `mapstructure:"enable_phone_rep"`
+	EnableVision    bool   `mapstructure:"enable_vision"`
+	EnableSpeech    bool   `mapstructure:"enable_speech"`
+	LLMProvider     string `mapstructure:"llm_provider"`
+	LLMBaseURL      string `mapstructure:"llm_base_url"`
+	LLMModel        string `mapstructure:"llm_model"`
 	// LLMReasoningEffort is sent as reasoning_effort to reasoning-capable
 	// OpenAI/Azure OpenAI deployments (GPT-5.x, o-series); classification at
 	// "low" effort is fast and high quality. Empty omits the parameter.
-	LLMReasoningEffort string `mapstructure:"llm_reasoning_effort"`
-	ClaudeAPIKey     string  `mapstructure:"claude_api_key"`
-	OpenAIAPIKey     string  `mapstructure:"openai_api_key"`
-	DeepSeekAPIKey   string  `mapstructure:"deepseek_api_key"`
-	ScamThreshold    float64 `mapstructure:"scam_threshold"`
-	SuspiciousThresh float64 `mapstructure:"suspicious_threshold"`
+	LLMReasoningEffort string  `mapstructure:"llm_reasoning_effort"`
+	ClaudeAPIKey       string  `mapstructure:"claude_api_key"`
+	OpenAIAPIKey       string  `mapstructure:"openai_api_key"`
+	DeepSeekAPIKey     string  `mapstructure:"deepseek_api_key"`
+	ScamThreshold      float64 `mapstructure:"scam_threshold"`
+	SuspiciousThresh   float64 `mapstructure:"suspicious_threshold"`
 
 	// Azure OpenAI (used only when llm_provider == "azure-openai")
 	AzureOpenAIEndpoint   string `mapstructure:"azure_openai_endpoint"`
@@ -185,6 +185,12 @@ type Neo4jConfig struct {
 	Database           string `mapstructure:"database"`
 	MaxConnections     int    `mapstructure:"max_connections"`
 	MaxLifetimeMinutes int    `mapstructure:"max_lifetime_minutes"`
+	// AutoSync periodically mirrors PostgreSQL data (campaigns, actors,
+	// indicators) into Neo4j so the threat-graph endpoints stay populated
+	// without a manual POST /graph/sync. It is a full re-sync, so it runs on
+	// a long interval and off the request hot path.
+	AutoSync            bool `mapstructure:"auto_sync"`
+	SyncIntervalMinutes int  `mapstructure:"sync_interval_minutes"`
 }
 
 type NATSConfig struct {

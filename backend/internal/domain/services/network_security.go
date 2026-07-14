@@ -1299,19 +1299,3 @@ func (s *NetworkSecurityService) GetVPNRecommendation(ctx context.Context, wifiA
 	rec.Reason = "Network appears safe - VPN optional"
 	return rec
 }
-
-// GetStats returns network security statistics
-func (s *NetworkSecurityService) GetStats(ctx context.Context) (*models.NetworkSecurityStats, error) {
-	stats := &models.NetworkSecurityStats{
-		AttacksByType: make(map[string]int64),
-	}
-
-	// In production, these would come from database
-	// For now, return placeholder data
-	if s.cache != nil {
-		// Try to get cached stats
-		// Implementation would use cache.Get()
-	}
-
-	return stats, nil
-}

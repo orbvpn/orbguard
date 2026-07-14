@@ -126,7 +126,11 @@ func (h *PlaybookHandler) Enable(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "playbook service not available"})
 		return
 	}
-	id, _ := uuid.Parse(chi.URLParam(r, "id"))
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid playbook ID"})
+		return
+	}
 	if err := h.service.EnablePlaybook(r.Context(), id); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -140,7 +144,11 @@ func (h *PlaybookHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "playbook service not available"})
 		return
 	}
-	id, _ := uuid.Parse(chi.URLParam(r, "id"))
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid playbook ID"})
+		return
+	}
 	if err := h.service.DisablePlaybook(r.Context(), id); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

@@ -36,12 +36,12 @@ const (
 
 // JobResult holds the result of a job execution
 type JobResult struct {
-	Success      bool          `json:"success"`
-	Error        string        `json:"error,omitempty"`
-	Duration     time.Duration `json:"duration"`
-	NewIOCs      int           `json:"new_iocs"`
-	UpdatedIOCs  int           `json:"updated_iocs"`
-	CompletedAt  time.Time     `json:"completed_at"`
+	Success     bool          `json:"success"`
+	Error       string        `json:"error,omitempty"`
+	Duration    time.Duration `json:"duration"`
+	NewIOCs     int           `json:"new_iocs"`
+	UpdatedIOCs int           `json:"updated_iocs"`
+	CompletedAt time.Time     `json:"completed_at"`
 }
 
 // Scheduler manages the scheduling of source updates
@@ -179,13 +179,26 @@ func (s *Scheduler) CancelJob(id uuid.UUID) bool {
 	return true
 }
 
-// scheduleAllSources creates initial jobs for all sources
+// scheduleAllSources creates an initial fetch job per enabled connector,
+// spaced out by each source's own update interval so they don't all fire at
+// once. executeJob reschedules the next run after each completes.
 func (s *Scheduler) scheduleAllSources() {
-	stats := s.aggregator.Stats()
-	s.logger.Info().Int("sources", stats.EnabledConnectors).Msg("scheduling all sources")
+	conns := s.aggregator.ListConnectors()
+	now := time.Now()
 
-	// In a real implementation, we'd iterate through registered connectors
-	// and schedule based on their update intervals
+	scheduled := 0
+	for _, conn := range conns {
+		if !conn.IsEnabled() {
+			continue
+		}
+		s.ScheduleSource(conn.Slug(), now.Add(conn.UpdateInterval()))
+		scheduled++
+	}
+
+	s.logger.Info().
+		Int("connectors", len(conns)).
+		Int("scheduled", scheduled).
+		Msg("scheduled all enabled sources")
 }
 
 // processJobs checks for and executes due jobs
@@ -266,12 +279,12 @@ func (s *Scheduler) Stats() SchedulerStats {
 	defer s.mu.RUnlock()
 
 	stats := SchedulerStats{
-		Running:      s.running,
-		TotalJobs:    len(s.jobs),
-		PendingJobs:  0,
-		RunningJobs:  0,
+		Running:       s.running,
+		TotalJobs:     len(s.jobs),
+		PendingJobs:   0,
+		RunningJobs:   0,
 		CompletedJobs: 0,
-		FailedJobs:   0,
+		FailedJobs:    0,
 	}
 
 	for _, job := range s.jobs {
@@ -302,9 +315,9 @@ type SchedulerStats struct {
 
 // SourceSchedule represents the schedule for a source
 type SourceSchedule struct {
-	SourceSlug     string        `json:"source_slug"`
-	UpdateInterval time.Duration `json:"update_interval"`
-	LastFetch      *time.Time    `json:"last_fetch"`
-	NextFetch      *time.Time    `json:"next_fetch"`
+	SourceSlug     string              `json:"source_slug"`
+	UpdateInterval time.Duration       `json:"update_interval"`
+	LastFetch      *time.Time          `json:"last_fetch"`
+	NextFetch      *time.Time          `json:"next_fetch"`
 	Status         models.SourceStatus `json:"status"`
 }

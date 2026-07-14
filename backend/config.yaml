@@ -40,6 +40,8 @@ neo4j:
   database: neo4j
   max_connections: 50
   max_lifetime_minutes: 60
+  auto_sync: true            # Mirror Postgres → Neo4j so the threat graph stays populated (no manual /graph/sync needed)
+  sync_interval_minutes: 720 # Full re-sync every 12h; first pass runs a couple minutes after boot, off the hot path
 
 nats:
   url: nats://localhost:4222
@@ -223,7 +225,7 @@ mitre:
 stix:
   enabled: true
   taxii_server:
-    enabled: false
+    enabled: true
     port: 8091
 
 ml:

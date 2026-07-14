@@ -165,6 +165,11 @@ func (h *GraphHandler) GetRelations(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.CorrelationResult
 // @Router /api/v1/graph/correlation/{id} [get]
 func (h *GraphHandler) GetCorrelation(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	indicatorID, err := uuid.Parse(idStr)
 	if err != nil {
@@ -194,6 +199,11 @@ func (h *GraphHandler) GetCorrelation(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} models.RelatedIndicator
 // @Router /api/v1/graph/related/{id} [get]
 func (h *GraphHandler) FindRelated(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	indicatorID, err := uuid.Parse(idStr)
 	if err != nil {
@@ -235,6 +245,11 @@ func (h *GraphHandler) FindRelated(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.InfrastructureOverlapResult
 // @Router /api/v1/graph/shared-infrastructure [get]
 func (h *GraphHandler) FindSharedInfrastructure(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 200 {
@@ -263,6 +278,11 @@ func (h *GraphHandler) FindSharedInfrastructure(w http.ResponseWriter, r *http.R
 // @Success 200 {array} models.CampaignDetection
 // @Router /api/v1/graph/detect-campaigns [get]
 func (h *GraphHandler) DetectCampaigns(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	minShared := 2
 	if m := r.URL.Query().Get("min_shared"); m != "" {
 		if parsed, err := strconv.Atoi(m); err == nil && parsed > 0 {
@@ -297,6 +317,11 @@ func (h *GraphHandler) DetectCampaigns(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.GraphQueryResult
 // @Router /api/v1/graph/traverse [post]
 func (h *GraphHandler) TraverseGraph(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	var req models.GraphTraversalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body")
@@ -333,6 +358,11 @@ func (h *GraphHandler) TraverseGraph(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.GraphStats
 // @Router /api/v1/graph/stats [get]
 func (h *GraphHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	stats, err := h.graphService.GetStats(r.Context())
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to get graph stats")
@@ -352,6 +382,11 @@ func (h *GraphHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string
 // @Router /api/v1/graph/sync [post]
 func (h *GraphHandler) SyncFromPostgres(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	if err := h.graphService.SyncFromPostgres(r.Context()); err != nil {
 		h.logger.Error().Err(err).Msg("failed to sync to graph")
 		h.respondError(w, http.StatusInternalServerError, "failed to sync to graph")
@@ -373,6 +408,11 @@ func (h *GraphHandler) SyncFromPostgres(w http.ResponseWriter, r *http.Request) 
 // @Success 200 {object} models.RelationshipBuildResult
 // @Router /api/v1/graph/build-relationships [post]
 func (h *GraphHandler) BuildRelationships(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	h.logger.Info().Msg("starting relationship building")
 
 	result, err := h.graphService.BuildRelationships(r.Context())
@@ -396,6 +436,11 @@ func (h *GraphHandler) BuildRelationships(w http.ResponseWriter, r *http.Request
 // @Success 200 {object} models.TemporalCorrelation
 // @Router /api/v1/graph/temporal/{id} [get]
 func (h *GraphHandler) GetTemporalCorrelation(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	indicatorID, err := uuid.Parse(idStr)
 	if err != nil {
@@ -431,6 +476,11 @@ func (h *GraphHandler) GetTemporalCorrelation(w http.ResponseWriter, r *http.Req
 // @Success 200 {object} models.TTPSimilarity
 // @Router /api/v1/graph/ttp-similarity [get]
 func (h *GraphHandler) GetTTPSimilarity(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	actor1Str := r.URL.Query().Get("actor1")
 	actor2Str := r.URL.Query().Get("actor2")
 
@@ -466,6 +516,11 @@ func (h *GraphHandler) GetTTPSimilarity(w http.ResponseWriter, r *http.Request) 
 // @Success 201 {object} map[string]string
 // @Router /api/v1/graph/relationship [post]
 func (h *GraphHandler) CreateRelationship(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	var req CreateRelationshipRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body")
@@ -518,6 +573,11 @@ type CreateRelationshipRequest struct {
 // @Success 200 {object} models.GraphQueryResult
 // @Router /api/v1/graph/search [post]
 func (h *GraphHandler) SearchGraph(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
 	var req models.GraphSearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body")

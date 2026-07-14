@@ -245,7 +245,7 @@ func (h *AlertsHandler) deviceProtection(ctx context.Context, deviceID string, d
 			IsActive: false,
 			Score:    0,
 			Grade:    calculateGrade(0),
-			Features: models.FeatureSet{SMS: off, Web: off, App: off, Network: off, VPN: off},
+			Features: models.FeatureSet{SMS: off, Web: off, App: off, Network: off, VPN: off, AntiTheft: off},
 			LastScan: time.Now(),
 		}, nil
 	}
@@ -277,11 +277,12 @@ func (h *AlertsHandler) deviceProtection(ctx context.Context, deviceID string, d
 		Score:    score,
 		Grade:    calculateGrade(score),
 		Features: models.FeatureSet{
-			SMS:     models.FeatureStatus{Enabled: smsEnabled, Status: featureState(smsEnabled)},
-			Web:     models.FeatureStatus{Enabled: webEnabled, Status: featureState(webEnabled)},
-			App:     models.FeatureStatus{Enabled: appEnabled, Status: featureState(appEnabled)},
-			Network: models.FeatureStatus{Enabled: networkEnabled, Status: featureState(networkEnabled)},
-			VPN:     models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
+			SMS:       models.FeatureStatus{Enabled: smsEnabled, Status: featureState(smsEnabled)},
+			Web:       models.FeatureStatus{Enabled: webEnabled, Status: featureState(webEnabled)},
+			App:       models.FeatureStatus{Enabled: appEnabled, Status: featureState(appEnabled)},
+			Network:   models.FeatureStatus{Enabled: networkEnabled, Status: featureState(networkEnabled)},
+			VPN:       models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
+			AntiTheft: models.FeatureStatus{Enabled: antiTheftEnabled, Status: featureState(antiTheftEnabled)},
 		},
 		LastScan: time.Now(),
 	}

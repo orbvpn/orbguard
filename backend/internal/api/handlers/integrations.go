@@ -134,7 +134,11 @@ func (h *IntegrationsHandler) Enable(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "integration service not available"})
 		return
 	}
-	id, _ := uuid.Parse(chi.URLParam(r, "id"))
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid integration ID"})
+		return
+	}
 	if err := h.service.EnableIntegration(r.Context(), id); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -148,7 +152,11 @@ func (h *IntegrationsHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "integration service not available"})
 		return
 	}
-	id, _ := uuid.Parse(chi.URLParam(r, "id"))
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid integration ID"})
+		return
+	}
 	if err := h.service.DisableIntegration(r.Context(), id); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

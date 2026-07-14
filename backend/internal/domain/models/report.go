@@ -147,11 +147,12 @@ type ProtectionStatus struct {
 }
 
 type FeatureSet struct {
-	SMS     FeatureStatus `json:"sms"`
-	Web     FeatureStatus `json:"web"`
-	App     FeatureStatus `json:"app"`
-	Network FeatureStatus `json:"network"`
-	VPN     FeatureStatus `json:"vpn"`
+	SMS       FeatureStatus `json:"sms"`
+	Web       FeatureStatus `json:"web"`
+	App       FeatureStatus `json:"app"`
+	Network   FeatureStatus `json:"network"`
+	VPN       FeatureStatus `json:"vpn"`
+	AntiTheft FeatureStatus `json:"anti_theft"`
 }
 
 type FeatureStatus struct {

@@ -157,6 +157,17 @@ func (a *Aggregator) GetConnector(slug string) (SourceConnector, bool) {
 	return conn, ok
 }
 
+// ListConnectors returns a snapshot of all registered connectors.
+func (a *Aggregator) ListConnectors() []SourceConnector {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	conns := make([]SourceConnector, 0, len(a.connectors))
+	for _, c := range a.connectors {
+		conns = append(conns, c)
+	}
+	return conns
+}
+
 // Run starts the aggregation loop
 func (a *Aggregator) Run(ctx context.Context) error {
 	if !a.config.Enabled {
