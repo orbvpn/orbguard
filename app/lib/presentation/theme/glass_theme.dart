@@ -1,14 +1,18 @@
-/// Glass Theme - iOS 26 Liquid Glass Design System
+/// Glass Theme — 2026 brand-kit Liquid Glass design system.
 ///
-/// Centralized styling for all frosted glass UI elements.
-/// Based on Apple's iOS 26 Liquid Glass design language.
+/// Centralized styling for all frosted glass UI elements. Values are the
+/// OrbVPN brand kit's `.glass` recipe: fill white .08 (dark) / .55 (light),
+/// 1px hairline, blur + saturate backdrop, deep ambient shadow, and a crisp
+/// top rim. Mirrors `brand.dart` (Brand.*) — same tokens, `isDark`-parameter
+/// API kept for the existing widget fleet.
 library;
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'brand.dart';
 import 'colors.dart';
 
-/// iOS 26 Liquid Glass design constants
+/// Brand-kit liquid glass design constants
 class GlassTheme {
   GlassTheme._();
 
@@ -16,79 +20,78 @@ class GlassTheme {
   // BLUR SETTINGS
   // ============================================================================
 
-  /// Standard blur for glass elements (iOS 26 style)
+  /// Standard blur for glass elements
   static const double blurSigma = 20.0;
 
   /// Heavy blur for modals and sheets
   static const double blurSigmaHeavy = 30.0;
 
   /// Light blur for subtle effects
-  static const double blurSigmaLight = 15.0;
+  static const double blurSigmaLight = 12.0;
 
   // ============================================================================
-  // GLASS COLORS - iOS 26 LIQUID GLASS STYLE
+  // GLASS COLORS — brand `--glass-fill`
   // ============================================================================
 
-  /// Glass background color for light mode
-  /// More opaque frosted white - matches Apple Music iOS 26 Beta 3
-  static Color glassColorLight = Colors.white.withAlpha(230);
+  /// Glass fill for light mode — white .55.
+  static Color glassColorLight = Colors.white.withValues(alpha: 0.55);
 
-  /// Glass background color for dark mode
-  /// Subtle white tint on dark
-  static Color glassColorDark = Colors.white.withAlpha(22);
+  /// Glass fill for dark mode — white .08.
+  static Color glassColorDark = Colors.white.withValues(alpha: 0.08);
 
   /// Get glass color based on theme
   static Color glassColor(bool isDark) => isDark ? glassColorDark : glassColorLight;
 
   // ============================================================================
-  // BORDER COLORS
+  // BORDER COLORS — brand `--glass-border`
   // ============================================================================
 
-  /// Glass border color for light mode
-  static Color glassBorderColorLight = Colors.black.withAlpha(12);
+  /// Glass border color for light mode — rgba(18,18,28,.08).
+  static Color glassBorderColorLight =
+      const Color(0xFF12121C).withValues(alpha: 0.08);
 
-  /// Glass border color for dark mode
-  static Color glassBorderColorDark = Colors.white.withAlpha(30);
+  /// Glass border color for dark mode — white .18.
+  static Color glassBorderColorDark = Colors.white.withValues(alpha: 0.18);
 
   /// Get glass border color based on theme
   static Color glassBorderColor(bool isDark) =>
       isDark ? glassBorderColorDark : glassBorderColorLight;
 
-  /// Standard border width
-  static const double borderWidth = 0.5;
+  /// Standard border width — kit hairline is 1px.
+  static const double borderWidth = 1.0;
 
   // ============================================================================
   // ACCENT COLORS - Using AppColors
   // ============================================================================
 
-  static const Color primaryAccent = AppColors.accent; // Cyan
-  static const Color secondaryAccent = AppColors.secondary; // Tech Blue
-  static const Color successColor = AppColors.success; // Green/Cyan
-  static const Color warningColor = AppColors.warning; // Orange
-  static const Color errorColor = AppColors.error; // Red
+  static const Color primaryAccent = AppColors.accent; // Volt Lime
+  static const Color secondaryAccent = AppColors.secondary; // Cyber Pink
+  static const Color successColor = AppColors.success; // Lime
+  static const Color warningColor = AppColors.warning; // Pink
+  static const Color errorColor = AppColors.error; // Danger red
 
   // ============================================================================
-  // SHADOWS - iOS 26 SOFT SHADOW STYLE
+  // SHADOWS — the kit's deep ambient shadow
   // ============================================================================
 
-  /// Shadow for light mode
-  static Color glassShadowColorLight = Colors.black.withAlpha(15);
+  /// Shadow color for light mode — rgba(20,20,45,.12).
+  static Color glassShadowColorLight = const Color(0x1F14142D);
 
-  /// Shadow for dark mode
-  static Color glassShadowColorDark = Colors.black.withAlpha(40);
+  /// Shadow color for dark mode — rgba(0,0,0,.45).
+  static Color glassShadowColorDark = const Color(0x73000000);
 
-  /// Shadow for light mode
-  static BoxShadow shadowLight = BoxShadow(
-    color: glassShadowColorLight,
-    blurRadius: 15,
-    offset: const Offset(0, 3),
+  /// Shadow for light mode — `0 18px 40px rgba(20,20,45,.12)`.
+  static BoxShadow shadowLight = const BoxShadow(
+    color: Color(0x1F14142D),
+    blurRadius: 40,
+    offset: Offset(0, 18),
   );
 
-  /// Shadow for dark mode
-  static BoxShadow shadowDark = BoxShadow(
-    color: glassShadowColorDark,
-    blurRadius: 15,
-    offset: const Offset(0, 3),
+  /// Shadow for dark mode — `0 24px 50px rgba(0,0,0,.45)`.
+  static BoxShadow shadowDark = const BoxShadow(
+    color: Color(0x73000000),
+    blurRadius: 50,
+    offset: Offset(0, 24),
   );
 
   /// Get shadow based on theme
@@ -99,15 +102,21 @@ class GlassTheme {
     return [shadow(isDark)];
   }
 
-  /// Elevated shadow for floating elements
-  static BoxShadow elevatedShadow(bool isDark) => BoxShadow(
-        color: Colors.black.withAlpha(isDark ? 50 : 20),
-        blurRadius: 20,
-        offset: const Offset(0, 4),
-      );
+  /// Elevated shadow for floating elements — same kit ambient shadow.
+  static BoxShadow elevatedShadow(bool isDark) => shadow(isDark);
 
   // ============================================================================
-  // BORDER RADIUS - iOS 26 STYLE
+  // LAYOUT
+  // ============================================================================
+
+  /// Max content width on wide screens (tablet/desktop).
+  static const double contentMaxWidth = 760.0;
+
+  /// Vertical space reserved for the floating pill nav (60 height + 12 margin).
+  static const double bottomNavClearance = 72.0;
+
+  // ============================================================================
+  // BORDER RADIUS
   // ============================================================================
 
   /// Pill shape radius (for nav bars, buttons)
@@ -129,16 +138,15 @@ class GlassTheme {
   // GRADIENT BACKGROUNDS FOR GLASS VISIBILITY
   // ============================================================================
 
-  /// Background gradient colors - dark mode
-  static const Color gradientTop = Color(0xFF1a1a2e);
-  static const Color gradientBottom = Color(0xFF0a0a14);
+  /// Background gradient colors - dark mode (obsidian)
+  static const Color gradientTop = AppColors.bgDarkTop;
+  static const Color gradientBottom = AppColors.bgDarkBottom;
 
-  /// Background gradient colors - light mode
-  static const Color gradientTopLight = Color(0xFFf0f4f8);
-  static const Color gradientBottomLight = Color(0xFFe0e5eb);
+  /// Background gradient colors - light mode (cloud)
+  static const Color gradientTopLight = AppColors.bgLightTop;
+  static const Color gradientBottomLight = AppColors.bgLightBottom;
 
   /// Top gradient for frosted glass visibility (light mode only)
-  /// Smooth fade from edge - no visible line
   static BoxDecoration topGradient = BoxDecoration(
     gradient: LinearGradient(
       begin: Alignment.topCenter,
@@ -156,7 +164,6 @@ class GlassTheme {
   );
 
   /// Bottom gradient for frosted glass visibility (light mode only)
-  /// Smooth fade from edge - no visible line
   static BoxDecoration bottomGradient = BoxDecoration(
     gradient: LinearGradient(
       begin: Alignment.bottomCenter,
@@ -183,7 +190,8 @@ class GlassTheme {
   // HELPER METHODS
   // ============================================================================
 
-  /// Get complete glass decoration
+  /// Get complete glass decoration — kit `.glass`: fill with a subtle top
+  /// sheen, 1px hairline, ambient shadow.
   static BoxDecoration glassDecoration({
     bool isDark = true,
     double radius = radiusMedium,
@@ -200,8 +208,21 @@ class GlassTheme {
       bgColor = Color.alphaBlend(tintColor.withAlpha(isDark ? 30 : 20), bgColor);
     }
 
+    final hi = isDark
+        ? Colors.white.withValues(alpha: 0.35)
+        : Colors.white.withValues(alpha: 0.45);
+
     return BoxDecoration(
-      color: bgColor,
+      // Kit fill gradient: hi-blend at the very top, then uniform fill.
+      gradient: customColor != null
+          ? null
+          : LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color.alphaBlend(hi, bgColor), bgColor, bgColor],
+              stops: const [0.0, 0.06, 1.0],
+            ),
+      color: customColor != null ? bgColor : null,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
         color: customBorderColor ?? glassBorderColor(isDark),
@@ -281,67 +302,87 @@ class GlassTheme {
     double opacity = 0.15,
   }) {
     return BoxDecoration(
-      color: tintColor.withOpacity(opacity),
+      color: tintColor.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: tintColor.withOpacity(0.3),
+        color: tintColor.withValues(alpha: 0.3),
         width: borderWidth,
       ),
     );
   }
 
-  /// Get background gradient for glass visibility
+  /// Get background gradient for glass visibility — obsidian/cloud.
   static LinearGradient backgroundGradient({bool isDark = true}) {
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: isDark
-          ? [gradientTop, gradientBottom]
-          : [gradientTopLight, gradientBottomLight],
+          ? [gradientTop, AppColors.bgDark, gradientBottom]
+          : [gradientTopLight, AppColors.bgLight, gradientBottomLight],
     );
   }
 
-  /// Standard blur filter
-  static ImageFilter get blurFilter => ImageFilter.blur(
-        sigmaX: blurSigma,
-        sigmaY: blurSigma,
+  /// Luminance-preserving saturation matrix (CSS `saturate(s)`).
+  static List<double> _saturate(double sat) {
+    const double lr = 0.213, lg = 0.715, lb = 0.072;
+    final double r = (1 - sat) * lr, g = (1 - sat) * lg, b = (1 - sat) * lb;
+    return <double>[
+      r + sat, g, b, 0, 0, //
+      r, g + sat, b, 0, 0, //
+      r, g, b + sat, 0, 0, //
+      0, 0, 0, 1, 0,
+    ];
+  }
+
+  static double get _sat =>
+      AppColors.uiBrightness == Brightness.dark ? 1.55 : 1.50;
+
+  /// Standard blur filter — kit backdrop-filter: blur THEN saturate(155%/150%)
+  /// so the colorful bed pops through every glass surface.
+  static ImageFilter get blurFilter => ImageFilter.compose(
+        outer: ColorFilter.matrix(_saturate(_sat)),
+        inner: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
       );
 
-  /// Light blur filter
-  static ImageFilter get blurFilterLight => ImageFilter.blur(
-        sigmaX: blurSigmaLight,
-        sigmaY: blurSigmaLight,
+  /// Light blur filter (inline controls)
+  static ImageFilter get blurFilterLight => ImageFilter.compose(
+        outer: ColorFilter.matrix(_saturate(_sat)),
+        inner: ImageFilter.blur(sigmaX: blurSigmaLight, sigmaY: blurSigmaLight),
       );
 
   /// Heavy blur filter for modals
-  static ImageFilter get blurFilterHeavy => ImageFilter.blur(
-        sigmaX: blurSigmaHeavy,
-        sigmaY: blurSigmaHeavy,
+  static ImageFilter get blurFilterHeavy => ImageFilter.compose(
+        outer: ColorFilter.matrix(_saturate(_sat)),
+        inner: ImageFilter.blur(sigmaX: blurSigmaHeavy, sigmaY: blurSigmaHeavy),
       );
 
   // ============================================================================
-  // TEXT STYLES
+  // TEXT STYLES — brand type stack (Archivo / IBM Plex Sans)
   // ============================================================================
 
-  /// Get themed text style
+  /// Section/card heading — display face.
   static TextStyle headingStyle({bool isDark = true}) {
     return TextStyle(
-      color: isDark ? Colors.white : AppColors.textPrimary,
-      fontWeight: FontWeight.bold,
+      fontFamily: Brand.fontDisplay,
+      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+      fontWeight: FontWeight.w700,
       fontSize: 18,
     );
   }
 
   static TextStyle bodyStyle({bool isDark = true}) {
     return TextStyle(
-      color: isDark ? Colors.white70 : AppColors.textSecondary,
+      fontFamily: Brand.fontSans,
+      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
       fontSize: 14,
+      height: 1.45,
     );
   }
 
   static TextStyle captionStyle({bool isDark = true}) {
     return TextStyle(
-      color: isDark ? Colors.white38 : Colors.black38,
+      fontFamily: Brand.fontSans,
+      color: isDark ? AppColors.textDisabledDark : AppColors.textDisabled,
       fontSize: 12,
     );
   }
@@ -351,8 +392,9 @@ class GlassTheme {
 // REUSABLE GLASS WIDGETS
 // ============================================================================
 
-/// Gradient background for glass visibility
-/// Place at the edges of screens with floating glass elements
+/// Ambient brand background: obsidian/cloud base + the kit's signature
+/// lime/pink radial bed (so glass has color to refract), plus the light-mode
+/// edge fades. Wraps every route via MaterialApp.builder.
 class GlassGradientBackground extends StatelessWidget {
   final GlassGradientPosition? position;
   final bool isDark;
@@ -367,15 +409,15 @@ class GlassGradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Full screen gradient background
+    // Full screen brand background
     if (child != null) {
       return Container(
-        decoration: BoxDecoration(
-          gradient: GlassTheme.backgroundGradient(isDark: isDark),
-        ),
+        color: isDark ? AppColors.bgDark : AppColors.bgLight,
         child: Stack(
           children: [
-            // Top gradient overlay (light mode only)
+            // Brand bed — lime top-left, pink bottom-right radial washes.
+            const BrandBed(),
+            // Edge fades for glass visibility (light mode only)
             if (!isDark)
               Positioned(
                 top: 0,
@@ -384,7 +426,6 @@ class GlassGradientBackground extends StatelessWidget {
                 height: GlassTheme.topGradientHeight,
                 child: Container(decoration: GlassTheme.topGradient),
               ),
-            // Bottom gradient overlay (light mode only)
             if (!isDark)
               Positioned(
                 bottom: 0,
@@ -426,7 +467,9 @@ class GlassGradientBackground extends StatelessWidget {
 /// Position for glass gradient background
 enum GlassGradientPosition { top, bottom }
 
-/// A glass container with iOS 26 Liquid Glass styling
+/// A glass container with brand-kit liquid glass styling: saturated blur,
+/// hairline, ambient shadow (un-clipped, on an outer box) and the crisp
+/// 1px top rim.
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double? borderRadius;
@@ -453,26 +496,60 @@ class GlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final radius = borderRadius ?? GlassTheme.radiusLarge;
+    final r = BorderRadius.circular(radius);
 
-    Widget content = Container(
+    Widget inner = Container(
       padding: padding,
       decoration: GlassTheme.glassDecoration(
         isDark: isDark,
         radius: radius,
         tintColor: tintColor,
         elevated: elevated,
+        // Shadow moves to the OUTER box so ClipRRect can't clip it away.
+        withShadow: !blur,
       ),
       child: child,
     );
 
+    Widget content;
     if (blur) {
-      content = ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          filter: GlassTheme.blurFilter,
-          child: content,
+      content = Container(
+        decoration: BoxDecoration(
+          borderRadius: r,
+          boxShadow: [
+            elevated
+                ? GlassTheme.elevatedShadow(isDark)
+                : GlassTheme.shadow(isDark)
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: r,
+          child: BackdropFilter(
+            filter: GlassTheme.blurFilter,
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                inner,
+                // Kit crisp top rim following the corner radius.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: GlassTopEdgePainter(
+                        radius: radius,
+                        color: Brand.topEdge,
+                        bottomColor: Brand.bottomEdge,
+                        topOnly: isDark,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
+    } else {
+      content = inner;
     }
 
     if (margin != null) {
@@ -487,7 +564,7 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// A circular glass button with iOS 26 styling
+/// A circular glass button with brand-kit styling
 class GlassCircleButton extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -530,7 +607,26 @@ class GlassCircleButton extends StatelessWidget {
       child: ClipOval(
         child: BackdropFilter(
           filter: GlassTheme.blurFilter,
-          child: Center(child: child),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Center(child: child),
+              // Kit crisp top rim following the circle's top arc.
+              if (tintColor == null)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: GlassTopEdgePainter(
+                        radius: size / 2,
+                        color: Brand.topEdge,
+                        bottomColor: Brand.bottomEdge,
+                        topOnly: isDark,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

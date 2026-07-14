@@ -4,6 +4,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -23,6 +25,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   String? _errorMessage;
   List<ThreatActor> _actors = [];
   String _selectedCategory = 'All';
+  String _searchQuery = '';
 
   final List<String> _categories = ['All', 'APT', 'Cybercrime', 'Hacktivism', 'Nation-State'];
 
@@ -69,14 +72,23 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredActors = _selectedCategory == 'All'
+    final cs = Theme.of(context).colorScheme;
+    final categoryActors = _selectedCategory == 'All'
         ? _actors
         : _actors.where((a) => _getActorCategory(a) == _selectedCategory).toList();
+    final query = _searchQuery.trim().toLowerCase();
+    final filteredActors = query.isEmpty
+        ? categoryActors
+        : categoryActors
+            .where((a) =>
+                a.name.toLowerCase().contains(query) ||
+                a.aliases.any((alias) => alias.toLowerCase().contains(query)))
+            .toList();
 
     return GlassPage(
       title: 'Threat Actors',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : Column(
@@ -88,12 +100,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.search, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.search, size: 22, color: cs.onSurface),
                         onPressed: () => _showSearchDialog(context),
                         tooltip: 'Search',
                       ),
                       IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
                         onPressed: _isLoading ? null : _loadActors,
                         tooltip: 'Refresh',
                       ),
@@ -113,10 +125,11 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           label: Text(cat),
                           selected: isSelected,
                           onSelected: (_) => setState(() => _selectedCategory = cat),
-                          backgroundColor: GlassTheme.glassColorDark,
+                          backgroundColor: GlassTheme.glassColor(
+                              Theme.of(context).brightness == Brightness.dark),
                           selectedColor: GlassTheme.primaryAccent.withAlpha(77),
                           labelStyle: TextStyle(
-                            color: isSelected ? GlassTheme.primaryAccent : Colors.white70,
+                            color: isSelected ? AppColors.accentInk : cs.onSurfaceVariant,
                           ),
                         ),
                       );
@@ -128,7 +141,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   child: filteredActors.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           itemCount: filteredActors.length,
                           itemBuilder: (context, index) {
                             return _buildActorCard(filteredActors[index]);
@@ -141,6 +154,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildActorCard(ThreatActor actor) {
+    final cs = Theme.of(context).colorScheme;
     final category = _getActorCategory(actor);
     final sophisticationColor = _getSophisticationColor(actor.sophisticationLevel);
 
@@ -163,8 +177,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   children: [
                     Text(
                       actor.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: cs.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -175,7 +191,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: _getCategoryColor(category).withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                           ),
                           child: Text(
                             category,
@@ -189,7 +205,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         if (actor.country != null)
                           Text(
                             actor.country!,
-                            style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
+                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                           ),
                       ],
                     ),
@@ -203,7 +219,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${actor.associatedCampaigns.length} campaigns',
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10),
+                    style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                   ),
                 ],
               ),
@@ -213,7 +229,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
             const SizedBox(height: 12),
             Text(
               actor.description!,
-              style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -222,12 +238,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           Row(
             children: [
               if (actor.aliases.isNotEmpty) ...[
-                DuotoneIcon(AppIcons.tag, size: 14, color: Colors.white.withAlpha(102)),
+                DuotoneIcon(AppIcons.tag, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     actor.aliases.take(3).join(', '),
-                    style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 11),
+                    style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -246,9 +262,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'Active',
-                      style: TextStyle(color: GlassTheme.successColor, fontSize: 10),
+                      style: TextStyle(color: AppColors.accentInk, fontSize: 10),
                     ),
                   ],
                 ),
@@ -260,20 +276,21 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DuotoneIcon(AppIcons.threatActor, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Threat Actors',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Threat actor profiles will appear here',
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -281,6 +298,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildErrorState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -289,24 +307,24 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
           children: [
             DuotoneIcon(AppIcons.warning, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Data',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'An unexpected error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadActors,
-              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: Colors.white),
+              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -316,6 +334,8 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   void _showActorDetails(BuildContext context, ThreatActor actor) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final category = _getActorCategory(actor);
 
     showModalBottomSheet(
@@ -327,13 +347,16 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -355,8 +378,10 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                       children: [
                         Text(
                           actor.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
@@ -370,7 +395,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                             ),
                             const SizedBox(width: 8),
                             if (actor.isActive)
-                              const GlassBadge(text: 'Active', color: GlassTheme.successColor),
+                              GlassBadge(text: 'Active', color: AppColors.accentInk),
                           ],
                         ),
                       ],
@@ -384,7 +409,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               if (actor.description != null) ...[
                 Text(
                   actor.description!,
-                  style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 14, height: 1.5),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -410,9 +435,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Aliases
               if (actor.aliases.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Also Known As',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -420,7 +445,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   runSpacing: 8,
                   children: actor.aliases.map((alias) => GlassBadge(
                         text: alias,
-                        color: Colors.white54,
+                        color: cs.onSurfaceVariant,
                       )).toList(),
                 ),
               ],
@@ -428,9 +453,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Motivations
               if (actor.motivations.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Motivations',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -439,10 +464,12 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   children: actor.motivations.map((m) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF9C27B0).withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.chartColors[4].withAlpha(40),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
-                        child: Text(m.value, style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 12)),
+                        child: Text(m.value,
+                            style: TextStyle(
+                                color: AppColors.chartColors[4], fontSize: 12)),
                       )).toList(),
                 ),
               ],
@@ -450,9 +477,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Targeted Industries
               if (actor.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Targeted Industries',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -468,9 +495,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // MITRE Techniques
               if (actor.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'MITRE ATT&CK TTPs',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -480,14 +507,14 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           ttp,
-                          style: const TextStyle(
-                            color: GlassTheme.primaryAccent,
+                          style: TextStyle(
+                            color: AppColors.accentInk,
                             fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       )).toList(),
@@ -497,9 +524,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
               // Tools
               if (actor.tools.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Known Tools',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -507,7 +534,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                   runSpacing: 8,
                   children: actor.tools.map((tool) => GlassBadge(
                         text: tool,
-                        color: const Color(0xFFFF5722),
+                        color: AppColors.errorInk,
                       )).toList(),
                 ),
               ],
@@ -519,43 +546,55 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 
   void _showSearchDialog(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: _searchQuery);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Search Actors', style: TextStyle(color: Colors.white)),
+        backgroundColor: cs.surface,
+        title: Text('Search Actors', style: TextStyle(color: cs.onSurface)),
         content: TextField(
-          style: const TextStyle(color: Colors.white),
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Enter actor name or alias...',
-            hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+            hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
-              child: DuotoneIcon(AppIcons.search, size: 20, color: Colors.white54),
+              child: DuotoneIcon(AppIcons.search, size: 20, color: cs.onSurfaceVariant),
             ),
           ),
           onSubmitted: (value) {
             Navigator.pop(context);
-            // Implement search
+            setState(() => _searchQuery = value.trim());
           },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _searchQuery = controller.text.trim());
+            },
+            child: const Text('Search'),
           ),
         ],
       ),
@@ -567,11 +606,11 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
       case 'apt':
         return GlassTheme.errorColor;
       case 'cybercrime':
-        return const Color(0xFFFF9800);
+        return AppColors.chartColors[5];
       case 'hacktivism':
-        return const Color(0xFF4CAF50);
+        return AppColors.chartColors[6];
       case 'nation-state':
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       default:
         return GlassTheme.primaryAccent;
     }
@@ -595,15 +634,15 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
   Color _getSophisticationColor(SeverityLevel level) {
     switch (level) {
       case SeverityLevel.critical:
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       case SeverityLevel.low:
-        return const Color(0xFF4CAF50);
+        return AppColors.severityLow;
       default:
-        return Colors.grey;
+        return AppColors.severityInfo;
     }
   }
 

@@ -1,10 +1,16 @@
-/// Network Provider
-/// State management for network security features
+// Network Provider
+// State management for network security features
+
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/api/url_reputation.dart';
+import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
 
 /// WiFi security level
@@ -107,71 +113,140 @@ class NetworkThreat {
   bool get isCritical => severity == 'critical' || severity == 'high';
 }
 
-/// VPN connection status
-class VpnStatus {
-  final bool isConnected;
-  final String? serverLocation;
-  final String? serverIp;
-  final String? protocol;
-  final DateTime? connectedAt;
-  final int? bytesIn;
-  final int? bytesOut;
+/// One canary domain resolved through the DEVICE's local resolver.
+/// Hijack detection must use the local resolver: a server resolving canaries
+/// proves nothing about the resolver this device actually uses.
+class DnsCanaryResolution {
+  final String canary;
+  final List<String> resolvedIps;
 
-  VpnStatus({
-    this.isConnected = false,
-    this.serverLocation,
-    this.serverIp,
-    this.protocol,
-    this.connectedAt,
-    this.bytesIn,
-    this.bytesOut,
+  /// Set when the local lookup itself failed (no network, blocked resolver).
+  /// A failed lookup is reported honestly instead of being sent as a clean
+  /// empty answer set.
+  final String? lookupError;
+
+  DnsCanaryResolution({
+    required this.canary,
+    required this.resolvedIps,
+    this.lookupError,
   });
 
-  Duration? get connectionDuration {
-    if (connectedAt == null || !isConnected) return null;
-    return DateTime.now().difference(connectedAt!);
+  bool get succeeded => lookupError == null && resolvedIps.isNotEmpty;
+}
+
+/// What the backend's authoritative canary DNS server observed for the leak
+/// check token this device resolved: the egress IP of whichever recursive
+/// resolver actually performed the device's lookup.
+class DnsLeakObservation {
+  /// Source IP of the first canary query seen at the authoritative server.
+  final String observedResolverIp;
+
+  /// Every distinct resolver egress IP observed for the token.
+  final List<String> observedResolverIps;
+
+  /// True when an observed IP exactly equals the device's configured
+  /// resolver. Public resolvers (1.1.1.1, 8.8.8.8) legitimately egress from
+  /// provider ranges that differ from their anycast address, so `false` is
+  /// informational, not proof of a leak by itself.
+  final bool matchesConfiguredResolver;
+
+  /// ASN of the observed resolver, when the backend recorded one.
+  final int? resolverAsn;
+
+  DnsLeakObservation({
+    required this.observedResolverIp,
+    required this.observedResolverIps,
+    required this.matchesConfiguredResolver,
+    this.resolverAsn,
+  });
+
+  static DnsLeakObservation? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final observed = json['observed_resolver_ip'] as String?;
+    if (observed == null || observed.isEmpty) return null;
+    return DnsLeakObservation(
+      observedResolverIp: observed,
+      observedResolverIps:
+          (json['observed_resolver_ips'] as List<dynamic>? ?? const [])
+              .map((e) => e.toString())
+              .toList(growable: false),
+      matchesConfiguredResolver:
+          json['matches_configured_resolver'] as bool? ?? false,
+      resolverAsn: (json['resolver_asn'] as num?)?.toInt(),
+    );
   }
 }
 
-/// DNS protection status
-class DnsProtectionStatus {
-  final bool isEnabled;
-  final String provider;
-  final String primaryDns;
-  final String? secondaryDns;
-  final bool isMalwareBlocking;
-  final bool isAdBlocking;
-  final bool isTrackingBlocking;
-  final int blockedQueries;
+/// Result of a DNS security check (client-side canary resolution verified by
+/// the backend against known-good answer sets and threat intelligence).
+class DnsCheckResult {
+  final bool isHijacked;
+  final bool isSecure;
+  final bool isEncrypted;
+  final String? providerName;
 
-  DnsProtectionStatus({
-    this.isEnabled = false,
-    this.provider = 'Default',
-    this.primaryDns = '',
-    this.secondaryDns,
-    this.isMalwareBlocking = false,
-    this.isAdBlocking = false,
-    this.isTrackingBlocking = false,
-    this.blockedQueries = 0,
+  /// Backend status of the hijack check ("performed: ..." or
+  /// "not_performed: ..."). Distinguishes "checked and clean" from
+  /// "check never ran".
+  final String hijackCheckStatus;
+
+  /// Backend status of the leak check. When the backend advertises a
+  /// controlled canary zone (GET /network/dns/leak-config) this device
+  /// resolves a random {token}.{zone} and the backend reports
+  /// "performed: ..." (query observed at its authoritative server) or
+  /// "not_observed: ...". When no canary zone is deployed the status stays
+  /// an explicit "unavailable: ..." — never a fabricated result.
+  final String leakCheckStatus;
+
+  /// Authoritative-server observation when [leakCheckPerformed]; null
+  /// otherwise.
+  final DnsLeakObservation? leakObservation;
+
+  final String? hijackDescription;
+  final double? hijackConfidence;
+  final List<String> issues;
+
+  /// What this device actually measured (including failed lookups).
+  final List<DnsCanaryResolution> canaryResolutions;
+  final String? resolverHint;
+  final DateTime checkedAt;
+
+  DnsCheckResult({
+    required this.isHijacked,
+    required this.isSecure,
+    required this.isEncrypted,
+    this.providerName,
+    required this.hijackCheckStatus,
+    required this.leakCheckStatus,
+    this.leakObservation,
+    this.hijackDescription,
+    this.hijackConfidence,
+    this.issues = const [],
+    this.canaryResolutions = const [],
+    this.resolverHint,
+    required this.checkedAt,
   });
+
+  bool get hijackCheckPerformed => hijackCheckStatus.startsWith('performed');
+  bool get leakCheckUnavailable => leakCheckStatus.startsWith('unavailable');
+  bool get leakCheckPerformed => leakCheckStatus.startsWith('performed');
+  bool get leakCheckNotObserved => leakCheckStatus.startsWith('not_observed');
 }
 
-/// Network security stats
+/// Network security stats. Every field is derived from real scan/check
+/// results — the app performs no on-device DNS or site blocking, so no
+/// "blocked" counters exist here.
 class NetworkSecurityStats {
   final int totalScans;
   final int threatsDetected;
   final int openNetworksFound;
   final int rogueApsDetected;
-  final int dnsQueriesBlocked;
-  final int maliciousSitesBlocked;
 
   NetworkSecurityStats({
     this.totalScans = 0,
     this.threatsDetected = 0,
     this.openNetworksFound = 0,
     this.rogueApsDetected = 0,
-    this.dnsQueriesBlocked = 0,
-    this.maliciousSitesBlocked = 0,
   });
 }
 
@@ -182,36 +257,74 @@ class NetworkProvider extends ChangeNotifier {
   // Platform channel for native WiFi scanning
   static const _wifiChannel = MethodChannel('com.orb.guard/wifi');
 
+  /// Master network-protection flag persisted by the Settings screen
+  /// (ProtectionSettings → SettingsProvider, key `prot_network`).
+  static const _kMasterProtectionKey = 'prot_network';
+  SharedPreferences? _prefs;
+
   // State
   WifiNetwork? _currentNetwork;
   final List<WifiNetwork> _nearbyNetworks = [];
-  final List<NetworkThreat> _threats = [];
-  VpnStatus _vpnStatus = VpnStatus();
-  DnsProtectionStatus _dnsStatus = DnsProtectionStatus();
+
+  /// Threats reported by the backend (GET /network/threats). Owned by
+  /// [loadNetworkThreats]; never touched by local scans.
+  final List<NetworkThreat> _remoteThreats = [];
+
+  /// Threats derived on-device (local scan heuristics, WiFi audit of the
+  /// current network, DNS hijack check). Owned by the scan/check methods;
+  /// never touched by [loadNetworkThreats].
+  final List<NetworkThreat> _localThreats = [];
+
   NetworkSecurityStats _stats = NetworkSecurityStats();
 
   bool _isLoading = false;
   bool _isScanning = false;
   String? _error;
 
+  // DNS security check state
+  DnsCheckResult? _dnsCheckResult;
+  bool _isCheckingDns = false;
+  String? _dnsCheckError;
+
   // Getters
   WifiNetwork? get currentNetwork => _currentNetwork;
   List<WifiNetwork> get nearbyNetworks => List.unmodifiable(_nearbyNetworks);
-  List<NetworkThreat> get threats => List.unmodifiable(_threats);
-  VpnStatus get vpnStatus => _vpnStatus;
-  DnsProtectionStatus get dnsStatus => _dnsStatus;
+  List<NetworkThreat> get threats =>
+      List.unmodifiable([..._remoteThreats, ..._localThreats]);
   NetworkSecurityStats get stats => _stats;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
   String? get error => _error;
+  DnsCheckResult? get dnsCheckResult => _dnsCheckResult;
+  bool get isCheckingDns => _isCheckingDns;
+  String? get dnsCheckError => _dnsCheckError;
+
+  /// True when the user turned network protection off in the app Settings
+  /// (`prot_network`). While set, active scans and DNS checks are skipped.
+  bool get protectionDisabledByUser => _protectionDisabledByUser;
+  bool _protectionDisabledByUser = false;
+
+  /// Reads the persisted Settings flag. Fails open (enabled) when
+  /// preferences are unavailable — an unreadable setting is not a user
+  /// opt-out.
+  Future<bool> _isProtectionEnabledByUser() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('NetworkProvider: cannot read protection setting: $e');
+    }
+    final enabled = _prefs?.getBool(_kMasterProtectionKey) ?? true;
+    _protectionDisabledByUser = !enabled;
+    return enabled;
+  }
 
   /// Active threats
   List<NetworkThreat> get activeThreats =>
-      _threats.where((t) => t.isActive).toList();
+      threats.where((t) => t.isActive).toList();
 
   /// Critical threats
   List<NetworkThreat> get criticalThreats =>
-      _threats.where((t) => t.isCritical && t.isActive).toList();
+      threats.where((t) => t.isCritical && t.isActive).toList();
 
   /// Open (unsecured) networks nearby
   List<WifiNetwork> get openNetworks =>
@@ -224,8 +337,6 @@ class NetworkProvider extends ChangeNotifier {
   /// Initialize provider
   Future<void> init() async {
     await refreshNetworkInfo();
-    await refreshDnsStatus();
-    await refreshVpnStatus();
     await loadNetworkThreats();
   }
 
@@ -261,6 +372,11 @@ class NetworkProvider extends ChangeNotifier {
   /// Scan nearby networks using platform channel
   Future<void> scanNetworks() async {
     if (_isScanning) return;
+    if (!await _isProtectionEnabledByUser()) {
+      _error = 'Network protection is disabled in Settings.';
+      notifyListeners();
+      return;
+    }
 
     _isScanning = true;
     notifyListeners();
@@ -285,13 +401,14 @@ class NetworkProvider extends ChangeNotifier {
         }
       }
 
-      // Also audit the current network via API
+      // Rebuild locally-derived threats from this scan, then append any
+      // findings from the backend WiFi audit of the current network.
+      _checkForThreats();
       if (_currentNetwork != null) {
         await _auditCurrentNetwork();
       }
 
-      _checkForThreats();
-      _updateStats();
+      _updateStats(countScan: true);
     } on PlatformException catch (e) {
       _error = 'Failed to scan networks: ${e.message}';
     } catch (e) {
@@ -321,8 +438,8 @@ class NetworkProvider extends ChangeNotifier {
         for (var i = 0; i < auditResult.threats.length; i++) {
           final threat = auditResult.threats[i];
           final threatId = 'wifi_${_currentNetwork!.bssid}_${threat.type}_$i';
-          if (!_threats.any((t) => t.id == threatId)) {
-            _threats.add(NetworkThreat(
+          if (!_localThreats.any((t) => t.id == threatId)) {
+            _localThreats.add(NetworkThreat(
               id: threatId,
               type: threat.type,
               title: _getThreatTitle(threat.type),
@@ -345,16 +462,17 @@ class NetworkProvider extends ChangeNotifier {
     try {
       final threatsData = await _api.getNetworkThreats();
 
-      _threats.clear();
+      _remoteThreats.clear();
       for (final threatJson in threatsData) {
-        _threats.add(NetworkThreat(
+        _remoteThreats.add(NetworkThreat(
           id: threatJson['id'] as String? ?? '',
           type: threatJson['type'] as String? ?? 'unknown',
           title: threatJson['title'] as String? ?? 'Network Threat',
           description: threatJson['description'] as String? ?? '',
           severity: threatJson['severity'] as String? ?? 'medium',
           detectedAt: threatJson['detected_at'] != null
-              ? DateTime.parse(threatJson['detected_at'] as String)
+              ? DateTime.tryParse(threatJson['detected_at'] as String) ??
+                  DateTime.now()
               : DateTime.now(),
           isActive: threatJson['is_active'] as bool? ?? true,
           recommendation: threatJson['recommendation'] as String?,
@@ -379,147 +497,260 @@ class NetworkProvider extends ChangeNotifier {
     return WifiSecurityLevel.open;
   }
 
-  /// Refresh VPN status from API
-  Future<void> refreshVpnStatus() async {
-    try {
-      final statusData = await _api.getVpnStatus();
+  // NOTE: device VPN connect/disconnect and DNS enable/disable were removed.
+  // The backend never exposed those endpoints; VPN protection is provided by
+  // the separate OrbVPN app, and secure DNS is configured at the OS level
+  // (Android Private DNS / Apple DNS profiles).
 
-      _vpnStatus = VpnStatus(
-        isConnected: statusData['is_connected'] as bool? ?? false,
-        serverLocation: statusData['server_location'] as String?,
-        serverIp: statusData['server_ip'] as String?,
-        protocol: statusData['protocol'] as String?,
-        connectedAt: statusData['connected_at'] != null
-            ? DateTime.parse(statusData['connected_at'] as String)
-            : null,
-        bytesIn: statusData['bytes_in'] as int?,
-        bytesOut: statusData['bytes_out'] as int?,
+  // ============================================
+  // DNS SECURITY CHECK (client-side resolution)
+  // ============================================
+
+  /// Well-known canary hostnames with long-term-stable, vendor-operated
+  /// answer sets the backend can verify:
+  ///   one.one.one.one -> 1.1.1.1 / 1.0.0.1 (+IPv6), operated by Cloudflare
+  ///   dns.google      -> 8.8.8.8 / 8.8.4.4 (+IPv6), operated by Google
+  static const List<String> _dnsCanaries = ['one.one.one.one', 'dns.google'];
+
+  /// Controlled leak-check canary zone advertised by the backend
+  /// (GET /network/dns/leak-config). Cached for the provider's lifetime once
+  /// fetched successfully; null while unknown, '' when the backend reports
+  /// leak detection unavailable.
+  String? _leakCanaryZone;
+
+  /// Fetch (and cache) the leak-check canary zone. Failures are tolerated:
+  /// the DNS check still runs, with the leak check reported by the backend
+  /// as not performed.
+  Future<String?> _getLeakCanaryZone() async {
+    if (_leakCanaryZone != null) return _leakCanaryZone;
+    try {
+      final config = await _api.get<Map<String, dynamic>>(
+        ApiEndpoints.networkDnsLeakConfig,
       );
+      final available = config['leak_check_available'] as bool? ?? false;
+      final zone = config['canary_zone'] as String? ?? '';
+      _leakCanaryZone = available ? zone : '';
     } catch (e) {
-      // VPN status failure shouldn't crash the app
-      _vpnStatus = VpnStatus(isConnected: false);
+      // Leave null so the next check retries the fetch.
+      debugPrint('DNS check: leak canary config unavailable: $e');
     }
-    notifyListeners();
+    final zone = _leakCanaryZone;
+    return (zone == null || zone.isEmpty) ? null : zone;
   }
 
-  /// Connect to VPN via API
-  Future<bool> connectVpn(String server) async {
-    _isLoading = true;
-    notifyListeners();
+  /// Generate a crypto-secure random leak canary token: 32 lowercase hex
+  /// characters (128 bits), a single valid DNS label.
+  static String _generateLeakCanaryToken() {
+    final rng = Random.secure();
+    const hex = '0123456789abcdef';
+    return String.fromCharCodes(
+      List.generate(32, (_) => hex.codeUnitAt(rng.nextInt(16))),
+    );
+  }
 
-    try {
-      final result = await _api.connectVpn(server);
-
-      _vpnStatus = VpnStatus(
-        isConnected: result['success'] as bool? ?? false,
-        serverLocation: result['server_location'] as String? ?? server,
-        serverIp: result['server_ip'] as String?,
-        protocol: result['protocol'] as String?,
-        connectedAt: DateTime.now(),
-      );
-      _isLoading = false;
+  /// Run a DNS hijack check: resolve canary domains through this device's
+  /// LOCAL resolver and submit the answers to the backend, which compares
+  /// them against known-good answer sets and threat intelligence.
+  ///
+  /// Device identity for the backend audit trail is carried by the
+  /// authenticated device api_key (the server's auth middleware resolves the
+  /// device_id from it), so no device_id needs to be embedded in the body.
+  Future<void> runDnsCheck() async {
+    if (_isCheckingDns) return;
+    if (!await _isProtectionEnabledByUser()) {
+      _dnsCheckError = 'Network protection is disabled in Settings.';
       notifyListeners();
-      return _vpnStatus.isConnected;
+      return;
+    }
+
+    _isCheckingDns = true;
+    _dnsCheckError = null;
+    notifyListeners();
+
+    try {
+      // 1. Resolve each canary through the device's local resolver.
+      final resolutions = <DnsCanaryResolution>[];
+      for (final canary in _dnsCanaries) {
+        try {
+          final addresses = await InternetAddress.lookup(canary)
+              .timeout(const Duration(seconds: 8));
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps:
+                addresses.map((a) => a.address).toList(growable: false),
+          ));
+        } on SocketException catch (e) {
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps: const [],
+            lookupError: e.message.isNotEmpty ? e.message : 'lookup failed',
+          ));
+        } on TimeoutException {
+          resolutions.add(DnsCanaryResolution(
+            canary: canary,
+            resolvedIps: const [],
+            lookupError: 'lookup timed out',
+          ));
+        }
+      }
+
+      // 2. Best-effort resolver hint from the native side. If the platform
+      // does not expose the configured DNS servers, the hint is omitted —
+      // never guessed.
+      String? resolverHint;
+      try {
+        final servers =
+            await _wifiChannel.invokeMethod<List<dynamic>>('getDnsServers');
+        if (servers != null && servers.isNotEmpty) {
+          resolverHint = servers.map((s) => s.toString()).join(',');
+        }
+      } on PlatformException catch (e) {
+        debugPrint('DNS check: resolver hint unavailable: ${e.message}');
+      } on MissingPluginException {
+        debugPrint('DNS check: resolver hint unavailable (no native handler)');
+      }
+
+      final successful = resolutions.where((r) => r.succeeded).toList();
+      if (successful.isEmpty && resolverHint == null) {
+        // Nothing measurable: local resolution failed for every canary and
+        // the resolver address is unknown. Report the failure explicitly
+        // instead of submitting an empty check.
+        final details = resolutions
+            .map((r) => '${r.canary}: ${r.lookupError ?? 'no answers'}')
+            .join('; ');
+        _dnsCheckError =
+            'DNS check could not run: local canary resolution failed ($details)';
+        return;
+      }
+
+      // 3. Real leak check: when the backend advertises a controlled canary
+      // zone, resolve a crypto-random {token}.{zone} through the LOCAL
+      // resolver. The answer does not matter and lookup failure is tolerated
+      // — what counts is which resolver IP contacts the backend's
+      // authoritative canary server for the token. The token is submitted
+      // either way: the absence of any query at the authoritative server is
+      // itself signal (surfaced as "not_observed").
+      String? leakCanaryToken;
+      final leakZone = await _getLeakCanaryZone();
+      if (leakZone != null) {
+        leakCanaryToken = _generateLeakCanaryToken();
+        try {
+          await InternetAddress.lookup('$leakCanaryToken.$leakZone')
+              .timeout(const Duration(seconds: 8));
+        } on SocketException catch (e) {
+          debugPrint(
+              'DNS check: leak canary lookup failed (token still submitted): ${e.message}');
+        } on TimeoutException {
+          debugPrint(
+              'DNS check: leak canary lookup timed out (token still submitted)');
+        }
+      }
+
+      // 4. Submit the client-side measurements for verification.
+      final response = await _api.post<Map<String, dynamic>>(
+        ApiEndpoints.networkDnsCheck,
+        data: {
+          'current_dns':
+              resolverHint == null ? '' : resolverHint.split(',').first,
+          'check_hijack': true,
+          'check_leaks': true,
+          if (leakCanaryToken != null) 'leak_canary_token': leakCanaryToken,
+          'client_resolutions': [
+            for (final r in successful)
+              {
+                'canary': r.canary,
+                'resolved_ips': r.resolvedIps,
+                if (resolverHint != null) 'resolver_hint': resolverHint,
+              },
+          ],
+        },
+      );
+
+      // 5. Parse the verified result.
+      final issues = <String>[];
+      for (final issue
+          in (response['security_issues'] as List<dynamic>? ?? const [])) {
+        final map = issue as Map<String, dynamic>;
+        final title = map['title'] as String? ?? '';
+        final description = map['description'] as String? ?? '';
+        issues.add(title.isEmpty ? description : '$title: $description');
+      }
+      final provider = response['provider'] as Map<String, dynamic>?;
+      final hijackDetails =
+          response['hijack_details'] as Map<String, dynamic>?;
+
+      // The check response also advertises the canary zone; refresh the
+      // cache so a zone enabled after the leak-config fetch is picked up.
+      final advertisedZone = response['leak_canary_zone'] as String?;
+      if (advertisedZone != null && advertisedZone.isNotEmpty) {
+        _leakCanaryZone = advertisedZone;
+      }
+
+      _dnsCheckResult = DnsCheckResult(
+        isHijacked: response['is_hijacked'] as bool? ?? false,
+        isSecure: response['is_secure'] as bool? ?? false,
+        isEncrypted: response['is_encrypted'] as bool? ?? false,
+        providerName: provider?['name'] as String?,
+        hijackCheckStatus:
+            response['hijack_check_status'] as String? ?? 'unknown',
+        leakCheckStatus: response['leak_check_status'] as String? ?? 'unknown',
+        leakObservation: DnsLeakObservation.fromJson(
+            response['leak_observation'] as Map<String, dynamic>?),
+        hijackDescription: hijackDetails?['description'] as String?,
+        hijackConfidence: (hijackDetails?['confidence'] as num?)?.toDouble(),
+        issues: issues,
+        canaryResolutions: resolutions,
+        resolverHint: resolverHint,
+        checkedAt: DateTime.now(),
+      );
+
+      _syncDnsHijackThreat();
     } catch (e) {
-      _error = 'Failed to connect VPN: $e';
-      _isLoading = false;
+      _dnsCheckError = 'DNS check failed: $e';
+      debugPrint(_dnsCheckError);
+    } finally {
+      _isCheckingDns = false;
       notifyListeners();
-      return false;
     }
   }
 
-  /// Disconnect VPN via API
-  Future<void> disconnectVpn() async {
-    try {
-      await _api.disconnectVpn();
-    } catch (e) {
-      debugPrint('Failed to disconnect VPN: $e');
-    }
-    _vpnStatus = VpnStatus(isConnected: false);
-    notifyListeners();
-  }
+  /// Keep the threats list in sync with the latest verified DNS check.
+  void _syncDnsHijackThreat() {
+    const threatId = 'dns_hijacking_local';
+    _localThreats.removeWhere((t) => t.id == threatId);
 
-  /// Refresh DNS status from API
-  Future<void> refreshDnsStatus() async {
-    try {
-      final statusData = await _api.getDnsStatus();
+    final result = _dnsCheckResult;
+    if (result == null || !result.isHijacked) return;
 
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: statusData['is_enabled'] as bool? ?? false,
-        provider: statusData['provider'] as String? ?? 'Default',
-        primaryDns: statusData['primary_dns'] as String? ?? '',
-        secondaryDns: statusData['secondary_dns'] as String?,
-        isMalwareBlocking: statusData['malware_blocking'] as bool? ?? false,
-        isAdBlocking: statusData['ad_blocking'] as bool? ?? false,
-        isTrackingBlocking: statusData['tracking_blocking'] as bool? ?? false,
-        blockedQueries: statusData['blocked_queries'] as int? ?? 0,
-      );
-    } catch (e) {
-      // DNS status failure shouldn't crash the app
-      _dnsStatus = DnsProtectionStatus();
-    }
-    notifyListeners();
-  }
-
-  /// Enable DNS protection via API
-  Future<void> enableDnsProtection({
-    bool malwareBlocking = true,
-    bool adBlocking = false,
-    bool trackingBlocking = true,
-  }) async {
-    try {
-      final result = await _api.enableDnsProtection(
-        malwareBlocking: malwareBlocking,
-        adBlocking: adBlocking,
-        trackingBlocking: trackingBlocking,
-      );
-
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: true,
-        provider: result['provider'] as String? ?? 'OrbGuard DNS',
-        primaryDns: result['primary_dns'] as String? ?? '',
-        secondaryDns: result['secondary_dns'] as String?,
-        isMalwareBlocking: malwareBlocking,
-        isAdBlocking: adBlocking,
-        isTrackingBlocking: trackingBlocking,
-        blockedQueries: _dnsStatus.blockedQueries,
-      );
-    } catch (e) {
-      _error = 'Failed to enable DNS protection: $e';
-    }
-    notifyListeners();
-  }
-
-  /// Disable DNS protection via API
-  Future<void> disableDnsProtection() async {
-    try {
-      await _api.disableDnsProtection();
-
-      _dnsStatus = DnsProtectionStatus(
-        isEnabled: false,
-        provider: 'Default',
-        primaryDns: '',
-        blockedQueries: _dnsStatus.blockedQueries,
-      );
-    } catch (e) {
-      _error = 'Failed to disable DNS protection: $e';
-    }
-    notifyListeners();
+    _localThreats.add(NetworkThreat(
+      id: threatId,
+      type: 'dns_hijacking',
+      title: _getThreatTitle('dns_hijacking'),
+      description: result.hijackDescription ??
+          'The DNS resolver used by this device is rewriting answers for well-known domains.',
+      severity: 'critical',
+      detectedAt: result.checkedAt,
+      recommendation: _getThreatRecommendation('dns_hijacking'),
+    ));
   }
 
   /// Dismiss threat
   void dismissThreat(String id) {
-    final index = _threats.indexWhere((t) => t.id == id);
-    if (index >= 0) {
-      _threats.removeAt(index);
+    final removedLocal = _localThreats.any((t) => t.id == id);
+    final removedRemote = _remoteThreats.any((t) => t.id == id);
+    if (removedLocal) _localThreats.removeWhere((t) => t.id == id);
+    if (removedRemote) _remoteThreats.removeWhere((t) => t.id == id);
+    if (removedLocal || removedRemote) {
       _updateStats();
       notifyListeners();
     }
   }
 
-  /// Check for network threats
+  /// Rebuild locally-derived scan threats. Only touches [_localThreats];
+  /// backend-reported threats are preserved. The DNS hijack finding (owned by
+  /// [_syncDnsHijackThreat]) is re-applied after the rebuild.
   void _checkForThreats() {
-    _threats.clear();
+    _localThreats.clear();
 
     // Check for open networks
     for (final network in _nearbyNetworks) {
@@ -529,7 +760,7 @@ class NetworkProvider extends ChangeNotifier {
             n.ssid == network.ssid &&
             n.bssid != network.bssid &&
             n.security.isSecure)) {
-          _threats.add(NetworkThreat(
+          _localThreats.add(NetworkThreat(
             id: 'evil_twin_${network.bssid}',
             type: 'evil_twin',
             title: 'Potential Evil Twin Detected',
@@ -546,7 +777,7 @@ class NetworkProvider extends ChangeNotifier {
 
     // Check current network security
     if (_currentNetwork != null && !_currentNetwork!.security.isSecure) {
-      _threats.add(NetworkThreat(
+      _localThreats.add(NetworkThreat(
         id: 'insecure_network',
         type: 'insecure_wifi',
         title: 'Insecure Network Connection',
@@ -558,17 +789,22 @@ class NetworkProvider extends ChangeNotifier {
             'Enable WPA2 or WPA3 encryption on your network, or use a VPN.',
       ));
     }
+
+    // Re-apply the DNS hijack finding (cleared with the rest of the local
+    // threats above) from the latest verified DNS check result.
+    _syncDnsHijackThreat();
   }
 
-  /// Update stats
-  void _updateStats() {
+  /// Update stats. [countScan] is true only when a real network scan
+  /// completed, so the scan counter reflects actual scans rather than every
+  /// state refresh.
+  void _updateStats({bool countScan = false}) {
+    final all = threats;
     _stats = NetworkSecurityStats(
-      totalScans: _stats.totalScans + 1,
-      threatsDetected: _threats.length,
+      totalScans: _stats.totalScans + (countScan ? 1 : 0),
+      threatsDetected: all.length,
       openNetworksFound: openNetworks.length,
-      rogueApsDetected: _threats.where((t) => t.type == 'evil_twin').length,
-      dnsQueriesBlocked: _dnsStatus.blockedQueries,
-      maliciousSitesBlocked: 0,
+      rogueApsDetected: all.where((t) => t.type == 'evil_twin').length,
     );
   }
 

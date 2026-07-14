@@ -1,9 +1,12 @@
-/// App Security Widgets
-/// Reusable widgets for app security screens
+// App Security Widgets
+// Reusable widgets for app security screens
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/url_reputation.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/app_security_provider.dart';
 
@@ -36,8 +39,8 @@ class RiskScoreGauge extends StatelessWidget {
             child: CircularProgressIndicator(
               value: 1.0,
               strokeWidth: 8,
-              backgroundColor: Colors.grey.withAlpha(40),
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.withAlpha(40)),
+              backgroundColor: Brand.surface2,
+              valueColor: AlwaysStoppedAnimation<Color>(Brand.surface2),
             ),
           ),
           // Progress circle
@@ -57,16 +60,12 @@ class RiskScoreGauge extends StatelessWidget {
             children: [
               Text(
                 '$percentage',
-                style: TextStyle(
-                  color: color,
-                  fontSize: size * 0.3,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.heading(size: size * 0.3, color: color),
               ),
               Text(
                 'Risk',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: size * 0.12,
                 ),
               ),
@@ -78,9 +77,9 @@ class RiskScoreGauge extends StatelessWidget {
   }
 
   Color _getScoreColor() {
-    if (score > 0.7) return Colors.red;
-    if (score > 0.4) return Colors.orange;
-    return Colors.green;
+    if (score > 0.7) return AppColors.errorInk;
+    if (score > 0.4) return AppColors.amberInk;
+    return AppColors.accentInk;
   }
 }
 
@@ -106,17 +105,13 @@ class PrivacyGradeBadge extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         border: Border.all(color: color.withAlpha(100)),
       ),
       child: Center(
         child: Text(
           grade.toUpperCase(),
-          style: TextStyle(
-            color: color,
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-          ),
+          style: BrandText.heading(size: fontSize, color: color),
         ),
       ),
     );
@@ -145,14 +140,14 @@ class RiskLevelBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(compact ? 4 : 8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         level.toUpperCase(),
-        style: TextStyle(
+        style: BrandText.label(
           color: color,
-          fontSize: compact ? 10 : 12,
-          fontWeight: FontWeight.bold,
+          size: compact ? 10 : 12,
+          weight: FontWeight.w700,
         ),
       ),
     );
@@ -174,23 +169,24 @@ class AppListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final hasResult = app.result != null;
     final borderColor = hasResult
         ? (app.isHighRisk
-            ? Colors.red.withAlpha(75)
+            ? AppColors.errorInk.withAlpha(75)
             : app.isMediumRisk
-                ? Colors.orange.withAlpha(75)
-                : Colors.green.withAlpha(75))
-        : Colors.white10;
+                ? AppColors.amberInk.withAlpha(75)
+                : AppColors.accentInk.withAlpha(75))
+        : cs.outline;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
-          borderRadius: BorderRadius.circular(12),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: borderColor),
         ),
         child: Row(
@@ -200,16 +196,16 @@ class AppListCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2B40),
-                borderRadius: BorderRadius.circular(10),
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
               child: Center(
                 child: Text(
                   app.app.appName.isNotEmpty
                       ? app.app.appName[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -243,13 +239,14 @@ class AppListCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppColors.warning.withAlpha(40),
+                            borderRadius: BorderRadius.circular(
+                                GlassTheme.radiusXSmall),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Sideloaded',
                             style: TextStyle(
-                              color: Colors.orange,
+                              color: AppColors.secondaryInk,
                               fontSize: 10,
                             ),
                           ),
@@ -260,7 +257,7 @@ class AppListCard extends StatelessWidget {
                   Text(
                     app.app.packageName,
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: cs.onSurfaceVariant,
                       fontSize: 11,
                     ),
                     maxLines: 1,
@@ -284,22 +281,23 @@ class AppListCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.purple.withAlpha(40),
-                              borderRadius: BorderRadius.circular(4),
+                              color: AppColors.chartColors[4].withAlpha(40),
+                              borderRadius: BorderRadius.circular(
+                                  GlassTheme.radiusXSmall),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const DuotoneIcon(
+                                DuotoneIcon(
                                   AppIcons.radar,
                                   size: 10,
-                                  color: Colors.purple,
+                                  color: AppColors.chartColors[4],
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   '${app.result!.detectedTrackers.length}',
-                                  style: const TextStyle(
-                                    color: Colors.purple,
+                                  style: TextStyle(
+                                    color: AppColors.chartColors[4],
                                     fontSize: 10,
                                   ),
                                 ),
@@ -322,12 +320,12 @@ class AppListCard extends StatelessWidget {
               )
             else if (!hasResult && onAnalyze != null)
               IconButton(
-                icon: const DuotoneIcon(AppIcons.search, color: Color(0xFF00D9FF)),
+                icon: DuotoneIcon(AppIcons.search, color: AppColors.accentInk),
                 onPressed: onAnalyze,
                 tooltip: 'Analyze',
               )
             else
-              const DuotoneIcon(AppIcons.chevronRight, color: Colors.grey),
+              DuotoneIcon(AppIcons.chevronRight, color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -348,7 +346,9 @@ class PermissionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = permission.isDangerous ? Colors.red : Colors.grey;
+    final color = permission.isDangerous
+        ? AppColors.errorInk
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     final iconName = AppSecurityProvider.getPermissionIcon(permission.permission);
 
     if (showDescription) {
@@ -356,7 +356,7 @@ class PermissionChip extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: color.withAlpha(20),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           border: Border.all(color: color.withAlpha(50)),
         ),
         child: Row(
@@ -374,20 +374,25 @@ class PermissionChip extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     permission.description,
                     style: TextStyle(
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             if (permission.isDangerous)
-              const DuotoneIcon(AppIcons.dangerTriangle, size: 18, color: Colors.red),
+              DuotoneIcon(AppIcons.dangerTriangle,
+                  size: 18, color: AppColors.errorInk),
           ],
         ),
       );
@@ -397,7 +402,7 @@ class PermissionChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -472,12 +477,12 @@ class TrackerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B40),
-          borderRadius: BorderRadius.circular(8),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         ),
         child: Row(
           children: [
@@ -486,13 +491,13 @@ class TrackerCard extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.purple.withAlpha(40),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.chartColors[4].withAlpha(40),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
-              child: const DuotoneIcon(
+              child: DuotoneIcon(
                 AppIcons.radar,
                 size: 18,
-                color: Colors.purple,
+                color: AppColors.chartColors[4],
               ),
             ),
             const SizedBox(width: 12),
@@ -507,14 +512,18 @@ class TrackerCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (tracker.company != null)
                     Text(
                       tracker.company!,
                       style: TextStyle(
-                        color: Colors.grey[500],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 11,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -524,7 +533,7 @@ class TrackerCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: _getCategoryColor().withAlpha(40),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Text(
                 tracker.category,
@@ -543,15 +552,15 @@ class TrackerCard extends StatelessWidget {
   Color _getCategoryColor() {
     switch (tracker.category.toLowerCase()) {
       case 'analytics':
-        return Colors.blue;
+        return AppColors.secondaryInk;
       case 'advertising':
-        return Colors.orange;
+        return AppColors.amberInk;
       case 'social':
-        return Colors.pink;
+        return AppColors.secondaryInk;
       case 'crash':
-        return Colors.red;
+        return AppColors.errorInk;
       default:
-        return Colors.grey;
+        return Brand.text2;
     }
   }
 }
@@ -564,22 +573,19 @@ class AppSecurityStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Security Overview',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(size: 18, weight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
           // Stats grid
@@ -587,18 +593,20 @@ class AppSecurityStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Total Apps',
                   stats.totalApps.toString(),
                   AppIcons.smartphone,
-                  const Color(0xFF00D9FF),
+                  AppColors.accentInk,
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Analyzed',
                   stats.analyzedApps.toString(),
                   AppIcons.search,
-                  Colors.blue,
+                  AppColors.secondaryInk,
                 ),
               ),
             ],
@@ -608,18 +616,20 @@ class AppSecurityStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'High Risk',
                   stats.highRiskApps.toString(),
                   AppIcons.dangerTriangle,
-                  Colors.red,
+                  AppColors.errorInk,
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Sideloaded',
                   stats.sideloadedApps.toString(),
                   AppIcons.fileDownload,
-                  Colors.orange,
+                  AppColors.amberInk,
                 ),
               ),
             ],
@@ -629,18 +639,20 @@ class AppSecurityStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Trackers',
                   stats.trackersFound.toString(),
                   AppIcons.radar,
-                  Colors.purple,
+                  AppColors.chartColors[4],
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Dangerous',
                   stats.dangerousPermissions.toString(),
                   AppIcons.shieldCheck,
-                  Colors.deepOrange,
+                  AppColors.errorInk,
                 ),
               ),
             ],
@@ -650,18 +662,22 @@ class AppSecurityStatsCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(25),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.bug, color: Colors.red, size: 20),
+                  DuotoneIcon(AppIcons.bug, color: AppColors.errorInk, size: 20),
                   const SizedBox(width: 12),
-                  Text(
-                    '${stats.malwareDetected} malware app${stats.malwareDetected > 1 ? 's' : ''} detected!',
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      '${stats.malwareDetected} malware app${stats.malwareDetected > 1 ? 's' : ''} detected!',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.errorInk,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
@@ -673,13 +689,13 @@ class AppSecurityStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(
-      String label, String value, String icon, Color color) {
+  Widget _buildStatItem(BuildContext context, String label, String value,
+      String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -690,18 +706,18 @@ class AppSecurityStatsCard extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.heading(size: 18, color: color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -726,11 +742,12 @@ class ScanProgressIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         children: [
@@ -741,10 +758,10 @@ class ScanProgressIndicator extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Scanning Apps...',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: cs.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -752,52 +769,52 @@ class ScanProgressIndicator extends StatelessWidget {
                       Text(
                         '${(progress * 100).round()}% complete',
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(
+                SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF00D9FF),
+                    color: AppColors.accentInk,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               child: LinearProgressIndicator(
                 value: progress,
-                backgroundColor: Colors.white10,
+                backgroundColor: cs.onSurface.withValues(alpha: 0.04),
                 valueColor:
-                    const AlwaysStoppedAnimation<Color>(Color(0xFF00D9FF)),
+                    AlwaysStoppedAnimation<Color>(AppColors.accentInk),
               ),
             ),
           ] else ...[
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'App Security Scan',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: cs.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'Analyze installed apps for risks',
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -806,11 +823,11 @@ class ScanProgressIndicator extends StatelessWidget {
                 ),
                 ElevatedButton.icon(
                   onPressed: onStart,
-                  icon: const DuotoneIcon(AppIcons.play, size: 18, color: Colors.black),
+                  icon: const DuotoneIcon(AppIcons.play, size: 18, color: Brand.onLime),
                   label: const Text('Scan'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D9FF),
-                    foregroundColor: Colors.black,
+                    backgroundColor: Brand.lime,
+                    foregroundColor: Brand.onLime,
                   ),
                 ),
               ],

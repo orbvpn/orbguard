@@ -1,12 +1,14 @@
 /// SMS Detail Screen
 /// Detailed view of a single SMS message with threat analysis
-
-library sms_detail_screen;
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/sms_provider.dart';
 import '../../widgets/sms/sms_widgets.dart';
@@ -88,7 +90,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Report False Positive'),
         content: const Text(
           'Are you sure this message is safe? This helps improve our detection accuracy.',
@@ -107,8 +109,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: GlassTheme.primaryAccent,
+              foregroundColor: Brand.onLime,
             ),
             child: const Text('Report'),
           ),
@@ -121,7 +123,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Delete Message'),
         content: const Text(
           'Are you sure you want to delete this message from OrbGuard?',
@@ -138,7 +140,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
+              foregroundColor: Brand.onDanger,
             ),
             child: const Text('Delete'),
           ),
@@ -160,16 +163,18 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     final analysis = _message.analysisResult;
     final isBlocked = widget.provider.isSenderBlocked(_message.sender);
 
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A0E21),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text('Message Details'),
         actions: [
           PopupMenuButton<String>(
-            icon: const DuotoneIcon('menu_dots', color: Colors.white, size: 24),
-            color: const Color(0xFF1D1E33),
+            icon: DuotoneIcon('menu_dots', color: cs.onSurface, size: 24),
+            color: cs.surface,
             onSelected: (value) {
               switch (value) {
                 case 'copy':
@@ -196,7 +201,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               PopupMenuItem(
                 value: 'copy',
                 child: ListTile(
-                  leading: const DuotoneIcon('copy', size: 20, color: Colors.white),
+                  leading: DuotoneIcon('copy', size: 20, color: cs.onSurface),
                   title: const Text('Copy message'),
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -207,7 +212,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                   leading: DuotoneIcon(
                     isBlocked ? 'check_circle' : 'forbidden',
                     size: 20,
-                    color: isBlocked ? Colors.green : Colors.red,
+                    color: isBlocked ? AppColors.accentInk : AppColors.errorInk,
                   ),
                   title: Text(isBlocked ? 'Unblock sender' : 'Block sender'),
                   contentPadding: EdgeInsets.zero,
@@ -217,7 +222,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 PopupMenuItem(
                   value: 'report',
                   child: ListTile(
-                    leading: const DuotoneIcon('flag', size: 20, color: Colors.white),
+                    leading: DuotoneIcon('flag', size: 20, color: cs.onSurface),
                     title: const Text('Report false positive'),
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -225,8 +230,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
-                  leading: const DuotoneIcon('trash_bin_minimalistic', size: 20, color: Colors.red),
-                  title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  leading: DuotoneIcon('trash_bin_minimalistic', size: 20, color: AppColors.errorInk),
+                  title: Text('Delete', style: TextStyle(color: AppColors.errorInk)),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -235,17 +240,17 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Sender info
             _buildSenderCard(isBlocked),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             // Message content
             _buildMessageCard(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             // Analysis or analyze button
             if (_isAnalyzing || _message.isAnalyzing)
@@ -255,7 +260,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
             else ...[
               // Threat level summary
               _buildThreatSummary(analysis!),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
               // Detected threats
               if (analysis.threats.isNotEmpty) ...[
@@ -281,36 +286,34 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               if (analysis.detectedIntents.isNotEmpty) ...[
                 _buildSection('Suspicious Intents'),
                 _buildIntentsChips(analysis.detectedIntents),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
               ],
 
               // Sender analysis
               if (analysis.senderAnalysis != null) ...[
                 _buildSection('Sender Analysis'),
                 SenderAnalysisCard(analysis: analysis.senderAnalysis!),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
               ],
 
               // Matched patterns
               if (analysis.matchedPatterns.isNotEmpty) ...[
                 _buildSection('Matched Patterns'),
                 _buildPatternChips(analysis.matchedPatterns),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
               ],
 
               // Re-analyze button
               OutlinedButton.icon(
                 onPressed: _analyzeMessage,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF00D9FF),
+                  foregroundColor: AppColors.accentInk,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                icon: const DuotoneIcon('refresh', size: 18, color: Color(0xFF00D9FF)),
+                icon: DuotoneIcon('refresh', size: 18, color: AppColors.accentInk),
                 label: const Text('Re-analyze'),
               ),
             ],
-
-            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -321,8 +324,8 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -369,13 +372,13 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red.withAlpha(50),
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.error.withAlpha(50),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
-                        child: const Text(
+                        child: Text(
                           'BLOCKED',
                           style: TextStyle(
-                            color: Colors.red,
+                            color: AppColors.errorInk,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
@@ -386,9 +389,9 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatDateTime(_message.timestamp),
+                  _formatDateTime(_message.timestamp), maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -405,11 +408,12 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
   }
 
   Widget _buildMessageCard() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +429,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               ),
               const Spacer(),
               IconButton(
-                icon: const DuotoneIcon('copy', size: 18, color: Colors.white),
+                icon: DuotoneIcon('copy', size: 18, color: cs.onSurface),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: _copyContent,
@@ -437,7 +441,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
           SelectableText(
             _message.content,
             style: TextStyle(
-              color: Colors.grey[300],
+              color: cs.onSurface,
               fontSize: 15,
               height: 1.5,
             ),
@@ -451,17 +455,17 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         children: [
-          const SizedBox(
+          SizedBox(
             width: 48,
             height: 48,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation(Color(0xFF00D9FF)),
+              valueColor: AlwaysStoppedAnimation(AppColors.accentInk),
             ),
           ),
           const SizedBox(height: 16),
@@ -477,7 +481,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
             'Checking for phishing, malware links, and suspicious patterns',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),
@@ -490,18 +494,18 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: Border.all(
-          color: const Color(0xFF00D9FF).withAlpha(50),
+          color: AppColors.accentInk.withAlpha(50),
         ),
       ),
       child: Column(
         children: [
-          const DuotoneIcon(
+          DuotoneIcon(
             'shield_check',
             size: 48,
-            color: Color(0xFF00D9FF),
+            color: AppColors.accentInk,
           ),
           const SizedBox(height: 16),
           const Text(
@@ -516,7 +520,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
             'Analyze this message to detect phishing, smishing, and other threats',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),
@@ -524,14 +528,14 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
           ElevatedButton.icon(
             onPressed: _analyzeMessage,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: GlassTheme.primaryAccent,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,
               ),
             ),
-            icon: const DuotoneIcon('magnifer', size: 18, color: Colors.black),
+            icon: const DuotoneIcon('magnifer', size: 18, color: Brand.onLime),
             label: const Text('Analyze Message'),
           ),
         ],
@@ -544,7 +548,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Color(analysis.threatLevel.color).withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: Border.all(
           color: Color(analysis.threatLevel.color).withAlpha(75),
         ),
@@ -580,8 +584,10 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                 Expanded(
                   child: Text(
                     analysis.recommendation!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                     ),
                   ),
@@ -594,18 +600,20 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(50),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(50),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon('danger_triangle', color: Colors.red, size: 18),
+                  DuotoneIcon('danger_triangle', color: AppColors.errorInk, size: 18),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'This message should be blocked',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.red,
+                        color: AppColors.errorInk,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -615,7 +623,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
                     TextButton(
                       onPressed: _blockSender,
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.errorInk,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                       ),
                       child: const Text('Block'),
@@ -650,9 +658,9 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.orange.withAlpha(50),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.orange.withAlpha(75)),
+            color: AppColors.warning.withAlpha(50),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+            border: Border.all(color: AppColors.warning.withAlpha(75)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -660,13 +668,13 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
               DuotoneIcon(
                 _getIntentSvgIcon(intent),
                 size: 14,
-                color: Colors.orange,
+                color: AppColors.secondaryInk,
               ),
               const SizedBox(width: 6),
               Text(
                 intent.value.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.orange,
+                style: TextStyle(
+                  color: AppColors.secondaryInk,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -700,6 +708,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
   }
 
   Widget _buildPatternChips(List<String> patterns) {
+    final cs = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 6,
       runSpacing: 6,
@@ -707,13 +716,13 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.grey.withAlpha(50),
-            borderRadius: BorderRadius.circular(4),
+            color: cs.onSurface.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: Text(
             pattern,
-            style: const TextStyle(
-              color: Colors.grey,
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -727,12 +736,14 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
       return Color(_message.threatLevel.color);
     }
     final hash = _message.sender.hashCode;
+    // Brand spectrum family (chartColors), skipping the danger red so a safe
+    // sender never gets a threat-colored avatar.
     final colors = [
-      const Color(0xFF00D9FF),
-      const Color(0xFF9C27B0),
-      const Color(0xFFFF9800),
-      const Color(0xFF4CAF50),
-      const Color(0xFFE91E63),
+      AppColors.chartColors[2], // cyan
+      AppColors.chartColors[4], // light-purple
+      AppColors.chartColors[5], // gold
+      AppColors.chartColors[6], // mint
+      AppColors.chartColors[1], // pink
     ];
     return colors[hash.abs() % colors.length];
   }

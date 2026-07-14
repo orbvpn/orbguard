@@ -17,6 +17,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'desktop_host_collector.dart';
+
 /// Persistence item type
 enum PersistenceType {
   launchAgent('Launch Agent', '/Library/LaunchAgents, ~/Library/LaunchAgents'),
@@ -1253,5 +1255,37 @@ class MacOSPersistenceScannerService {
   /// Dispose resources
   void dispose() {
     _itemController.close();
+  }
+
+  // =========================================================================
+  // Host-local collection (W5.11)
+  //
+  // The backend's desktop network/browser scanners run on the SERVER host,
+  // so this device's data must be collected client-side. Output maps mirror
+  // the backend NetworkConnection / BrowserExtension JSON shapes.
+  // =========================================================================
+
+  /// Collect this Mac's active network connections via `lsof`.
+  Future<HostCollection> collectNetworkConnections() =>
+      collectMacosNetworkConnections();
+
+  /// Collect browser extensions installed in this Mac's browser profiles
+  /// (Chrome, Edge, Brave, Chromium, Firefox).
+  Future<HostCollection> collectBrowserExtensions() async {
+    final home = Platform.environment['HOME'] ?? '';
+    final chromium = await collectChromiumExtensions({
+      'Chrome': '$home/Library/Application Support/Google/Chrome',
+      'Edge': '$home/Library/Application Support/Microsoft Edge',
+      'Brave': '$home/Library/Application Support/BraveSoftware/Brave-Browser',
+      'Chromium': '$home/Library/Application Support/Chromium',
+    });
+    final firefox = await collectFirefoxExtensions(
+      '$home/Library/Application Support/Firefox/Profiles',
+    );
+    return HostCollection(
+      items: [...chromium.items, ...firefox.items],
+      errors: [...chromium.errors, ...firefox.errors],
+      source: '${chromium.source}; ${firefox.source}',
+    );
   }
 }

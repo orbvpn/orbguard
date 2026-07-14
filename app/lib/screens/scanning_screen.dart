@@ -1,15 +1,32 @@
 // lib/screens/scanning_screen.dart
-// Modern animated scanning screen
+// Animated scanning screen driven by REAL scan-stage callbacks.
+//
+// Honesty contract:
+// - Progress and stage labels come from DeviceScanProgress events emitted by
+//   the actual scan engine (no timers, no Random()).
+// - When only a plain `onScan` callback is provided (legacy path from
+//   lib/main.dart) the screen shows an indeterminate spinner — it never
+//   fabricates percentages or "items scanned" counters.
+// - Cancelling pops `null` (a cancelled scan is not an "all clear" result).
+// - Scan failures (including "scan engine not available on this build") are
+//   shown explicitly and pop `null` instead of an empty success.
 
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
+import '../services/security/device_scan_service.dart';
 
 /// Result object from scanning screen containing all scan data
 class ScanResult {
   final List<Map<String, dynamic>> threats;
+
+  /// Number of scan stages that genuinely ran. (The native scanners do not
+  /// report per-item counts, so no per-item number is fabricated here.)
   final int itemsScanned;
   final Duration scanDuration;
 
@@ -20,10 +37,21 @@ class ScanResult {
   });
 }
 
-class ScanningScreen extends StatefulWidget {
-  final Future<List<Map<String, dynamic>>> Function() onScan;
+/// Scan runner that reports real per-stage progress.
+typedef ProgressScanRunner = Future<List<Map<String, dynamic>>> Function(
+    DeviceScanProgressCallback onProgress);
 
-  const ScanningScreen({super.key, required this.onScan});
+class ScanningScreen extends StatefulWidget {
+  /// Legacy runner without progress reporting (used by lib/main.dart).
+  /// The screen shows honest indeterminate progress for this path.
+  final Future<List<Map<String, dynamic>>> Function()? onScan;
+
+  /// Preferred runner that emits real [DeviceScanProgress] updates.
+  final ProgressScanRunner? onScanWithProgress;
+
+  const ScanningScreen({super.key, this.onScan, this.onScanWithProgress})
+      : assert(onScan != null || onScanWithProgress != null,
+            'Provide onScan or onScanWithProgress');
 
   @override
   State<ScanningScreen> createState() => _ScanningScreenState();
@@ -33,57 +61,21 @@ class _ScanningScreenState extends State<ScanningScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _rotationController;
-  late AnimationController _progressController;
   late Animation<double> _pulseAnimation;
 
-  int _currentPhaseIndex = 0;
-  double _overallProgress = 0.0;
-  bool _scanComplete = false;
-  List<Map<String, dynamic>> _threats = [];
-  String _currentActivity = '';
-  int _itemsScanned = 0;
-  Timer? _activityTimer;
-  Timer? _countTimer;
-  late DateTime _scanStartTime;
+  // Real progress state (null progress = indeterminate legacy path).
+  double? _overallProgress;
+  String _stageName = '';
+  int _stagesCompleted = 0;
+  int _totalStages = 0;
+  int _threatsSoFar = 0;
+  final List<String> _stageWarnings = [];
 
-  final List<ScanPhase> _phases = [
-    ScanPhase(
-      name: 'System Analysis',
-      svgIcon: 'cpu',
-      description: 'Checking system integrity',
-      activities: ['Analyzing boot sequence', 'Checking system partitions', 'Verifying kernel modules', 'Scanning system apps'],
-    ),
-    ScanPhase(
-      name: 'Network Security',
-      svgIcon: 'wi_fi_router',
-      description: 'Monitoring network connections',
-      activities: ['Checking active connections', 'Analyzing DNS queries', 'Scanning open ports', 'Detecting suspicious traffic'],
-    ),
-    ScanPhase(
-      name: 'App Inspection',
-      svgIcon: 'smartphone',
-      description: 'Scanning installed applications',
-      activities: ['Analyzing app permissions', 'Checking app signatures', 'Scanning for malware patterns', 'Verifying app sources'],
-    ),
-    ScanPhase(
-      name: 'File System',
-      svgIcon: 'folder',
-      description: 'Scanning storage for threats',
-      activities: ['Scanning downloads folder', 'Checking hidden files', 'Analyzing file signatures', 'Detecting suspicious files'],
-    ),
-    ScanPhase(
-      name: 'Process Monitor',
-      svgIcon: 'database',
-      description: 'Analyzing running processes',
-      activities: ['Checking background services', 'Analyzing process memory', 'Detecting injection attacks', 'Monitoring system calls'],
-    ),
-    ScanPhase(
-      name: 'Threat Intelligence',
-      svgIcon: 'radar',
-      description: 'Matching against threat database',
-      activities: ['Querying threat database', 'Checking known signatures', 'Analyzing behavioral patterns', 'Correlating indicators'],
-    ),
-  ];
+  bool _scanComplete = false;
+  bool _scanFailed = false;
+  String _failureMessage = '';
+  List<Map<String, dynamic>> _threats = [];
+  late DateTime _scanStartTime;
 
   @override
   void initState() {
@@ -106,108 +98,72 @@ class _ScanningScreenState extends State<ScanningScreen>
       duration: const Duration(seconds: 8),
       vsync: this,
     )..repeat();
+  }
 
-    _progressController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
+  void _onProgress(DeviceScanProgress update) {
+    if (!mounted) return;
+    setState(() {
+      _totalStages = update.totalStages;
+      _stageName = update.stageName;
+      _threatsSoFar = update.threatsFound;
+      if (update.stageCompleted) {
+        _stagesCompleted = update.stageIndex + 1;
+        if (update.stageError != null) {
+          _stageWarnings.add('${update.stageName}: ${update.stageError}');
+        }
+      }
+      _overallProgress = update.fraction;
+    });
   }
 
   Future<void> _startScan() async {
-    // Record scan start time
     _scanStartTime = DateTime.now();
 
-    // Start activity updates
-    _updateActivity();
-    _startCountTimer();
-
-    // Run through each phase
-    for (int i = 0; i < _phases.length; i++) {
-      if (!mounted) return;
-
-      setState(() {
-        _currentPhaseIndex = i;
-      });
-
-      // Animate progress for this phase
-      final phaseProgress = (i + 1) / _phases.length;
-      await _animateProgress(phaseProgress);
-
-      // Minimum time per phase for visual effect
-      await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(400)));
-    }
-
-    // Run actual scan in background
     try {
-      _threats = await widget.onScan();
-    } catch (e) {
-      print('Scan error: $e');
-    }
-
-    // Complete
-    _activityTimer?.cancel();
-    _countTimer?.cancel();
-
-    if (mounted) {
-      setState(() {
-        _scanComplete = true;
-        _overallProgress = 1.0;
-      });
-
-      // Haptic feedback
-      HapticFeedback.mediumImpact();
-
-      // Wait a moment then show results
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) {
-        final scanDuration = DateTime.now().difference(_scanStartTime);
-        Navigator.pop(context, ScanResult(
-          threats: _threats,
-          itemsScanned: _itemsScanned,
-          scanDuration: scanDuration,
-        ));
+      if (widget.onScanWithProgress != null) {
+        _overallProgress = 0.0;
+        _threats = await widget.onScanWithProgress!(_onProgress);
+      } else {
+        // Legacy path: no stage data available — indeterminate, not faked.
+        _overallProgress = null;
+        _threats = await widget.onScan!();
       }
-    }
-  }
-
-  void _updateActivity() {
-    _activityTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) {
-      if (!mounted || _scanComplete) {
-        timer.cancel();
-        return;
-      }
-
-      final phase = _phases[_currentPhaseIndex];
-      final activityIndex = Random().nextInt(phase.activities.length);
-      setState(() {
-        _currentActivity = phase.activities[activityIndex];
-      });
-    });
-  }
-
-  void _startCountTimer() {
-    _countTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (!mounted || _scanComplete) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _itemsScanned += Random().nextInt(15) + 5;
-      });
-    });
-  }
-
-  Future<void> _animateProgress(double target) async {
-    final startProgress = _overallProgress;
-    final steps = 20;
-    final stepDuration = 30;
-
-    for (int i = 0; i <= steps; i++) {
+    } on DeviceScanUnavailableException catch (e) {
       if (!mounted) return;
-      await Future.delayed(Duration(milliseconds: stepDuration));
       setState(() {
-        _overallProgress = startProgress + (target - startProgress) * (i / steps);
+        _scanFailed = true;
+        _failureMessage = e.message;
       });
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _scanFailed = true;
+        _failureMessage = 'Scan failed: $e';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _scanComplete = true;
+      _overallProgress = 1.0;
+    });
+
+    HapticFeedback.mediumImpact();
+
+    // Brief pause so the completed state is visible, then return results.
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) {
+      final scanDuration = DateTime.now().difference(_scanStartTime);
+      Navigator.pop(
+        context,
+        ScanResult(
+          threats: _threats,
+          itemsScanned: _stagesCompleted,
+          scanDuration: scanDuration,
+        ),
+      );
     }
   }
 
@@ -215,16 +171,13 @@ class _ScanningScreenState extends State<ScanningScreen>
   void dispose() {
     _pulseController.dispose();
     _rotationController.dispose();
-    _progressController.dispose();
-    _activityTimer?.cancel();
-    _countTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: Theme.of(context).canvasColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -234,16 +187,20 @@ class _ScanningScreenState extends State<ScanningScreen>
               child: Row(
                 children: [
                   IconButton(
-                    icon: const DuotoneIcon('close_circle', size: 24, color: Colors.white54),
-                    onPressed: () => Navigator.pop(context, ScanResult(
-                      threats: [],
-                      itemsScanned: 0,
-                      scanDuration: Duration.zero,
-                    )),
+                    icon: DuotoneIcon('close_circle',
+                        size: 24,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    // A cancelled scan is NOT a clean result; pop null so the
+                    // caller does not show an "all clear" dialog.
+                    onPressed: () => Navigator.pop(context, null),
                   ),
                   const Spacer(),
                   Text(
-                    _scanComplete ? 'Scan Complete' : 'Scanning...',
+                    _scanFailed
+                        ? 'Scan Unavailable'
+                        : _scanComplete
+                            ? 'Scan Complete'
+                            : 'Scanning...',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -257,23 +214,15 @@ class _ScanningScreenState extends State<ScanningScreen>
 
             const Spacer(),
 
-            // Main scanner animation
             _buildScannerOrb(),
 
             const SizedBox(height: 40),
 
-            // Progress info
             _buildProgressInfo(),
 
             const Spacer(),
 
-            // Phase indicators
-            _buildPhaseIndicators(),
-
-            const SizedBox(height: 24),
-
-            // Current activity
-            _buildCurrentActivity(),
+            _buildStatusArea(),
 
             const SizedBox(height: 40),
           ],
@@ -282,6 +231,20 @@ class _ScanningScreenState extends State<ScanningScreen>
     );
   }
 
+  /// Status FILL (gradients, glow, ring) — brand threat-status tokens.
+  Color get _accentColor => _scanFailed
+      ? AppColors.threatDetected
+      : _scanComplete
+          ? AppColors.protected
+          : AppColors.scanning;
+
+  /// Contrast-safe INK for the status icon (lime is fill-only on light).
+  Color get _accentInk => _scanFailed
+      ? AppColors.errorInk
+      : _scanComplete
+          ? AppColors.accentInk
+          : Brand.text2;
+
   Widget _buildScannerOrb() {
     return SizedBox(
       width: 220,
@@ -289,42 +252,42 @@ class _ScanningScreenState extends State<ScanningScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Outer rotating ring
-          AnimatedBuilder(
-            animation: _rotationController,
-            builder: (context, child) {
-              return Transform.rotate(
-                angle: _rotationController.value * 2 * pi,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
-                      colors: [
-                        Colors.cyan.withOpacity(0),
-                        Colors.cyan.withOpacity(0.3),
-                        Colors.cyan.withOpacity(0.8),
-                        Colors.cyan.withOpacity(0),
-                      ],
+          // Outer rotating ring (cosmetic spinner, not a progress claim)
+          if (!_scanComplete && !_scanFailed)
+            AnimatedBuilder(
+              animation: _rotationController,
+              builder: (context, child) {
+                return Transform.rotate(
+                  angle: _rotationController.value * 2 * pi,
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [
+                          AppColors.scanning.withValues(alpha: 0),
+                          AppColors.scanning.withValues(alpha: 0.3),
+                          AppColors.scanning.withValues(alpha: 0.8),
+                          AppColors.scanning.withValues(alpha: 0),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
 
-          // Progress ring
+          // Progress ring: real fraction when stage data exists, otherwise
+          // an indeterminate spinner (value: null).
           SizedBox(
             width: 180,
             height: 180,
             child: CircularProgressIndicator(
-              value: _overallProgress,
+              value: _scanFailed ? 0 : _overallProgress,
               strokeWidth: 4,
-              backgroundColor: Colors.grey.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _scanComplete ? Colors.green : Colors.cyan,
-              ),
+              backgroundColor: AppColors.idle.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
             ),
           ),
 
@@ -333,7 +296,9 @@ class _ScanningScreenState extends State<ScanningScreen>
             animation: _pulseAnimation,
             builder: (context, child) {
               return Transform.scale(
-                scale: _scanComplete ? 1.0 : _pulseAnimation.value,
+                scale: (_scanComplete || _scanFailed)
+                    ? 1.0
+                    : _pulseAnimation.value,
                 child: Container(
                   width: 140,
                   height: 140,
@@ -341,19 +306,13 @@ class _ScanningScreenState extends State<ScanningScreen>
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        _scanComplete
-                            ? Colors.green.withOpacity(0.4)
-                            : Colors.cyan.withOpacity(0.4),
-                        _scanComplete
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.cyan.withOpacity(0.1),
+                        _accentColor.withValues(alpha: 0.4),
+                        _accentColor.withValues(alpha: 0.1),
                       ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: _scanComplete
-                            ? Colors.green.withOpacity(0.3)
-                            : Colors.cyan.withOpacity(0.3),
+                        color: _accentColor.withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 10,
                       ),
@@ -361,9 +320,13 @@ class _ScanningScreenState extends State<ScanningScreen>
                   ),
                   child: Center(
                     child: DuotoneIcon(
-                      _scanComplete ? 'check_circle' : 'shield_check',
+                      _scanFailed
+                          ? 'danger_circle'
+                          : _scanComplete
+                              ? 'check_circle'
+                              : 'shield_check',
                       size: 60,
-                      color: _scanComplete ? Colors.green : Colors.cyan,
+                      color: _accentInk,
                     ),
                   ),
                 ),
@@ -376,165 +339,163 @@ class _ScanningScreenState extends State<ScanningScreen>
   }
 
   Widget _buildProgressInfo() {
+    if (_scanFailed) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       children: [
-        // Percentage
-        Text(
-          '${(_overallProgress * 100).toInt()}%',
-          style: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: _scanComplete ? Colors.green : Colors.white,
+        // Percentage only when real stage progress exists.
+        if (_overallProgress != null)
+          Text(
+            '${(_overallProgress! * 100).toInt()}%',
+            style: BrandText.display(
+              size: 48,
+              color: _scanComplete
+                  ? AppColors.accentInk
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          )
+        else
+          Text(
+            'Scanning device…',
+            style: BrandText.heading(
+              size: 24,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
-        ),
         const SizedBox(height: 8),
-        // Items scanned
-        Text(
-          '${_formatNumber(_itemsScanned)} items scanned',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[400],
+        if (_totalStages > 0)
+          Text(
+            '$_stagesCompleted of $_totalStages scan stages completed',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
+        if (_threatsSoFar > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '$_threatsSoFar threat${_threatsSoFar == 1 ? '' : 's'} found so far',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.secondaryInk,
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  String _formatNumber(int number) {
-    if (number >= 1000000) {
-      return '${(number / 1000000).toStringAsFixed(1)}M';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    }
-    return number.toString();
-  }
-
-  Widget _buildPhaseIndicators() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(_phases.length, (index) {
-          final isComplete = index < _currentPhaseIndex || _scanComplete;
-          final isCurrent = index == _currentPhaseIndex && !_scanComplete;
-
-          return Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isComplete
-                      ? Colors.green.withOpacity(0.2)
-                      : isCurrent
-                          ? Colors.cyan.withOpacity(0.2)
-                          : Colors.grey.withOpacity(0.1),
-                  border: Border.all(
-                    color: isComplete
-                        ? Colors.green
-                        : isCurrent
-                            ? Colors.cyan
-                            : Colors.grey.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: DuotoneIcon(
-                  isComplete ? 'check_circle' : _phases[index].svgIcon,
-                  size: 20,
-                  color: isComplete
-                      ? Colors.green
-                      : isCurrent
-                          ? Colors.cyan
-                          : Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: 50,
-                child: Text(
-                  _phases[index].name.split(' ').first,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: isComplete || isCurrent ? Colors.white : Colors.grey[600],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildCurrentActivity() {
-    if (_scanComplete) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildStatusArea() {
+    if (_scanFailed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
           children: [
-            const DuotoneIcon('check_circle', size: 20, color: Colors.green),
-            const SizedBox(width: 8),
-            Text(
-              _threats.isEmpty ? 'No threats detected' : '${_threats.length} threats found',
-              style: TextStyle(
-                color: _threats.isEmpty ? Colors.green : Colors.orange,
-                fontWeight: FontWeight.w500,
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
               ),
+              child: Text(
+                _failureMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.errorInk,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, null),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger,
+              ),
+              child: const Text('Close'),
             ),
           ],
         ),
       );
     }
 
+    if (_scanComplete) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DuotoneIcon('check_circle',
+                    size: 20, color: AppColors.accentInk),
+                const SizedBox(width: 8),
+                Text(
+                  _threats.isEmpty
+                      ? 'No threats detected'
+                      : '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found',
+                  style: TextStyle(
+                    color: _threats.isEmpty
+                        ? AppColors.accentInk
+                        : AppColors.secondaryInk,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            if (_stageWarnings.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${_stageWarnings.length} scan stage'
+                  '${_stageWarnings.length == 1 ? '' : 's'} could not run:\n'
+                  '${_stageWarnings.join('\n')}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.amberInk,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Running: show the real current stage.
     return Column(
       children: [
-        Text(
-          _phases[_currentPhaseIndex].name,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.cyan,
-          ),
-        ),
-        const SizedBox(height: 8),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: Text(
-            _currentActivity.isEmpty
-                ? _phases[_currentPhaseIndex].description
-                : _currentActivity,
-            key: ValueKey(_currentActivity),
+        if (_stageName.isNotEmpty)
+          Text(
+            _stageName,
             style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[500],
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.secondaryInk,
             ),
           ),
-        ),
+        if (_stageWarnings.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _stageWarnings.last,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.amberInk,
+              ),
+            ),
+          ),
       ],
     );
   }
-}
-
-class ScanPhase {
-  final String name;
-  final String svgIcon;
-  final String description;
-  final List<String> activities;
-
-  ScanPhase({
-    required this.name,
-    required this.svgIcon,
-    required this.description,
-    required this.activities,
-  });
 }

@@ -1,15 +1,15 @@
-/// Glass App Bar - iOS 26 Liquid Glass Design
-/// Frosted glass-effect app bar widget matching OrbX design
-///
-/// Features:
-/// - Round back button on LEFT
-/// - Title in pill-shaped container on RIGHT
-/// - Tap feedback animation (scale + opacity)
+// Glass App Bar - iOS 26 Liquid Glass Design
+// Frosted glass-effect app bar widget matching OrbX design
+//
+// Features:
+// - Round back button on LEFT
+// - Title in pill-shaped container on RIGHT
+// - Tap feedback animation (scale + opacity)
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/brand.dart';
 import '../theme/glass_theme.dart';
 import '../theme/colors.dart';
 import 'duotone_icon.dart';
@@ -37,7 +37,7 @@ class GlassHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Padding(
@@ -100,6 +100,8 @@ class GlassHeader extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -163,7 +165,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = actualIsDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final totalHeight = height +
         (bottom?.preferredSize.height ?? 0) +
         MediaQuery.of(context).padding.top;
@@ -230,6 +232,8 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     if (title != null) {
       return Text(
         title!,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: textColor,
           fontSize: 18,
@@ -278,8 +282,7 @@ class GlassAppBarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actualIsDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = color ?? (actualIsDark ? Colors.white : Colors.black87);
+    final iconColor = color ?? Theme.of(context).colorScheme.onSurface;
 
     Widget iconWidget;
     if (svgIcon != null) {
@@ -441,6 +444,9 @@ class GlassPage extends StatelessWidget {
   final List<Widget>? actions;
   final VoidCallback? onAction;
   final bool showBackButton;
+  /// Icon for the round leading button. Defaults to the back chevron; pass e.g.
+  /// [AppIcons.home] to make the leading act as a "go home" button instead.
+  final String? leadingIcon;
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   /// When true, returns just the body without Scaffold/header (for embedding in other screens)
@@ -454,6 +460,7 @@ class GlassPage extends StatelessWidget {
     this.actions,
     this.onAction,
     this.showBackButton = true,
+    this.leadingIcon,
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.embedded = false,
@@ -468,20 +475,27 @@ class GlassPage extends StatelessWidget {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final textColor = Theme.of(context).colorScheme.onSurface;
 
     return GlassStatusBar(
       isDark: isDark,
       child: Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
-          child: Column(
-            children: [
-              // OrbX-style header: round back + pill title
-              _buildOrbXHeader(context, isDark, textColor),
-              // Main content
-              Expanded(child: body),
-            ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
+              child: Column(
+                children: [
+                  // OrbX-style header: round back + pill title
+                  _buildOrbXHeader(context, isDark, textColor),
+                  // Main content
+                  Expanded(child: body),
+                ],
+              ),
+            ),
           ),
         ),
         bottomNavigationBar: bottomNavigationBar,
@@ -509,7 +523,7 @@ class GlassPage extends StatelessWidget {
                     filter: GlassTheme.blurFilter,
                     child: Center(
                       child: DuotoneIcon(
-                        AppIcons.chevronLeft,
+                        leadingIcon ?? AppIcons.chevronLeft,
                         size: 22,
                         color: textColor,
                       ),
@@ -544,6 +558,8 @@ class GlassPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -605,9 +621,9 @@ class GlassBottomNav extends StatelessWidget {
               children: List.generate(items.length, (index) {
                 final item = items[index];
                 final isSelected = index == currentIndex;
-                final iconColor = isSelected
-                    ? AppColors.accent
-                    : (actualIsDark ? Colors.white54 : Colors.black45);
+                // Kit: only the active item takes lime — ink-safe on light.
+                final iconColor =
+                    isSelected ? Brand.navActive : Brand.navInactive;
 
                 return GestureDetector(
                   onTap: () => onTap(index),
@@ -620,7 +636,7 @@ class GlassBottomNav extends StatelessWidget {
                     ),
                     decoration: isSelected
                         ? BoxDecoration(
-                            color: AppColors.accent.withAlpha(30),
+                            color: Brand.navActivePill,
                             borderRadius: BorderRadius.circular(20),
                           )
                         : null,
@@ -643,6 +659,8 @@ class GlassBottomNav extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             item.label!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: iconColor,
                               fontSize: 10,

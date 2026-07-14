@@ -1,8 +1,8 @@
-/// Connection Manager
-/// Manages WebSocket connection lifecycle, network monitoring, and auto-reconnection
+// Connection Manager
+// Manages WebSocket connection lifecycle, network monitoring, and auto-reconnection
 
 import 'dart:async';
-import 'dart:io';
+import 'dart:developer' as developer;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,16 +57,21 @@ class ConnectionManager {
 
     _isInitialized = true;
 
-    // Auto-connect if enabled and we have network
+    // Auto-connect if enabled and we have network. Fire-and-forget: the
+    // WebSocket handshake can stall on a slow or unreachable network, and no
+    // caller (e.g. DashboardProvider.init) should block its first render on
+    // it — connection status is surfaced via the state stream + banner.
     if (_autoConnect && _hasNetwork()) {
-      await connect();
+      unawaited(connect().catchError((Object e) {
+        developer.log('Auto-connect failed: $e', name: 'OrbGuard.Conn');
+      }));
     }
   }
 
   /// Connect to threat stream
   Future<void> connect() async {
     if (!_hasNetwork()) {
-      print('No network connection available');
+      developer.log('No network connection available', name: 'OrbGuard.Conn');
       return;
     }
 
@@ -123,17 +128,17 @@ class ConnectionManager {
     _lastConnectivity = results;
     final hasNetwork = _hasNetwork();
 
-    print('Connectivity changed: $results (had: $hadNetwork, has: $hasNetwork)');
+    developer.log('Connectivity changed: $results (had: $hadNetwork, has: $hasNetwork)', name: 'OrbGuard.Conn');
 
     if (!hadNetwork && hasNetwork) {
       // Network restored - reconnect
       if (_autoConnect) {
-        print('Network restored, reconnecting...');
+        developer.log('Network restored, reconnecting...', name: 'OrbGuard.Conn');
         connect();
       }
     } else if (hadNetwork && !hasNetwork) {
       // Network lost - the WebSocket will handle this
-      print('Network lost');
+      developer.log('Network lost', name: 'OrbGuard.Conn');
     }
   }
 
@@ -167,7 +172,7 @@ class ConnectionManager {
       final state = connectionState;
       if (state != WebSocketState.connecting &&
           state != WebSocketState.reconnecting) {
-        print('Health check: should be connected but not, reconnecting...');
+        developer.log('Health check: should be connected but not, reconnecting...', name: 'OrbGuard.Conn');
         connect();
       }
     }
@@ -237,6 +242,8 @@ class ConnectionHealth {
         return 'VPN';
       case ConnectivityResult.bluetooth:
         return 'Bluetooth';
+      case ConnectivityResult.satellite:
+        return 'Satellite';
       case ConnectivityResult.other:
         return 'Other';
       case ConnectivityResult.none:

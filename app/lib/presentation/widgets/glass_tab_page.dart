@@ -7,7 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/colors.dart';
+import '../theme/brand.dart';
 import '../theme/glass_theme.dart';
 import 'duotone_icon.dart';
 import 'glass_app_bar.dart';
@@ -35,8 +35,16 @@ class GlassTabPage extends StatefulWidget {
   final List<Widget>? actions;
   final Widget? headerContent;
   final int initialIndex;
+
   /// When true, skips the outer GlassPage wrapper (for embedding in other screens)
   final bool embedded;
+
+  /// Forwarded to the standalone GlassPage header: whether to show the round
+  /// leading button, its icon (e.g. AppIcons.home to act as "go home"), and the
+  /// tap handler.
+  final bool showBackButton;
+  final String? leadingIcon;
+  final VoidCallback? onBack;
 
   const GlassTabPage({
     super.key,
@@ -49,6 +57,9 @@ class GlassTabPage extends StatefulWidget {
     this.headerContent,
     this.initialIndex = 0,
     this.embedded = false,
+    this.showBackButton = true,
+    this.leadingIcon,
+    this.onBack,
   });
 
   @override
@@ -145,45 +156,68 @@ class GlassTabPageState extends State<GlassTabPage>
       title: widget.title,
       actions: widget.actions,
       embedded: widget.embedded,
-      body: Stack(
-        children: [
-          // Header content + Tab content
-          Column(
-            children: [
-              // Optional header content (like action buttons)
-              if (widget.headerContent != null) widget.headerContent!,
+      showBackButton: widget.showBackButton,
+      leadingIcon: widget.leadingIcon,
+      onBack: widget.onBack,
+      body: widget.embedded ? _buildEmbeddedLayout() : _buildStandaloneLayout(),
+    );
+  }
 
-              // Tab content
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children:
-                      widget.tabs.map((tab) => tab.content).toList(),
-                ),
-              ),
+  /// Standalone screens own the whole page, so the tab selector floats at the
+  /// bottom like the app's main navigation bar.
+  Widget _buildStandaloneLayout() {
+    return Stack(
+      children: [
+        // Header content + Tab content
+        Column(
+          children: [
+            // Optional header content (like action buttons)
+            if (widget.headerContent != null) widget.headerContent!,
 
-              // Space for bottom nav (height + margin only, SafeArea handles safe area)
-              const SizedBox(height: 60 + 12),
-            ],
-          ),
+            // Tab content
+            Expanded(child: _buildTabContent()),
 
-          // Bottom navigation
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildBottomNav(),
-          ),
-        ],
-      ),
+            // Space for bottom nav (height + margin only, SafeArea handles safe area)
+            const SizedBox(height: 60 + 12),
+          ],
+        ),
+
+        // Bottom navigation
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: _buildBottomNav(),
+        ),
+      ],
+    );
+  }
+
+  /// Embedded screens sit inside the app shell, which already shows the main
+  /// bottom navigation bar — render the tab selector at the top instead of
+  /// stacking a second pill above it.
+  Widget _buildEmbeddedLayout() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: _buildNavRow(),
+        ),
+        if (widget.headerContent != null) widget.headerContent!,
+        Expanded(child: _buildTabContent()),
+      ],
+    );
+  }
+
+  Widget _buildTabContent() {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      children: widget.tabs.map((tab) => tab.content).toList(),
     );
   }
 
   Widget _buildBottomNav() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-
     // SafeArea in GlassPage already handles safe area insets
     // We only add 12px margin from the safe area boundary
     return Padding(
@@ -192,7 +226,15 @@ class GlassTabPageState extends State<GlassTabPage>
         right: 16,
         bottom: 12,
       ),
-      child: AnimatedBuilder(
+      child: _buildNavRow(),
+    );
+  }
+
+  Widget _buildNavRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
+    return AnimatedBuilder(
         animation: _searchExpandAnimation,
         builder: (context, child) {
           return Row(
@@ -217,9 +259,7 @@ class GlassTabPageState extends State<GlassTabPage>
               ],
             ],
           );
-        },
-      ),
-    );
+        });
   }
 
   Widget _buildTabsContainer(bool isDark, Color textColor) {
@@ -254,10 +294,10 @@ class GlassTabPageState extends State<GlassTabPage>
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(26),
+                        // Kit: only the ACTIVE tab takes lime — pill tint +
+                        // ink-safe icon/label (deep lime on light).
                         color: isSelected
-                            ? (isDark
-                                ? AppColors.accent.withAlpha(35)
-                                : AppColors.accent.withAlpha(20))
+                            ? Brand.navActivePill
                             : Colors.transparent,
                       ),
                       child: Column(
@@ -267,23 +307,22 @@ class GlassTabPageState extends State<GlassTabPage>
                             tab.iconPath,
                             size: 22,
                             color: isSelected
-                                ? AppColors.accent
-                                : (isDark
-                                    ? Colors.white.withAlpha(150)
-                                    : Colors.black.withAlpha(100)),
+                                ? Brand.navActive
+                                : Brand.navInactive,
                           ),
                           const SizedBox(height: 3),
                           Text(
                             tab.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 9,
-                              fontWeight:
-                                  isSelected ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                               color: isSelected
-                                  ? AppColors.accent
-                                  : (isDark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black.withAlpha(100)),
+                                  ? Brand.navActive
+                                  : Brand.navInactive,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -306,7 +345,8 @@ class GlassTabPageState extends State<GlassTabPage>
       child: Container(
         width: 60,
         height: 60,
-        decoration: GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
+        decoration:
+            GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
         child: ClipOval(
           child: BackdropFilter(
             filter: GlassTheme.blurFilter,
@@ -314,7 +354,7 @@ class GlassTabPageState extends State<GlassTabPage>
               child: DuotoneIcon(
                 'magnifer',
                 size: 24,
-                color: isDark ? Colors.white.withAlpha(180) : Colors.black.withAlpha(120),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -330,7 +370,8 @@ class GlassTabPageState extends State<GlassTabPage>
       child: Container(
         width: 60,
         height: 60,
-        decoration: GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
+        decoration:
+            GlassTheme.circularGlassDecoration(isDark: isDark, elevated: true),
         child: ClipOval(
           child: BackdropFilter(
             filter: GlassTheme.blurFilter,
@@ -338,7 +379,7 @@ class GlassTabPageState extends State<GlassTabPage>
               child: DuotoneIcon(
                 currentTab.iconPath,
                 size: 26,
-                color: AppColors.accent,
+                color: Brand.navActive,
               ),
             ),
           ),
@@ -381,7 +422,7 @@ class GlassTabPageState extends State<GlassTabPage>
                       fontSize: 16,
                       color: textColor,
                     ),
-                    cursorColor: AppColors.accent,
+                    cursorColor: Brand.focus,
                     decoration: InputDecoration(
                       hintText: widget.searchHint ?? 'Search...',
                       hintStyle: TextStyle(

@@ -1,11 +1,14 @@
 /// URL Widgets
 /// Reusable widgets for URL/web protection screens
-library url_widgets;
+library;
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/url_reputation.dart';
 import '../../models/api/threat_indicator.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/url_provider.dart';
 
@@ -24,7 +27,9 @@ class UrlSafetyBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSafe ? Colors.green : Color(severity?.color ?? 0xFFE53935);
+    final color = isSafe
+        ? AppColors.accentInk
+        : (severity != null ? Color(severity!.color) : AppColors.error);
     final label = isSafe ? 'Safe' : (severity?.displayName ?? 'Unsafe');
     final icon = isSafe ? AppIcons.shieldCheck : AppIcons.dangerTriangle;
 
@@ -35,7 +40,7 @@ class UrlSafetyBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: color.withAlpha(50),
-        borderRadius: BorderRadius.circular(compact ? 4 : 8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         border: Border.all(color: color.withAlpha(100)),
       ),
       child: Row(
@@ -65,13 +70,13 @@ class UrlCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _getCategoryColor();
+    final color = _getCategoryColor(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         category.displayName,
@@ -84,30 +89,30 @@ class UrlCategoryChip extends StatelessWidget {
     );
   }
 
-  Color _getCategoryColor() {
+  Color _getCategoryColor(BuildContext context) {
     switch (category) {
       case UrlCategory.safe:
-        return Colors.green;
+        return AppColors.accentInk;
       case UrlCategory.phishing:
       case UrlCategory.malware:
       case UrlCategory.scam:
-        return Colors.red;
+        return AppColors.errorInk;
       case UrlCategory.spam:
       case UrlCategory.suspiciousTld:
       case UrlCategory.typosquatting:
-        return Colors.orange;
+        return AppColors.secondaryInk;
       case UrlCategory.adult:
       case UrlCategory.gambling:
       case UrlCategory.drugs:
       case UrlCategory.violence:
-        return Colors.purple;
+        return AppColors.chartColors[4];
       case UrlCategory.ads:
       case UrlCategory.tracking:
-        return Colors.amber;
+        return AppColors.amberInk;
       case UrlCategory.cryptomining:
-        return Colors.deepOrange;
+        return AppColors.errorInk;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 }
@@ -129,18 +134,19 @@ class UrlResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final borderColor = result.isSafe
-        ? Colors.green.withAlpha(75)
+        ? AppColors.accentInk.withAlpha(75)
         : Color(result.severity.color).withAlpha(75);
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
-          borderRadius: BorderRadius.circular(12),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(color: borderColor),
         ),
         child: Column(
@@ -151,7 +157,9 @@ class UrlResultCard extends StatelessWidget {
               children: [
                 DuotoneIcon(
                   result.isSafe ? AppIcons.checkCircle : AppIcons.dangerCircle,
-                  color: result.isSafe ? Colors.green : Color(result.severity.color),
+                  color: result.isSafe
+                      ? AppColors.accentInk
+                      : Color(result.severity.color),
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -172,7 +180,7 @@ class UrlResultCard extends StatelessWidget {
                       Text(
                         result.url,
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
                         maxLines: 1,
@@ -207,20 +215,21 @@ class UrlResultCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.red.withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.error.withAlpha(25),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const DuotoneIcon(AppIcons.dangerTriangle, size: 16, color: Colors.red),
+                        DuotoneIcon(AppIcons.dangerTriangle,
+                            size: 16, color: AppColors.errorInk),
                         const SizedBox(width: 6),
                         Text(
                           '${result.threats.length} threat${result.threats.length > 1 ? 's' : ''} detected',
-                          style: const TextStyle(
-                            color: Colors.red,
+                          style: TextStyle(
+                            color: AppColors.errorInk,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -232,7 +241,7 @@ class UrlResultCard extends StatelessWidget {
                           child: Text(
                             '• ${t.description}',
                             style: TextStyle(
-                              color: Colors.grey[400],
+                              color: cs.onSurfaceVariant,
                               fontSize: 11,
                             ),
                             maxLines: 2,
@@ -253,14 +262,14 @@ class UrlResultCard extends StatelessWidget {
                   DuotoneIcon(
                     AppIcons.lightbulb,
                     size: 16,
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       result.recommendation!,
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -276,17 +285,18 @@ class UrlResultCard extends StatelessWidget {
                 Text(
                   'Risk Score:',
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius:
+                        BorderRadius.circular(GlassTheme.radiusXSmall),
                     child: LinearProgressIndicator(
                       value: result.riskScore,
-                      backgroundColor: Colors.grey.withAlpha(50),
+                      backgroundColor: cs.onSurface.withValues(alpha: 0.06),
                       valueColor: AlwaysStoppedAnimation(
                         _getRiskColor(result.riskScore),
                       ),
@@ -311,10 +321,10 @@ class UrlResultCard extends StatelessWidget {
   }
 
   Color _getRiskColor(double score) {
-    if (score >= 0.7) return Colors.red;
-    if (score >= 0.4) return Colors.orange;
-    if (score >= 0.2) return Colors.amber;
-    return Colors.green;
+    if (score >= 0.7) return AppColors.errorInk;
+    if (score >= 0.4) return AppColors.amberInk;
+    if (score >= 0.2) return AppColors.amberInk;
+    return AppColors.accentInk;
   }
 }
 
@@ -337,7 +347,7 @@ class UrlHistoryItem extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
@@ -384,9 +394,11 @@ class UrlHistoryItem extends StatelessWidget {
                   Text(
                     _formatTime(entry.checkedAt),
                     style: TextStyle(
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -402,11 +414,13 @@ class UrlHistoryItem extends StatelessWidget {
               if (onDelete != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey),
+                  icon: DuotoneIcon(AppIcons.closeCircle,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ],
@@ -417,9 +431,9 @@ class UrlHistoryItem extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    if (entry.isPending) return const Color(0xFF00D9FF);
-    if (entry.result?.isSafe == true) return Colors.green;
-    return Colors.red;
+    if (entry.isPending) return AppColors.scanning;
+    if (entry.result?.isSafe == true) return AppColors.accentInk;
+    return AppColors.errorInk;
   }
 
   String _extractDomain(String url) {
@@ -475,27 +489,25 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Check URL Safety',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: BrandText.title(size: 16, weight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(
             'Enter a URL to check if it\'s safe to visit',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -507,11 +519,11 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
             onSubmitted: (_) => _handleCheck(),
             decoration: InputDecoration(
               hintText: 'example.com or https://...',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF0A0E21),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 borderSide: BorderSide.none,
               ),
               contentPadding: const EdgeInsets.symmetric(
@@ -520,7 +532,7 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
               ),
               prefixIcon: DuotoneIcon(
                 AppIcons.urlProtection,
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -528,11 +540,11 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
           ElevatedButton.icon(
             onPressed: widget.isChecking ? null : _handleCheck,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: Brand.lime,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
             ),
             icon: widget.isChecking
@@ -541,10 +553,10 @@ class _UrlInputWidgetState extends State<UrlInputWidget> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.black),
+                      valueColor: AlwaysStoppedAnimation(Brand.onLime),
                     ),
                   )
-                : const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
+                : const DuotoneIcon(AppIcons.search, size: 20, color: Brand.onLime),
             label: Text(widget.isChecking ? 'Checking...' : 'Check URL'),
           ),
         ],
@@ -561,11 +573,12 @@ class UrlStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,33 +588,34 @@ class UrlStatsCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withAlpha(50),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppColors.primary.withAlpha(50),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
-                child: const DuotoneIcon(
+                child: DuotoneIcon(
                   AppIcons.globus,
-                  color: Color(0xFF00D9FF),
+                  color: AppColors.accentInk,
                   size: 24,
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Web Protection',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: BrandText.title(size: 16, weight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'URL scanning & phishing protection',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -614,28 +628,28 @@ class UrlStatsCard extends StatelessWidget {
               _StatItem(
                 label: 'Checked',
                 value: stats.totalChecked.toString(),
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               _StatItem(
                 label: 'Safe',
                 value: stats.safeSites.toString(),
-                color: Colors.green,
+                color: AppColors.accentInk,
               ),
               _StatItem(
                 label: 'Blocked',
                 value: stats.threatsBlocked.toString(),
-                color: Colors.red,
+                color: AppColors.errorInk,
               ),
             ],
           ),
           if (stats.threatsBlocked > 0) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Threats Blocked',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
-                color: Colors.grey,
+                color: cs.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -644,19 +658,19 @@ class UrlStatsCard extends StatelessWidget {
                 _ThreatTypeChip(
                   label: 'Phishing',
                   count: stats.phishingBlocked,
-                  color: Colors.orange,
+                  color: AppColors.secondaryInk,
                 ),
                 const SizedBox(width: 8),
                 _ThreatTypeChip(
                   label: 'Malware',
                   count: stats.malwareBlocked,
-                  color: Colors.red,
+                  color: AppColors.errorInk,
                 ),
                 const SizedBox(width: 8),
                 _ThreatTypeChip(
                   label: 'Scams',
                   count: stats.scamsBlocked,
-                  color: Colors.purple,
+                  color: AppColors.chartColors[4],
                 ),
               ],
             ),
@@ -685,19 +699,19 @@ class _StatItem extends StatelessWidget {
         children: [
           Text(
             value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.heading(size: 24, color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -724,7 +738,7 @@ class _ThreatTypeChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -759,11 +773,12 @@ class DomainDetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -771,21 +786,19 @@ class DomainDetailsCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              const DuotoneIcon(AppIcons.infoCircle, size: 20, color: Colors.grey),
+              DuotoneIcon(AppIcons.infoCircle,
+                  size: 20, color: cs.onSurfaceVariant),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Domain Information',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
+                style: BrandText.title(size: 14, weight: FontWeight.w700),
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _getScoreColor(domain.reputationScore).withAlpha(40),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Text(
                   '${domain.reputationScore.toInt()}/100',
@@ -818,12 +831,12 @@ class DomainDetailsCard extends StatelessWidget {
             if (domain.isNewlyRegistered)
               _WarningRow(
                 text: 'Newly registered domain (< 30 days)',
-                color: Colors.orange,
+                color: AppColors.secondaryInk,
               ),
             if (domain.isOnBlocklist)
               _WarningRow(
                 text: 'Domain is on blocklists',
-                color: Colors.red,
+                color: AppColors.errorInk,
               ),
           ],
 
@@ -838,9 +851,9 @@ class DomainDetailsCard extends StatelessWidget {
   }
 
   Color _getScoreColor(double score) {
-    if (score >= 70) return Colors.green;
-    if (score >= 40) return Colors.orange;
-    return Colors.red;
+    if (score >= 70) return AppColors.accentInk;
+    if (score >= 40) return AppColors.amberInk;
+    return AppColors.errorInk;
   }
 }
 
@@ -859,7 +872,7 @@ class _InfoRow extends StatelessWidget {
           Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),
@@ -869,6 +882,8 @@ class _InfoRow extends StatelessWidget {
               value,
               style: const TextStyle(fontSize: 13),
               textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -891,11 +906,15 @@ class _WarningRow extends StatelessWidget {
         children: [
           DuotoneIcon(AppIcons.dangerTriangle, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -911,13 +930,15 @@ class _SslSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = ssl.hasValidSsl && !ssl.isExpired ? Colors.green : Colors.red;
+    final color = ssl.hasValidSsl && !ssl.isExpired
+        ? AppColors.accentInk
+        : AppColors.errorInk;
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         children: [
@@ -938,14 +959,18 @@ class _SslSection extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (ssl.issuer != null)
                   Text(
                     'Issued by: ${ssl.issuer}',
                     style: TextStyle(
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -955,7 +980,7 @@ class _SslSection extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: color.withAlpha(50),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Text(
                 ssl.grade!,
@@ -985,19 +1010,26 @@ class UrlListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListTile(
-      leading: const DuotoneIcon(AppIcons.globus, color: Colors.grey),
-      title: Text(entry.domain),
+      leading: DuotoneIcon(AppIcons.globus, color: cs.onSurfaceVariant),
+      title: Text(
+        entry.domain,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Text(
         'Added ${_formatDate(entry.addedAt)}',
         style: TextStyle(
-          color: Colors.grey[500],
+          color: cs.onSurfaceVariant,
           fontSize: 12,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: IconButton(
-        icon: const DuotoneIcon(AppIcons.minusCircle, color: Colors.red),
-        color: Colors.red,
+        icon: DuotoneIcon(AppIcons.minusCircle, color: AppColors.errorInk),
+        color: AppColors.errorInk,
         onPressed: onRemove,
       ),
     );

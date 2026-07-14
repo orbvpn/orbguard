@@ -16,6 +16,8 @@ import (
 type Handlers struct {
 	Health          *HealthHandler
 	Intelligence    *IntelligenceHandler
+	Indicators      *IndicatorsHandler
+	SupplyChain     *SupplyChainHandler
 	Stats           *StatsHandler
 	Campaigns       *CampaignsHandler
 	Actors          *ActorsHandler
@@ -90,18 +92,28 @@ type Dependencies struct {
 	AnalyticsService      *services.AnalyticsService
 	IntegrationService    *services.IntegrationService
 	ScamDetector          *ai.ScamDetector
+	// OSVBaseURL overrides the OSV.dev API base URL used by the
+	// supply-chain handler. Empty means the public https://api.osv.dev.
+	OSVBaseURL string
 }
 
 // NewHandlers creates all handlers
 func NewHandlers(deps Dependencies) *Handlers {
+	var indicatorRepo *repository.IndicatorRepository
+	if deps.Repos != nil {
+		indicatorRepo = deps.Repos.Indicators
+	}
+
 	return &Handlers{
 		Health:          NewHealthHandler(deps.Cache, deps.Repos, deps.Logger),
 		Intelligence:    NewIntelligenceHandler(deps.Repos, deps.Cache, deps.Logger),
+		Indicators:      NewIndicatorsHandler(deps.Repos, deps.Logger),
+		SupplyChain:     NewSupplyChainHandler(deps.Repos, deps.Logger, deps.OSVBaseURL),
 		Stats:           NewStatsHandler(deps.Repos, deps.Cache, deps.Logger),
 		Campaigns:       NewCampaignsHandler(deps.Repos, deps.Logger),
 		Actors:          NewActorsHandler(deps.Repos, deps.Logger),
 		Sources:         NewSourcesHandler(deps.Repos, deps.Aggregator, deps.Logger),
-		Admin:           NewAdminHandler(deps.Aggregator, deps.Scheduler, deps.Logger),
+		Admin:           NewAdminHandler(deps.Aggregator, deps.Scheduler, deps.Repos, deps.Logger),
 		TAXII:           NewTAXIIHandler(deps.STIXTAXIIService, deps.Logger),
 		Streaming:       NewStreamingHandler(deps.WSHub, deps.EventBus, deps.Logger),
 		SMS:             NewSMSHandler(deps.Repos, deps.Cache, deps.Logger),
@@ -110,13 +122,13 @@ func NewHandlers(deps Dependencies) *Handlers {
 		AppSecurity:     NewAppSecurityHandler(deps.AppAnalyzer, deps.Logger),
 		NetworkSecurity: NewNetworkSecurityHandler(deps.NetworkSecurity, deps.Logger),
 		Graph:           NewGraphHandler(deps.GraphService, deps.Logger),
-		YARA:            NewYARAHandler(deps.YARAService, deps.Logger),
+		YARA:            NewYARAHandler(deps.YARAService, deps.Logger).WithRepositories(deps.Repos),
 		Correlation:     NewCorrelationHandler(deps.CorrelationEngine, deps.Logger),
 		MITRE:           NewMITREHandler(deps.MITREService, deps.Logger),
 		ML:              NewMLHandler(deps.MLService, deps.Logger),
 		Privacy:         NewPrivacyHandler(deps.PrivacyService, deps.Logger),
 		DeviceSecurity:  NewDeviceSecurityHandler(deps.DeviceSecurityService, deps.Logger),
-		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger),
+		QRSecurity:      NewQRSecurityHandler(deps.QRSecurityService, deps.Logger).WithRepositories(deps.Repos),
 		Enterprise:      NewEnterpriseHandler(deps.EnterpriseService, deps.Logger),
 		OrbNet:          NewOrbNetHandler(deps.OrbNetService, deps.Logger),
 		Auth:            newAuthHandler(deps),
@@ -131,6 +143,8 @@ func NewHandlers(deps Dependencies) *Handlers {
 			BrowserScanner:     deps.BrowserScanner,
 			VTClient:           deps.VTClient,
 			Logger:             deps.Logger,
+			Results:            repository.NewDesktopResultsRepositoryFromRepos(deps.Repos),
+			Indicators:         indicatorRepo,
 		}),
 		Webhooks:     NewWebhookHandler(deps.Logger, deps.WebhookService),
 		Playbooks:    NewPlaybookHandler(deps.Logger, deps.PlaybookService),

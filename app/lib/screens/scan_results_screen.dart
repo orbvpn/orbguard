@@ -4,6 +4,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
 class ScanResultsScreen extends StatefulWidget {
@@ -62,28 +65,31 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     final isClean = widget.threats.isEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: Theme.of(context).canvasColor,
       body: CustomScrollView(
         slivers: [
           // App Bar
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: const Color(0xFF0A0E21),
+            backgroundColor: Theme.of(context).canvasColor,
             flexibleSpace: FlexibleSpaceBar(
               background: _buildHeader(isClean, critical.length, high.length),
             ),
             leading: IconButton(
-              icon: const DuotoneIcon('alt_arrow_left', color: Colors.white, size: 24),
+              icon: DuotoneIcon('alt_arrow_left',
+                  color: Theme.of(context).colorScheme.onSurface, size: 24),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
-                icon: const DuotoneIcon('share', color: Colors.white, size: 24),
+                icon: DuotoneIcon('share',
+                    color: Theme.of(context).colorScheme.onSurface, size: 24),
                 onPressed: () => _shareResults(),
               ),
               IconButton(
-                icon: const DuotoneIcon('info_circle', color: Colors.white, size: 24),
+                icon: DuotoneIcon('info_circle',
+                    color: Theme.of(context).colorScheme.onSurface, size: 24),
                 onPressed: () => _showScanDetails(),
               ),
             ],
@@ -103,7 +109,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -120,26 +126,38 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                     ] else ...[
                       // Threat List
                       if (critical.isNotEmpty) ...[
-                        _buildSectionHeader('Critical Threats', Colors.red, critical.length),
-                        ...critical.map((t) => _buildThreatCard(t, Colors.red)),
-                        const SizedBox(height: 16),
+                        _buildSectionHeader('Critical Threats',
+                            AppColors.severityCritical, critical.length,
+                            AppColors.errorInk),
+                        ...critical.map((t) => _buildThreatCard(
+                            t, AppColors.severityCritical, AppColors.errorInk)),
+                        const SizedBox(height: 24),
                       ],
 
                       if (high.isNotEmpty) ...[
-                        _buildSectionHeader('High Priority', Colors.orange, high.length),
-                        ...high.map((t) => _buildThreatCard(t, Colors.orange)),
-                        const SizedBox(height: 16),
+                        _buildSectionHeader('High Priority',
+                            AppColors.severityHigh, high.length,
+                            AppColors.errorInk),
+                        ...high.map((t) => _buildThreatCard(
+                            t, AppColors.severityHigh, AppColors.errorInk)),
+                        const SizedBox(height: 24),
                       ],
 
                       if (medium.isNotEmpty) ...[
-                        _buildSectionHeader('Medium Priority', Colors.amber, medium.length),
-                        ...medium.map((t) => _buildThreatCard(t, Colors.amber)),
-                        const SizedBox(height: 16),
+                        _buildSectionHeader('Medium Priority',
+                            AppColors.severityMedium, medium.length,
+                            AppColors.secondaryInk),
+                        ...medium.map((t) => _buildThreatCard(
+                            t, AppColors.severityMedium, AppColors.secondaryInk)),
+                        const SizedBox(height: 24),
                       ],
 
                       if (low.isNotEmpty) ...[
-                        _buildSectionHeader('Low Priority', Colors.blue, low.length),
-                        ...low.map((t) => _buildThreatCard(t, Colors.blue)),
+                        _buildSectionHeader('Low Priority',
+                            AppColors.severityLow, low.length,
+                            AppColors.amberInk),
+                        ...low.map((t) => _buildThreatCard(
+                            t, AppColors.severityLow, AppColors.amberInk)),
                       ],
 
                       const SizedBox(height: 24),
@@ -148,8 +166,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                       if (critical.isNotEmpty || high.isNotEmpty)
                         _buildRemoveAllButton(),
                     ],
-
-                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -161,16 +177,24 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   }
 
   Widget _buildHeader(bool isClean, int critical, int high) {
+    final bg = Theme.of(context).canvasColor;
+    // Status fill (glow/tints) + contrast-safe ink for text/icons.
+    final statusFill = isClean
+        ? AppColors.protected
+        : critical > 0
+            ? AppColors.severityCritical
+            : AppColors.warning;
+    final statusInk = isClean
+        ? AppColors.accentInk
+        : critical > 0
+            ? AppColors.errorInk
+            : AppColors.secondaryInk;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: isClean
-              ? [Colors.green.withOpacity(0.3), const Color(0xFF0A0E21)]
-              : critical > 0
-                  ? [Colors.red.withOpacity(0.3), const Color(0xFF0A0E21)]
-                  : [Colors.orange.withOpacity(0.3), const Color(0xFF0A0E21)],
+          colors: [statusFill.withValues(alpha: 0.3), bg],
         ),
       ),
       child: SafeArea(
@@ -184,18 +208,10 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isClean
-                    ? Colors.green.withOpacity(0.2)
-                    : critical > 0
-                        ? Colors.red.withOpacity(0.2)
-                        : Colors.orange.withOpacity(0.2),
+                color: statusFill.withValues(alpha: 0.2),
                 boxShadow: [
                   BoxShadow(
-                    color: isClean
-                        ? Colors.green.withOpacity(0.3)
-                        : critical > 0
-                            ? Colors.red.withOpacity(0.3)
-                            : Colors.orange.withOpacity(0.3),
+                    color: statusFill.withValues(alpha: 0.3),
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -208,11 +224,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                         ? 'shield_cross'
                         : 'danger_triangle',
                 size: 50,
-                color: isClean
-                    ? Colors.green
-                    : critical > 0
-                        ? Colors.red
-                        : Colors.orange,
+                color: statusInk,
               ),
             ),
             const SizedBox(height: 16),
@@ -221,15 +233,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               isClean
                   ? 'Device Secure'
                   : '${widget.threats.length} Threat${widget.threats.length > 1 ? 's' : ''} Found',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isClean
-                    ? Colors.green
-                    : critical > 0
-                        ? Colors.red
-                        : Colors.orange,
-              ),
+              style: BrandText.heading(size: 28, color: statusInk),
             ),
             const SizedBox(height: 8),
             Text(
@@ -238,7 +242,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                   : 'Action required to secure your device',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -250,35 +254,44 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   Widget _buildStatsRow(int critical, int high, int medium, int low) {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Critical', critical, Colors.red)),
+        Expanded(
+            child: _buildStatCard('Critical', critical,
+                AppColors.severityCritical, AppColors.errorInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('High', high, Colors.orange)),
+        Expanded(
+            child: _buildStatCard(
+                'High', high, AppColors.severityHigh, AppColors.errorInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('Medium', medium, Colors.amber)),
+        Expanded(
+            child: _buildStatCard('Medium', medium, AppColors.severityMedium,
+                AppColors.secondaryInk)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatCard('Low', low, Colors.blue)),
+        Expanded(
+            child: _buildStatCard(
+                'Low', low, AppColors.severityLow, AppColors.amberInk)),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, int count, Color color) {
+  Widget _buildStatCard(String label, int count, Color color, Color ink) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         border: count > 0
-            ? Border.all(color: color.withOpacity(0.5), width: 1)
+            ? Border.all(color: color.withValues(alpha: 0.5), width: 1)
             : null,
       ),
       child: Column(
         children: [
           Text(
             count.toString(),
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: count > 0 ? color : Colors.grey[600],
+            style: BrandText.heading(
+              size: 28,
+              color: count > 0
+                  ? ink
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
@@ -286,7 +299,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             label,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -298,22 +311,22 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
-          _buildSummaryItem('folder_open', 'Items Scanned', _formatNumber(widget.itemsScanned)),
+          _buildSummaryItem('folder_open', 'Scan Stages Completed', _formatNumber(widget.itemsScanned)),
           Container(
             width: 1,
             height: 40,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.outline,
           ),
           _buildSummaryItem('clock_circle', 'Scan Time', _formatDuration(widget.scanDuration)),
           Container(
             width: 1,
             height: 40,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.outline,
           ),
           _buildSummaryItem(
             'shield_check',
@@ -329,20 +342,20 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Expanded(
       child: Column(
         children: [
-          DuotoneIcon(icon, size: 20, color: Colors.cyan),
+          DuotoneIcon(icon, size: 20, color: AppColors.secondaryInk),
           const SizedBox(height: 8),
           Text(
-            value,
+            value, maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
-            label,
+            label, maxLines: 2, overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 10,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -354,9 +367,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -365,18 +378,15 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.green.withOpacity(0.2),
+              color: AppColors.success.withValues(alpha: 0.2),
             ),
-            child: const DuotoneIcon('check_circle', size: 32, color: Colors.green),
+            child: DuotoneIcon('check_circle',
+                size: 32, color: AppColors.accentInk),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Your Device is Clean',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
+            style: BrandText.heading(size: 20, color: AppColors.accentInk),
           ),
           const SizedBox(height: 8),
           Text(
@@ -385,7 +395,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 20),
@@ -417,13 +427,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.success.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DuotoneIcon(icon, size: 20, color: Colors.green),
+          DuotoneIcon(icon, size: 20, color: AppColors.accentInk),
           const SizedBox(height: 8),
           Text(
             title,
@@ -436,7 +446,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             subtitle,
             style: TextStyle(
               fontSize: 10,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -444,7 +454,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildSectionHeader(String title, Color color, int count) {
+  Widget _buildSectionHeader(String title, Color color, int count, Color ink) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -454,30 +464,33 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             height: 20,
             decoration: BoxDecoration(
               color: color,
+              // 4px accent bar — radius kept tiny on purpose (radiusXSmall
+              // would pill a 4px-wide bar).
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: BrandText.heading(size: 18),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Text(
               count.toString(),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: ink,
               ),
             ),
           ),
@@ -486,13 +499,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     );
   }
 
-  Widget _buildThreatCard(ThreatDetection threat, Color color) {
+  Widget _buildThreatCard(ThreatDetection threat, Color color, Color ink) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -503,21 +516,18 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: DuotoneIcon(
               _getThreatSvgIcon(threat.type),
-              color: color,
+              color: ink,
               size: 22,
             ),
           ),
           title: Text(
             threat.name,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
+            style: BrandText.title(size: 15, weight: FontWeight.w700),
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -525,7 +535,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               threat.description,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -535,8 +545,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.overlayLight,
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,20 +568,24 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                decoration: GlassTheme.tintedGlassDecoration(
+                  tintColor: AppColors.warning,
+                  radius: GlassTheme.radiusXSmall,
+                  opacity: 0.1,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DuotoneIcon('danger_triangle', color: Colors.orange, size: 18),
+                    DuotoneIcon('danger_triangle',
+                        color: AppColors.secondaryInk, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         threat.metadata['consequence'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.secondaryInk),
                       ),
                     ),
                   ],
@@ -583,20 +597,24 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.cyan.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.cyan.withOpacity(0.3)),
+                decoration: GlassTheme.tintedGlassDecoration(
+                  tintColor: AppColors.info,
+                  radius: GlassTheme.radiusXSmall,
+                  opacity: 0.1,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DuotoneIcon('lightbulb', color: Colors.cyan, size: 18),
+                    DuotoneIcon('lightbulb',
+                        color: AppColors.secondaryInk, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         threat.metadata['recommendation'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.cyan),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.secondaryInk),
                       ),
                     ),
                   ],
@@ -604,37 +622,111 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               ),
             ],
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _quarantineThreat(threat),
-                    icon: const DuotoneIcon('shield', size: 18, color: Colors.cyan),
-                    label: const Text('Quarantine'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.cyan,
-                      side: const BorderSide(color: Colors.cyan),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
+            // Actions are capability-based: only remediations the app can
+            // actually perform are offered — no simulated quarantine.
+            if (_isDismissOnly(threat))
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _dismissThreat(threat),
+                  icon: DuotoneIcon('check_circle',
+                      size: 18, color: AppColors.secondaryInk),
+                  label: const Text('Dismiss Warning'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondaryInk,
+                    side: BorderSide(color: AppColors.secondaryInk),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _removeThreat(threat),
-                    icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: Colors.white),
-                    label: const Text('Remove'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: color,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+              )
+            else if (_hasNativeRemediation(threat)) ...[
+              if (threat.type.toLowerCase() == 'package') ...[
+                _buildGuidanceRow(
+                  'Automatic uninstall requires elevated access. If removal '
+                  'fails, uninstall manually: Settings > Apps > ${threat.name}.',
                 ),
+                const SizedBox(height: 12),
               ],
-            ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _removeThreat(threat),
+                  icon: DuotoneIcon('trash_bin_minimalistic',
+                      size: 18, color: Brand.onDanger),
+                  label: const Text('Remove'),
+                  style: ElevatedButton.styleFrom(
+                    // Destructive action — brand danger fill regardless of tier.
+                    backgroundColor: Brand.danger,
+                    foregroundColor: Brand.onDanger,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ] else ...[
+              _buildGuidanceRow(
+                'Manual removal required — OrbGuard cannot remediate this '
+                'threat type automatically. Follow the recommendation above, '
+                'then dismiss this warning.',
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _dismissThreat(threat),
+                  icon: DuotoneIcon('check_circle',
+                      size: 18, color: AppColors.secondaryInk),
+                  label: const Text('Dismiss Warning'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondaryInk,
+                    side: BorderSide(color: AppColors.secondaryInk),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Threat types the native layer can actually remediate
+  /// (SpywareScanner.removeThreat: kill process / delete file / pm uninstall;
+  /// IOSSpywareScanner.removeThreat on iOS).
+  bool _hasNativeRemediation(ThreatDetection threat) {
+    final type = threat.type.toLowerCase();
+    return type == 'process' || type == 'file' || type == 'package';
+  }
+
+  /// Informational findings with nothing on the device to remove —
+  /// dismissing the warning is the only honest action.
+  bool _isDismissOnly(ThreatDetection threat) {
+    final type = threat.type.toLowerCase();
+    return type == 'network' || type == 'behavioral' || threat.severity == 'LOW';
+  }
+
+  Widget _buildGuidanceRow(String text) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: GlassTheme.tintedGlassDecoration(
+        tintColor: AppColors.severityInfo,
+        radius: GlassTheme.radiusXSmall,
+        opacity: 0.15,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DuotoneIcon('info_circle', color: Brand.text2, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -651,13 +743,15 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12),
             ),
           ),
@@ -671,14 +765,14 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showRemoveAllDialog(),
-        icon: const DuotoneIcon('trash_bin_2', size: 24, color: Colors.white),
+        icon: DuotoneIcon('trash_bin_2', size: 24, color: Brand.onDanger),
         label: const Text('Remove All Threats'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
+          backgroundColor: Brand.danger,
+          foregroundColor: Brand.onDanger,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
         ),
       ),
@@ -743,11 +837,31 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     return '${duration.inMinutes}m ${duration.inSeconds % 60}s';
   }
 
-  void _shareResults() {
+  /// Copies a plain-text scan report to the clipboard — a real export, not a
+  /// fake "exported" toast.
+  Future<void> _shareResults() async {
     HapticFeedback.lightImpact();
+
+    final buffer = StringBuffer()
+      ..writeln('OrbGuard Scan Report')
+      ..writeln('Generated: ${DateTime.now().toIso8601String()}')
+      ..writeln('Scan stages completed: ${widget.itemsScanned}')
+      ..writeln('Duration: ${_formatDuration(widget.scanDuration)}')
+      ..writeln('Threats found: ${widget.threats.length}')
+      ..writeln();
+    for (final threat in widget.threats) {
+      buffer
+        ..writeln('[${threat.severity}] ${threat.name} '
+            '(${_formatThreatType(threat.type)})')
+        ..writeln('  ${threat.description}')
+        ..writeln('  Location: ${threat.path}');
+    }
+
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Report exported'),
+        content: Text('Report copied to clipboard'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -756,9 +870,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   void _showScanDetails() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1D1E33),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(GlassTheme.radiusLarge)),
       ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24),
@@ -766,12 +880,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Scan Details',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: BrandText.heading(size: 20),
             ),
             const SizedBox(height: 20),
-            _buildDetailItem('Items Scanned', _formatNumber(widget.itemsScanned)),
+            _buildDetailItem('Scan Stages Completed', _formatNumber(widget.itemsScanned)),
             _buildDetailItem('Duration', _formatDuration(widget.scanDuration)),
             _buildDetailItem('Threats Found', widget.threats.length.toString()),
             _buildDetailItem('Scan Type', 'Full System Scan'),
@@ -788,7 +902,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[400])),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
@@ -801,8 +915,8 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
         title: const Text('Remove Threat'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -810,12 +924,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           children: [
             Text(
               threat.name,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.errorInk),
             ),
             const SizedBox(height: 12),
             Text(
               _getRemovalDescription(threat),
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
           ],
         ),
@@ -829,7 +944,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               Navigator.pop(dialogContext);
               _executeRemoval(threat);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger),
             child: const Text('Remove'),
           ),
         ],
@@ -839,8 +956,6 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
 
   String _getRemovalDescription(ThreatDetection threat) {
     switch (threat.type.toLowerCase()) {
-      case 'network':
-        return 'This will dismiss the network warning. The connection will be monitored for suspicious activity.';
       case 'process':
         return 'This will terminate the suspicious process. The app may need elevated access.';
       case 'file':
@@ -852,183 +967,31 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
     }
   }
 
-  void _executeRemoval(ThreatDetection threat) async {
-    print('[OrbGuard] _executeRemoval called for: ${threat.name}');
-    print('[OrbGuard] Threat type: ${threat.type}, severity: ${threat.severity}');
-    print('[OrbGuard] Current threats count: ${widget.threats.length}');
-
-    // Show loading indicator
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Text('Removing ${threat.name}...'),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    // For network threats or low-severity informational threats, just dismiss
-    final isInfoThreat = threat.type.toLowerCase() == 'network' ||
-        threat.severity == 'LOW' ||
-        threat.type.toLowerCase() == 'behavioral';
-
-    print('[OrbGuard] isInfoThreat: $isInfoThreat');
-
-    if (isInfoThreat) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        print('[OrbGuard] Attempting to remove threat from list...');
-        final removed = widget.threats.remove(threat);
-        print('[OrbGuard] Remove result: $removed, remaining: ${widget.threats.length}');
-        setState(() {});
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                DuotoneIcon('check_circle', color: Colors.green, size: 24),
-                SizedBox(width: 12),
-                Text('Threat dismissed'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Color(0xFF1D1E33),
-          ),
-        );
-
-        // If no more threats, go back
-        if (widget.threats.isEmpty) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (mounted) Navigator.pop(context);
-        }
-      }
-      return;
-    }
-
-    // For actionable threats (files, processes, packages), call native removal
-    try {
-      const platform = MethodChannel('com.orb.guard/system');
-      final result = await platform.invokeMethod('removeThreat', {
-        'id': threat.id,
-        'type': threat.type,
-        'path': threat.path,
-        'requiresRoot': threat.requiresRoot,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        if (result['success'] == true) {
-          setState(() {
-            widget.threats.remove(threat);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  DuotoneIcon('check_circle', color: Colors.green, size: 24),
-                  SizedBox(width: 12),
-                  Text('Threat removed successfully'),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Color(0xFF1D1E33),
-            ),
-          );
-
-          if (widget.threats.isEmpty) {
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) Navigator.pop(context);
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const DuotoneIcon('danger_circle', color: Colors.red, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('Failed: ${result['error'] ?? 'Could not remove threat'}')),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: const Color(0xFF1D1E33),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      // If native call fails, still allow dismissal for non-critical threats
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        if (threat.severity != 'CRITICAL') {
-          setState(() {
-            widget.threats.remove(threat);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  DuotoneIcon('check_circle', color: Colors.green, size: 24),
-                  SizedBox(width: 12),
-                  Text('Threat dismissed'),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Color(0xFF1D1E33),
-            ),
-          );
-          if (widget.threats.isEmpty) {
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) Navigator.pop(context);
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  DuotoneIcon('danger_circle', color: Colors.orange, size: 24),
-                  SizedBox(width: 12),
-                  Expanded(child: Text('Critical threat requires elevated access to remove')),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Color(0xFF1D1E33),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  void _quarantineThreat(ThreatDetection threat) {
+  /// Dismiss an informational warning. This only removes the warning from
+  /// the results list — it changes nothing on the device, and says so.
+  void _dismissThreat(ThreatDetection threat) {
     HapticFeedback.lightImpact();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Quarantine Threat'),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
+        title: const Text('Dismiss Warning'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               threat.name,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.secondaryInk),
             ),
             const SizedBox(height: 12),
             Text(
-              'Quarantining will isolate this threat, preventing it from causing harm while keeping it for analysis.',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              'This removes the warning from the scan results. It does not '
+              'change anything on your device.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
           ],
         ),
@@ -1040,17 +1003,43 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              _executeQuarantine(threat);
+              _executeDismiss(threat);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan),
-            child: const Text('Quarantine'),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: Brand.onPink),
+            child: const Text('Dismiss'),
           ),
         ],
       ),
     );
   }
 
-  void _executeQuarantine(ThreatDetection threat) async {
+  void _executeDismiss(ThreatDetection threat) async {
+    setState(() {
+      widget.threats.remove(threat);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            DuotoneIcon('check_circle', color: AppColors.info, size: 24),
+            SizedBox(width: 12),
+            Text('Warning dismissed'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    if (widget.threats.isEmpty) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  void _executeRemoval(ThreatDetection threat) async {
+    // Show loading indicator
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1058,10 +1047,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              // Snackbar surface is dark in both themes (see app_theme).
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.onDark),
             ),
             const SizedBox(width: 16),
-            Text('Quarantining ${threat.name}...'),
+            Text('Removing ${threat.name}...'),
           ],
         ),
         behavior: SnackBarBehavior.floating,
@@ -1069,65 +1060,196 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       ),
     );
 
-    // Simulate quarantine process
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (mounted) {
-      setState(() {
-        widget.threats.remove(threat);
+    // Call the real native removal (kill process / delete file / uninstall).
+    // Failures are surfaced honestly — the threat is never silently
+    // re-labelled as "dismissed".
+    try {
+      const platform = MethodChannel('com.orb.guard/system');
+      final result = await platform.invokeMethod('removeThreat', {
+        'id': threat.id,
+        'type': threat.type,
+        'path': threat.path,
+        'requiresRoot': threat.requiresRoot,
       });
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              DuotoneIcon('shield', color: Colors.cyan, size: 24),
-              SizedBox(width: 12),
-              Text('Threat quarantined successfully'),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Color(0xFF1D1E33),
-        ),
-      );
 
-      if (widget.threats.isEmpty) {
-        Navigator.pop(context);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (result['success'] == true) {
+        setState(() {
+          widget.threats.remove(threat);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                DuotoneIcon('check_circle', color: AppColors.success, size: 24),
+                SizedBox(width: 12),
+                Text('Threat removed successfully'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        if (widget.threats.isEmpty) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) Navigator.pop(context);
+        }
+      } else {
+        _showRemovalFailure(
+          threat,
+          result['error'] as String? ??
+              (threat.requiresRoot
+                  ? 'Removal requires elevated access, which is not available on this device.'
+                  : 'The system could not remove this threat.'),
+        );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showRemovalFailure(threat, 'Removal is not available: $e');
     }
+  }
+
+  void _showRemovalFailure(ThreatDetection threat, String reason) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const DuotoneIcon('danger_circle',
+                color: AppColors.warning, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Could not remove "${threat.name}": $reason '
+                'Manual removal is required.',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   void _showRemoveAllDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
         title: const Text('Remove All Threats'),
         content: const Text(
-          'Are you sure you want to remove all detected threats?\n\nThis action cannot be undone.',
+          'This removes every threat OrbGuard can act on: suspicious '
+          'processes, files and apps are removed via the system, and '
+          'informational warnings are dismissed. Threats that need manual '
+          'action are kept in the list.\n\nThis action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               HapticFeedback.heavyImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Removing all threats...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              _executeRemoveAll();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.danger,
+                foregroundColor: Brand.onDanger),
             child: const Text('Remove All'),
           ),
         ],
       ),
     );
+  }
+
+  /// Really remove/dismiss every threat the app has a capability for, and
+  /// report an honest per-outcome summary.
+  Future<void> _executeRemoveAll() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              // Snackbar surface is dark in both themes (see app_theme).
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.onDark),
+            ),
+            SizedBox(width: 16),
+            Text('Removing threats...'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 10),
+      ),
+    );
+
+    const platform = MethodChannel('com.orb.guard/system');
+    final snapshot = List<ThreatDetection>.from(widget.threats);
+    var removed = 0;
+    var dismissed = 0;
+    var failed = 0;
+    var manual = 0;
+
+    for (final threat in snapshot) {
+      if (_isDismissOnly(threat)) {
+        widget.threats.remove(threat);
+        dismissed++;
+        continue;
+      }
+      if (!_hasNativeRemediation(threat)) {
+        manual++;
+        continue;
+      }
+      try {
+        final result = await platform.invokeMethod('removeThreat', {
+          'id': threat.id,
+          'type': threat.type,
+          'path': threat.path,
+          'requiresRoot': threat.requiresRoot,
+        });
+        if (result['success'] == true) {
+          widget.threats.remove(threat);
+          removed++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {});
+
+    final parts = <String>[
+      if (removed > 0) '$removed removed',
+      if (dismissed > 0) '$dismissed dismissed',
+      if (failed > 0) '$failed failed',
+      if (manual > 0) '$manual need manual action',
+    ];
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          parts.isEmpty ? 'No threats to remove' : parts.join(', '),
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+
+    if (widget.threats.isEmpty) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) Navigator.pop(context);
+    }
   }
 }

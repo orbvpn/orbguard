@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/pkg/logger"
@@ -673,6 +674,50 @@ func (h *DeviceSecurityHandler) GetLatestSecurityInfo(w http.ResponseWriter, r *
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
 		"android": models.LatestAndroidSecurity,
 		"ios":     models.LatestiOSSecurity,
+	})
+}
+
+// RegisterPushToken handles POST /api/v1/device/{device_id}/push-token
+//
+// It registers a device's FCM token so anti-theft remote commands are
+// delivered in real time. The request is auth-scoped to the device: when the
+// authenticated principal carries a device id (device-bound token), it must
+// match the path device_id.
+func (h *DeviceSecurityHandler) RegisterPushToken(w http.ResponseWriter, r *http.Request) {
+	deviceID := chi.URLParam(r, "device_id")
+	if deviceID == "" {
+		h.respondError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+
+	// Auth scoping: a device-bound principal may only register its own token.
+	if authDevice := middleware.GetDeviceID(r.Context()); authDevice != "" && authDevice != deviceID {
+		h.respondError(w, http.StatusForbidden, "device_id does not match authenticated device")
+		return
+	}
+
+	var req struct {
+		Token    string `json:"token"`
+		Platform string `json:"platform"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Token == "" {
+		h.respondError(w, http.StatusBadRequest, "token is required")
+		return
+	}
+
+	if err := h.service.RegisterPushToken(r.Context(), deviceID, req.Token, req.Platform); err != nil {
+		h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to register push token")
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":    "registered",
+		"device_id": deviceID,
 	})
 }
 

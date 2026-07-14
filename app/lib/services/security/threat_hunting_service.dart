@@ -1,17 +1,23 @@
-/// Threat Hunting Service
-///
-/// Proactive threat detection and investigation:
-/// - Hypothesis-driven hunting
-/// - IOC sweeping across device
-/// - MITRE ATT&CK-based detection rules
-/// - Automated hunt queries
-/// - Threat investigation workflows
-/// - Evidence collection and correlation
+// Threat Hunting Service
+//
+// Proactive threat detection and investigation:
+// - Hypothesis-driven hunting
+// - IOC sweeping across device
+// - MITRE ATT&CK-based detection rules
+// - Automated hunt queries
+// - Threat investigation workflows
+// - Evidence collection and correlation
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../models/api/threat_indicator.dart';
+import '../../models/api/url_reputation.dart';
+import '../api/orbguard_api_client.dart';
 
 /// Threat hunt definition
 class ThreatHunt {
@@ -107,6 +113,11 @@ class HuntResult {
   final int rulesMatched;
   final String summary;
 
+  /// Rules that could not be evaluated on this platform/build, keyed by
+  /// rule id with a human-readable reason. These are explicitly surfaced
+  /// instead of being silently reported as "clean".
+  final Map<String, String> unavailableRules;
+
   HuntResult({
     required this.huntId,
     required this.startTime,
@@ -116,6 +127,7 @@ class HuntResult {
     required this.itemsScanned,
     required this.rulesMatched,
     required this.summary,
+    this.unavailableRules = const {},
   });
 
   Duration get duration => endTime.difference(startTime);
@@ -168,6 +180,41 @@ class HuntFinding {
     if (severity >= 0.3) return 'Low';
     return 'Informational';
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'rule_id': ruleId,
+        'rule_name': ruleName,
+        'type': type.name,
+        'description': description,
+        'severity': severity,
+        'evidence': evidence,
+        'context': context,
+        'mitre_attack_ids': mitreAttackIds,
+        'timestamp': timestamp.toIso8601String(),
+        'recommendations': recommendations,
+      };
+
+  factory HuntFinding.fromJson(Map<String, dynamic> json) {
+    return HuntFinding(
+      id: json['id'] as String,
+      ruleId: json['rule_id'] as String? ?? '',
+      ruleName: json['rule_name'] as String? ?? '',
+      type: FindingType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => FindingType.suspiciousApp,
+      ),
+      description: json['description'] as String? ?? '',
+      severity: (json['severity'] as num?)?.toDouble() ?? 0.5,
+      evidence: json['evidence'] as String? ?? '',
+      context: (json['context'] as Map?)?.cast<String, dynamic>() ?? {},
+      mitreAttackIds:
+          (json['mitre_attack_ids'] as List<dynamic>?)?.cast<String>() ?? [],
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? ''),
+      recommendations:
+          (json['recommendations'] as List<dynamic>?)?.cast<String>() ?? [],
+    );
+  }
 }
 
 /// Finding types
@@ -209,6 +256,50 @@ class InvestigationCase {
     this.closedAt,
     this.conclusion,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'status': status.name,
+        'priority': priority.name,
+        'related_findings': relatedFindings.map((f) => f.toJson()).toList(),
+        'notes': notes,
+        'timeline': timeline.map((t) => t.toJson()).toList(),
+        'created_at': createdAt.toIso8601String(),
+        'closed_at': closedAt?.toIso8601String(),
+        'conclusion': conclusion,
+      };
+
+  factory InvestigationCase.fromJson(Map<String, dynamic> json) {
+    return InvestigationCase(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      status: CaseStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => CaseStatus.open,
+      ),
+      priority: CasePriority.values.firstWhere(
+        (p) => p.name == json['priority'],
+        orElse: () => CasePriority.medium,
+      ),
+      relatedFindings: (json['related_findings'] as List<dynamic>?)
+              ?.map((f) => HuntFinding.fromJson(f as Map<String, dynamic>))
+              .toList() ??
+          [],
+      notes: (json['notes'] as List<dynamic>?)?.cast<String>() ?? [],
+      timeline: (json['timeline'] as List<dynamic>?)
+              ?.map((t) => TimelineEvent.fromJson(t as Map<String, dynamic>))
+              .toList() ??
+          [],
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
+      closedAt: json['closed_at'] != null
+          ? DateTime.tryParse(json['closed_at'] as String)
+          : null,
+      conclusion: json['conclusion'] as String?,
+    );
+  }
 }
 
 /// Case status
@@ -246,14 +337,69 @@ class TimelineEvent {
     this.actor,
     this.data,
   }) : timestamp = timestamp ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+        'timestamp': timestamp.toIso8601String(),
+        'event': event,
+        'actor': actor,
+        'data': data,
+      };
+
+  factory TimelineEvent.fromJson(Map<String, dynamic> json) {
+    return TimelineEvent(
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? ''),
+      event: json['event'] as String? ?? '',
+      actor: json['actor'] as String?,
+      data: (json['data'] as Map?)?.cast<String, dynamic>(),
+    );
+  }
+}
+
+/// Outcome of executing a single hunt rule.
+class _RuleOutcome {
+  final List<HuntFinding> findings;
+  final int itemsScanned;
+
+  /// Non-null when the rule could not be evaluated on this platform/build.
+  final String? unavailableReason;
+
+  const _RuleOutcome({
+    this.findings = const [],
+    this.itemsScanned = 0,
+    this.unavailableReason,
+  });
+}
+
+/// Thrown internally when a native capability is not present.
+class _CapabilityUnavailable implements Exception {
+  final String reason;
+  _CapabilityUnavailable(this.reason);
+
+  @override
+  String toString() => reason;
 }
 
 /// Threat Hunting Service
 class ThreatHuntingService {
-  static const MethodChannel _channel = MethodChannel('com.orbguard/threat_hunt');
+  // Real native channels implemented by the device agent
+  // (android/app/src/main/kotlin/com/orb/guard/MainActivity.kt).
+  static const MethodChannel _systemChannel =
+      MethodChannel('com.orb.guard/system');
+  static const MethodChannel _wifiChannel =
+      MethodChannel('com.orb.guard/wifi');
+  static const MethodChannel _browserChannel =
+      MethodChannel('com.orb.guard/browser');
+
+  static const String _casesPrefsKey = 'threat_hunting.cases';
+
+  final OrbGuardApiClient _api = OrbGuardApiClient.instance;
 
   // Available hunts
   final List<ThreatHunt> _availableHunts = [];
+
+  // Per-hunt-execution caches (cleared at the start of each hunt)
+  List<Map<String, dynamic>>? _installedAppsCache;
+  bool _wifiPostureEvaluated = false;
 
   // Hunt results
   final Map<String, HuntResult> _huntResults = {};
@@ -281,6 +427,47 @@ class ThreatHuntingService {
   /// Initialize the service
   Future<void> initialize() async {
     _loadBuiltInHunts();
+    await _loadPersistedCases();
+  }
+
+  /// Load investigation cases persisted on-device.
+  /// The backend has no investigation-case endpoint, so cases live in
+  /// SharedPreferences (same on-device persistence pattern as the rest of
+  /// the app).
+  Future<void> _loadPersistedCases() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_casesPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+
+      _cases.clear();
+      for (final entry in decoded) {
+        if (entry is! Map) continue;
+        try {
+          final investigation =
+              InvestigationCase.fromJson(entry.cast<String, dynamic>());
+          _cases[investigation.id] = investigation;
+        } catch (e) {
+          debugPrint('ThreatHunting: skipping corrupt persisted case: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('ThreatHunting: failed to load persisted cases: $e');
+    }
+  }
+
+  Future<void> _persistCases() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload =
+          jsonEncode(_cases.values.map((c) => c.toJson()).toList());
+      await prefs.setString(_casesPrefsKey, payload);
+    } catch (e) {
+      debugPrint('ThreatHunting: failed to persist cases: $e');
+    }
   }
 
   /// Load built-in threat hunts
@@ -514,8 +701,13 @@ class ThreatHuntingService {
     _activeHunts.add(huntId);
     final startTime = DateTime.now();
     final findings = <HuntFinding>[];
+    final unavailableRules = <String, String>{};
     int itemsScanned = 0;
     int rulesMatched = 0;
+
+    // Reset per-execution caches so each hunt sees fresh device state.
+    _installedAppsCache = null;
+    _wifiPostureEvaluated = false;
 
     try {
       _huntProgressController.add(HuntProgress(
@@ -534,17 +726,22 @@ class ThreatHuntingService {
           progress: (i + 1) / hunt.rules.length,
         ));
 
-        final ruleFindings = await _executeRule(rule, hunt);
-        findings.addAll(ruleFindings);
+        final outcome = await _executeRule(rule, hunt);
+        findings.addAll(outcome.findings);
+        itemsScanned += outcome.itemsScanned;
 
-        if (ruleFindings.isNotEmpty) {
+        if (outcome.unavailableReason != null) {
+          unavailableRules[rule.id] = outcome.unavailableReason!;
+          debugPrint(
+              'ThreatHunting: rule ${rule.id} unavailable: ${outcome.unavailableReason}');
+        }
+
+        if (outcome.findings.isNotEmpty) {
           rulesMatched++;
-          for (final finding in ruleFindings) {
+          for (final finding in outcome.findings) {
             _findingController.add(finding);
           }
         }
-
-        itemsScanned += await _getItemsScannedForRule(rule);
       }
 
       final result = HuntResult(
@@ -555,7 +752,9 @@ class ThreatHuntingService {
         findings: findings,
         itemsScanned: itemsScanned,
         rulesMatched: rulesMatched,
-        summary: _generateHuntSummary(hunt, findings),
+        summary: _generateHuntSummary(hunt, findings,
+            unavailableRules: unavailableRules),
+        unavailableRules: unavailableRules,
       );
 
       _huntResults[huntId] = result;
@@ -577,6 +776,7 @@ class ThreatHuntingService {
         itemsScanned: itemsScanned,
         rulesMatched: rulesMatched,
         summary: 'Hunt failed: $e',
+        unavailableRules: unavailableRules,
       );
 
       _huntResults[huntId] = result;
@@ -587,164 +787,542 @@ class ThreatHuntingService {
   }
 
   /// Execute a single rule
-  Future<List<HuntFinding>> _executeRule(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
-
+  Future<_RuleOutcome> _executeRule(HuntRule rule, ThreatHunt hunt) async {
     switch (rule.type) {
       case RuleType.permission:
-        findings.addAll(await _checkPermissions(rule, hunt));
-        break;
+        return _checkPermissions(rule, hunt);
       case RuleType.behavior:
-        findings.addAll(await _checkBehaviors(rule, hunt));
-        break;
+        return _checkBehaviors(rule, hunt);
       case RuleType.network:
-        findings.addAll(await _checkNetwork(rule, hunt));
-        break;
+        return _checkNetwork(rule, hunt);
       case RuleType.hash:
-        findings.addAll(await _checkHashes(rule, hunt));
-        break;
+        return _checkHashes(rule, hunt);
       case RuleType.domain:
-        findings.addAll(await _checkDomains(rule, hunt));
-        break;
+        return _checkDomains(rule, hunt);
       case RuleType.path:
-        findings.addAll(await _checkPaths(rule, hunt));
-        break;
+        return _checkPaths(rule, hunt);
       default:
-        break;
+        return _RuleOutcome(
+          unavailableReason:
+              'No rule engine implemented for type "${rule.type.name}"',
+        );
     }
-
-    return findings;
   }
 
-  /// Check permission-based rules
-  Future<List<HuntFinding>> _checkPermissions(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
+  /// Fetch the installed-app inventory from the device agent
+  /// (com.orb.guard/system -> getInstalledApps). Cached per hunt execution.
+  Future<List<Map<String, dynamic>>> _getInstalledApps() async {
+    if (_installedAppsCache != null) return _installedAppsCache!;
 
-    if (!Platform.isAndroid) return findings;
+    if (!Platform.isAndroid) {
+      throw _CapabilityUnavailable(
+          'Installed-app inventory is only available on Android');
+    }
 
     try {
-      final apps = await _channel.invokeMethod<List<dynamic>>('getAppsWithPermission', {
-        'permission': rule.query,
-      });
+      final result = await _systemChannel
+          .invokeMethod<Map<dynamic, dynamic>>('getInstalledApps');
+      final rawApps = result?['apps'];
+      if (rawApps is! List) {
+        throw _CapabilityUnavailable(
+            'Device agent returned no app inventory');
+      }
+      _installedAppsCache = rawApps
+          .whereType<Map>()
+          .map((a) => a.map((k, v) => MapEntry(k.toString(), v)))
+          .toList();
+      return _installedAppsCache!;
+    } on MissingPluginException {
+      throw _CapabilityUnavailable(
+          'Device agent app-inventory channel (com.orb.guard/system) '
+          'is not implemented on this platform');
+    } on PlatformException catch (e) {
+      throw _CapabilityUnavailable(
+          'Device agent app-inventory call failed: ${e.message}');
+    }
+  }
 
-      for (final app in (apps ?? [])) {
-        final appMap = Map<String, dynamic>.from(app as Map);
+  /// Check permission-based rules against the real installed-app inventory.
+  Future<_RuleOutcome> _checkPermissions(HuntRule rule, ThreatHunt hunt) async {
+    final List<Map<String, dynamic>> apps;
+    try {
+      apps = await _getInstalledApps();
+    } on _CapabilityUnavailable catch (e) {
+      return _RuleOutcome(unavailableReason: e.reason);
+    }
+
+    final findings = <HuntFinding>[];
+    final query = rule.query.toLowerCase();
+
+    for (final app in apps) {
+      final isSystemApp = app['isSystemApp'] == true;
+      if (isSystemApp) continue; // System apps legitimately hold these.
+
+      final permissions = (app['permissions'] as List<dynamic>? ?? [])
+          .map((p) => p.toString().toLowerCase());
+      final matched = permissions.any((p) => p.contains(query));
+      if (!matched) continue;
+
+      final packageName = app['packageName']?.toString() ?? 'unknown';
+      final appName = app['appName']?.toString() ?? packageName;
+      findings.add(HuntFinding(
+        id: 'finding_perm_${packageName}_${rule.id}',
+        ruleId: rule.id,
+        ruleName: rule.name,
+        type: FindingType.suspiciousApp,
+        description: 'App "$appName" requests ${rule.query}',
+        severity: rule.severity,
+        evidence: 'Package: $packageName, Permission: ${rule.query}, '
+            'Installer: ${app['installerPackage'] ?? 'unknown'}',
+        context: app,
+        mitreAttackIds: hunt.mitreAttackIds,
+        recommendations: [
+          'Review app permissions',
+          'Consider uninstalling if unnecessary',
+        ],
+      ));
+    }
+
+    return _RuleOutcome(findings: findings, itemsScanned: apps.length);
+  }
+
+  /// Check behavior-based rules. The device agent does not currently expose
+  /// runtime behavior telemetry (launcher visibility, background services,
+  /// network volume per app), so behavior queries are reported as
+  /// unavailable rather than silently returning a clean result.
+  Future<_RuleOutcome> _checkBehaviors(HuntRule rule, ThreatHunt hunt) async {
+    // Permission-combination behavior queries can be partially evaluated
+    // from the static app inventory (requested permissions).
+    final permissionTokens = <String>[
+      'READ_CONTACTS',
+      'READ_SMS',
+      'READ_EXTERNAL_STORAGE',
+      'SCHEDULE_EXACT_ALARM',
+      'FOREGROUND_SERVICE',
+      'INTERNET',
+    ].where((t) => rule.query.contains(t)).toList();
+
+    final runtimeTokens = <String>[
+      'NO_LAUNCHER_ICON',
+      'BACKGROUND_SERVICE',
+      'HIGH_NETWORK_TX',
+      'NO_USER_INTERACTION',
+      'SU_BINARY_ACCESS',
+      'ROOT_CHECK',
+      'NATIVE_CODE',
+      'SYSTEM_CALL_ANOMALY',
+    ].where((t) => rule.query.contains(t)).toList();
+
+    if (permissionTokens.isEmpty) {
+      return _RuleOutcome(
+        unavailableReason: 'Behavior query "${rule.query}" requires runtime '
+            'telemetry (${runtimeTokens.join(', ')}) that the device agent '
+            'does not expose yet',
+      );
+    }
+
+    final List<Map<String, dynamic>> apps;
+    try {
+      apps = await _getInstalledApps();
+    } on _CapabilityUnavailable catch (e) {
+      return _RuleOutcome(unavailableReason: e.reason);
+    }
+
+    final findings = <HuntFinding>[];
+    for (final app in apps) {
+      if (app['isSystemApp'] == true) continue;
+
+      final permissions = (app['permissions'] as List<dynamic>? ?? [])
+          .map((p) => p.toString())
+          .toList();
+      final hasAll = permissionTokens.every(
+          (token) => permissions.any((p) => p.contains(token)));
+      if (!hasAll) continue;
+
+      final packageName = app['packageName']?.toString() ?? 'unknown';
+      final appName = app['appName']?.toString() ?? packageName;
+      findings.add(HuntFinding(
+        id: 'finding_behavior_${packageName}_${rule.id}',
+        ruleId: rule.id,
+        ruleName: rule.name,
+        type: FindingType.suspiciousApp,
+        description:
+            'App "$appName" holds the permission combination '
+            '${permissionTokens.join(' + ')}',
+        severity: rule.severity *
+            (runtimeTokens.isEmpty ? 1.0 : 0.8), // static-only evidence
+        evidence: 'Package: $packageName, Permissions: '
+            '${permissionTokens.join(', ')}'
+            '${runtimeTokens.isEmpty ? '' : ' (runtime signals '
+                '${runtimeTokens.join(', ')} not evaluated — '
+                'no runtime telemetry available)'}',
+        context: app,
+        mitreAttackIds: hunt.mitreAttackIds,
+        recommendations: [
+          'Review whether this app needs these permissions',
+          'Revoke permissions or uninstall if unexpected',
+        ],
+      ));
+    }
+
+    return _RuleOutcome(findings: findings, itemsScanned: apps.length);
+  }
+
+  /// Check network-based rules using the device agent's Wi-Fi channel
+  /// (com.orb.guard/wifi -> getCurrentNetwork). Per-flow traffic analytics
+  /// (ports, DNS patterns, beaconing intervals) require packet capture that
+  /// is not available on-device, so those query semantics are explicitly
+  /// reported as unavailable; the current network's security posture IS
+  /// evaluated from real data.
+  Future<_RuleOutcome> _checkNetwork(HuntRule rule, ThreatHunt hunt) async {
+    Map<dynamic, dynamic>? network;
+    try {
+      network =
+          await _wifiChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentNetwork');
+    } on MissingPluginException {
+      return const _RuleOutcome(
+        unavailableReason:
+            'Wi-Fi telemetry channel (com.orb.guard/wifi) is not implemented '
+            'on this platform',
+      );
+    } on PlatformException catch (e) {
+      return _RuleOutcome(
+        unavailableReason: 'getCurrentNetwork failed: ${e.message}',
+      );
+    }
+
+    final findings = <HuntFinding>[];
+    var itemsScanned = 0;
+
+    // Evaluate the connected network's security posture once per hunt run
+    // (the posture is a property of the network, not of each rule).
+    if (!_wifiPostureEvaluated && network != null) {
+      _wifiPostureEvaluated = true;
+      itemsScanned = 1;
+
+      final ssid = network['ssid']?.toString() ?? 'Unknown';
+      final bssid = network['bssid']?.toString() ?? '';
+      final security = (network['security']?.toString() ?? '').toLowerCase();
+
+      double? postureSeverity;
+      String? postureIssue;
+      if (security.isEmpty || security == 'unknown') {
+        postureSeverity = null; // No claim without data.
+      } else if (security.contains('open') || security == 'none') {
+        postureSeverity = 0.8;
+        postureIssue = 'unencrypted (open) network';
+      } else if (security.contains('wep')) {
+        postureSeverity = 0.9;
+        postureIssue = 'WEP encryption (broken, trivially crackable)';
+      } else if (security.contains('wpa') &&
+          !security.contains('wpa2') &&
+          !security.contains('wpa3')) {
+        postureSeverity = 0.6;
+        postureIssue = 'legacy WPA(1) encryption';
+      }
+
+      if (postureSeverity != null) {
         findings.add(HuntFinding(
-          id: 'finding_${DateTime.now().millisecondsSinceEpoch}',
+          id: 'finding_wifi_${bssid.isEmpty ? ssid : bssid}_${hunt.id}',
           ruleId: rule.id,
           ruleName: rule.name,
-          type: FindingType.suspiciousApp,
-          description: 'App "${appMap['name']}" has ${rule.query} permission',
-          severity: rule.severity,
-          evidence: 'Package: ${appMap['package']}, Permission: ${rule.query}',
-          context: appMap,
+          type: FindingType.networkAnomaly,
+          description:
+              'Connected Wi-Fi network "$ssid" uses $postureIssue',
+          severity: postureSeverity,
+          evidence: 'SSID: $ssid, BSSID: $bssid, Security: $security '
+              '(reported by device Wi-Fi agent)',
+          context: network.map((k, v) => MapEntry(k.toString(), v)),
           mitreAttackIds: hunt.mitreAttackIds,
-          recommendations: ['Review app permissions', 'Consider uninstalling if unnecessary'],
+          recommendations: [
+            'Avoid sensitive activity on this network',
+            'Use a VPN while connected',
+            'Switch to a WPA2/WPA3 protected network',
+          ],
         ));
       }
-    } catch (e) {
-      debugPrint('Permission check failed: $e');
     }
 
-    return findings;
+    if (findings.isEmpty) {
+      return _RuleOutcome(
+        itemsScanned: itemsScanned,
+        unavailableReason:
+            'Rule query "${rule.query}" requires on-device traffic capture '
+            'which is not available; current Wi-Fi posture was evaluated '
+            'via getCurrentNetwork and raised no findings',
+      );
+    }
+
+    return _RuleOutcome(findings: findings, itemsScanned: itemsScanned);
   }
 
-  /// Check behavior-based rules
-  Future<List<HuntFinding>> _checkBehaviors(HuntRule rule, ThreatHunt hunt) async {
+  /// Check hash/IOC rules. The device agent does not expose APK file bytes
+  /// for SHA-256 computation, so this sweeps the real installed-app
+  /// inventory (package names from getInstalledApps) against the live
+  /// threat-intelligence service via POST /indicators/check.
+  Future<_RuleOutcome> _checkHashes(HuntRule rule, ThreatHunt hunt) async {
+    final List<Map<String, dynamic>> apps;
+    try {
+      apps = await _getInstalledApps();
+    } on _CapabilityUnavailable catch (e) {
+      return _RuleOutcome(unavailableReason: e.reason);
+    }
+
+    // Sweep non-system packages (sideloaded/user-installed apps are the
+    // realistic malware delivery channel on Android).
+    final candidates = apps
+        .where((a) => a['isSystemApp'] != true)
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      return const _RuleOutcome(itemsScanned: 0);
+    }
+
+    final byPackage = <String, Map<String, dynamic>>{
+      for (final app in candidates)
+        if (app['packageName'] != null) app['packageName'].toString(): app,
+    };
+
     final findings = <HuntFinding>[];
+    try {
+      final packageNames = byPackage.keys.toList();
+      const chunkSize = 100;
+      for (var i = 0; i < packageNames.length; i += chunkSize) {
+        final chunk = packageNames.sublist(
+            i,
+            (i + chunkSize) > packageNames.length
+                ? packageNames.length
+                : i + chunkSize);
+        final results = await _api.checkIndicators(
+          chunk.map((p) => IndicatorCheckRequest(value: p)).toList(),
+        );
 
-    // Simulate behavior analysis
-    // In production, this would analyze actual app behavior data
-
-    if (rule.query.contains('NO_LAUNCHER_ICON')) {
-      try {
-        final hiddenApps = await _channel.invokeMethod<List<dynamic>>('getHiddenApps');
-
-        for (final app in (hiddenApps ?? [])) {
-          final appMap = Map<String, dynamic>.from(app as Map);
+        for (final result in results.where((r) => r.isThreat)) {
+          final app = byPackage[result.value];
+          final appName =
+              app?['appName']?.toString() ?? result.value;
           findings.add(HuntFinding(
-            id: 'finding_${DateTime.now().millisecondsSinceEpoch}',
+            id: 'finding_ioc_${result.value}_${rule.id}',
             ruleId: rule.id,
             ruleName: rule.name,
-            type: FindingType.suspiciousApp,
-            description: 'Hidden app detected: ${appMap['name']}',
-            severity: rule.severity,
-            evidence: 'No launcher icon, running background service',
-            context: appMap,
-            mitreAttackIds: hunt.mitreAttackIds,
-            recommendations: ['Investigate app purpose', 'Consider removal'],
+            type: FindingType.malwareIndicator,
+            description:
+                'Installed app "$appName" matches a known threat indicator',
+            severity: _severityToDouble(result.severity, rule.severity),
+            evidence: 'Package: ${result.value} flagged by threat '
+                'intelligence (confidence: '
+                '${result.confidence?.toStringAsFixed(2) ?? 'n/a'}'
+                '${result.campaignName != null ? ', campaign: ${result.campaignName}' : ''}). '
+                'Note: matched on package identity; APK hash computation is '
+                'not available from the device agent.',
+            context: {
+              if (app != null) ...app,
+              'indicator_type': result.type?.value,
+              'tags': result.tags,
+              'intel_description': result.description,
+            },
+            mitreAttackIds: result.mitreTechniques?.isNotEmpty == true
+                ? result.mitreTechniques!
+                : hunt.mitreAttackIds,
+            recommendations: [
+              'Uninstall this app immediately',
+              'Run a full device scan',
+              'Change credentials used on this device',
+            ],
           ));
         }
-      } catch (e) {
-        debugPrint('Hidden app check failed: $e');
+      }
+    } catch (e) {
+      return _RuleOutcome(
+        itemsScanned: candidates.length,
+        unavailableReason:
+            'Threat-intelligence indicator check (/indicators/check) '
+            'failed: $e',
+      );
+    }
+
+    return _RuleOutcome(findings: findings, itemsScanned: candidates.length);
+  }
+
+  /// Check domain rules against the URLs the browser-protection agent has
+  /// actually observed on this device (com.orb.guard/browser ->
+  /// getAnalyzedUrls), via the live POST /url/check[/batch] endpoint plus
+  /// the rule's own domain regex.
+  Future<_RuleOutcome> _checkDomains(HuntRule rule, ThreatHunt hunt) async {
+    List<dynamic> rawUrls;
+    try {
+      final result = await _browserChannel
+          .invokeMethod<Map<dynamic, dynamic>>('getAnalyzedUrls');
+      rawUrls = result?['urls'] as List<dynamic>? ?? const [];
+    } on MissingPluginException {
+      return const _RuleOutcome(
+        unavailableReason:
+            'Browser URL-history channel (com.orb.guard/browser) is not '
+            'implemented on this platform',
+      );
+    } on PlatformException catch (e) {
+      return _RuleOutcome(
+        unavailableReason: 'getAnalyzedUrls failed: ${e.message}',
+      );
+    }
+
+    // Deduplicate observed URLs and extract domains.
+    final urls = <String>{};
+    final domainsByUrl = <String, String>{};
+    for (final entry in rawUrls) {
+      if (entry is! Map) continue;
+      final url = entry['url']?.toString();
+      if (url == null || url.isEmpty) continue;
+      urls.add(url);
+      final domain = entry['domain']?.toString() ??
+          Uri.tryParse(url)?.host ??
+          '';
+      if (domain.isNotEmpty) domainsByUrl[url] = domain;
+    }
+
+    if (urls.isEmpty) {
+      // Honest empty: the browser agent has not observed any URLs yet.
+      return const _RuleOutcome(itemsScanned: 0);
+    }
+
+    final findings = <HuntFinding>[];
+
+    // 1) Local rule regex against observed domains.
+    RegExp? pattern;
+    try {
+      pattern = RegExp(rule.query, caseSensitive: false);
+    } on FormatException {
+      pattern = null; // Query is an IOC-set placeholder, not a regex.
+    }
+    if (pattern != null) {
+      for (final entry in domainsByUrl.entries) {
+        if (!pattern.hasMatch(entry.value)) continue;
+        findings.add(HuntFinding(
+          id: 'finding_domain_rx_${entry.value}_${rule.id}',
+          ruleId: rule.id,
+          ruleName: rule.name,
+          type: FindingType.malwareIndicator,
+          description:
+              'Visited domain "${entry.value}" matches hunt pattern',
+          severity: rule.severity,
+          evidence: 'URL: ${entry.key} matched pattern ${rule.query} '
+              '(observed by browser protection agent)',
+          context: {'url': entry.key, 'domain': entry.value},
+          mitreAttackIds: hunt.mitreAttackIds,
+          recommendations: [
+            'Do not revisit this site',
+            'Clear browser data and saved credentials for this site',
+          ],
+        ));
       }
     }
 
-    return findings;
-  }
+    // 2) Live reputation check via the backend URL service.
+    try {
+      final urlList = urls.toList();
+      const chunkSize = 50;
+      for (var i = 0; i < urlList.length; i += chunkSize) {
+        final chunk = urlList.sublist(
+            i,
+            (i + chunkSize) > urlList.length ? urlList.length : i + chunkSize);
+        final List<UrlReputationResult> results = chunk.length == 1
+            ? [await _api.checkUrl(chunk.first)]
+            : await _api.checkUrlsBatch(chunk);
 
-  /// Check network-based rules
-  Future<List<HuntFinding>> _checkNetwork(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
-
-    // In production, this would analyze actual network traffic
-    // For now, we simulate based on stored network data
-
-    return findings;
-  }
-
-  /// Check hash-based rules
-  Future<List<HuntFinding>> _checkHashes(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
-
-    // Would compare APK hashes against known malware database
-    // Requires integration with threat intelligence
-
-    return findings;
-  }
-
-  /// Check domain-based rules
-  Future<List<HuntFinding>> _checkDomains(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
-
-    // Would check DNS history against malicious domain list
-
-    return findings;
-  }
-
-  /// Check path-based rules
-  Future<List<HuntFinding>> _checkPaths(HuntRule rule, ThreatHunt hunt) async {
-    final findings = <HuntFinding>[];
-
-    // Would check for known malware file paths
-
-    return findings;
-  }
-
-  /// Get items scanned for a rule
-  Future<int> _getItemsScannedForRule(HuntRule rule) async {
-    switch (rule.type) {
-      case RuleType.permission:
-      case RuleType.behavior:
-        try {
-          final count = await _channel.invokeMethod<int>('getInstalledAppCount');
-          return count ?? 0;
-        } catch (e) {
-          return 100; // Estimate
+        for (final result in results) {
+          if (result.isSafe && !result.shouldBlock) continue;
+          findings.add(HuntFinding(
+            id: 'finding_domain_intel_${result.domain}_${rule.id}',
+            ruleId: rule.id,
+            ruleName: rule.name,
+            type: FindingType.malwareIndicator,
+            description:
+                'Visited domain "${result.domain}" is flagged as '
+                '${result.category.name} by threat intelligence',
+            severity: _severityToDouble(result.threatLevel, rule.severity),
+            evidence: 'URL: ${result.url}, category: ${result.category.name}, '
+                'threat level: ${result.threatLevel.value}, confidence: '
+                '${result.confidence.toStringAsFixed(2)}'
+                '${result.campaignName != null ? ', campaign: ${result.campaignName}' : ''}',
+            context: {
+              'url': result.url,
+              'domain': result.domain,
+              'category': result.category.name,
+              'warnings': result.warnings,
+              'block_reason': result.blockReason,
+            },
+            mitreAttackIds: hunt.mitreAttackIds,
+            recommendations: [
+              if (result.recommendation != null) result.recommendation!,
+              'Avoid this site and check for credential reuse',
+            ],
+          ));
         }
-      case RuleType.network:
-        return 1000; // Network events
-      case RuleType.hash:
-        return 50; // APK files
-      default:
-        return 100;
+      }
+    } catch (e) {
+      return _RuleOutcome(
+        findings: findings,
+        itemsScanned: urls.length,
+        unavailableReason:
+            'URL reputation check (/url/check) failed: $e — only the local '
+            'pattern match was evaluated',
+      );
     }
+
+    return _RuleOutcome(findings: findings, itemsScanned: urls.length);
+  }
+
+  /// Check path-based rules. Like the hash rule, the package inventory is
+  /// the available evidence surface; known-malware package identifiers are
+  /// already swept by the hash/IOC rule against /indicators/check, and raw
+  /// file-system path scanning is not exposed by the device agent.
+  Future<_RuleOutcome> _checkPaths(HuntRule rule, ThreatHunt hunt) async {
+    if (rule.query == 'KNOWN_MALWARE_PACKAGES') {
+      final hasHashRule = hunt.rules.any((r) => r.type == RuleType.hash);
+      if (hasHashRule) {
+        // The hash/IOC rule in this hunt already sweeps the package
+        // inventory against /indicators/check; re-running it here would
+        // double-report the same evidence under a second rule id.
+        return const _RuleOutcome(
+          unavailableReason:
+              'Package-identity sweep is covered by the IOC hash rule in '
+              'this hunt; raw file-system path scanning is not exposed by '
+              'the device agent',
+        );
+      }
+      // Same evidence surface and intelligence source as the hash rule.
+      return _checkHashes(rule, hunt);
+    }
+    return _RuleOutcome(
+      unavailableReason:
+          'File-system path scanning for "${rule.query}" requires native '
+          'file access the device agent does not expose',
+    );
+  }
+
+  /// Map backend severity levels onto the 0..1 finding scale, falling back
+  /// to the rule's static severity when the backend gives no signal.
+  double _severityToDouble(SeverityLevel? level, double fallback) {
+    if (level == null || level == SeverityLevel.unknown) return fallback;
+    return (level.score / 10.0).clamp(0.0, 1.0);
   }
 
   /// Generate hunt summary
-  String _generateHuntSummary(ThreatHunt hunt, List<HuntFinding> findings) {
+  String _generateHuntSummary(
+    ThreatHunt hunt,
+    List<HuntFinding> findings, {
+    Map<String, String> unavailableRules = const {},
+  }) {
+    final unavailableNote = unavailableRules.isEmpty
+        ? ''
+        : ' ${unavailableRules.length} rule(s) could not be evaluated on '
+            'this device (see rule details).';
+
     if (findings.isEmpty) {
-      return 'No threats detected during ${hunt.name}. Device appears clean.';
+      if (unavailableRules.length == hunt.rules.length) {
+        return '${hunt.name}: no rules could be evaluated on this device — '
+            'result is inconclusive, not clean.$unavailableNote';
+      }
+      return 'No threats detected during ${hunt.name}.$unavailableNote';
     }
 
     final critical = findings.where((f) => f.severity >= 0.9).length;
@@ -752,7 +1330,8 @@ class ThreatHuntingService {
 
     return '${hunt.name} completed: ${findings.length} findings '
         '($critical critical, $high high risk). '
-        'Immediate attention ${critical > 0 ? "required" : "recommended"}.';
+        'Immediate attention ${critical > 0 ? "required" : "recommended"}.'
+        '$unavailableNote';
   }
 
   /// Execute all critical hunts
@@ -796,6 +1375,9 @@ class ThreatHuntingService {
 
     _cases[caseId] = investigation;
     _caseUpdateController.add(investigation);
+
+    // Persist on-device (no backend investigation-case endpoint exists).
+    unawaited(_persistCases());
 
     return investigation;
   }

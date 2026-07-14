@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/pkg/logger"
 )
@@ -34,7 +36,23 @@ type ScamDetectorConfig struct {
 	// LLM settings
 	ClaudeAPIKey     string
 	OpenAIAPIKey     string
-	LLMProvider      string // "claude" or "openai"
+	DeepSeekAPIKey   string
+	LLMProvider      string // "claude", "openai", "deepseek" or "azure-openai"
+	LLMBaseURL       string // optional override of the provider's API base URL
+	LLMModel         string // optional override of the provider's default model
+	// LLMReasoningEffort is passed as reasoning_effort to reasoning-capable
+	// OpenAI/Azure OpenAI deployments (GPT-5.x, o-series). Empty omits it.
+	LLMReasoningEffort string
+
+	// Azure OpenAI settings (used only when LLMProvider == "azure-openai")
+	AzureOpenAIEndpoint   string
+	AzureOpenAIKey        string
+	AzureOpenAIDeployment string
+	AzureOpenAIAPIVersion string
+	// AzureOpenAITranscribeDeployment enables Azure OpenAI audio transcription
+	// (e.g. gpt-4o-transcribe) for speech analysis when set together with the
+	// Azure endpoint and key.
+	AzureOpenAITranscribeDeployment string
 
 	// Feature flags
 	EnableVision     bool
@@ -68,6 +86,14 @@ type ScamDetectorStats struct {
 
 // NewScamDetector creates a new scam detector
 func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetector {
+	// Set default thresholds before the config is captured by the detector.
+	if config.ScamThreshold == 0 {
+		config.ScamThreshold = 0.7
+	}
+	if config.SuspiciousThresh == 0 {
+		config.SuspiciousThresh = 0.4
+	}
+
 	detector := &ScamDetector{
 		logger: log.WithComponent("scam-detector"),
 		config: config,
@@ -77,20 +103,20 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 		},
 	}
 
-	// Set default thresholds
-	if config.ScamThreshold == 0 {
-		config.ScamThreshold = 0.7
-	}
-	if config.SuspiciousThresh == 0 {
-		config.SuspiciousThresh = 0.4
-	}
-
 	// Initialize components
 	if config.EnableLLM {
 		llmConfig := LLMConfig{
-			ClaudeAPIKey: config.ClaudeAPIKey,
-			OpenAIAPIKey: config.OpenAIAPIKey,
-			Provider:     config.LLMProvider,
+			ClaudeAPIKey:          config.ClaudeAPIKey,
+			OpenAIAPIKey:          config.OpenAIAPIKey,
+			DeepSeekAPIKey:        config.DeepSeekAPIKey,
+			Provider:              config.LLMProvider,
+			BaseURL:               config.LLMBaseURL,
+			Model:                 config.LLMModel,
+			ReasoningEffort:       config.LLMReasoningEffort,
+			AzureOpenAIEndpoint:   config.AzureOpenAIEndpoint,
+			AzureOpenAIKey:        config.AzureOpenAIKey,
+			AzureOpenAIDeployment: config.AzureOpenAIDeployment,
+			AzureOpenAIAPIVersion: config.AzureOpenAIAPIVersion,
 		}
 		detector.llmClient = NewLLMClient(llmConfig, log)
 	}
@@ -109,10 +135,17 @@ func NewScamDetector(log *logger.Logger, config ScamDetectorConfig) *ScamDetecto
 	}
 
 	if config.EnableSpeech && detector.llmClient != nil {
+		// Provider is left empty so the analyzer selects automatically:
+		// Azure OpenAI when a transcribe deployment is fully configured,
+		// otherwise the OpenAI API key. The Azure chat api-version is NOT
+		// passed through: audio transcription deployments require a newer
+		// api-version, which the analyzer defaults itself.
 		speechConfig := SpeechAnalyzerConfig{
-			OpenAIAPIKey:     config.OpenAIAPIKey,
-			Provider:         "openai",
-			EnableTranscript: true,
+			OpenAIAPIKey:                    config.OpenAIAPIKey,
+			AzureOpenAIEndpoint:             config.AzureOpenAIEndpoint,
+			AzureOpenAIKey:                  config.AzureOpenAIKey,
+			AzureOpenAITranscribeDeployment: config.AzureOpenAITranscribeDeployment,
+			EnableTranscript:                true,
 		}
 		detector.speechAnalyzer = NewSpeechAnalyzer(log, detector.llmClient, speechConfig)
 	}
@@ -139,6 +172,7 @@ func (d *ScamDetector) Analyze(ctx context.Context, req *models.ScamAnalysisRequ
 	startTime := time.Now()
 
 	result := &models.ScamAnalysisResult{
+		ID:          uuid.New(),
 		RequestID:   req.ID,
 		ContentType: req.ContentType,
 		Timestamp:   time.Now(),
@@ -207,10 +241,37 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 		}
 	}
 
-	// Intent classification
+	// Intent classification and entity extraction are independent LLM-backed
+	// analyses; run them concurrently to halve worst-case latency (ingress
+	// resets slow responses).
+	var (
+		intentResult *MessageIntent
+		entityResult *models.ExtractedEntities
+		analysisWG   sync.WaitGroup
+	)
 	if d.intentClassifier != nil {
-		intent, err := d.intentClassifier.ClassifyIntent(ctx, content, req.ContentType)
-		if err == nil {
+		analysisWG.Add(1)
+		go func() {
+			defer analysisWG.Done()
+			if intent, err := d.intentClassifier.ClassifyIntent(ctx, content, req.ContentType); err == nil {
+				intentResult = intent
+			}
+		}()
+	}
+	if d.entityExtractor != nil {
+		analysisWG.Add(1)
+		go func() {
+			defer analysisWG.Done()
+			if entities, err := d.entityExtractor.ExtractFromRequest(ctx, req); err == nil {
+				entityResult = entities
+			}
+		}()
+	}
+	analysisWG.Wait()
+
+	if intentResult != nil {
+		intent := intentResult
+		{
 			result.Intent = &models.IntentAnalysis{
 				PrimaryIntent: string(intent.PrimaryIntent),
 				Confidence:    intent.Confidence,
@@ -245,9 +306,9 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 	}
 
 	// Entity extraction
-	if d.entityExtractor != nil {
-		entities, err := d.entityExtractor.ExtractFromRequest(ctx, req)
-		if err == nil && entities != nil {
+	if entityResult != nil {
+		entities := entityResult
+		{
 			result.Entities = entities
 
 			// Check phone numbers for reputation
@@ -270,8 +331,10 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 			}
 
 			// Check for suspicious URLs
+			suspiciousURLs := 0
 			for _, url := range entities.URLs {
 				if url.IsSuspicious {
+					suspiciousURLs++
 					result.Indicators = append(result.Indicators, models.ScamIndicator{
 						Type:        "suspicious_url",
 						Description: fmt.Sprintf("Suspicious URL detected: %s", url.Reason),
@@ -279,6 +342,9 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 						Evidence:    url.URL,
 					})
 				}
+			}
+			if suspiciousURLs > 0 {
+				result.RiskScore = maxFloat(result.RiskScore, 0.6)
 			}
 
 			// Check for crypto addresses (suspicious in unsolicited messages)
@@ -289,8 +355,41 @@ func (d *ScamDetector) analyzeText(ctx context.Context, req *models.ScamAnalysis
 					Confidence:  0.7,
 					Evidence:    entities.CryptoAddresses[0].Address,
 				})
+				result.RiskScore = maxFloat(result.RiskScore, 0.45)
 			}
 		}
+	}
+
+	// Combine rule-based signals into the risk score. Each signal alone is
+	// only a floor; corroborating signals compound so blatant scams cross the
+	// scam threshold even when the LLM is unavailable.
+	manipulationSeverity := ""
+	if result.Manipulation != nil && result.Manipulation.IsManipulative {
+		manipulationSeverity = strings.ToLower(result.Manipulation.Severity)
+		switch manipulationSeverity {
+		case "high", "critical":
+			result.RiskScore = maxFloat(result.RiskScore, 0.5)
+		case "medium":
+			result.RiskScore = maxFloat(result.RiskScore, 0.35)
+		}
+	}
+	hasSuspiciousURL := false
+	if result.Entities != nil {
+		for _, url := range result.Entities.URLs {
+			if url.IsSuspicious {
+				hasSuspiciousURL = true
+				break
+			}
+		}
+	}
+	if hasSuspiciousURL && (manipulationSeverity == "high" || manipulationSeverity == "critical") {
+		// A deceptive link combined with high-severity psychological
+		// manipulation is the canonical phishing shape.
+		result.RiskScore = maxFloat(result.RiskScore, 0.8)
+	}
+	urgency := strings.ToLower(result.UrgencyLevel)
+	if (urgency == "high" || urgency == "critical") && result.RiskScore >= 0.35 {
+		result.RiskScore = minFloat(result.RiskScore+0.1, 0.95)
 	}
 
 	// LLM analysis for complex cases
@@ -598,17 +697,91 @@ func (d *ScamDetector) finalizeResult(result *models.ScamAnalysisResult, startTi
 		}
 	}
 
-	// Generate recommendation
-	result.Recommendation = d.generateRecommendation(result)
+	// Derive verdict confidence from the actual analysis signals
+	result.Confidence = d.computeConfidence(result)
+
+	// Generate recommendation (single string) and safety tips (one per line)
+	tips := d.buildRecommendations(result)
+	result.Recommendation = strings.Join(tips, "\n")
+	if len(tips) > 0 {
+		result.SafetyTips = tips
+	}
+
+	result.AnalyzedAt = time.Now()
 
 	// Calculate processing time
 	result.ProcessingTime = time.Since(startTime)
 }
 
-// generateRecommendation generates a recommendation based on the analysis
-func (d *ScamDetector) generateRecommendation(result *models.ScamAnalysisResult) string {
+// computeConfidence derives an overall verdict confidence from the strength
+// and agreement of the underlying analysis signals: individual indicator
+// confidences (pattern matches, phone reputation, LLM-provided indicators),
+// the intent classifier confidence, and how decisively the final risk score
+// sits away from the scam decision boundary.
+func (d *ScamDetector) computeConfidence(result *models.ScamAnalysisResult) float64 {
+	threshold := d.config.ScamThreshold
+	if threshold <= 0 || threshold >= 1 {
+		threshold = 0.7
+	}
+
+	// Decisiveness: normalized distance of the risk score from the decision
+	// boundary on whichever side of it the score falls.
+	var decisiveness float64
+	if result.RiskScore >= threshold {
+		decisiveness = (result.RiskScore - threshold) / (1 - threshold)
+	} else {
+		decisiveness = (threshold - result.RiskScore) / threshold
+	}
+	if decisiveness > 1 {
+		decisiveness = 1
+	}
+
+	// Collect positive signal confidences.
+	var sum, maxConf float64
+	var n int
+	for _, ind := range result.Indicators {
+		if ind.Confidence > 0 {
+			sum += ind.Confidence
+			if ind.Confidence > maxConf {
+				maxConf = ind.Confidence
+			}
+			n++
+		}
+	}
+	if result.Intent != nil && result.Intent.Confidence > 0 {
+		sum += result.Intent.Confidence
+		if result.Intent.Confidence > maxConf {
+			maxConf = result.Intent.Confidence
+		}
+		n++
+	}
+
+	var confidence float64
+	if n == 0 {
+		// No positive signals: the verdict rests on the absence of risk
+		// signals. Confidence grows with distance below the boundary but is
+		// capped, since absence of evidence is weaker than positive evidence.
+		confidence = 0.5 + 0.4*decisiveness
+	} else {
+		avg := sum / float64(n)
+		strength := 0.5*maxConf + 0.5*avg
+		confidence = 0.55*strength + 0.45*decisiveness
+	}
+
+	if confidence < 0 {
+		confidence = 0
+	}
+	if confidence > 1 {
+		confidence = 1
+	}
+	return confidence
+}
+
+// buildRecommendations generates recommendations based on the analysis,
+// one actionable item per entry.
+func (d *ScamDetector) buildRecommendations(result *models.ScamAnalysisResult) []string {
 	if !result.IsScam && result.RiskScore < d.config.SuspiciousThresh {
-		return "This content appears to be safe. However, always exercise caution with unsolicited messages."
+		return []string{"This content appears to be safe. However, always exercise caution with unsolicited messages."}
 	}
 
 	recommendations := []string{}
@@ -646,7 +819,7 @@ func (d *ScamDetector) generateRecommendation(result *models.ScamAnalysisResult)
 		recommendations = append(recommendations, "Proceed with caution and verify through official channels.")
 	}
 
-	return strings.Join(recommendations, "\n")
+	return recommendations
 }
 
 // updateStats updates detection statistics

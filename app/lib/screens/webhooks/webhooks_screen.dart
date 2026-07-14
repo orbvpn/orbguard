@@ -1,8 +1,11 @@
-/// Webhooks Screen
-/// Webhook configuration and management interface
+// Webhooks Screen
+// Webhook configuration and management interface
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -54,7 +57,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     return GlassPage(
       title: 'Webhooks',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _error != null
               ? _buildErrorState()
               : Column(
@@ -66,12 +69,12 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
+                        icon: DuotoneIcon('add_circle', size: 22, color: context.colors.onSurface),
                         onPressed: () => _showAddWebhookDialog(context),
                         tooltip: 'Add Webhook',
                       ),
                       IconButton(
-                        icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
+                        icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
                         onPressed: _isLoading ? null : _loadWebhooks,
                         tooltip: 'Refresh',
                       ),
@@ -82,14 +85,14 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                   child: _webhooks.isEmpty
                       ? _buildEmptyState()
                       : ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           children: [
                             // Stats
                             Row(
                               children: [
-                                _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), GlassTheme.successColor),
+                                _buildStatCard('Active', _webhooks.where((w) => w.isEnabled).length.toString(), AppColors.accentInk),
                                 const SizedBox(width: 12),
-                                _buildStatCard('Total Sent', _formatSentCount(_webhooks.fold(0, (sum, w) => sum + w.sentCount)), GlassTheme.primaryAccent),
+                                _buildStatCard('Total Sent', _formatSentCount(_webhooks.fold(0, (sum, w) => sum + w.sentCount)), AppColors.accentInk),
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -106,7 +109,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
 
   String _formatSentCount(int count) {
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+    if (count >= 1000) return (count / 1000).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
     return count.toString();
   }
 
@@ -116,9 +119,9 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text(value, style: BrandText.heading(color: color, size: 28)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -135,29 +138,28 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
             children: [
               GlassDuotoneIconBox(
                 icon: _getWebhookSvgIcon(webhook.type),
-                color: webhook.isEnabled ? GlassTheme.primaryAccent : Colors.grey,
+                color: webhook.isEnabled ? GlassTheme.primaryAccent : context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(webhook.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(webhook.type, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 11)),
+                    Text(webhook.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
+                    Text(webhook.type, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11)),
                   ],
                 ),
               ),
               Switch(
                 value: webhook.isEnabled,
-                onChanged: (v) => setState(() => webhook.isEnabled = v),
-                activeColor: GlassTheme.successColor,
+                onChanged: (v) => _setWebhookEnabled(webhook, v),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             webhook.url,
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12, fontFamily: 'monospace'),
+            style: BrandText.mono(color: context.colors.onSurfaceVariant, size: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -169,7 +171,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
               _buildWebhookStat(
                 webhook.lastStatus == 'success' ? 'check_circle' : 'danger_circle',
                 webhook.lastStatus == 'success' ? 'Healthy' : 'Failed',
-                color: webhook.lastStatus == 'success' ? GlassTheme.successColor : GlassTheme.errorColor,
+                color: webhook.lastStatus == 'success' ? AppColors.accentInk : AppColors.errorInk,
               ),
             ],
           ),
@@ -192,9 +194,9 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: color ?? Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: color ?? context.colors.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: color ?? Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: color ?? context.colors.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
@@ -204,25 +206,25 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon('link', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon('link', size: 64, color: AppColors.accentInk.withAlpha(128)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Webhooks',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Configure webhooks to receive threat notifications',
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: context.colors.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => _showAddWebhookDialog(context),
-            icon: const DuotoneIcon('add_circle', size: 18, color: Colors.white),
+            icon: const DuotoneIcon('add_circle', size: 18, color: Brand.onLime),
             label: const Text('Add Webhook'),
             style: ElevatedButton.styleFrom(
               backgroundColor: GlassTheme.primaryAccent,
-              foregroundColor: Colors.white,
+              foregroundColor: Brand.onLime,
             ),
           ),
         ],
@@ -237,26 +239,26 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon('danger_circle', size: 64, color: GlassTheme.errorColor.withAlpha(128)),
+            DuotoneIcon('danger_circle', size: 64, color: AppColors.errorInk.withAlpha(128)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to Load Webhooks',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadWebhooks,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -304,6 +306,47 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     }
   }
 
+  /// Persist the enable/disable toggle to the backend. Optimistically flips the
+  /// switch, then reverts and surfaces an error if the API call fails.
+  Future<void> _setWebhookEnabled(Webhook webhook, bool enabled) async {
+    final previous = webhook.isEnabled;
+    setState(() => webhook.isEnabled = enabled);
+    try {
+      await _api.setWebhookEnabled(webhook.id, enabled);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => webhook.isEnabled = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update webhook: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  /// Trigger a real test delivery via the backend and report the outcome.
+  Future<void> _testWebhook(Webhook webhook) async {
+    try {
+      await _api.testWebhook(webhook.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Test delivery sent to ${webhook.name}'),
+          backgroundColor: GlassTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to test ${webhook.name}: $e'),
+          backgroundColor: GlassTheme.errorColor,
+        ),
+      );
+    }
+  }
+
   void _showAddWebhookDialog(BuildContext context) {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
@@ -311,30 +354,32 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Add Webhook', style: TextStyle(color: Colors.white)),
+        backgroundColor: context.isDark
+            ? GlassTheme.gradientTop
+            : GlassTheme.gradientTopLight,
+        title: Text('Add Webhook', style: TextStyle(color: context.colors.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.onSurface),
               decoration: InputDecoration(
                 labelText: 'Name',
-                labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                 hintText: 'e.g., Slack Notifications',
-                hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: urlController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.onSurface),
               decoration: InputDecoration(
                 labelText: 'Webhook URL',
-                labelStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                labelStyle: TextStyle(color: context.colors.onSurfaceVariant),
                 hintText: 'https://...',
-                hintStyle: TextStyle(color: Colors.white.withAlpha(77)),
+                hintStyle: TextStyle(color: context.colors.onSurfaceVariant.withValues(alpha: 0.7)),
               ),
             ),
           ],
@@ -348,7 +393,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 _createWebhook(nameController.text, urlController.text);
               }
             },
-            child: const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+            child: Text('Add', style: TextStyle(color: AppColors.accentInk)),
           ),
         ],
       ),
@@ -365,19 +410,22 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(24),
             children: [
-              Text(webhook.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(webhook.name, style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               GlassBadge(text: webhook.type, color: GlassTheme.primaryAccent),
               const SizedBox(height: 16),
@@ -385,7 +433,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 padding: const EdgeInsets.all(12),
                 child: SelectableText(
                   webhook.url,
-                  style: TextStyle(color: Colors.white.withAlpha(204), fontFamily: 'monospace', fontSize: 12),
+                  style: BrandText.mono(color: context.colors.onSurface.withValues(alpha: 0.8), size: 12),
                 ),
               ),
               const SizedBox(height: 20),
@@ -400,7 +448,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('Events', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Events', style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -414,13 +462,13 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        // Test webhook
+                        _testWebhook(webhook);
                       },
-                      icon: const DuotoneIcon('forward', size: 18, color: GlassTheme.primaryAccent),
+                      icon: DuotoneIcon('forward', size: 18, color: AppColors.accentInk),
                       label: const Text('Test'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.primaryAccent,
-                        side: const BorderSide(color: GlassTheme.primaryAccent),
+                        foregroundColor: AppColors.accentInk,
+                        side: BorderSide(color: AppColors.accentInk),
                       ),
                     ),
                   ),
@@ -431,11 +479,11 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                         Navigator.pop(context);
                         _deleteWebhook(webhook);
                       },
-                      icon: const DuotoneIcon('trash_bin_minimalistic', size: 18, color: GlassTheme.errorColor),
+                      icon: DuotoneIcon('trash_bin_minimalistic', size: 18, color: AppColors.errorInk),
                       label: const Text('Delete'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: GlassTheme.errorColor,
-                        side: const BorderSide(color: GlassTheme.errorColor),
+                        foregroundColor: AppColors.errorInk,
+                        side: BorderSide(color: AppColors.errorInk),
                       ),
                     ),
                   ),
@@ -454,8 +502,8 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );

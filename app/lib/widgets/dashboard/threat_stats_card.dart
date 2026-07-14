@@ -1,12 +1,12 @@
-/// Threat Statistics Card Widget
-/// Displays threat statistics from OrbGuard Lab API
-
-import 'dart:ui';
+// Threat Statistics Card Widget
+// Displays threat statistics from OrbGuard Lab API
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/threat_stats.dart';
 import '../../models/api/threat_indicator.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -30,6 +30,7 @@ class ThreatStatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,29 +54,26 @@ class ThreatStatsCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.cyan.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+            color: AppColors.info.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
-          child: const DuotoneIcon(
+          child: DuotoneIcon(
             AppIcons.chartSquare,
-            color: Colors.cyan,
+            color: AppColors.secondaryInk,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Threat Intelligence',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(),
           ),
         ),
         if (onTap != null)
-          const DuotoneIcon(
+          DuotoneIcon(
             AppIcons.chevronRight,
-            color: Colors.grey,
+            color: Brand.text3,
             size: 20,
           ),
       ],
@@ -97,11 +95,11 @@ class ThreatStatsCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.cloudStorage, size: 40, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.cloudStorage, size: 40, color: Brand.text3),
             const SizedBox(height: 8),
             Text(
               'Unable to load threat data',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: Brand.text2),
             ),
           ],
         ),
@@ -119,7 +117,7 @@ class ThreatStatsCard extends StatelessWidget {
               child: _StatItem(
                 label: 'Blocked Today',
                 value: _formatNumber(threatOverview?.threatsBlockedToday ?? 0),
-                color: Colors.green,
+                color: AppColors.accentInk,
                 icon: AppIcons.shield,
               ),
             ),
@@ -127,7 +125,7 @@ class ThreatStatsCard extends StatelessWidget {
               child: _StatItem(
                 label: 'This Week',
                 value: _formatNumber(threatOverview?.threatsBlockedWeek ?? 0),
-                color: Colors.cyan,
+                color: AppColors.secondaryInk,
                 icon: AppIcons.calendar,
               ),
             ),
@@ -141,7 +139,7 @@ class ThreatStatsCard extends StatelessWidget {
               child: _SeverityChip(
                 label: 'Critical',
                 count: stats?.getCountBySeverity(SeverityLevel.critical) ?? 0,
-                color: Colors.red,
+                color: AppColors.severityCritical,
               ),
             ),
             const SizedBox(width: 8),
@@ -149,7 +147,7 @@ class ThreatStatsCard extends StatelessWidget {
               child: _SeverityChip(
                 label: 'High',
                 count: stats?.getCountBySeverity(SeverityLevel.high) ?? 0,
-                color: Colors.orange,
+                color: AppColors.severityHigh,
               ),
             ),
             const SizedBox(width: 8),
@@ -157,7 +155,7 @@ class ThreatStatsCard extends StatelessWidget {
               child: _SeverityChip(
                 label: 'Medium',
                 count: stats?.getCountBySeverity(SeverityLevel.medium) ?? 0,
-                color: Colors.amber,
+                color: AppColors.severityMedium,
               ),
             ),
           ],
@@ -167,21 +165,22 @@ class ThreatStatsCard extends StatelessWidget {
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            decoration: GlassTheme.tintedGlassDecoration(
+              tintColor: AppColors.error,
+              radius: GlassTheme.radiusXSmall,
+              opacity: 0.1,
             ),
             child: Row(
               children: [
-                const DuotoneIcon(AppIcons.dangerTriangle, color: Colors.red, size: 20),
+                DuotoneIcon(AppIcons.dangerTriangle,
+                    color: AppColors.errorInk, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${threatOverview!.activeCampaignsTargetingDevice} active campaign${threatOverview!.activeCampaignsTargetingDevice > 1 ? 's' : ''} targeting your device',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Colors.red,
+                      color: AppColors.errorInk,
                     ),
                   ),
                 ),
@@ -226,11 +225,15 @@ class _StatItem extends StatelessWidget {
           children: [
             DuotoneIcon(icon, size: 14, color: color),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[500],
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Brand.text2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -238,11 +241,9 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          style: BrandText.heading(size: 28, color: color),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -265,10 +266,10 @@ class _SeverityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+      decoration: GlassTheme.tintedGlassDecoration(
+        tintColor: color,
+        radius: GlassTheme.radiusXSmall,
+        opacity: 0.1,
       ),
       child: Column(
         children: [
@@ -279,13 +280,17 @@ class _SeverityChip extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: color,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -317,12 +322,14 @@ class ThreatStatsCompact extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildMiniStat(AppIcons.shield, blockedToday.toString(), Colors.green),
+          _buildMiniStat(
+              AppIcons.shield, blockedToday.toString(), AppColors.accentInk),
           const SizedBox(width: 12),
-          _buildMiniStat(AppIcons.dangerCircle, criticalCount.toString(), Colors.red),
+          _buildMiniStat(AppIcons.dangerCircle, criticalCount.toString(),
+              AppColors.errorInk),
           const SizedBox(width: 12),
           _buildMiniStat(
-              AppIcons.dangerTriangle, highCount.toString(), Colors.orange),
+              AppIcons.dangerTriangle, highCount.toString(), AppColors.amberInk),
         ],
       ),
     );
@@ -366,7 +373,7 @@ class ThreatTrendIndicator extends StatelessWidget {
         child: Center(
           child: Text(
             'No trend data',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            style: TextStyle(color: Brand.text3, fontSize: 12),
           ),
         ),
       );
@@ -380,7 +387,7 @@ class ThreatTrendIndicator extends StatelessWidget {
         child: Center(
           child: Text(
             'No threats detected',
-            style: TextStyle(color: Colors.green[400], fontSize: 12),
+            style: TextStyle(color: AppColors.accentInk, fontSize: 12),
           ),
         ),
       );
@@ -413,9 +420,9 @@ class ThreatTrendIndicator extends StatelessWidget {
 
   Color _getColorForCount(int count, int max) {
     final ratio = count / max;
-    if (ratio > 0.7) return Colors.red;
-    if (ratio > 0.4) return Colors.orange;
-    if (ratio > 0.1) return Colors.amber;
-    return Colors.green;
+    if (ratio > 0.7) return AppColors.severityHigh;
+    if (ratio > 0.4) return AppColors.severityMedium;
+    if (ratio > 0.1) return AppColors.severityLow;
+    return AppColors.success;
   }
 }

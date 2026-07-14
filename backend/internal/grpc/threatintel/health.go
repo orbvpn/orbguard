@@ -15,9 +15,12 @@ import (
 func RegisterHealthServer(grpcServer *grpc.Server, db *database.PostgresDB, cache *cache.RedisCache) {
 	healthServer := health.NewServer()
 
-	// Register health check for the main service
+	// Register health check for the main service.
+	// ThreatIntelligenceService is reported NOT_SERVING because its
+	// registration is currently a placeholder (no generated protobuf
+	// bindings) and its RPC methods are not reachable.
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
-	healthServer.SetServingStatus("threatintel.v1.ThreatIntelligenceService", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("threatintel.v1.ThreatIntelligenceService", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
 	// Start background health checker
 	go func() {
@@ -39,14 +42,16 @@ func RegisterHealthServer(grpcServer *grpc.Server, db *database.PostgresDB, cach
 				}
 			}
 
-			// Update overall health status
+			// Update overall health status.
+			// ThreatIntelligenceService stays NOT_SERVING regardless of
+			// infrastructure health: its gRPC registration is a placeholder
+			// and its methods are not reachable.
 			if dbHealthy && redisHealthy {
 				healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
-				healthServer.SetServingStatus("threatintel.v1.ThreatIntelligenceService", grpc_health_v1.HealthCheckResponse_SERVING)
 			} else {
 				healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-				healthServer.SetServingStatus("threatintel.v1.ThreatIntelligenceService", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 			}
+			healthServer.SetServingStatus("threatintel.v1.ThreatIntelligenceService", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
 			// Check every 10 seconds
 			select {

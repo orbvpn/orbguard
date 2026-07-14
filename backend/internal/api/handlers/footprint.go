@@ -1,16 +1,22 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services/digital_footprint"
 	"orbguard-lab/pkg/logger"
 )
+
+// removalProcessTimeout bounds the background opt-out submission per request.
+const removalProcessTimeout = 2 * time.Minute
 
 // FootprintHandler handles digital footprint endpoints
 type FootprintHandler struct {
@@ -139,7 +145,11 @@ func (h *FootprintHandler) RequestRemoval(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID, _ := uuid.Parse(req.UserID)
+	userID := h.resolveUserID(r.Context(), req.UserID)
+	if userID == uuid.Nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "user identity required"})
+		return
+	}
 	brokerID, err := uuid.Parse(req.BrokerID)
 	if err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid broker_id"})
@@ -151,7 +161,46 @@ func (h *FootprintHandler) RequestRemoval(w http.ResponseWriter, r *http.Request
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Submit the opt-out asynchronously; status transitions are persisted by
+	// the removal service and visible via GET /footprint/removal/{id}.
+	h.processRemovalAsync(*result)
+
 	respondJSON(w, http.StatusOK, result)
+}
+
+// resolveUserID prefers the authenticated user identity from the request
+// context and falls back to the (service-supplied) body value.
+func (h *FootprintHandler) resolveUserID(ctx context.Context, bodyUserID string) uuid.UUID {
+	if authUID := middleware.GetUserID(ctx); authUID != "" {
+		if id, err := uuid.Parse(authUID); err == nil {
+			return id
+		}
+	}
+	id, _ := uuid.Parse(bodyUserID)
+	return id
+}
+
+// processRemovalAsync runs the opt-out submission for a removal request in
+// the background with its own bounded context.
+func (h *FootprintHandler) processRemovalAsync(request models.RemovalRequest) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), removalProcessTimeout)
+		defer cancel()
+
+		if err := h.scanner.ProcessRemovalRequest(ctx, &request); err != nil {
+			h.logger.Warn().Err(err).
+				Str("request_id", request.ID.String()).
+				Str("broker", request.BrokerName).
+				Msg("removal request processing failed")
+			return
+		}
+		h.logger.Info().
+			Str("request_id", request.ID.String()).
+			Str("broker", request.BrokerName).
+			Str("status", string(request.Status)).
+			Msg("removal request processed")
+	}()
 }
 
 // RequestBatchRemoval handles POST /api/v1/footprint/removal/batch
@@ -171,7 +220,11 @@ func (h *FootprintHandler) RequestBatchRemoval(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	userID, _ := uuid.Parse(req.UserID)
+	userID := h.resolveUserID(r.Context(), req.UserID)
+	if userID == uuid.Nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "user identity required"})
+		return
+	}
 	brokerIDs := make([]uuid.UUID, 0, len(req.BrokerIDs))
 	for _, id := range req.BrokerIDs {
 		if bid, err := uuid.Parse(id); err == nil {
@@ -184,6 +237,12 @@ func (h *FootprintHandler) RequestBatchRemoval(w http.ResponseWriter, r *http.Re
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Submit each created opt-out asynchronously.
+	for _, request := range result.Requests {
+		h.processRemovalAsync(request)
+	}
+
 	respondJSON(w, http.StatusOK, result)
 }
 
@@ -205,6 +264,15 @@ func (h *FootprintHandler) GetRemovalStatus(w http.ResponseWriter, r *http.Reque
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Per-user scoping: non-service callers may only read their own requests.
+	if !middleware.IsServiceRequest(r.Context()) {
+		if authUID := middleware.GetUserID(r.Context()); authUID != "" && result.UserID.String() != authUID {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "removal request not found"})
+			return
+		}
+	}
+
 	respondJSON(w, http.StatusOK, result)
 }
 

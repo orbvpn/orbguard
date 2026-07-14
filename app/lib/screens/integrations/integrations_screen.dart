@@ -3,9 +3,13 @@
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../services/api/api_interceptors.dart' show ApiError;
 import '../../services/api/orbguard_api_client.dart';
 
 class IntegrationsScreen extends StatefulWidget {
@@ -42,8 +46,15 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // Integrations is an optional enterprise feature — when the backend does
+      // not expose it the endpoint 404s. Treat that as an empty state (the
+      // normal "Available Integrations" list, just empty) rather than a scary
+      // error. Non-404 errors are real and still surface.
+      final gone = e is ApiError && e.statusCode == 404;
       setState(() {
-        _errorMessage = 'Failed to load integrations: ${e.toString()}';
+        if (gone) _integrations.clear();
+        _errorMessage =
+            gone ? null : 'Failed to load integrations: ${e.toString()}';
         _isLoading = false;
       });
     }
@@ -62,7 +73,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
                   onPressed: _isLoading ? null : _loadIntegrations,
                   tooltip: 'Refresh',
                 ),
@@ -72,18 +83,18 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           // Content
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                 : _errorMessage != null
                     ? _buildErrorState()
                     : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
                       // Stats
                       Row(
                         children: [
-                          _buildStatCard('Connected', _integrations.where((i) => i.isConnected).length.toString(), GlassTheme.successColor),
+                          _buildStatCard('Connected', _integrations.where((i) => i.isConnected).length.toString(), AppColors.accentInk),
                           const SizedBox(width: 12),
-                          _buildStatCard('Available', _integrations.length.toString(), GlassTheme.primaryAccent),
+                          _buildStatCard('Available', _integrations.length.toString(), AppColors.accentInk),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -111,9 +122,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text(value, style: BrandText.heading(color: color, size: 28)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -130,7 +141,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
             height: 56,
             decoration: BoxDecoration(
               color: integration.color.withAlpha(40),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Center(
               child: DuotoneIcon(
@@ -147,11 +158,11 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               children: [
                 Text(
                   integration.name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
                   integration.description,
-                  style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -163,8 +174,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               : OutlinedButton(
                   onPressed: () => _connectIntegration(integration),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: GlassTheme.primaryAccent,
-                    side: const BorderSide(color: GlassTheme.primaryAccent),
+                    foregroundColor: AppColors.accentInk,
+                    side: BorderSide(color: AppColors.accentInk),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     minimumSize: Size.zero,
                   ),
@@ -185,13 +196,16 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -204,7 +218,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                     height: 64,
                     decoration: BoxDecoration(
                       color: integration.color.withAlpha(40),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                     ),
                     child: Center(
                       child: DuotoneIcon(
@@ -221,22 +235,22 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       children: [
                         Text(
                           integration.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: context.colors.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         integration.isConnected
                             ? const GlassBadge(text: 'Connected', color: GlassTheme.successColor)
-                            : const GlassBadge(text: 'Not Connected', color: Colors.grey),
+                            : GlassBadge(text: 'Not Connected', color: context.colors.onSurfaceVariant),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
-              Text(integration.description, style: TextStyle(color: Colors.white.withAlpha(204))),
+              Text(integration.description, style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8))),
               const SizedBox(height: 24),
 
-              const Text('Features', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('Features', style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ...integration.features.map((feature) => _buildFeatureRow(feature)),
 
@@ -250,14 +264,14 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                           _disconnectIntegration(integration);
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: GlassTheme.errorColor,
-                          side: const BorderSide(color: GlassTheme.errorColor),
+                          foregroundColor: AppColors.errorInk,
+                          side: BorderSide(color: AppColors.errorInk),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: GlassTheme.errorColor),
+                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: AppColors.errorInk),
                             const SizedBox(width: 8),
                             const Text('Disconnect'),
                           ],
@@ -270,13 +284,13 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: GlassTheme.primaryAccent,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Brand.onLime,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.white),
+                            DuotoneIcon(AppIcons.urlProtection, size: 18, color: Brand.onLime),
                             const SizedBox(width: 8),
                             const Text('Connect'),
                           ],
@@ -295,10 +309,10 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          DuotoneIcon(AppIcons.checkCircle, size: 18, color: GlassTheme.successColor),
+          DuotoneIcon(AppIcons.checkCircle, size: 18, color: AppColors.accentInk),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(feature, style: TextStyle(color: Colors.white.withAlpha(204))),
+            child: Text(feature, style: TextStyle(color: context.colors.onSurface.withValues(alpha: 0.8))),
           ),
         ],
       ),
@@ -312,26 +326,26 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            DuotoneIcon(AppIcons.shieldWarning, size: 48, color: GlassTheme.errorColor),
+            DuotoneIcon(AppIcons.shieldWarning, size: 48, color: AppColors.errorInk),
             const SizedBox(height: 16),
             Text(
               'Error Loading Integrations',
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 14),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
               onPressed: _loadIntegrations,
-              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: GlassTheme.primaryAccent),
+              icon: DuotoneIcon(AppIcons.refresh, size: 18, color: AppColors.accentInk),
               label: const Text('Retry'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: GlassTheme.primaryAccent,
-                side: const BorderSide(color: GlassTheme.primaryAccent),
+                foregroundColor: AppColors.accentInk,
+                side: BorderSide(color: AppColors.accentInk),
               ),
             ),
           ],
@@ -378,7 +392,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${integration.name} disconnected'),
-            backgroundColor: Colors.grey,
+            backgroundColor: Brand.surface2,
           ),
         );
       }
@@ -442,7 +456,7 @@ class Integration {
       description: json['description'] as String? ?? '',
       color: _parseColor(json['color']),
       features: (json['features'] as List<dynamic>?)
-              ?.map((e) => e as String)
+              ?.map((e) => e.toString())
               .toList() ??
           [],
       isConnected: json['is_connected'] as bool? ?? false,
@@ -450,14 +464,17 @@ class Integration {
   }
 
   static Color _parseColor(dynamic colorValue) {
-    if (colorValue == null) return const Color(0xFF6B7280);
+    if (colorValue == null) return AppColors.severityInfo;
     if (colorValue is int) return Color(colorValue);
     if (colorValue is String) {
       // Handle hex color strings like "#FF5500" or "0xFFFF5500"
       String hex = colorValue.replaceAll('#', '').replaceAll('0x', '');
       if (hex.length == 6) hex = 'FF$hex'; // Add alpha if missing
-      return Color(int.parse(hex, radix: 16));
+      // Tolerate a non-hex color string (e.g. a named color) instead of
+      // throwing and failing the whole integrations parse.
+      final parsed = int.tryParse(hex, radix: 16);
+      if (parsed != null) return Color(parsed);
     }
-    return const Color(0xFF6B7280);
+    return AppColors.severityInfo;
   }
 }

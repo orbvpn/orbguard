@@ -17,6 +17,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'desktop_host_collector.dart';
+
 /// Windows persistence item type
 enum WindowsPersistenceType {
   registryRunKey('Registry Run Key', 'HKLM/HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'),
@@ -1458,5 +1460,50 @@ class WindowsPersistenceScannerService {
   /// Export scan results to JSON
   String exportToJson(WindowsScanResult result) {
     return jsonEncode(result.toJson());
+  }
+
+  // =========================================================================
+  // Host-local collection (W5.11)
+  //
+  // The backend's desktop network/browser scanners run on the SERVER host,
+  // so this device's data must be collected client-side. Output maps mirror
+  // the backend NetworkConnection / BrowserExtension JSON shapes.
+  // =========================================================================
+
+  /// Collect this PC's active network connections via `netstat -ano` with
+  /// PID-to-name mapping from `tasklist`.
+  Future<HostCollection> collectNetworkConnections() =>
+      collectWindowsNetworkConnections();
+
+  /// Collect browser extensions installed in this PC's browser profiles
+  /// (Chrome, Edge, Brave, Firefox).
+  Future<HostCollection> collectBrowserExtensions() async {
+    final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
+    final appData = Platform.environment['APPDATA'] ?? '';
+    final chromium = await collectChromiumExtensions({
+      if (localAppData.isNotEmpty) ...{
+        'Chrome': '$localAppData\\Google\\Chrome\\User Data',
+        'Edge': '$localAppData\\Microsoft\\Edge\\User Data',
+        'Brave': '$localAppData\\BraveSoftware\\Brave-Browser\\User Data',
+        'Chromium': '$localAppData\\Chromium\\User Data',
+      },
+    });
+    final firefox = appData.isNotEmpty
+        ? await collectFirefoxExtensions('$appData\\Mozilla\\Firefox\\Profiles')
+        : const HostCollection(
+            items: [],
+            errors: ['APPDATA environment variable not set; Firefox profiles unreachable'],
+            source: 'Firefox scan skipped',
+          );
+    return HostCollection(
+      items: [...chromium.items, ...firefox.items],
+      errors: [
+        if (localAppData.isEmpty)
+          'LOCALAPPDATA environment variable not set; Chromium-family profiles unreachable',
+        ...chromium.errors,
+        ...firefox.errors,
+      ],
+      source: '${chromium.source}; ${firefox.source}',
+    );
   }
 }

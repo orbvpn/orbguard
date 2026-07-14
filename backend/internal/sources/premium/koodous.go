@@ -19,6 +19,12 @@ import (
 const (
 	koodousAPIURL = "https://developer.koodous.com"
 	koodousSlug   = "koodous"
+	koodousName   = "Koodous"
+
+	// Koodous free-tier throttling has been observed to lock the API for
+	// ~8+ hours once exhausted ("throttled, available in 29895 seconds").
+	// Keep a conservative minimum interval so we stay inside the quota.
+	koodousMinInterval = 6 * time.Hour
 )
 
 // KoodousConnector fetches Android malware intelligence from Koodous
@@ -47,6 +53,14 @@ func NewKoodousConnector(log *logger.Logger) *KoodousConnector {
 
 // Configure configures the connector with the given config
 func (c *KoodousConnector) Configure(cfg sources.ConnectorConfig) error {
+	// Clamp the update interval to respect Koodous free-tier throttling.
+	if cfg.UpdateInterval < koodousMinInterval {
+		c.logger.Debug().
+			Dur("configured", cfg.UpdateInterval).
+			Dur("clamped_to", koodousMinInterval).
+			Msg("Koodous update interval raised to respect free-tier throttling")
+		cfg.UpdateInterval = koodousMinInterval
+	}
 	if err := c.BaseConnector.Configure(cfg); err != nil {
 		return err
 	}
@@ -94,9 +108,28 @@ func (c *KoodousConnector) Fetch(ctx context.Context) (*models.SourceFetchResult
 		return result, err
 	}
 
+	// Honor an active rate-limit backoff window (Koodous throttles for many
+	// hours once the quota is hit) without hammering the API or spamming
+	// logs (logged once per window).
+	if remaining, first := c.BackoffRemaining(); remaining > 0 {
+		if first {
+			c.logger.Warn().Dur("remaining", remaining).Msg("Koodous in rate-limit backoff, skipping fetch")
+		}
+		err := &sources.RateLimitError{Provider: koodousName, Wait: remaining, Repeat: !first}
+		result.Error = err
+		result.Duration = time.Since(start)
+		return result, err
+	}
+
 	// Fetch detected Android malware
 	indicators, err := c.fetchDetectedMalware(ctx)
 	if err != nil {
+		if rlErr, ok := sources.AsRateLimit(err); ok {
+			c.SetBackoff(rlErr.Wait)
+			result.Error = rlErr
+			result.Duration = time.Since(start)
+			return result, rlErr
+		}
 		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "403") {
 			c.logger.Info().Msg("Koodous API access denied - check API key")
 			result.Success = true
@@ -122,8 +155,8 @@ func (c *KoodousConnector) Fetch(ctx context.Context) (*models.SourceFetchResult
 
 // fetchDetectedMalware fetches recently detected Android malware
 func (c *KoodousConnector) fetchDetectedMalware(ctx context.Context) ([]models.RawIndicator, error) {
-	// Search for detected APKs
-	url := fmt.Sprintf("%s/apks?search=detected:true&ordering=-analyzed&page_size=100", koodousAPIURL)
+	// Search for detected APKs (trailing slash avoids a 301 redirect)
+	url := fmt.Sprintf("%s/apks/?search=detected:true&ordering=-analyzed&page_size=100", koodousAPIURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -147,6 +180,10 @@ func (c *KoodousConnector) fetchDetectedMalware(ctx context.Context) ([]models.R
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			// DRF-style throttle: parse "available in N seconds" / Retry-After
+			return nil, sources.NewRateLimitError(koodousName, resp, body, koodousMinInterval)
+		}
 		return nil, fmt.Errorf("Koodous returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -257,7 +294,7 @@ func (c *KoodousConnector) LookupAPK(ctx context.Context, sha256 string) (*koodo
 		return nil, fmt.Errorf("Koodous API key not configured")
 	}
 
-	url := fmt.Sprintf("%s/apks/%s", koodousAPIURL, sha256)
+	url := fmt.Sprintf("%s/apks/%s/", koodousAPIURL, sha256)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -278,6 +315,9 @@ func (c *KoodousConnector) LookupAPK(ctx context.Context, sha256 string) (*koodo
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, sources.NewRateLimitError(koodousName, resp, body, koodousMinInterval)
+		}
 		return nil, fmt.Errorf("Koodous returned status %d: %s", resp.StatusCode, string(body))
 	}
 

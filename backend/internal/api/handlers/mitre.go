@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -266,7 +267,11 @@ func (h *MITREHandler) GetMatrix(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, matrix)
 }
 
-// ExportNavigatorLayer exports techniques as ATT&CK Navigator layer
+// ExportNavigatorLayer exports techniques as ATT&CK Navigator layer.
+//
+// POST takes {name, description, techniques, domain} in the body; GET takes
+// the same fields as query parameters (techniques comma-separated) so the
+// export can be linked/downloaded directly.
 func (h *MITREHandler) ExportNavigatorLayer(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string   `json:"name"`
@@ -275,7 +280,19 @@ func (h *MITREHandler) ExportNavigatorLayer(w http.ResponseWriter, r *http.Reque
 		Domain      string   `json:"domain"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if r.Method == http.MethodGet {
+		q := r.URL.Query()
+		req.Name = q.Get("name")
+		req.Description = q.Get("description")
+		req.Domain = q.Get("domain")
+		if raw := q.Get("techniques"); raw != "" {
+			for _, t := range strings.Split(raw, ",") {
+				if t = strings.TrimSpace(t); t != "" {
+					req.Techniques = append(req.Techniques, t)
+				}
+			}
+		}
+	} else if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body", err)
 		return
 	}

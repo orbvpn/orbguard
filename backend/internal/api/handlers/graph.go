@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/graph"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -40,6 +42,117 @@ func (h *GraphHandler) respondError(w http.ResponseWriter, status int, message s
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// parseGraphLimit parses a limit query parameter with a default and hard cap.
+func parseGraphLimit(r *http.Request, def, cap int) int {
+	limit := def
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > cap {
+		limit = cap
+	}
+	return limit
+}
+
+// GetNodes lists graph nodes for exploration
+// @Summary List graph nodes
+// @Description List nodes in the threat graph with optional type filter and free-text search
+// @Tags graph
+// @Accept json
+// @Produce json
+// @Param type query string false "Node label filter (e.g. Indicator, Campaign, ThreatActor)"
+// @Param search query string false "Free-text search over value/name/id"
+// @Param limit query int false "Maximum results (cap 500)" default(100)
+// @Success 200 {object} map[string]interface{}
+// @Failure 503 {object} map[string]string
+// @Router /api/v1/graph/nodes [get]
+func (h *GraphHandler) GetNodes(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
+	nodeType := r.URL.Query().Get("type")
+	// The Flutter client sends "query"; accept both spellings.
+	search := r.URL.Query().Get("search")
+	if search == "" {
+		search = r.URL.Query().Get("query")
+	}
+	limit := parseGraphLimit(r, 100, 500)
+
+	nodes, err := h.graphService.ListNodes(r.Context(), nodeType, search, limit)
+	if err != nil {
+		if errors.Is(err, services.ErrGraphUnavailable) {
+			h.logger.Warn().Err(err).Msg("graph nodes requested but Neo4j is unavailable")
+			h.respondError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		h.logger.Error().Err(err).Msg("failed to list graph nodes")
+		h.respondError(w, http.StatusInternalServerError, "failed to list graph nodes")
+		return
+	}
+
+	if nodes == nil {
+		nodes = []graph.NodeView{}
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"nodes": nodes,
+		"count": len(nodes),
+	})
+}
+
+// GetRelations lists graph relationships for exploration
+// @Summary List graph relations
+// @Description List relationships in the threat graph with optional type filter, endpoint node filter, and free-text search
+// @Tags graph
+// @Accept json
+// @Produce json
+// @Param type query string false "Relationship type filter (e.g. BELONGS_TO, USES)"
+// @Param node_id query string false "Only relations touching this node id"
+// @Param search query string false "Free-text search over endpoint value/name"
+// @Param limit query int false "Maximum results (cap 500)" default(100)
+// @Success 200 {object} map[string]interface{}
+// @Failure 503 {object} map[string]string
+// @Router /api/v1/graph/relations [get]
+func (h *GraphHandler) GetRelations(w http.ResponseWriter, r *http.Request) {
+	if h.graphService == nil {
+		h.respondError(w, http.StatusServiceUnavailable, "graph database (Neo4j) is not available: graph features are disabled on this deployment")
+		return
+	}
+
+	relType := r.URL.Query().Get("type")
+	nodeID := r.URL.Query().Get("node_id")
+	search := r.URL.Query().Get("search")
+	if search == "" {
+		search = r.URL.Query().Get("query")
+	}
+	limit := parseGraphLimit(r, 100, 500)
+
+	relations, err := h.graphService.ListRelations(r.Context(), relType, nodeID, search, limit)
+	if err != nil {
+		if errors.Is(err, services.ErrGraphUnavailable) {
+			h.logger.Warn().Err(err).Msg("graph relations requested but Neo4j is unavailable")
+			h.respondError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		h.logger.Error().Err(err).Msg("failed to list graph relations")
+		h.respondError(w, http.StatusInternalServerError, "failed to list graph relations")
+		return
+	}
+
+	if relations == nil {
+		relations = []graph.RelationView{}
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"relations": relations,
+		"count":     len(relations),
+	})
 }
 
 // GetCorrelation returns correlation data for an indicator

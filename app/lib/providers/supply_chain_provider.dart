@@ -1,8 +1,11 @@
-/// Supply Chain Provider
-/// State management for supply chain vulnerability monitoring
+// Supply Chain Provider
+// State management for supply chain vulnerability monitoring
 
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
+import '../services/notifications/notification_channels.dart';
+import '../services/notifications/notification_service.dart';
 import '../services/security/supply_chain_monitor_service.dart';
 
 class SupplyChainProvider extends ChangeNotifier {
@@ -11,7 +14,8 @@ class SupplyChainProvider extends ChangeNotifier {
   // State
   List<DependencyScanResult> _scanResults = [];
   DependencyScanResult? _currentAppScan;
-  Map<String, List<ThirdPartyLibrary>> _librariesByCategory = {};
+  final Map<String, List<ThirdPartyLibrary>> _librariesByCategory = {};
+  final List<Vulnerability> _criticalAlerts = [];
 
   // Loading states
   bool _isLoading = false;
@@ -26,6 +30,7 @@ class SupplyChainProvider extends ChangeNotifier {
   List<DependencyScanResult> get scanResults => _scanResults;
   DependencyScanResult? get currentAppScan => _currentAppScan;
   Map<String, List<ThirdPartyLibrary>> get librariesByCategory => _librariesByCategory;
+  List<Vulnerability> get criticalAlerts => List.unmodifiable(_criticalAlerts);
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
   double get scanProgress => _scanProgress;
@@ -76,10 +81,19 @@ class SupplyChainProvider extends ChangeNotifier {
         notifyListeners();
       });
 
-      // Listen to vulnerability alerts
+      // Listen to vulnerability alerts: track in UI state and raise a
+      // real user-facing notification for critical CVEs.
       _service.onVulnerabilityAlert.listen((vuln) {
-        // Handle critical vulnerability alert
-        debugPrint('Critical vulnerability found: ${vuln.cveId}');
+        _criticalAlerts.add(vuln);
+        NotificationService.instance.showNotification(
+          title: 'Critical vulnerability: ${vuln.cveId}',
+          body: vuln.description.isNotEmpty
+              ? vuln.description
+              : 'A critical (CVSS ${vuln.cvssScore.toStringAsFixed(1)}) '
+                  'vulnerability was found in an installed app dependency.',
+          channel: NotificationChannels.appSecurity,
+        );
+        notifyListeners();
       });
     } catch (e) {
       _error = 'Failed to initialize supply chain monitor';
@@ -183,15 +197,15 @@ class SupplyChainProvider extends ChangeNotifier {
   static int getRiskColor(RiskLevel level) {
     switch (level) {
       case RiskLevel.critical:
-        return 0xFFFF1744;
+        return AppColors.severityCritical.toARGB32();
       case RiskLevel.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case RiskLevel.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case RiskLevel.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
       case RiskLevel.safe:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
     }
   }
 

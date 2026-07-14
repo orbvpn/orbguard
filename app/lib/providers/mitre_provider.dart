@@ -1,6 +1,6 @@
 /// MITRE ATT&CK Provider
 /// State management for MITRE ATT&CK technique display
-library mitre_provider;
+library;
 
 import 'package:flutter/foundation.dart';
 

@@ -1,10 +1,13 @@
-/// Connection Indicator Widget
-/// Real-time WebSocket connection status indicator
+// Connection Indicator Widget
+// Real-time WebSocket connection status indicator
 
 import 'package:flutter/material.dart';
 
 import '../../services/realtime/websocket_service.dart';
 import '../../services/realtime/connection_manager.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 
@@ -32,12 +35,12 @@ class ConnectionIndicator extends StatelessWidget {
   Widget _buildCompact() {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: _getColor().withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
+          color: _getColor().withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -61,13 +64,13 @@ class ConnectionIndicator extends StatelessWidget {
   Widget _buildFull() {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _getColor().withOpacity(0.2),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _getColor().withOpacity(0.3)),
+          color: _getColor().withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+          border: Border.all(color: _getColor().withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -116,7 +119,7 @@ class ConnectionIndicator extends StatelessWidget {
         boxShadow: state == WebSocketState.connected
             ? [
                 BoxShadow(
-                  color: _getColor().withOpacity(0.5),
+                  color: _getColor().withValues(alpha: 0.5),
                   blurRadius: 6,
                   spreadRadius: 1,
                 ),
@@ -134,14 +137,14 @@ class ConnectionIndicator extends StatelessWidget {
   Color _getColor() {
     switch (state) {
       case WebSocketState.connected:
-        return Colors.green;
+        return AppColors.accentInk;
       case WebSocketState.connecting:
       case WebSocketState.reconnecting:
-        return Colors.amber;
+        return AppColors.amberInk;
       case WebSocketState.error:
-        return Colors.red;
+        return AppColors.errorInk;
       case WebSocketState.disconnected:
-        return Colors.grey;
+        return AppColors.idle;
     }
   }
 
@@ -218,7 +221,7 @@ class _PulsingDotState extends State<_PulsingDot>
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(_animation.value),
+            color: widget.color.withValues(alpha: _animation.value),
             shape: BoxShape.circle,
           ),
         );
@@ -243,13 +246,15 @@ class ConnectionHealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      // Spacing comes from the surrounding sheet/screen gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildDetails(),
+          _buildDetails(context),
           const SizedBox(height: 16),
           _buildActions(),
         ],
@@ -263,8 +268,8 @@ class ConnectionHealthCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _getStateColor().withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            color: _getStateColor().withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           ),
           child: DuotoneIcon(
             _getStateIcon(),
@@ -277,12 +282,9 @@ class ConnectionHealthCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Connection Status',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.title(),
               ),
               const SizedBox(height: 2),
               Text(
@@ -291,6 +293,8 @@ class ConnectionHealthCard extends StatelessWidget {
                   fontSize: 13,
                   color: _getStateColor(),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -303,37 +307,41 @@ class ConnectionHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetails() {
+  Widget _buildDetails(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(8),
+        color: cs.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Column(
         children: [
-          _buildDetailRow('Network', health.networkTypeText,
-              health.hasNetwork ? Colors.green : Colors.red),
+          _buildDetailRow(context, 'Network', health.networkTypeText,
+              health.hasNetwork ? AppColors.accentInk : AppColors.errorInk),
           const SizedBox(height: 8),
           _buildDetailRow(
+            context,
             'Events Received',
             health.eventsReceived.toString(),
-            Colors.cyan,
+            AppColors.secondaryInk,
           ),
           if (health.lastEventTime != null) ...[
             const SizedBox(height: 8),
             _buildDetailRow(
+              context,
               'Last Event',
               _formatTime(health.lastEventTime!),
-              Colors.grey,
+              cs.onSurfaceVariant,
             ),
           ],
           if (health.lastHealthCheck != null) ...[
             const SizedBox(height: 8),
             _buildDetailRow(
+              context,
               'Last Check',
               _formatTime(health.lastHealthCheck!),
-              Colors.grey,
+              cs.onSurfaceVariant,
             ),
           ],
         ],
@@ -341,7 +349,8 @@ class ConnectionHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color valueColor) {
+  Widget _buildDetailRow(
+      BuildContext context, String label, String value, Color valueColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -349,15 +358,19 @@ class ConnectionHealthCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[500],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: valueColor,
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: valueColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -371,11 +384,12 @@ class ConnectionHealthCard extends StatelessWidget {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: health.hasNetwork ? onConnect : null,
-              icon: DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.black),
+              icon: DuotoneIcon(AppIcons.urlProtection,
+                  size: 18, color: Brand.onPink),
               label: const Text('Connect'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyan,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.info,
+                foregroundColor: Brand.onPink,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
@@ -384,11 +398,12 @@ class ConnectionHealthCard extends StatelessWidget {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: onDisconnect,
-              icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.orange),
+              icon: DuotoneIcon(AppIcons.closeCircle,
+                  size: 18, color: AppColors.secondaryInk),
               label: const Text('Disconnect'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.orange,
-                side: const BorderSide(color: Colors.orange),
+                foregroundColor: AppColors.secondaryInk,
+                side: BorderSide(color: AppColors.secondaryInk),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
@@ -400,14 +415,14 @@ class ConnectionHealthCard extends StatelessWidget {
   Color _getStateColor() {
     switch (health.state) {
       case WebSocketState.connected:
-        return Colors.green;
+        return AppColors.accentInk;
       case WebSocketState.connecting:
       case WebSocketState.reconnecting:
-        return Colors.amber;
+        return AppColors.amberInk;
       case WebSocketState.error:
-        return Colors.red;
+        return AppColors.errorInk;
       case WebSocketState.disconnected:
-        return Colors.grey;
+        return AppColors.idle;
     }
   }
 
@@ -463,7 +478,7 @@ class ConnectionStatusAction extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Colors.red,
+                  color: AppColors.error,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -477,14 +492,14 @@ class ConnectionStatusAction extends StatelessWidget {
   Color _getColor() {
     switch (state) {
       case WebSocketState.connected:
-        return Colors.green;
+        return AppColors.accentInk;
       case WebSocketState.connecting:
       case WebSocketState.reconnecting:
-        return Colors.amber;
+        return AppColors.amberInk;
       case WebSocketState.error:
-        return Colors.red;
+        return AppColors.errorInk;
       case WebSocketState.disconnected:
-        return Colors.grey;
+        return AppColors.idle;
     }
   }
 

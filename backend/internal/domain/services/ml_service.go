@@ -2,6 +2,10 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,26 +20,27 @@ import (
 
 // MLService orchestrates all ML operations for threat intelligence
 type MLService struct {
-	featureExtractor  *FeatureExtractor
-	isolationForest   *IsolationForest
-	kmeans            *KMeans
-	randomForest      *RandomForest
-	entityExtractor   *EntityExtractor
-	repos             *repository.Repositories
-	cache             *cache.RedisCache
-	logger            *logger.Logger
+	featureExtractor *FeatureExtractor
+	isolationForest  *IsolationForest
+	kmeans           *KMeans
+	randomForest     *RandomForest
+	entityExtractor  *EntityExtractor
+	repos            *repository.Repositories
+	cache            *cache.RedisCache
+	logger           *logger.Logger
 
 	// Training state
-	lastTrainedAt     time.Time
+	minTrainingSize    int
+	lastTrainedAt      time.Time
 	trainingInProgress atomic.Bool
-	trainingMu        sync.Mutex
+	trainingMu         sync.Mutex
 
 	// Stats
-	totalPredictions   atomic.Int64
-	totalAnomalies     atomic.Int64
-	totalEntities      atomic.Int64
-	cacheHits          atomic.Int64
-	cacheMisses        atomic.Int64
+	totalPredictions atomic.Int64
+	totalAnomalies   atomic.Int64
+	totalEntities    atomic.Int64
+	cacheHits        atomic.Int64
+	cacheMisses      atomic.Int64
 }
 
 // MLServiceConfig holds configuration for the ML service
@@ -67,6 +72,11 @@ func NewMLService(
 	c *cache.RedisCache,
 	log *logger.Logger,
 ) *MLService {
+	minTrainingSize := config.MinTrainingSize
+	if minTrainingSize <= 0 {
+		minTrainingSize = DefaultMLServiceConfig().MinTrainingSize
+	}
+
 	return &MLService{
 		featureExtractor: NewFeatureExtractor(log),
 		isolationForest:  NewIsolationForest(config.IsolationForest, log),
@@ -76,7 +86,83 @@ func NewMLService(
 		repos:            repos,
 		cache:            c,
 		logger:           log.WithComponent("ml-service"),
+		minTrainingSize:  minTrainingSize,
 	}
+}
+
+// ModelsNotTrainedError indicates that a requested ML operation requires a
+// trained model, but training has not (yet) happened — typically because the
+// indicator store does not hold enough data, or the auto-train loop has not
+// run since startup (models are in-memory only).
+type ModelsNotTrainedError struct {
+	// ModelType is the model the operation required.
+	ModelType string
+	// IndicatorsNeeded is how many more indicators are needed before
+	// training can start (0 means enough data exists and training is
+	// pending or in progress).
+	IndicatorsNeeded int
+}
+
+// Error implements the error interface.
+func (e *ModelsNotTrainedError) Error() string {
+	return fmt.Sprintf("ml model %q is not trained yet (%d more indicators needed)", e.ModelType, e.IndicatorsNeeded)
+}
+
+// modelsNotTrainedError builds a ModelsNotTrainedError, computing how many
+// more indicators are required from the current store size.
+func (s *MLService) modelsNotTrainedError(ctx context.Context, modelType string) *ModelsNotTrainedError {
+	needed := s.minTrainingSize
+	if s.repos != nil && s.repos.Indicators != nil {
+		if _, total, err := s.repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: 1}); err == nil {
+			remaining := s.minTrainingSize - int(total)
+			if remaining < 0 {
+				remaining = 0
+			}
+			needed = remaining
+		} else {
+			s.logger.Warn().Err(err).Msg("failed to count indicators for training-state report")
+		}
+	}
+
+	return &ModelsNotTrainedError{
+		ModelType:        modelType,
+		IndicatorsNeeded: needed,
+	}
+}
+
+// GetIndicatorsByIDs fetches indicators by ID for batch ML operations.
+// Missing IDs are returned separately; database errors abort the fetch.
+func (s *MLService) GetIndicatorsByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Indicator, []uuid.UUID, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	indicators := make([]*models.Indicator, 0, len(ids))
+	missing := make([]uuid.UUID, 0)
+
+	for _, id := range ids {
+		indicator, err := s.repos.Indicators.GetByID(ctx, id)
+		if err != nil {
+			return nil, nil, err
+		}
+		if indicator == nil {
+			missing = append(missing, id)
+			continue
+		}
+		indicators = append(indicators, indicator)
+	}
+
+	return indicators, missing, nil
+}
+
+// ListIndicators fetches indicators matching a filter for batch ML operations.
+func (s *MLService) ListIndicators(ctx context.Context, filter repository.IndicatorFilter) ([]*models.Indicator, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	indicators, _, err := s.repos.Indicators.List(ctx, filter)
+	return indicators, err
 }
 
 // EnrichIndicator enriches an indicator with ML analysis
@@ -142,12 +228,22 @@ func (s *MLService) EnrichBatch(ctx context.Context, indicators []*models.Indica
 	return results, nil
 }
 
-// DetectAnomalies runs anomaly detection on indicators
+// DetectAnomalies runs anomaly detection on indicators. Returns
+// ModelsNotTrainedError when the isolation forest has not been trained.
 func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.Indicator) (*models.AnomalyDetectionResult, error) {
 	startTime := time.Now()
 
 	if !s.isolationForest.IsTrained() {
-		return nil, nil
+		return nil, s.modelsNotTrainedError(ctx, "isolation_forest")
+	}
+
+	if len(indicators) == 0 {
+		return &models.AnomalyDetectionResult{
+			TotalProcessed: 0,
+			AnomalyCount:   0,
+			Scores:         []models.AnomalyScore{},
+			ProcessingTime: time.Since(startTime),
+		}, nil
 	}
 
 	// Extract feature vectors
@@ -164,6 +260,7 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 	for _, score := range scores {
 		if score.IsAnomaly {
 			anomalyCount++
+			s.totalAnomalies.Add(1)
 		}
 		sum += score.Score
 		sumSq += score.Score * score.Score
@@ -176,12 +273,21 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 	}
 
 	n := float64(len(scores))
-	mean := sum / n
-	variance := (sumSq / n) - (mean * mean)
+	mean := 0.0
 	stdDev := 0.0
-	if variance > 0 {
-		stdDev = variance
+	anomalyRate := 0.0
+	if n > 0 {
+		mean = sum / n
+		variance := (sumSq / n) - (mean * mean)
+		if variance > 0 {
+			stdDev = math.Sqrt(variance)
+		}
+		anomalyRate = float64(anomalyCount) / n
+	} else {
+		min = 0
 	}
+
+	s.totalPredictions.Add(int64(len(scores)))
 
 	return &models.AnomalyDetectionResult{
 		TotalProcessed: len(indicators),
@@ -192,16 +298,21 @@ func (s *MLService) DetectAnomalies(ctx context.Context, indicators []*models.In
 			StdDevScore: stdDev,
 			MinScore:    min,
 			MaxScore:    max,
-			AnomalyRate: float64(anomalyCount) / n,
+			AnomalyRate: anomalyRate,
 		},
 		ProcessingTime: time.Since(startTime),
 	}, nil
 }
 
-// ClusterIndicators clusters indicators into groups
+// ClusterIndicators clusters indicators into groups. Clustering trains an
+// ad-hoc K-Means model on the provided indicators, so it requires at least k
+// data points but no pre-trained model.
 func (s *MLService) ClusterIndicators(ctx context.Context, indicators []*models.Indicator, k int) (*models.ClusteringResult, error) {
-	if len(indicators) == 0 {
-		return nil, nil
+	if k < 2 {
+		return nil, fmt.Errorf("k must be at least 2, got %d", k)
+	}
+	if len(indicators) < k {
+		return nil, fmt.Errorf("clustering requires at least k=%d indicators, got %d", k, len(indicators))
 	}
 
 	// Extract feature vectors
@@ -220,12 +331,21 @@ func (s *MLService) ClusterIndicators(ctx context.Context, indicators []*models.
 	return km.Predict(vectors), nil
 }
 
-// PredictSeverity predicts severity for indicators
+// PredictSeverity predicts severity for indicators. Returns
+// ModelsNotTrainedError when the random forest has not been trained.
 func (s *MLService) PredictSeverity(ctx context.Context, indicators []*models.Indicator) (*models.SeverityPredictionResult, error) {
 	startTime := time.Now()
 
 	if !s.randomForest.IsTrained() {
-		return nil, nil
+		return nil, s.modelsNotTrainedError(ctx, "random_forest")
+	}
+
+	if len(indicators) == 0 {
+		return &models.SeverityPredictionResult{
+			TotalProcessed: 0,
+			Predictions:    []models.SeverityPrediction{},
+			ProcessingTime: time.Since(startTime),
+		}, nil
 	}
 
 	// Extract feature vectors
@@ -233,6 +353,7 @@ func (s *MLService) PredictSeverity(ctx context.Context, indicators []*models.In
 
 	// Run predictions
 	predictions := s.randomForest.Predict(vectors)
+	s.totalPredictions.Add(int64(len(predictions)))
 
 	return &models.SeverityPredictionResult{
 		TotalProcessed: len(indicators),
@@ -286,7 +407,7 @@ func (s *MLService) Train(ctx context.Context) (*models.MLTrainingResult, error)
 		}
 	}
 
-	if len(indicators) < 100 {
+	if len(indicators) < s.minTrainingSize {
 		return &models.MLTrainingResult{
 			Success: false,
 			Error:   "insufficient training data",
@@ -322,11 +443,11 @@ func (s *MLService) Train(ctx context.Context) (*models.MLTrainingResult, error)
 	s.lastTrainedAt = time.Now()
 
 	return &models.MLTrainingResult{
-		ModelType:      "all",
-		Version:        "1.0",
-		TrainingSize:   len(indicators),
-		TrainingTime:   time.Since(startTime),
-		Success:        true,
+		ModelType:    "all",
+		Version:      "1.0",
+		TrainingSize: len(indicators),
+		TrainingTime: time.Since(startTime),
+		Success:      true,
 		Metrics: map[string]float64{
 			"isolation_forest_threshold": s.isolationForest.threshold,
 			"kmeans_silhouette":          s.kmeans.silhouette,
@@ -362,7 +483,7 @@ func (s *MLService) TrainModel(ctx context.Context, modelType string) (*models.M
 		}
 	}
 
-	if len(indicators) < 100 {
+	if len(indicators) < s.minTrainingSize {
 		return &models.MLTrainingResult{
 			Success: false,
 			Error:   "insufficient training data",
@@ -483,15 +604,277 @@ func (s *MLService) FindOptimalClusters(ctx context.Context, indicators []*model
 	return s.kmeans.OptimalK(vectors, maxK)
 }
 
-// AnalyzeIndicator provides comprehensive ML analysis of a single indicator
+// IsAnomalyModelTrained reports whether the isolation forest is trained and
+// anomaly detection can run.
+func (s *MLService) IsAnomalyModelTrained() bool {
+	return s.isolationForest.IsTrained()
+}
+
+// MLInsight is a narrative insight derived from real indicator and model
+// state. Every insight is computed from persisted data — no values are
+// fabricated; when a data source is empty the corresponding insight is simply
+// omitted.
+type MLInsight struct {
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Severity    string         `json:"severity"` // info, warning, high, critical
+	GeneratedAt time.Time      `json:"generated_at"`
+	Data        map[string]any `json:"data,omitempty"`
+}
+
+// mlInsightRecentLimit bounds how many recent indicators are scored when
+// computing the anomaly-cluster insight.
+const mlInsightRecentLimit = 1000
+
+// GenerateInsights derives narrative insights from the indicator store and
+// the in-memory model state: indicator velocity vs the prior period, dominant
+// types and severities, Pegasus presence, and (when the anomaly model is
+// trained) the types that cluster among anomalous indicators.
+func (s *MLService) GenerateInsights(ctx context.Context) ([]MLInsight, error) {
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
+	}
+
+	stats, err := s.repos.Indicators.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load indicator stats: %w", err)
+	}
+
+	now := time.Now()
+	insights := make([]MLInsight, 0, 5)
+
+	if stats.TotalCount == 0 {
+		return insights, nil
+	}
+
+	// --- Indicator velocity: this week vs the average of the prior three weeks.
+	priorMonthRemainder := stats.MonthlyNew - stats.WeeklyNew
+	if priorMonthRemainder > 0 {
+		prevWeeklyAvg := float64(priorMonthRemainder) / 3.0
+		changePct := (float64(stats.WeeklyNew) - prevWeeklyAvg) / prevWeeklyAvg * 100.0
+		severity := "info"
+		direction := "down"
+		if changePct >= 0 {
+			direction = "up"
+		}
+		if changePct >= 50 {
+			severity = "warning"
+		}
+		insights = append(insights, MLInsight{
+			ID:    "indicator-velocity",
+			Title: "Indicator Velocity",
+			Description: fmt.Sprintf(
+				"%d new indicators in the last 7 days, %s %.0f%% vs the prior three-week average of %.1f per week.",
+				stats.WeeklyNew, direction, math.Abs(changePct), prevWeeklyAvg),
+			Severity:    severity,
+			GeneratedAt: now,
+			Data: map[string]any{
+				"weekly_new":          stats.WeeklyNew,
+				"monthly_new":         stats.MonthlyNew,
+				"today_new":           stats.TodayNew,
+				"prev_weekly_average": prevWeeklyAvg,
+				"change_percent":      changePct,
+			},
+		})
+	} else if stats.WeeklyNew > 0 {
+		// No prior-period baseline exists; report counts without a trend claim.
+		insights = append(insights, MLInsight{
+			ID:    "indicator-velocity",
+			Title: "Indicator Velocity",
+			Description: fmt.Sprintf(
+				"%d new indicators in the last 7 days (%d today). No prior-period data is available for trend comparison.",
+				stats.WeeklyNew, stats.TodayNew),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data: map[string]any{
+				"weekly_new":  stats.WeeklyNew,
+				"monthly_new": stats.MonthlyNew,
+				"today_new":   stats.TodayNew,
+			},
+		})
+	}
+
+	// --- Dominant indicator types.
+	if len(stats.ByType) > 0 {
+		type typeCount struct {
+			Type  string
+			Count int64
+		}
+		counts := make([]typeCount, 0, len(stats.ByType))
+		for t, c := range stats.ByType {
+			counts = append(counts, typeCount{Type: t, Count: c})
+		}
+		sort.Slice(counts, func(i, j int) bool {
+			if counts[i].Count != counts[j].Count {
+				return counts[i].Count > counts[j].Count
+			}
+			return counts[i].Type < counts[j].Type
+		})
+		top := counts
+		if len(top) > 3 {
+			top = top[:3]
+		}
+		parts := make([]string, 0, len(top))
+		data := map[string]any{"total_count": stats.TotalCount}
+		for _, tc := range top {
+			pct := float64(tc.Count) / float64(stats.TotalCount) * 100.0
+			parts = append(parts, fmt.Sprintf("%s (%d, %.1f%%)", tc.Type, tc.Count, pct))
+			data[tc.Type] = tc.Count
+		}
+		insights = append(insights, MLInsight{
+			ID:          "dominant-types",
+			Title:       "Dominant Indicator Types",
+			Description: fmt.Sprintf("Top indicator types across %d stored indicators: %s.", stats.TotalCount, strings.Join(parts, ", ")),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data:        data,
+		})
+	}
+
+	// --- Severity distribution.
+	if stats.CriticalCount > 0 {
+		criticalShare := float64(stats.CriticalCount) / float64(stats.TotalCount) * 100.0
+		severity := "info"
+		if criticalShare >= 25 {
+			severity = "high"
+		} else if criticalShare >= 10 {
+			severity = "warning"
+		}
+		insights = append(insights, MLInsight{
+			ID:    "critical-share",
+			Title: "Critical Severity Share",
+			Description: fmt.Sprintf(
+				"%d of %d indicators (%.1f%%) are rated critical severity.",
+				stats.CriticalCount, stats.TotalCount, criticalShare),
+			Severity:    severity,
+			GeneratedAt: now,
+			Data: map[string]any{
+				"critical_count":   stats.CriticalCount,
+				"total_count":      stats.TotalCount,
+				"critical_percent": criticalShare,
+				"by_severity":      stats.BySeverity,
+			},
+		})
+	}
+
+	// --- Pegasus presence.
+	if stats.PegasusCount > 0 {
+		insights = append(insights, MLInsight{
+			ID:    "pegasus-presence",
+			Title: "Pegasus-Linked Indicators",
+			Description: fmt.Sprintf(
+				"%d indicators in the store are linked to Pegasus spyware infrastructure.",
+				stats.PegasusCount),
+			Severity:    "critical",
+			GeneratedAt: now,
+			Data:        map[string]any{"pegasus_count": stats.PegasusCount},
+		})
+	}
+
+	// --- Anomaly clusters over recent indicators (only when the model is
+	// actually trained — no fabricated anomaly data).
+	if s.isolationForest.IsTrained() {
+		indicators, _, err := s.repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: mlInsightRecentLimit})
+		if err != nil {
+			s.logger.Warn().Err(err).Msg("insights: failed to list recent indicators for anomaly clustering")
+		} else if len(indicators) > 0 {
+			result, err := s.DetectAnomalies(ctx, indicators)
+			if err != nil {
+				s.logger.Warn().Err(err).Msg("insights: anomaly detection failed")
+			} else if result.AnomalyCount > 0 {
+				byID := make(map[uuid.UUID]*models.Indicator, len(indicators))
+				for _, ind := range indicators {
+					byID[ind.ID] = ind
+				}
+				typeCounts := make(map[string]int)
+				for _, score := range result.Scores {
+					if !score.IsAnomaly {
+						continue
+					}
+					if ind, ok := byID[score.IndicatorID]; ok {
+						typeCounts[string(ind.Type)]++
+					}
+				}
+				type cluster struct {
+					Type  string
+					Count int
+				}
+				clusters := make([]cluster, 0, len(typeCounts))
+				for t, c := range typeCounts {
+					clusters = append(clusters, cluster{Type: t, Count: c})
+				}
+				sort.Slice(clusters, func(i, j int) bool {
+					if clusters[i].Count != clusters[j].Count {
+						return clusters[i].Count > clusters[j].Count
+					}
+					return clusters[i].Type < clusters[j].Type
+				})
+				top := clusters
+				if len(top) > 3 {
+					top = top[:3]
+				}
+				parts := make([]string, 0, len(top))
+				data := map[string]any{
+					"anomaly_count":  result.AnomalyCount,
+					"processed":      result.TotalProcessed,
+					"anomaly_rate":   result.Statistics.AnomalyRate,
+					"mean_score":     result.Statistics.MeanScore,
+					"detection_time": result.ProcessingTime.String(),
+				}
+				for _, c := range top {
+					parts = append(parts, fmt.Sprintf("%s (%d)", c.Type, c.Count))
+					data["cluster_"+c.Type] = c.Count
+				}
+				severity := "info"
+				if result.Statistics.AnomalyRate >= 0.2 {
+					severity = "warning"
+				}
+				insights = append(insights, MLInsight{
+					ID:    "anomaly-clusters",
+					Title: "Anomaly Clusters",
+					Description: fmt.Sprintf(
+						"Anomaly detection flags %d of %d recent indicators (%.1f%%); most anomalous types: %s.",
+						result.AnomalyCount, result.TotalProcessed,
+						result.Statistics.AnomalyRate*100.0, strings.Join(parts, ", ")),
+					Severity:    severity,
+					GeneratedAt: now,
+					Data:        data,
+				})
+			}
+		}
+	} else {
+		// Honest model state: anomaly insights are unavailable until training.
+		notTrained := s.modelsNotTrainedError(ctx, "isolation_forest")
+		insights = append(insights, MLInsight{
+			ID:          "anomaly-model-untrained",
+			Title:       "Anomaly Model Not Trained",
+			Description: fmt.Sprintf("Anomaly-based insights are unavailable: %s.", notTrained.Error()),
+			Severity:    "info",
+			GeneratedAt: now,
+			Data: map[string]any{
+				"model":             notTrained.ModelType,
+				"indicators_needed": notTrained.IndicatorsNeeded,
+			},
+		})
+	}
+
+	return insights, nil
+}
+
+// AnalyzeIndicator provides comprehensive ML analysis of a single indicator.
+// Returns (nil, nil) when the indicator does not exist.
 func (s *MLService) AnalyzeIndicator(ctx context.Context, indicatorID uuid.UUID) (*models.MLEnrichmentResult, error) {
-	if s.repos == nil {
-		return nil, nil
+	if s.repos == nil || s.repos.Indicators == nil {
+		return nil, fmt.Errorf("indicator repository is not available")
 	}
 
 	indicator, err := s.repos.Indicators.GetByID(ctx, indicatorID)
 	if err != nil {
 		return nil, err
+	}
+	if indicator == nil {
+		return nil, nil
 	}
 
 	return s.EnrichIndicator(ctx, indicator)

@@ -1,12 +1,12 @@
-/// Social Media Monitoring Service
-///
-/// Monitors social media for security and privacy concerns:
-/// - Account impersonation detection
-/// - Privacy setting audits
-/// - Data exposure monitoring
-/// - Reputation monitoring
-/// - Fake account detection
-/// - Social engineering attack detection
+// Social Media Monitoring Service
+//
+// Monitors social media for security and privacy concerns:
+// - Account impersonation detection
+// - Privacy setting audits
+// - Data exposure monitoring
+// - Reputation monitoring
+// - Fake account detection
+// - Social engineering attack detection
 
 import 'dart:async';
 import 'dart:convert';
@@ -231,23 +231,31 @@ enum ExposureType {
 /// Social media monitoring result
 class MonitoringResult {
   final SocialAccount account;
-  final PrivacyScore privacyScore;
+
+  /// Privacy audit result. Null means the audit could not be performed
+  /// (no backend signal) — it does NOT mean "perfect privacy".
+  final PrivacyScore? privacyScore;
   final List<ImpersonationAlert> impersonationAlerts;
   final List<DataExposure> exposures;
+
+  /// True only when a real backend exposure scan actually ran. When false,
+  /// [exposures] being empty means "not analyzable", not "no exposures".
+  final bool exposureAnalysisPerformed;
   final DateTime scanTime;
 
   MonitoringResult({
     required this.account,
-    required this.privacyScore,
+    this.privacyScore,
     required this.impersonationAlerts,
     required this.exposures,
+    this.exposureAnalysisPerformed = false,
     DateTime? scanTime,
   }) : scanTime = scanTime ?? DateTime.now();
 
   bool get hasIssues =>
       impersonationAlerts.isNotEmpty ||
       exposures.isNotEmpty ||
-      privacyScore.overallScore < 60;
+      (privacyScore != null && privacyScore!.overallScore < 60);
 }
 
 /// Social Media Monitor Service
@@ -279,6 +287,11 @@ class SocialMediaMonitorService {
 
   /// Stream of monitoring results
   Stream<MonitoringResult> get onResult => _resultController.stream;
+
+  /// True when a backend API key is configured. Without it, privacy audits,
+  /// exposure scans and impersonation checks are honestly reported as
+  /// "not analyzable" rather than fabricated.
+  bool get isBackendConfigured => _apiKey != null;
 
   /// Initialize the service
   Future<void> initialize({String? apiKey}) async {
@@ -324,14 +337,15 @@ class SocialMediaMonitorService {
       throw ArgumentError('Account not found: $accountId');
     }
 
-    // Perform privacy audit
+    // Perform privacy audit (null = not analyzable, never fabricated)
     final privacyScore = await _auditPrivacy(account);
 
     // Check for impersonation
     final impersonationAlerts = await _checkImpersonation(account);
 
-    // Check for data exposure
-    final exposures = await _checkDataExposure(account);
+    // Check for data exposure (null = not analyzable, never fabricated)
+    final exposureFindings = await _checkDataExposure(account);
+    final exposures = exposureFindings ?? const <DataExposure>[];
 
     // Update account
     _accounts[accountId] = SocialAccount(
@@ -350,6 +364,7 @@ class SocialMediaMonitorService {
       privacyScore: privacyScore,
       impersonationAlerts: impersonationAlerts,
       exposures: exposures,
+      exposureAnalysisPerformed: exposureFindings != null,
     );
 
     _resultController.add(result);
@@ -385,162 +400,86 @@ class SocialMediaMonitorService {
     return results;
   }
 
-  /// Audit privacy settings
-  Future<PrivacyScore> _auditPrivacy(SocialAccount account) async {
-    final settings = <String, PrivacySetting>{};
-    final risks = <PrivacyRisk>[];
-    final recommendations = <String>[];
-    int score = 100;
+  /// Audit privacy settings.
+  ///
+  /// OrbGuard cannot read a user's actual privacy settings on any social
+  /// platform from the device, so no score or "current setting" is ever
+  /// fabricated. The audit runs only against the backend audit API; when no
+  /// backend is configured (or the call fails) this returns null, which the
+  /// UI must treat as "not analyzable" — never as a measured score.
+  Future<PrivacyScore?> _auditPrivacy(SocialAccount account) async {
+    if (_apiKey == null) return null;
 
-    // Platform-specific privacy checks
-    switch (account.platform) {
-      case SocialPlatform.facebook:
-        settings['profile_visibility'] = PrivacySetting(
-          name: 'Profile Visibility',
-          currentValue: 'Friends of Friends',
-          recommendedValue: 'Friends Only',
-          isOptimal: false,
-          description: 'Who can see your profile',
-        );
-        score -= 15;
-        risks.add(PrivacyRisk(
-          id: 'fb_profile_vis',
-          title: 'Profile Too Visible',
-          description: 'Your profile is visible to friends of friends',
-          severity: RiskSeverity.medium,
-          remediation: 'Change profile visibility to Friends Only',
-        ));
-        recommendations.add('Restrict profile visibility to Friends Only');
+    try {
+      final response = await http.get(
+        Uri.parse('$_apiBaseUrl/privacy-audit'
+            '?platform=${account.platform.name}'
+            '&username=${Uri.encodeComponent(account.username)}'),
+        headers: {'Authorization': 'Bearer $_apiKey'},
+      );
 
-        settings['location_sharing'] = PrivacySetting(
-          name: 'Location Sharing',
-          currentValue: 'Enabled',
-          recommendedValue: 'Disabled',
-          isOptimal: false,
-          description: 'Share your location on posts',
-        );
-        score -= 10;
-        break;
+      if (response.statusCode != 200) return null;
 
-      case SocialPlatform.instagram:
-        settings['account_privacy'] = PrivacySetting(
-          name: 'Account Privacy',
-          currentValue: 'Public',
-          recommendedValue: 'Private',
-          isOptimal: false,
-          description: 'Whether your account is public or private',
-        );
-        score -= 20;
-        risks.add(PrivacyRisk(
-          id: 'ig_public',
-          title: 'Public Account',
-          description: 'Your Instagram account is public',
-          severity: RiskSeverity.high,
-          remediation: 'Switch to a private account',
-        ));
-        recommendations.add('Consider making your account private');
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final score = data['overall_score'];
+      if (score is! num) return null;
 
-        settings['activity_status'] = PrivacySetting(
-          name: 'Activity Status',
-          currentValue: 'Visible',
-          recommendedValue: 'Hidden',
-          isOptimal: false,
-          description: 'Show when you were last active',
-        );
-        score -= 5;
-        break;
+      final settings = <String, PrivacySetting>{};
+      final rawSettings = data['settings'];
+      if (rawSettings is Map<String, dynamic>) {
+        rawSettings.forEach((key, value) {
+          if (value is Map<String, dynamic>) {
+            settings[key] = PrivacySetting(
+              name: value['name'] as String? ?? key,
+              currentValue: value['current_value'] as String? ?? '',
+              recommendedValue: value['recommended_value'] as String? ?? '',
+              isOptimal: value['is_optimal'] as bool? ?? false,
+              description: value['description'] as String? ?? '',
+            );
+          }
+        });
+      }
 
-      case SocialPlatform.twitter:
-        settings['tweet_privacy'] = PrivacySetting(
-          name: 'Tweet Privacy',
-          currentValue: 'Public',
-          recommendedValue: 'Protected',
-          isOptimal: false,
-          description: 'Who can see your tweets',
-        );
-        score -= 15;
+      final risks = <PrivacyRisk>[];
+      final rawRisks = data['risks'];
+      if (rawRisks is List) {
+        for (final raw in rawRisks.whereType<Map<String, dynamic>>()) {
+          risks.add(PrivacyRisk(
+            id: raw['id'] as String? ??
+                'risk_${DateTime.now().millisecondsSinceEpoch}',
+            title: raw['title'] as String? ?? '',
+            description: raw['description'] as String? ?? '',
+            severity: RiskSeverity.values.firstWhere(
+              (s) => s.name == raw['severity'],
+              orElse: () => RiskSeverity.informational,
+            ),
+            remediation: raw['remediation'] as String? ?? '',
+          ));
+        }
+      }
 
-        settings['location_tagging'] = PrivacySetting(
-          name: 'Location Tagging',
-          currentValue: 'Enabled',
-          recommendedValue: 'Disabled',
-          isOptimal: false,
-          description: 'Add location to tweets',
-        );
-        score -= 10;
-        recommendations.add('Disable location tagging on tweets');
-        break;
-
-      case SocialPlatform.linkedin:
-        settings['profile_viewing'] = PrivacySetting(
-          name: 'Profile Viewing Mode',
-          currentValue: 'Your Name and Headline',
-          recommendedValue: 'Private Mode',
-          isOptimal: false,
-          description: 'What others see when you view their profile',
-        );
-        score -= 5;
-
-        settings['contact_sync'] = PrivacySetting(
-          name: 'Contact Sync',
-          currentValue: 'Enabled',
-          recommendedValue: 'Disabled',
-          isOptimal: false,
-          description: 'Sync your contacts with LinkedIn',
-        );
-        score -= 10;
-        break;
-
-      default:
-        // Generic checks
-        settings['default_privacy'] = PrivacySetting(
-          name: 'Default Privacy',
-          currentValue: 'Unknown',
-          recommendedValue: 'Private',
-          isOptimal: false,
-          description: 'Default privacy settings',
-        );
-        score -= 10;
+      return PrivacyScore(
+        overallScore: score.toInt().clamp(0, 100),
+        settings: settings,
+        risks: risks,
+        recommendations: (data['recommendations'] as List?)
+                ?.whereType<String>()
+                .toList() ??
+            const [],
+      );
+    } catch (e) {
+      debugPrint('Privacy audit failed: $e');
+      return null;
     }
-
-    // Add general risks
-    if (score < 60) {
-      risks.add(PrivacyRisk(
-        id: 'general_exposure',
-        title: 'High Data Exposure Risk',
-        description: 'Your current settings expose significant personal data',
-        severity: RiskSeverity.high,
-        remediation: 'Review and update privacy settings',
-      ));
-    }
-
-    return PrivacyScore(
-      overallScore: score.clamp(0, 100),
-      settings: settings,
-      risks: risks,
-      recommendations: recommendations,
-    );
   }
 
   /// Check for impersonation
   Future<List<ImpersonationAlert>> _checkImpersonation(SocialAccount account) async {
     final alerts = <ImpersonationAlert>[];
 
-    // In production, this would search for similar accounts
-    // using name matching, profile photo similarity, etc.
-
-    // Simulated check - look for common impersonation patterns
-    final impersonatorPatterns = [
-      '${account.username}_official',
-      '${account.username}_real',
-      '${account.username}__',
-      '${account.username}.official',
-      'real_${account.username}',
-      '${account.username}1',
-      '${account.username}2',
-    ];
-
-    // Simulate finding an impersonator
+    // Impersonation detection requires a live similar-account search API.
+    // Without one this check honestly returns no alerts rather than
+    // fabricating matches from username patterns.
     if (_apiKey != null) {
       try {
         final response = await http.get(
@@ -550,79 +489,83 @@ class SocialMediaMonitorService {
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body) as Map<String, dynamic>;
-          // Process API response
+          final rawAlerts = data['alerts'];
+          if (rawAlerts is List) {
+            for (final raw in rawAlerts.whereType<Map<String, dynamic>>()) {
+              alerts.add(ImpersonationAlert(
+                id: raw['id'] as String? ??
+                    'imp_${DateTime.now().millisecondsSinceEpoch}',
+                platform: account.platform,
+                impersonatorUsername:
+                    raw['impersonator_username'] as String? ?? '',
+                targetUsername: account.username,
+                similarityScore:
+                    (raw['similarity_score'] as num?)?.toDouble() ?? 0.0,
+                indicators: (raw['indicators'] as List?)
+                        ?.whereType<String>()
+                        .toList() ??
+                    const [],
+              ));
+            }
+          }
         }
       } catch (e) {
         debugPrint('Impersonation check failed: $e');
       }
     }
 
-    // Local simulation for demo
-    if (account.username.length > 5) {
-      alerts.add(ImpersonationAlert(
-        id: 'imp_${DateTime.now().millisecondsSinceEpoch}',
-        platform: account.platform,
-        impersonatorUsername: '${account.username}_official',
-        targetUsername: account.username,
-        similarityScore: 0.85,
-        indicators: [
-          'Similar username pattern',
-          'Recently created account',
-          'Copying profile information',
-        ],
-      ));
-    }
-
     return alerts;
   }
 
-  /// Check for data exposure
-  Future<List<DataExposure>> _checkDataExposure(SocialAccount account) async {
-    final exposures = <DataExposure>[];
+  /// Check for data exposure.
+  ///
+  /// Exposures are derived ONLY from real backend scan responses — never
+  /// asserted from "typical" platform patterns. Returns null when the scan
+  /// could not be performed (no backend configured, or the request failed),
+  /// which callers surface as an explicit "not analyzable" state.
+  Future<List<DataExposure>?> _checkDataExposure(SocialAccount account) async {
+    if (_apiKey == null) return null;
 
-    // Check for common exposure patterns based on platform
-    switch (account.platform) {
-      case SocialPlatform.facebook:
+    try {
+      final response = await http.get(
+        Uri.parse('$_apiBaseUrl/data-exposure'
+            '?platform=${account.platform.name}'
+            '&username=${Uri.encodeComponent(account.username)}'),
+        headers: {'Authorization': 'Bearer $_apiKey'},
+      );
+
+      if (response.statusCode != 200) return null;
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final rawExposures = data['exposures'];
+      if (rawExposures is! List) return null;
+
+      final exposures = <DataExposure>[];
+      for (final raw in rawExposures.whereType<Map<String, dynamic>>()) {
         exposures.add(DataExposure(
-          id: 'exp_${account.id}_email',
-          type: ExposureType.contactInfo,
-          description: 'Email address visible on profile',
-          source: 'Facebook Profile',
-          exposedData: 'Email address',
-          severity: RiskSeverity.medium,
-          recommendation: 'Hide email from public profile',
+          id: raw['id'] as String? ??
+              'exp_${account.id}_${DateTime.now().millisecondsSinceEpoch}',
+          type: ExposureType.values.firstWhere(
+            (t) => t.name == raw['type'],
+            orElse: () => ExposureType.personalInfo,
+          ),
+          description: raw['description'] as String? ?? '',
+          source: raw['source'] as String? ?? account.platform.displayName,
+          exposedData: raw['exposed_data'] as String? ?? '',
+          severity: RiskSeverity.values.firstWhere(
+            (s) => s.name == raw['severity'],
+            orElse: () => RiskSeverity.informational,
+          ),
+          recommendation: raw['recommendation'] as String? ?? '',
         ));
-        break;
+      }
 
-      case SocialPlatform.instagram:
-        exposures.add(DataExposure(
-          id: 'exp_${account.id}_location',
-          type: ExposureType.locationData,
-          description: 'Location tags on recent posts',
-          source: 'Instagram Posts',
-          exposedData: 'Frequent locations',
-          severity: RiskSeverity.medium,
-          recommendation: 'Remove location tags from posts',
-        ));
-        break;
-
-      case SocialPlatform.linkedin:
-        exposures.add(DataExposure(
-          id: 'exp_${account.id}_work',
-          type: ExposureType.workInfo,
-          description: 'Detailed work history visible',
-          source: 'LinkedIn Profile',
-          exposedData: 'Employment history, skills',
-          severity: RiskSeverity.low,
-          recommendation: 'Review profile visibility settings',
-        ));
-        break;
-
-      default:
-        break;
+      // An empty list here is a real "analyzed and clean" verdict.
+      return exposures;
+    } catch (e) {
+      debugPrint('Data exposure check failed: $e');
+      return null;
     }
-
-    return exposures;
   }
 
   /// Start continuous monitoring
@@ -667,17 +610,38 @@ class SocialMediaMonitorService {
     return exposures..sort((a, b) => a.severity.index.compareTo(b.severity.index));
   }
 
-  /// Report an impersonator
+  /// Report an impersonator through the backend.
+  ///
+  /// Returns true only when the backend actually accepted the report. There
+  /// is no client-side reporting capability, so without a configured backend
+  /// this honestly returns false instead of faking success.
   Future<bool> reportImpersonator(String alertId) async {
     final alert = _alerts.firstWhere(
       (a) => a.id == alertId,
       orElse: () => throw ArgumentError('Alert not found'),
     );
 
-    // In production, this would submit a report to the platform
-    debugPrint('Reporting impersonator: ${alert.impersonatorUsername}');
+    if (_apiKey == null) return false;
 
-    return true;
+    try {
+      final response = await http.post(
+        Uri.parse('$_apiBaseUrl/report-impersonator'),
+        headers: {
+          'Authorization': 'Bearer $_apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'alert_id': alert.id,
+          'platform': alert.platform.name,
+          'impersonator_username': alert.impersonatorUsername,
+          'target_username': alert.targetUsername,
+        }),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Impersonator report failed: $e');
+      return false;
+    }
   }
 
   /// Get service statistics

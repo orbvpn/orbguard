@@ -1,8 +1,8 @@
-/// API Interceptors for OrbGuard Lab API
-/// Handles authentication, retry logic, logging, and caching
+// API Interceptors for OrbGuard Lab API
+// Handles authentication, retry logic, logging, and caching
 
 import 'dart:async';
-import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -89,8 +89,13 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
+    // Never try to refresh the refresh call itself (it would queue forever
+    // behind _isRefreshing and deadlock).
+    final isRefreshCall =
+        err.requestOptions.path.endsWith(ApiEndpoints.authRefresh);
+
     // Handle 401 Unauthorized - attempt token refresh
-    if (err.response?.statusCode == 401 && _refreshToken != null) {
+    if (err.response?.statusCode == 401 && _refreshToken != null && !isRefreshCall) {
       if (!_isRefreshing) {
         _isRefreshing = true;
 
@@ -142,17 +147,16 @@ class AuthInterceptor extends Interceptor {
 
   Future<String?> _refreshAccessToken() async {
     try {
+      // POST /api/v1/auth/refresh is a public route; the backend rotates the
+      // pair and responds: {token, refresh_token, expires_in, token_type}.
       final response = await _dio.post(
-        '${ApiConfig.baseUrl}${ApiEndpoints.authRefresh}',
+        ApiEndpoints.authRefresh,
         data: {'refresh_token': _refreshToken},
-        options: Options(
-          headers: {'Authorization': 'Bearer $_refreshToken'},
-        ),
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
-        final newAccessToken = data['access_token'] as String?;
+        final newAccessToken = data['token'] as String?;
         final newRefreshToken = data['refresh_token'] as String?;
 
         if (newAccessToken != null) {
@@ -253,13 +257,13 @@ class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     if (enabled) {
-      print('┌──────────────────────────────────────────────────────────────');
-      print('│ REQUEST: ${options.method} ${options.uri}');
-      print('│ Headers: ${_sanitizeHeaders(options.headers)}');
+      developer.log('┌──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
+      developer.log('│ REQUEST: ${options.method} ${options.uri}', name: 'OrbGuard.API');
+      developer.log('│ Headers: ${_sanitizeHeaders(options.headers)}', name: 'OrbGuard.API');
       if (logRequestBody && options.data != null) {
-        print('│ Body: ${_truncate(options.data.toString(), 500)}');
+        developer.log('│ Body: ${_truncate(options.data.toString(), 500)}', name: 'OrbGuard.API');
       }
-      print('└──────────────────────────────────────────────────────────────');
+      developer.log('└──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
     }
     handler.next(options);
   }
@@ -267,15 +271,15 @@ class LoggingInterceptor extends Interceptor {
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     if (enabled) {
-      print('┌──────────────────────────────────────────────────────────────');
-      print('│ RESPONSE: ${response.statusCode} ${response.requestOptions.uri}');
-      print('│ Duration: ${DateTime.now().difference(
+      developer.log('┌──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
+      developer.log('│ RESPONSE: ${response.statusCode} ${response.requestOptions.uri}', name: 'OrbGuard.API');
+      developer.log('│ Duration: ${DateTime.now().difference(
         response.requestOptions.extra['startTime'] ?? DateTime.now()
-      ).inMilliseconds}ms');
+      ).inMilliseconds}ms', name: 'OrbGuard.API');
       if (logResponseBody && response.data != null) {
-        print('│ Body: ${_truncate(response.data.toString(), 500)}');
+        developer.log('│ Body: ${_truncate(response.data.toString(), 500)}', name: 'OrbGuard.API');
       }
-      print('└──────────────────────────────────────────────────────────────');
+      developer.log('└──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
     }
     handler.next(response);
   }
@@ -283,11 +287,11 @@ class LoggingInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (enabled) {
-      print('┌──────────────────────────────────────────────────────────────');
-      print('│ ERROR: ${err.type} ${err.requestOptions.uri}');
-      print('│ Status: ${err.response?.statusCode}');
-      print('│ Message: ${err.message}');
-      print('└──────────────────────────────────────────────────────────────');
+      developer.log('┌──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
+      developer.log('│ ERROR: ${err.type} ${err.requestOptions.uri}', name: 'OrbGuard.API');
+      developer.log('│ Status: ${err.response?.statusCode}', name: 'OrbGuard.API');
+      developer.log('│ Message: ${err.message}', name: 'OrbGuard.API');
+      developer.log('└──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
     }
     handler.next(err);
   }

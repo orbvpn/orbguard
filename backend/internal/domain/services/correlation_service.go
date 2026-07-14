@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -18,9 +19,14 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
+// ErrCorrelationPersistenceUnavailable is returned when correlation event
+// persistence is required but the database pool is not available.
+var ErrCorrelationPersistenceUnavailable = errors.New("correlation persistence is not available: database connection pool is not configured")
+
 // CorrelationEngine provides advanced threat correlation capabilities
 type CorrelationEngine struct {
 	repos      *repository.Repositories
+	eventsRepo *repository.CorrelationRepository
 	cache      *cache.RedisCache
 	logger     *logger.Logger
 	config     *models.CorrelationConfig
@@ -37,7 +43,10 @@ type CorrelationEngine struct {
 // NewCorrelationEngine creates a new correlation engine
 func NewCorrelationEngine(repos *repository.Repositories, c *cache.RedisCache, log *logger.Logger) *CorrelationEngine {
 	return &CorrelationEngine{
-		repos:           repos,
+		repos: repos,
+		// Reuses the shared connection pool; nil when no pool is configured,
+		// in which case correlation results are computed but not persisted.
+		eventsRepo:      repository.NewCorrelationRepositoryFromRepos(repos),
 		cache:           c,
 		logger:          log.WithComponent("correlation-engine"),
 		config:          models.DefaultCorrelationConfig(),
@@ -52,8 +61,22 @@ func (e *CorrelationEngine) SetConfig(config *models.CorrelationConfig) {
 	e.config = config
 }
 
-// Correlate performs correlation analysis on the given request
+// Correlate performs correlation analysis on the given request and persists
+// the discovered correlation events (best effort) so they can be returned by
+// GET /correlation.
 func (e *CorrelationEngine) Correlate(ctx context.Context, req *models.CorrelationRequest) (*models.CorrelationResponse, error) {
+	response, err := e.correlate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	e.persistEvents(ctx, response.RequestID, "api", response.Correlations)
+
+	return response, nil
+}
+
+// correlate performs correlation analysis without persisting the results.
+func (e *CorrelationEngine) correlate(ctx context.Context, req *models.CorrelationRequest) (*models.CorrelationResponse, error) {
 	startTime := time.Now()
 	requestID := uuid.New()
 
@@ -814,6 +837,150 @@ func (e *CorrelationEngine) GetStats() *models.CorrelationEngineStats {
 	}
 
 	return stats
+}
+
+// persistEvents stores correlation events best-effort. Persistence problems
+// are logged but never fail the correlation request itself, since the
+// results were already computed and returned to the caller.
+func (e *CorrelationEngine) persistEvents(ctx context.Context, requestID uuid.UUID, triggeredBy string, events []models.CorrelationEvent) {
+	if len(events) == 0 {
+		return
+	}
+	if e.eventsRepo == nil {
+		e.logger.Debug().
+			Int("events", len(events)).
+			Msg("correlation events not persisted: database pool unavailable")
+		return
+	}
+
+	persistCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := e.eventsRepo.InsertEvents(persistCtx, requestID, triggeredBy, events); err != nil {
+		e.logger.Warn().
+			Err(err).
+			Str("request_id", requestID.String()).
+			Int("events", len(events)).
+			Msg("failed to persist correlation events")
+	}
+}
+
+// GetRecentEvents returns the most recent persisted correlation events,
+// newest first, optionally filtered by a free-text search.
+func (e *CorrelationEngine) GetRecentEvents(ctx context.Context, search string, limit int) ([]models.CorrelationEvent, error) {
+	if e.eventsRepo == nil {
+		e.logger.Error().Msg("correlation events requested but persistence is unavailable")
+		return nil, ErrCorrelationPersistenceUnavailable
+	}
+	return e.eventsRepo.ListRecentEvents(ctx, search, limit)
+}
+
+// CorrelationRunSummary summarises one server-side correlation run.
+type CorrelationRunSummary struct {
+	RunID                uuid.UUID `json:"run_id"`
+	RequestID            uuid.UUID `json:"request_id"`
+	RequestedBy          string    `json:"requested_by"`
+	IndicatorsAnalyzed   int       `json:"indicators_analyzed"`
+	CorrelationsFound    int       `json:"correlations_found"`
+	ClustersFormed       int       `json:"clusters_formed"`
+	CampaignsMatched     int       `json:"campaigns_matched"`
+	ActorsMatched        int       `json:"actors_matched"`
+	AverageConfidence    float64   `json:"average_confidence"`
+	StrongestCorrelation float64   `json:"strongest_correlation"`
+	ProcessingTimeMS     int64     `json:"processing_time_ms"`
+	StartedAt            time.Time `json:"started_at"`
+	CompletedAt          time.Time `json:"completed_at"`
+}
+
+// maxRunIndicators bounds how many recent indicators a server-side
+// correlation run analyses.
+const maxRunIndicators = 500
+
+// RunServerCorrelation runs a server-scoped correlation over the most recent
+// indicators, persists the discovered events and the run summary, and
+// returns both. Persistence is required for runs: without it the run history
+// would silently disappear, so a missing pool is an explicit error.
+func (e *CorrelationEngine) RunServerCorrelation(ctx context.Context, requestedBy string) (*CorrelationRunSummary, *models.CorrelationResponse, error) {
+	if e.eventsRepo == nil {
+		e.logger.Error().Msg("correlation run requested but persistence is unavailable")
+		return nil, nil, ErrCorrelationPersistenceUnavailable
+	}
+
+	startedAt := time.Now().UTC()
+
+	// Scope: the most recent indicators in the platform.
+	indicators, _, err := e.repos.Indicators.List(ctx, repository.IndicatorFilter{Limit: maxRunIndicators})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch indicators for correlation run: %w", err)
+	}
+
+	response, err := e.correlate(ctx, &models.CorrelationRequest{
+		IndicatorIDs: extractIDs(indicators),
+		Types: []models.CorrelationType{
+			models.CorrelationTemporal,
+			models.CorrelationInfrastructure,
+			models.CorrelationTTP,
+			models.CorrelationNetwork,
+			models.CorrelationCampaign,
+		},
+		IncludeEvidence: true,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("correlation run failed: %w", err)
+	}
+
+	e.persistEvents(ctx, response.RequestID, "run", response.Correlations)
+
+	completedAt := time.Now().UTC()
+	run := &repository.CorrelationRunRecord{
+		ID:                   uuid.New(),
+		RequestID:            response.RequestID,
+		RequestedBy:          requestedBy,
+		IndicatorsAnalyzed:   len(indicators),
+		CorrelationsFound:    len(response.Correlations),
+		ClustersFormed:       len(response.Clusters),
+		CampaignsMatched:     len(response.CampaignMatches),
+		ActorsMatched:        len(response.ActorMatches),
+		AverageConfidence:    response.Statistics.AverageConfidence,
+		StrongestCorrelation: response.Statistics.StrongestCorrelation,
+		ProcessingMS:         response.ProcessingTime.Milliseconds(),
+		StartedAt:            startedAt,
+		CompletedAt:          completedAt,
+	}
+
+	persistCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := e.eventsRepo.InsertRun(persistCtx, run); err != nil {
+		// The run executed and its events were persisted; surface the
+		// summary-persistence failure to the caller since run history is a
+		// contract of this endpoint.
+		return nil, nil, fmt.Errorf("failed to persist correlation run summary: %w", err)
+	}
+
+	summary := &CorrelationRunSummary{
+		RunID:                run.ID,
+		RequestID:            run.RequestID,
+		RequestedBy:          run.RequestedBy,
+		IndicatorsAnalyzed:   run.IndicatorsAnalyzed,
+		CorrelationsFound:    run.CorrelationsFound,
+		ClustersFormed:       run.ClustersFormed,
+		CampaignsMatched:     run.CampaignsMatched,
+		ActorsMatched:        run.ActorsMatched,
+		AverageConfidence:    run.AverageConfidence,
+		StrongestCorrelation: run.StrongestCorrelation,
+		ProcessingTimeMS:     run.ProcessingMS,
+		StartedAt:            run.StartedAt,
+		CompletedAt:          run.CompletedAt,
+	}
+
+	e.logger.Info().
+		Str("run_id", run.ID.String()).
+		Str("requested_by", requestedBy).
+		Int("indicators", run.IndicatorsAnalyzed).
+		Int("correlations", run.CorrelationsFound).
+		Msg("server-side correlation run complete")
+
+	return summary, response, nil
 }
 
 // CorrelateIndicator correlates a single indicator

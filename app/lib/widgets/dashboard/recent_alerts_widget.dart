@@ -1,13 +1,13 @@
-/// Recent Alerts Widget
-/// Displays recent security alerts and real-time events
-
-import 'dart:ui';
+// Recent Alerts Widget
+// Displays recent security alerts and real-time events
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/threat_stats.dart';
 import '../../models/api/threat_indicator.dart';
 import '../../services/realtime/websocket_service.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -32,6 +32,7 @@ class RecentAlertsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,15 +59,17 @@ class RecentAlertsWidget extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: unreadCount > 0
-                ? Colors.red.withOpacity(0.2)
-                : Colors.cyan.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+                ? AppColors.error.withValues(alpha: 0.2)
+                : AppColors.info.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: Stack(
             children: [
               DuotoneIcon(
                 AppIcons.bell,
-                color: unreadCount > 0 ? Colors.red : Colors.cyan,
+                color: unreadCount > 0
+                    ? AppColors.errorInk
+                    : AppColors.secondaryInk,
                 size: 20,
               ),
               if (unreadCount > 0)
@@ -77,7 +80,7 @@ class RecentAlertsWidget extends StatelessWidget {
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
-                      color: Colors.red,
+                      color: AppColors.error,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -90,19 +93,16 @@ class RecentAlertsWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Recent Alerts',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.title(),
               ),
               if (unreadCount > 0)
                 Text(
                   '$unreadCount unread',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.red[300],
+                    color: AppColors.errorInk,
                   ),
                 ),
             ],
@@ -132,13 +132,14 @@ class RecentAlertsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.checkCircle, size: 48, color: Colors.green[400]),
+            DuotoneIcon(AppIcons.checkCircle,
+                size: 48, color: AppColors.accentInk),
             const SizedBox(height: 12),
             Text(
               'No recent alerts',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Brand.text2,
               ),
             ),
             const SizedBox(height: 4),
@@ -146,7 +147,7 @@ class RecentAlertsWidget extends StatelessWidget {
               'Your device is secure',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.green[400],
+                color: AppColors.accentInk,
               ),
             ),
           ],
@@ -167,8 +168,8 @@ class RecentAlertsWidget extends StatelessWidget {
           background: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 16),
-            color: Colors.red.withOpacity(0.2),
-            child: DuotoneIcon(AppIcons.trash, color: Colors.red),
+            color: AppColors.error.withValues(alpha: 0.2),
+            child: DuotoneIcon(AppIcons.trash, color: AppColors.errorInk),
           ),
           child: _AlertTile(
             alert: alert,
@@ -194,12 +195,12 @@ class _AlertTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.1)),
+            bottom: BorderSide(color: Brand.border),
           ),
         ),
         child: Row(
@@ -230,7 +231,7 @@ class _AlertTile extends StatelessWidget {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Colors.cyan,
+                            color: AppColors.info,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -241,7 +242,7 @@ class _AlertTile extends StatelessWidget {
                     alert.message,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: Brand.text2,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -255,7 +256,7 @@ class _AlertTile extends StatelessWidget {
                         _formatTime(alert.timestamp),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey[600],
+                          color: Brand.text3,
                         ),
                       ),
                     ],
@@ -263,7 +264,7 @@ class _AlertTile extends StatelessWidget {
                 ],
               ),
             ),
-            DuotoneIcon(AppIcons.chevronRight, color: Colors.grey, size: 20),
+            DuotoneIcon(AppIcons.chevronRight, color: Brand.text3, size: 20),
           ],
         ),
       ),
@@ -276,19 +277,19 @@ class _AlertTile extends StatelessWidget {
 
     switch (alert.severity) {
       case SeverityLevel.critical:
-        color = Colors.red;
+        color = AppColors.severityCritical;
         icon = AppIcons.dangerCircle;
         break;
       case SeverityLevel.high:
-        color = Colors.orange;
+        color = AppColors.severityHigh;
         icon = AppIcons.dangerTriangle;
         break;
       case SeverityLevel.medium:
-        color = Colors.amber;
+        color = AppColors.severityMedium;
         icon = AppIcons.infoCircle;
         break;
       default:
-        color = Colors.grey;
+        color = AppColors.severityInfo;
         icon = AppIcons.infoCircle;
     }
 
@@ -296,7 +297,7 @@ class _AlertTile extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         shape: BoxShape.circle,
       ),
       child: Center(child: DuotoneIcon(icon, size: 18, color: color)),
@@ -307,15 +308,15 @@ class _AlertTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4),
+        color: Brand.surface2,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         alert.type.toUpperCase(),
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.w500,
-          color: Colors.grey[400],
+          color: Brand.text2,
         ),
       ),
     );
@@ -349,6 +350,7 @@ class RealtimeEventsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,24 +375,21 @@ class RealtimeEventsWidget extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isConnected
-                ? Colors.green.withOpacity(0.2)
-                : Colors.grey.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+                ? AppColors.success.withValues(alpha: 0.2)
+                : AppColors.idle.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: DuotoneIcon(
             AppIcons.wifi,
-            color: isConnected ? Colors.green : Colors.grey,
+            color: isConnected ? AppColors.accentInk : AppColors.idle,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Live Threat Feed',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(),
           ),
         ),
         _buildConnectionStatus(),
@@ -403,9 +402,9 @@ class RealtimeEventsWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isConnected
-            ? Colors.green.withOpacity(0.2)
-            : Colors.grey.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
+            ? AppColors.success.withValues(alpha: 0.2)
+            : AppColors.idle.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -414,7 +413,7 @@ class RealtimeEventsWidget extends StatelessWidget {
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: isConnected ? Colors.green : Colors.grey,
+              color: isConnected ? AppColors.success : AppColors.idle,
               shape: BoxShape.circle,
             ),
           ),
@@ -423,7 +422,7 @@ class RealtimeEventsWidget extends StatelessWidget {
             isConnected ? 'Live' : 'Offline',
             style: TextStyle(
               fontSize: 11,
-              color: isConnected ? Colors.green : Colors.grey,
+              color: isConnected ? AppColors.accentInk : AppColors.idle,
             ),
           ),
         ],
@@ -437,24 +436,25 @@ class RealtimeEventsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.cloudStorage, size: 48, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.cloudStorage, size: 48, color: Brand.text3),
             const SizedBox(height: 12),
             Text(
               'Not connected to threat stream',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Brand.text2,
               ),
             ),
             if (onConnect != null) ...[
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onConnect,
-                icon: DuotoneIcon(AppIcons.urlProtection, size: 18, color: Colors.cyan),
+                icon: DuotoneIcon(AppIcons.urlProtection,
+                    size: 18, color: AppColors.secondaryInk),
                 label: const Text('Connect'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.cyan,
-                  side: const BorderSide(color: Colors.cyan),
+                  foregroundColor: AppColors.secondaryInk,
+                  side: BorderSide(color: AppColors.secondaryInk),
                 ),
               ),
             ],
@@ -470,13 +470,13 @@ class RealtimeEventsWidget extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.stopwatch, size: 48, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.stopwatch, size: 48, color: Brand.text3),
             const SizedBox(height: 12),
             Text(
               'Waiting for threat events...',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[400],
+                color: Brand.text2,
               ),
             ),
           ],
@@ -511,12 +511,12 @@ class _RealtimeEventTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.1)),
+            bottom: BorderSide(color: Brand.border),
           ),
         ),
         child: Row(
@@ -533,15 +533,13 @@ class _RealtimeEventTile extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     event.value,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                      fontFamily: 'monospace',
-                    ),
+                    style: BrandText.mono(size: 11),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -557,7 +555,7 @@ class _RealtimeEventTile extends StatelessWidget {
                   _formatTime(event.timestamp),
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey[600],
+                    color: Brand.text3,
                   ),
                 ),
               ],
@@ -574,7 +572,9 @@ class _RealtimeEventTile extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         color: _getSeverityColor(),
-        borderRadius: BorderRadius.circular(2),
+        // 4px-wide bar: the radius clamps to width/2, so the token renders
+        // identically to the previous 2px radius.
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
     );
   }
@@ -583,8 +583,8 @@ class _RealtimeEventTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: _getSeverityColor().withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4),
+        color: _getSeverityColor().withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         event.severity.value.toUpperCase(),
@@ -600,13 +600,13 @@ class _RealtimeEventTile extends StatelessWidget {
   Color _getSeverityColor() {
     switch (event.severity) {
       case SeverityLevel.critical:
-        return Colors.red;
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return Colors.orange;
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return Colors.amber;
+        return AppColors.severityMedium;
       default:
-        return Colors.grey;
+        return AppColors.severityInfo;
     }
   }
 

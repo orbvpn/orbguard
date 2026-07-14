@@ -1,12 +1,11 @@
-/// Protection Status Card Widget
-/// Displays device protection status and feature overview
-
-import 'dart:math' as math;
-import 'dart:ui';
+// Protection Status Card Widget
+// Displays device protection status and feature overview
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/threat_stats.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -32,13 +31,15 @@ class ProtectionStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      // Spacing comes from the parent screen's section gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           if (isLoading)
             _buildLoadingState()
           else
-            _buildProtectionStatus(),
+            _buildProtectionStatus(context),
         ],
       ),
     );
@@ -53,7 +54,7 @@ class ProtectionStatusCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProtectionStatus() {
+  Widget _buildProtectionStatus(BuildContext context) {
     final isProtected = protection?.isProtected ?? status?.isActive ?? false;
     final score = protection?.protectionScore ?? status?.score ?? 0.0;
     final grade = protection?.protectionGrade ?? status?.grade ?? 'U';
@@ -63,19 +64,19 @@ class ProtectionStatusCard extends StatelessWidget {
     String statusText;
 
     if (!isProtected) {
-      statusColor = Colors.red;
+      statusColor = AppColors.errorInk;
       statusIcon = AppIcons.shield;
       statusText = 'Not Protected';
     } else if (score >= 80) {
-      statusColor = Colors.green;
+      statusColor = AppColors.accentInk;
       statusIcon = AppIcons.shieldCheck;
       statusText = 'Fully Protected';
     } else if (score >= 50) {
-      statusColor = Colors.orange;
+      statusColor = AppColors.amberInk;
       statusIcon = AppIcons.shield;
       statusText = 'Partially Protected';
     } else {
-      statusColor = Colors.red;
+      statusColor = AppColors.errorInk;
       statusIcon = AppIcons.dangerTriangle;
       statusText = 'Low Protection';
     }
@@ -93,11 +94,9 @@ class ProtectionStatusCard extends StatelessWidget {
         // Status text
         Text(
           statusText,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: statusColor,
-          ),
+          style: BrandText.heading(size: 22, color: statusColor),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
         // Last scan info
@@ -106,7 +105,7 @@ class ProtectionStatusCard extends StatelessWidget {
             'Last scan: ${_formatTime(protection!.lastScan)}',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         const SizedBox(height: 20),
@@ -119,11 +118,12 @@ class ProtectionStatusCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: onScanTap,
-              icon: const DuotoneIcon(AppIcons.search, size: 20, color: Colors.black),
+              icon: const DuotoneIcon(AppIcons.search,
+                  size: 20, color: Brand.onLime),
               label: const Text('Start Scan'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.black,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
@@ -189,8 +189,8 @@ class _ProtectionScoreCircle extends StatelessWidget {
             child: CircularProgressIndicator(
               value: 1,
               strokeWidth: 8,
-              backgroundColor: Colors.grey.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation(Colors.grey.withOpacity(0.1)),
+              backgroundColor: Brand.surface2,
+              valueColor: AlwaysStoppedAnimation(Brand.border),
             ),
           ),
           // Progress circle
@@ -212,17 +212,13 @@ class _ProtectionScoreCircle extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 grade,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+                style: BrandText.heading(size: 28, color: color),
               ),
               Text(
                 '${score.round()}%',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[400],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -255,11 +251,11 @@ class _FeatureStatusChip extends StatelessWidget {
 
     Color color;
     if (!isEnabled) {
-      color = Colors.grey;
+      color = AppColors.idle;
     } else if (!isHealthy) {
-      color = Colors.orange;
+      color = AppColors.secondaryInk;
     } else {
-      color = Colors.green;
+      color = AppColors.accentInk;
     }
 
     return Column(
@@ -269,9 +265,9 @@ class _FeatureStatusChip extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.5)),
+            border: Border.all(color: color.withValues(alpha: 0.5)),
           ),
           child: DuotoneIcon(
             feature.icon,
@@ -286,6 +282,8 @@ class _FeatureStatusChip extends StatelessWidget {
             fontSize: 10,
             color: color,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -311,28 +309,28 @@ class ProtectionStatusIndicator extends StatelessWidget {
     String icon;
 
     if (!isProtected) {
-      color = Colors.red;
+      color = AppColors.errorInk;
       icon = AppIcons.shield;
     } else if (score >= 80) {
-      color = Colors.green;
+      color = AppColors.accentInk;
       icon = AppIcons.shieldCheck;
     } else if (score >= 50) {
-      color = Colors.orange;
+      color = AppColors.amberInk;
       icon = AppIcons.shield;
     } else {
-      color = Colors.red;
+      color = AppColors.errorInk;
       icon = AppIcons.dangerTriangle;
     }
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.5)),
+          color: color.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusLarge),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -371,6 +369,8 @@ class DeviceHealthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       onTap: onTap,
+      // Spacing comes from the parent screen's section gaps.
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,9 +385,9 @@ class DeviceHealthCard extends StatelessWidget {
               ),
             )
           else if (health != null)
-            _buildHealth()
+            _buildHealth(context)
           else
-            _buildEmptyState(),
+            _buildEmptyState(context),
         ],
       ),
     );
@@ -400,32 +400,31 @@ class DeviceHealthCard extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: (health?.isHealthy ?? true)
-                ? Colors.green.withOpacity(0.2)
-                : Colors.orange.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+                ? AppColors.success.withValues(alpha: 0.2)
+                : AppColors.warning.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
           child: DuotoneIcon(
             AppIcons.smartphone,
-            color: (health?.isHealthy ?? true) ? Colors.green : Colors.orange,
+            color: (health?.isHealthy ?? true)
+                ? AppColors.accentInk
+                : AppColors.secondaryInk,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Device Health',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(),
           ),
         ),
         if (health != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: _getGradeColor(health!.grade).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: _getGradeColor(health!.grade).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
             ),
             child: Text(
               health!.grade,
@@ -440,38 +439,44 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHealth() {
+  Widget _buildHealth(BuildContext context) {
     return Column(
       children: [
         // Health checks
-        _buildHealthCheck('Secure Screen Lock', health!.hasSecureScreenLock),
-        _buildHealthCheck('Device Encrypted', health!.isEncrypted),
-        _buildHealthCheck('Security Patch', health!.hasLatestSecurityPatch),
-        _buildHealthCheck('Not Rooted', !health!.isRooted),
         _buildHealthCheck(
-            'Dev Options Off', !health!.developerOptionsEnabled),
+            context, 'Secure Screen Lock', health!.hasSecureScreenLock),
+        _buildHealthCheck(context, 'Device Encrypted', health!.isEncrypted),
+        _buildHealthCheck(
+            context, 'Security Patch', health!.hasLatestSecurityPatch),
+        _buildHealthCheck(context, 'Not Rooted', !health!.isRooted),
+        _buildHealthCheck(
+            context, 'Dev Options Off', !health!.developerOptionsEnabled),
         // Issues
         if (health!.hasIssues) ...[
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const DuotoneIcon(AppIcons.infoCircle,
-                        color: Colors.orange, size: 16),
+                    DuotoneIcon(AppIcons.infoCircle,
+                        color: AppColors.secondaryInk, size: 16),
                     const SizedBox(width: 8),
-                    Text(
-                      '${health!.issues.length} issue${health!.issues.length > 1 ? 's' : ''} found',
-                      style: const TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        '${health!.issues.length} issue${health!.issues.length > 1 ? 's' : ''} found',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.secondaryInk,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -485,7 +490,9 @@ class DeviceHealthCard extends StatelessWidget {
                             '• $issue',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[400],
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         )),
@@ -497,7 +504,8 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthCheck(String label, bool passed) {
+  Widget _buildHealthCheck(BuildContext context, String label, bool passed) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -505,14 +513,18 @@ class DeviceHealthCard extends StatelessWidget {
           DuotoneIcon(
             passed ? AppIcons.checkCircle : AppIcons.closeCircle,
             size: 18,
-            color: passed ? Colors.green : Colors.red,
+            color: passed ? AppColors.accentInk : AppColors.errorInk,
           ),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: passed ? Colors.grey[300] : Colors.red[300],
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: passed ? cs.onSurfaceVariant : cs.error,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -520,17 +532,19 @@ class DeviceHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            DuotoneIcon(AppIcons.questionCircle, size: 40, color: Colors.grey[600]),
+            DuotoneIcon(AppIcons.questionCircle,
+                size: 40, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
             Text(
               'Health status unavailable',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -541,17 +555,17 @@ class DeviceHealthCard extends StatelessWidget {
   Color _getGradeColor(String grade) {
     switch (grade.toUpperCase()) {
       case 'A':
-        return Colors.green;
+        return AppColors.accentInk;
       case 'B':
-        return Colors.lightGreen;
+        return AppColors.accentInk;
       case 'C':
-        return Colors.amber;
+        return AppColors.amberInk;
       case 'D':
-        return Colors.orange;
+        return AppColors.secondaryInk;
       case 'F':
-        return Colors.red;
+        return AppColors.errorInk;
       default:
-        return Colors.grey;
+        return AppColors.idle;
     }
   }
 }

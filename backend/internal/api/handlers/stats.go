@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/internal/infrastructure/database/repository"
@@ -17,14 +18,19 @@ type StatsHandler struct {
 	repos  *repository.Repositories
 	cache  *cache.RedisCache
 	logger *logger.Logger
+
+	// netRepo reads per-device protection state (DNS/VPN configs, audits,
+	// anti-theft settings, SMS/app analysis activity).
+	netRepo *repository.NetworkSecurityRepository
 }
 
 // NewStatsHandler creates a new StatsHandler
 func NewStatsHandler(repos *repository.Repositories, c *cache.RedisCache, log *logger.Logger) *StatsHandler {
 	return &StatsHandler{
-		repos:  repos,
-		cache:  c,
-		logger: log.WithComponent("stats"),
+		repos:   repos,
+		cache:   c,
+		logger:  log.WithComponent("stats"),
+		netRepo: repository.NewNetworkSecurityRepositoryFromRepos(repos),
 	}
 }
 
@@ -155,65 +161,96 @@ func calculateGrade(score float64) string {
 	}
 }
 
+// GetProtection handles GET /api/v1/stats/protection. The protection status
+// is computed from the authenticated device's real persisted state — never
+// from hardcoded feature flags.
 func (h *StatsHandler) GetProtection(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	deviceID := middleware.GetDeviceID(ctx)
+	if deviceID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "device identity required for protection status"})
+		return
+	}
+
+	if h.repos == nil || h.netRepo == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "protection status unavailable: database not configured"})
+		return
+	}
+
 	var status models.ProtectionStatus
+	cacheKey := cache.KeyProtectionStats + ":device:" + deviceID
 
-	// Try cache
-	err := h.cache.GetJSON(ctx, cache.KeyProtectionStats, &status)
+	// Try cache (per device)
+	err := h.cache.GetJSON(ctx, cacheKey, &status)
 	if err != nil {
-		status = h.computeProtectionStatus(ctx)
+		status, err = h.computeProtectionStatus(ctx, deviceID)
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", deviceID).Msg("failed to compute protection status")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "failed to compute protection status"})
+			return
+		}
 
-		// Cache lebih pendek (1 menit)
-		_ = h.cache.SetJSON(ctx, cache.KeyProtectionStats, status, 1*time.Minute)
+		// Short cache (1 minute)
+		_ = h.cache.SetJSON(ctx, cacheKey, status, 1*time.Minute)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=60")
+	w.Header().Set("Cache-Control", "private, max-age=60")
 	json.NewEncoder(w).Encode(status)
 }
 
-func (h *StatsHandler) computeProtectionStatus(ctx context.Context) models.ProtectionStatus {
-	score := 100.0
+// computeProtectionStatus derives the protection status from the device's
+// persisted state: the device registry row, per-device DNS/VPN configuration,
+// anti-theft settings, and recent SMS/app/network analysis activity.
+func (h *StatsHandler) computeProtectionStatus(ctx context.Context, deviceID string) (models.ProtectionStatus, error) {
+	// Resolve the device row; tokens carry the devices.id, with hardware ID
+	// as a fallback for older registrations.
+	device, err := h.repos.Devices.FindByID(ctx, deviceID)
+	if err != nil {
+		device, err = h.repos.Devices.FindByHardwareID(ctx, deviceID)
+	}
+	if err != nil || device == nil || device.Revoked || device.Status != "active" {
+		// Unknown or revoked device: nothing is protected.
+		if err != nil {
+			h.logger.Warn().Err(err).Str("device_id", deviceID).Msg("device not found for protection status")
+		}
+		off := models.FeatureStatus{Enabled: false, Status: featureState(false)}
+		return models.ProtectionStatus{
+			IsActive: false,
+			Score:    0,
+			Grade:    calculateGrade(0),
+			Features: models.FeatureSet{SMS: off, Web: off, App: off, Network: off, VPN: off},
+			LastScan: time.Now(),
+		}, nil
+	}
 
-	var criticalCount int64
-	var highCount int64
+	state, err := h.netRepo.GetDeviceProtectionState(ctx, deviceID)
+	if err != nil {
+		return models.ProtectionStatus{}, err
+	}
 
-	if h.repos != nil {
-		if dbStats, err := h.repos.Indicators.GetStats(ctx); err == nil {
+	smsEnabled := state.SMSActive
+	webEnabled := state.DNSConfigured
+	appEnabled := state.AppScanActive
+	networkEnabled := state.NetworkAuditRecent
+	vpnEnabled := state.VPNConfigured
+	antiTheftEnabled := state.AntiTheftEnabled
 
-			criticalCount = dbStats.CriticalCount
-
-			// Get high from BySeverity map
-			if v, ok := dbStats.BySeverity["high"]; ok {
-				highCount = v
-			}
+	// Score from actually-enabled modules (6 modules, equal weight).
+	enabled := 0
+	for _, on := range []bool{smsEnabled, webEnabled, appEnabled, networkEnabled, vpnEnabled, antiTheftEnabled} {
+		if on {
+			enabled++
 		}
 	}
-
-	// Score logic
-	if criticalCount > 0 {
-		score -= 25
-	}
-	if highCount > 0 {
-		score -= 10
-	}
-
-	// Feature flags (temporary hardcoded)
-	smsEnabled := true
-	webEnabled := true
-	appEnabled := true
-	networkEnabled := true
-	vpnEnabled := false
-
-	if !vpnEnabled {
-		score -= 10
-	}
-
-	if score < 0 {
-		score = 0
-	}
+	score := float64(enabled) / 6.0 * 100.0
 
 	return models.ProtectionStatus{
 		IsActive: score >= 60,
@@ -227,5 +264,5 @@ func (h *StatsHandler) computeProtectionStatus(ctx context.Context) models.Prote
 			VPN:     models.FeatureStatus{Enabled: vpnEnabled, Status: featureState(vpnEnabled)},
 		},
 		LastScan: time.Now(),
-	}
+	}, nil
 }

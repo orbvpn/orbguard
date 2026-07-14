@@ -2,14 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -40,7 +43,9 @@ func (h *URLHandler) CheckURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.urlService.CheckURL(r.Context(), &req)
+	userID := middleware.GetUserID(r.Context())
+
+	result, err := h.urlService.CheckURLForUser(r.Context(), userID, &req)
 	if err != nil {
 		h.logger.Error().Err(err).Str("url", req.URL).Msg("failed to check URL")
 		h.respondError(w, http.StatusInternalServerError, "failed to check URL")
@@ -94,7 +99,7 @@ func (h *URLHandler) GetReputation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rep == nil {
-		h.respondError(w, http.StatusNotFound, "no reputation data for domain")
+		h.respondError(w, http.StatusNotFound, "domain does not exist or is not a valid domain name")
 		return
 	}
 
@@ -115,7 +120,9 @@ func (h *URLHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 // GetDNSBlockRules handles GET /api/v1/url/dns-rules
 func (h *URLHandler) GetDNSBlockRules(w http.ResponseWriter, r *http.Request) {
-	rules, err := h.urlService.GetDNSBlockRules(r.Context())
+	userID := middleware.GetUserID(r.Context())
+
+	rules, err := h.urlService.GetDNSBlockRules(r.Context(), userID)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to get DNS block rules")
 		h.respondError(w, http.StatusInternalServerError, "failed to get DNS rules")
@@ -129,14 +136,17 @@ func (h *URLHandler) GetDNSBlockRules(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// AddToWhitelist handles POST /api/v1/url/whitelist
-func (h *URLHandler) AddToWhitelist(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		URL     string `json:"url,omitempty"`
-		Domain  string `json:"domain,omitempty"`
-		Pattern string `json:"pattern,omitempty"`
-		Reason  string `json:"reason,omitempty"`
-	}
+// urlListRequest is the request body for whitelist/blacklist additions
+type urlListRequest struct {
+	URL     string `json:"url,omitempty"`
+	Domain  string `json:"domain,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+// addToList handles adding an entry to the authenticated user's list
+func (h *URLHandler) addToList(w http.ResponseWriter, r *http.Request, listType models.URLListType) {
+	var req urlListRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -147,94 +157,68 @@ func (h *URLHandler) AddToWhitelist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		h.respondError(w, http.StatusUnauthorized, "user identity is required to manage URL lists")
+		return
+	}
+
 	entry := &models.URLListEntry{
-		ID:        uuid.New(),
 		URL:       req.URL,
 		Domain:    req.Domain,
 		Pattern:   req.Pattern,
-		ListType:  models.URLListTypeWhitelist,
+		ListType:  listType,
 		Reason:    req.Reason,
-		CreatedBy: "api",
-		CreatedAt: time.Now(),
+		CreatedBy: userID,
 		IsActive:  true,
 	}
 
-	if err := h.urlService.AddToList(r.Context(), entry); err != nil {
-		h.logger.Error().Err(err).Msg("failed to add to whitelist")
-		h.respondError(w, http.StatusInternalServerError, "failed to add to whitelist")
+	if err := h.urlService.AddToList(r.Context(), userID, entry); err != nil {
+		h.respondListError(w, err, "failed to add to "+string(listType))
 		return
 	}
 
 	h.respondJSON(w, http.StatusCreated, entry)
+}
+
+// AddToWhitelist handles POST /api/v1/url/whitelist
+func (h *URLHandler) AddToWhitelist(w http.ResponseWriter, r *http.Request) {
+	h.addToList(w, r, models.URLListTypeWhitelist)
 }
 
 // AddToBlacklist handles POST /api/v1/url/blacklist
 func (h *URLHandler) AddToBlacklist(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		URL     string `json:"url,omitempty"`
-		Domain  string `json:"domain,omitempty"`
-		Pattern string `json:"pattern,omitempty"`
-		Reason  string `json:"reason,omitempty"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	h.addToList(w, r, models.URLListTypeBlacklist)
+}
+
+// getList handles fetching the authenticated user's list entries
+func (h *URLHandler) getList(w http.ResponseWriter, r *http.Request, listType models.URLListType) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		h.respondError(w, http.StatusUnauthorized, "user identity is required to view URL lists")
 		return
 	}
 
-	if req.URL == "" && req.Domain == "" && req.Pattern == "" {
-		h.respondError(w, http.StatusBadRequest, "url, domain, or pattern is required")
+	entries, err := h.urlService.GetList(r.Context(), userID, listType)
+	if err != nil {
+		h.respondListError(w, err, "failed to get "+string(listType))
 		return
 	}
 
-	entry := &models.URLListEntry{
-		ID:        uuid.New(),
-		URL:       req.URL,
-		Domain:    req.Domain,
-		Pattern:   req.Pattern,
-		ListType:  models.URLListTypeBlacklist,
-		Reason:    req.Reason,
-		CreatedBy: "api",
-		CreatedAt: time.Now(),
-		IsActive:  true,
-	}
-
-	if err := h.urlService.AddToList(r.Context(), entry); err != nil {
-		h.logger.Error().Err(err).Msg("failed to add to blacklist")
-		h.respondError(w, http.StatusInternalServerError, "failed to add to blacklist")
-		return
-	}
-
-	h.respondJSON(w, http.StatusCreated, entry)
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"entries": entries,
+		"count":   len(entries),
+	})
 }
 
 // GetWhitelist handles GET /api/v1/url/whitelist
 func (h *URLHandler) GetWhitelist(w http.ResponseWriter, r *http.Request) {
-	entries, err := h.urlService.GetList(r.Context(), models.URLListTypeWhitelist)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to get whitelist")
-		h.respondError(w, http.StatusInternalServerError, "failed to get whitelist")
-		return
-	}
-
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"entries": entries,
-		"count":   len(entries),
-	})
+	h.getList(w, r, models.URLListTypeWhitelist)
 }
 
 // GetBlacklist handles GET /api/v1/url/blacklist
 func (h *URLHandler) GetBlacklist(w http.ResponseWriter, r *http.Request) {
-	entries, err := h.urlService.GetList(r.Context(), models.URLListTypeBlacklist)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to get blacklist")
-		h.respondError(w, http.StatusInternalServerError, "failed to get blacklist")
-		return
-	}
-
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"entries": entries,
-		"count":   len(entries),
-	})
+	h.getList(w, r, models.URLListTypeBlacklist)
 }
 
 // RemoveFromList handles DELETE /api/v1/url/list/{id}
@@ -246,9 +230,19 @@ func (h *URLHandler) RemoveFromList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.urlService.RemoveFromList(r.Context(), id); err != nil {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		h.respondError(w, http.StatusUnauthorized, "user identity is required to manage URL lists")
+		return
+	}
+
+	if err := h.urlService.RemoveFromList(r.Context(), userID, id); err != nil {
+		if errors.Is(err, repository.ErrURLListEntryNotFound) {
+			h.respondError(w, http.StatusNotFound, "list entry not found")
+			return
+		}
 		h.logger.Error().Err(err).Str("id", idStr).Msg("failed to remove from list")
-		h.respondError(w, http.StatusInternalServerError, "failed to remove from list")
+		h.respondListError(w, err, "failed to remove from list")
 		return
 	}
 
@@ -263,8 +257,10 @@ func (h *URLHandler) GetBlockPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.GetUserID(r.Context())
+
 	// Check the URL to get threat details
-	result, err := h.urlService.CheckURL(r.Context(), &models.URLCheckRequest{URL: url})
+	result, err := h.urlService.CheckURLForUser(r.Context(), userID, &models.URLCheckRequest{URL: url})
 	if err != nil {
 		h.logger.Error().Err(err).Str("url", url).Msg("failed to check URL for block page")
 		h.respondError(w, http.StatusInternalServerError, "failed to generate block page")
@@ -303,17 +299,46 @@ func (h *URLHandler) ReportURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log the report
-	h.logger.Info().
-		Str("url", req.URL).
-		Str("report_type", req.ReportType).
-		Str("device_id", req.DeviceID).
-		Msg("URL report received")
+	switch req.ReportType {
+	case "false_positive", "missed_threat", "feedback":
+	default:
+		h.respondError(w, http.StatusBadRequest, "report_type must be one of: false_positive, missed_threat, feedback")
+		return
+	}
 
-	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "received",
-		"message": "Thank you for your report. It will be reviewed.",
+	userID := middleware.GetUserID(r.Context())
+	deviceID := middleware.GetDeviceID(r.Context())
+	if deviceID == "" {
+		deviceID = req.DeviceID
+	}
+
+	report, err := h.urlService.ReportURL(r.Context(), userID, deviceID, req.URL, req.ReportType, req.Comment)
+	if err != nil {
+		h.logger.Error().Err(err).Str("url", req.URL).Msg("failed to persist URL report")
+		h.respondListError(w, err, "failed to submit report")
+		return
+	}
+
+	h.respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":         report.ID,
+		"status":     report.Status,
+		"created_at": report.CreatedAt,
+		"message":    "Thank you for your report. It will be reviewed.",
 	})
+}
+
+// respondListError maps known service errors for list operations to
+// appropriate HTTP statuses, falling back to 500.
+func (h *URLHandler) respondListError(w http.ResponseWriter, err error, fallback string) {
+	switch {
+	case errors.Is(err, services.ErrURLListsUnavailable):
+		h.respondError(w, http.StatusServiceUnavailable, "URL list storage is currently unavailable")
+	case errors.Is(err, services.ErrUserIdentityRequired):
+		h.respondError(w, http.StatusUnauthorized, "user identity is required")
+	default:
+		h.logger.Error().Err(err).Msg(fallback)
+		h.respondError(w, http.StatusInternalServerError, fallback)
+	}
 }
 
 func (h *URLHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {

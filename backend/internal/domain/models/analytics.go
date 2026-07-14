@@ -65,8 +65,10 @@ type AnalyticsSummary struct {
 	BlockedDomains      int64   `json:"blocked_domains"`
 	BlockedIPs          int64   `json:"blocked_ips"`
 
-	DetectionRate       float64 `json:"detection_rate"`
-	FalsePositiveRate   float64 `json:"false_positive_rate"`
+	// DetectionRate / FalsePositiveRate are computed from community report
+	// review outcomes; they are omitted (null) when no reviewed data exists.
+	DetectionRate       *float64 `json:"detection_rate,omitempty"`
+	FalsePositiveRate   *float64 `json:"false_positive_rate,omitempty"`
 
 	ChangeFromPrevious  *ChangeMetrics `json:"change_from_previous,omitempty"`
 }
@@ -313,8 +315,8 @@ type AlertMetrics struct {
 	OpenAlerts        int64              `json:"open_alerts"`
 	AcknowledgedAlerts int64             `json:"acknowledged_alerts"`
 	ResolvedAlerts    int64              `json:"resolved_alerts"`
-	MTTR              float64            `json:"mttr_minutes"` // Mean Time To Resolve
-	MTTA              float64            `json:"mtta_minutes"` // Mean Time To Acknowledge
+	MTTR              *float64           `json:"mttr_minutes,omitempty"` // Mean Time To Resolve
+	MTTA              *float64           `json:"mtta_minutes,omitempty"` // Mean Time To Acknowledge
 	AlertsBySeverity  []CategoryCount    `json:"alerts_by_severity"`
 	AlertsByCategory  []CategoryCount    `json:"alerts_by_category"`
 	AlertsTrend       []TrendDataPoint   `json:"alerts_trend"`
@@ -323,12 +325,14 @@ type AlertMetrics struct {
 // DetectionMetrics contains detection-related metrics
 type DetectionMetrics struct {
 	TimeRange           AnalyticsTimeRange `json:"time_range"`
-	TotalChecks         int64              `json:"total_checks"`
+	// TotalChecks / DetectionRate / AverageResponseTime require server-side
+	// check tracking; they are omitted when no such tracking data exists.
+	TotalChecks         int64              `json:"total_checks,omitempty"`
 	TotalDetections     int64              `json:"total_detections"`
-	DetectionRate       float64            `json:"detection_rate"`
+	DetectionRate       *float64           `json:"detection_rate,omitempty"`
 	FalsePositives      int64              `json:"false_positives"`
-	FalsePositiveRate   float64            `json:"false_positive_rate"`
-	AverageResponseTime float64            `json:"average_response_time_ms"`
+	FalsePositiveRate   *float64           `json:"false_positive_rate,omitempty"`
+	AverageResponseTime float64            `json:"average_response_time_ms,omitempty"`
 	DetectionsByType    []CategoryCount    `json:"detections_by_type"`
 	DetectionsTrend     []TrendDataPoint   `json:"detections_trend"`
 }

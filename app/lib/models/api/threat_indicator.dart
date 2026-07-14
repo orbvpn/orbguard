@@ -1,5 +1,27 @@
-/// Threat Indicator Models
-/// Models for threat indicators from OrbGuard Lab API
+// Threat Indicator Models
+// Models for threat indicators from OrbGuard Lab API
+
+import 'dart:convert';
+import '../../presentation/theme/colors.dart';
+
+/// Backend JSON-blob fields (metadata/properties) arrive in different shapes
+/// depending on server version: a JSON object, a JSON string, or — when Go
+/// marshals a []byte column — a base64-encoded JSON blob. Accept all three;
+/// anything unparseable becomes null instead of failing the whole response.
+Map<String, dynamic>? parseJsonBlob(dynamic raw) {
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  if (raw is String && raw.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    try {
+      final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+  }
+  return null;
+}
 
 /// Types of threat indicators
 enum IndicatorType {
@@ -54,17 +76,17 @@ enum SeverityLevel {
   int get color {
     switch (this) {
       case SeverityLevel.critical:
-        return 0xFFD32F2F; // Red
+        return AppColors.severityCritical.toARGB32(); // brand deep danger
       case SeverityLevel.high:
-        return 0xFFF57C00; // Orange
+        return AppColors.severityHigh.toARGB32(); // brand danger
       case SeverityLevel.medium:
-        return 0xFFFBC02D; // Yellow
+        return AppColors.severityMedium.toARGB32(); // brand pink (alert)
       case SeverityLevel.low:
-        return 0xFF388E3C; // Green
+        return AppColors.severityLow.toARGB32(); // brand gold (near-benign)
       case SeverityLevel.info:
-        return 0xFF1976D2; // Blue
+        return AppColors.severityInfo.toARGB32(); // brand neutral
       case SeverityLevel.unknown:
-        return 0xFF757575; // Grey
+        return AppColors.severityInfo.toARGB32(); // brand neutral
     }
   }
 
@@ -149,8 +171,8 @@ class ThreatIndicator {
 
   factory ThreatIndicator.fromJson(Map<String, dynamic> json) {
     return ThreatIndicator(
-      id: json['id'] as String,
-      value: json['value'] as String,
+      id: json['id'] as String? ?? '',
+      value: json['value'] as String? ?? '',
       type: IndicatorType.fromString(json['type'] as String? ?? 'unknown'),
       severity: SeverityLevel.fromString(json['severity'] as String? ?? 'unknown'),
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
@@ -164,15 +186,19 @@ class ThreatIndicator {
       sourceName: json['source_name'] as String?,
       campaignId: json['campaign_id'] as String?,
       campaignName: json['campaign_name'] as String?,
-      firstSeen: json['first_seen'] != null
-          ? DateTime.parse(json['first_seen'] as String)
+      firstSeen: json['first_seen'] is String
+          ? DateTime.tryParse(json['first_seen'] as String)
           : null,
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'] as String)
+      lastSeen: json['last_seen'] is String
+          ? DateTime.tryParse(json['last_seen'] as String)
           : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      createdAt: json['created_at'] is String
+          ? (DateTime.tryParse(json['created_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] is String
+          ? (DateTime.tryParse(json['updated_at'] as String) ?? DateTime.now())
+          : DateTime.now(),
+      metadata: parseJsonBlob(json['metadata']),
       mitreTechniques:
           (json['mitre_techniques'] as List<dynamic>?)?.cast<String>(),
     );
@@ -286,7 +312,7 @@ class IndicatorCheckResult {
 
   factory IndicatorCheckResult.fromJson(Map<String, dynamic> json) {
     return IndicatorCheckResult(
-      value: json['value'] as String,
+      value: json['value'] as String? ?? '',
       isThreat: json['is_threat'] as bool? ?? false,
       type: json['type'] != null
           ? IndicatorType.fromString(json['type'] as String)
@@ -469,7 +495,7 @@ class GraphNode {
       id: json['id'] as String,
       label: json['label'] as String? ?? '',
       type: json['type'] as String? ?? 'unknown',
-      properties: json['properties'] as Map<String, dynamic>?,
+      properties: parseJsonBlob(json['properties']),
     );
   }
 }
@@ -493,7 +519,7 @@ class GraphEdge {
       source: json['source'] as String,
       target: json['target'] as String,
       relationship: json['relationship'] as String? ?? 'related',
-      properties: json['properties'] as Map<String, dynamic>?,
+      properties: parseJsonBlob(json['properties']),
     );
   }
 }

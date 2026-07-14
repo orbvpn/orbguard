@@ -1,8 +1,10 @@
-/// Campaigns Screen
-/// Active threat campaign tracking and intelligence interface
+// Campaigns Screen
+// Active threat campaign tracking and intelligence interface
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -51,6 +53,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GlassTabPage(
       title: 'Threat Campaigns',
       hasSearch: true,
@@ -64,7 +67,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               icon: DuotoneIcon(
                 _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
                 size: 24,
-                color: Colors.white,
+                color: cs.onSurface,
               ),
               onPressed: () {
                 setState(() => _showActiveOnly = !_showActiveOnly);
@@ -72,7 +75,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               },
             ),
             IconButton(
-              icon: const DuotoneIcon(AppIcons.refresh, size: 24, color: Colors.white),
+              icon: DuotoneIcon(AppIcons.refresh, size: 24, color: cs.onSurface),
               onPressed: _isLoading ? null : _loadCampaigns,
             ),
           ],
@@ -83,7 +86,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Active',
           iconPath: 'shield',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
@@ -92,7 +95,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Critical',
           iconPath: 'danger_triangle',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns.where((c) => c.severity == SeverityLevel.critical).toList()),
@@ -101,7 +104,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Stats',
           iconPath: 'chart',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildStatsView(),
@@ -110,7 +113,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'History',
           iconPath: 'history',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns),
@@ -120,22 +123,23 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildStatsView() {
+    final cs = Theme.of(context).colorScheme;
     final activeCampaigns = _campaigns.where((c) => c.isActive).length;
     final criticalCount = _campaigns.where((c) => c.severity == SeverityLevel.critical).length;
     final highCount = _campaigns.where((c) => c.severity == SeverityLevel.high).length;
     final totalIOCs = _campaigns.fold<int>(0, (sum, c) => sum + c.indicatorCount);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Campaign Overview',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: cs.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -154,22 +158,23 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildStatRow(String label, String value, String icon) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          DuotoneIcon(icon, size: 20, color: GlassTheme.primaryAccent),
+          DuotoneIcon(icon, size: 20, color: AppColors.accentInk),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.white.withAlpha(179)),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: cs.onSurface,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),
@@ -189,7 +194,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: campaigns.length,
       itemBuilder: (context, index) {
         return _buildCampaignCard(campaigns[index]);
@@ -198,6 +203,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildCampaignCard(Campaign campaign) {
+    final cs = Theme.of(context).colorScheme;
     final severityColor = _getSeverityColor(campaign.severity);
 
     return GlassCard(
@@ -219,8 +225,10 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                   children: [
                     Text(
                       campaign.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: cs.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -237,9 +245,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                        Text(
-                          campaign.objective ?? 'Unknown',
-                          style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12),
+                        Flexible(
+                          child: Text(
+                            campaign.objective ?? 'Unknown',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -252,7 +264,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           const SizedBox(height: 12),
           Text(
             campaign.description ?? 'No description available',
-            style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -265,7 +277,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                 _buildCampaignStat(AppIcons.clock, _formatDate(campaign.firstSeen!)),
               const Spacer(),
               if (campaign.associatedActors.isNotEmpty)
-                GlassBadge(text: campaign.associatedActors.first, color: const Color(0xFF9C27B0), fontSize: 10),
+                GlassBadge(text: campaign.associatedActors.first, color: AppColors.chartColors[4], fontSize: 10),
             ],
           ),
           if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
@@ -275,9 +287,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               runSpacing: 6,
               children: [
                 ...campaign.targetedCountries.take(2).map((region) =>
-                    _buildTargetChip(AppIcons.global, region, const Color(0xFF2196F3))),
+                    _buildTargetChip(AppIcons.global, region, AppColors.secondaryInk)),
                 ...campaign.targetedIndustries.take(2).map((sector) =>
-                    _buildTargetChip(AppIcons.enterprise, sector, const Color(0xFFFF9800))),
+                    _buildTargetChip(AppIcons.enterprise, sector, AppColors.amberInk)),
               ],
             ),
           ],
@@ -287,12 +299,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildCampaignStat(String icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        DuotoneIcon(icon, size: 14, color: Colors.white.withAlpha(128)),
+        DuotoneIcon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12)),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       ],
     );
   }
@@ -302,7 +315,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -320,6 +333,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     required String title,
     required String subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -328,12 +342,12 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withAlpha(153)),
+            style: TextStyle(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
@@ -342,6 +356,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildErrorState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -350,24 +365,24 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           children: [
             DuotoneIcon(AppIcons.dangerTriangle, size: 64, color: GlassTheme.errorColor.withAlpha(179)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error Loading Campaigns',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'An unknown error occurred',
-              style: TextStyle(color: Colors.white.withAlpha(153)),
+              style: TextStyle(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadCampaigns,
-              icon: const DuotoneIcon('refresh', size: 18, color: Colors.white),
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
               ),
             ),
           ],
@@ -377,6 +392,8 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   void _showCampaignDetails(BuildContext context, Campaign campaign) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final severityColor = _getSeverityColor(campaign.severity);
 
     showModalBottomSheet(
@@ -388,13 +405,16 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -416,8 +436,10 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                       children: [
                         Text(
                           campaign.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -437,7 +459,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                             Text(
                               campaign.isActive ? 'Active Campaign' : 'Inactive',
                               style: TextStyle(
-                                color: campaign.isActive ? GlassTheme.successColor : Colors.grey,
+                                color: campaign.isActive ? AppColors.accentInk : cs.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -452,7 +474,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // Description
               Text(
                 campaign.description ?? 'No description available',
-                style: TextStyle(color: Colors.white.withAlpha(204), fontSize: 14),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
               ),
               const SizedBox(height: 20),
 
@@ -478,9 +500,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // Targets
               if (campaign.targetedCountries.isNotEmpty || campaign.targetedIndustries.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Targets',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 if (campaign.targetedCountries.isNotEmpty) ...[
@@ -489,7 +511,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: campaign.targetedCountries.map((r) =>
-                        GlassBadge(text: r, color: const Color(0xFF2196F3))).toList(),
+                        GlassBadge(text: r, color: AppColors.secondaryInk)).toList(),
                   ),
                 ],
                 if (campaign.targetedIndustries.isNotEmpty) ...[
@@ -499,7 +521,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: campaign.targetedIndustries.map((s) =>
-                        GlassBadge(text: s, color: const Color(0xFFFF9800))).toList(),
+                        GlassBadge(text: s, color: AppColors.amberInk)).toList(),
                   ),
                 ],
               ],
@@ -507,9 +529,9 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               // TTPs
               if (campaign.mitreTechniques.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'MITRE ATT&CK TTPs',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -519,14 +541,14 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: GlassTheme.primaryAccent.withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                         ),
                         child: Text(
                           ttp,
-                          style: const TextStyle(
-                            color: GlassTheme.primaryAccent,
+                          style: TextStyle(
+                            color: AppColors.accentInk,
                             fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: Brand.fontMono,
                           ),
                         ),
                       )).toList(),
@@ -540,16 +562,17 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withAlpha(153))),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500),
               textAlign: TextAlign.end,
             ),
           ),
@@ -561,15 +584,15 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
   Color _getSeverityColor(SeverityLevel severity) {
     switch (severity) {
       case SeverityLevel.critical:
-        return GlassTheme.errorColor;
+        return AppColors.severityCritical;
       case SeverityLevel.high:
-        return const Color(0xFFFF5722);
+        return AppColors.severityHigh;
       case SeverityLevel.medium:
-        return GlassTheme.warningColor;
+        return AppColors.severityMedium;
       case SeverityLevel.low:
-        return const Color(0xFF4CAF50);
+        return AppColors.severityLow;
       default:
-        return Colors.grey;
+        return AppColors.severityInfo;
     }
   }
 

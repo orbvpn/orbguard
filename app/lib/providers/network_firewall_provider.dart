@@ -1,8 +1,9 @@
-/// Network Firewall Provider
-/// State management for network firewall and connection monitoring
+// Network Firewall Provider
+// State management for network firewall and connection monitoring
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/security/network_firewall_service.dart';
 
@@ -10,7 +11,7 @@ class NetworkFirewallProvider extends ChangeNotifier {
   final NetworkFirewallService _service = NetworkFirewallService();
 
   // State
-  List<NetworkConnection> _connections = [];
+  final List<NetworkConnection> _connections = [];
   List<FirewallRule> _rules = [];
   List<AppNetworkProfile> _appProfiles = [];
   FirewallStats _stats = FirewallStats();
@@ -35,7 +36,22 @@ class NetworkFirewallProvider extends ChangeNotifier {
   List<AppNetworkProfile> get appProfiles => _appProfiles;
   FirewallStats get stats => _stats;
   bool get isLoading => _isLoading;
+
+  /// Authoritative firewall state, read from the service. Only true after the
+  /// native engine confirmed it is enforcing.
   bool get isEnabled => _isEnabled;
+
+  /// Availability of the native firewall engine on this build.
+  FirewallEngineStatus get engineStatus => _service.engineStatus;
+
+  /// Human-readable reason when the engine is unavailable
+  /// (e.g. "firewall engine not available on this build").
+  String? get engineUnavailableReason => _service.engineUnavailableReason;
+
+  /// True when the firewall can actually be enabled on this build.
+  bool get isEngineAvailable =>
+      _service.engineStatus == FirewallEngineStatus.available;
+
   String? get error => _error;
   List<NetworkConnection> get recentAlerts => _recentAlerts;
 
@@ -83,41 +99,61 @@ class NetworkFirewallProvider extends ChangeNotifier {
 
       await _loadRules();
       _updateStats();
+
+      // Surface an explicit unavailable state instead of a silent no-op.
+      if (_service.engineStatus == FirewallEngineStatus.unavailable) {
+        _error = _service.engineUnavailableReason;
+      }
     } catch (e) {
-      _error = 'Failed to initialize firewall';
+      _error = 'Failed to initialize firewall: $e';
       debugPrint('Error: $e');
     } finally {
+      _isEnabled = _service.isEnabled;
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Enable firewall
-  Future<void> enable() async {
-    if (_isEnabled) return;
+  /// Enable firewall.
+  ///
+  /// Returns true only when the native engine confirmed enforcement is on.
+  /// On failure (including a missing engine on this build) the error is
+  /// surfaced via [error] and the state remains honest.
+  Future<bool> enable() async {
+    if (_isEnabled) return true;
 
     try {
       await _service.enable();
-      _isEnabled = true;
-      notifyListeners();
+      _error = null;
+    } on StateError catch (e) {
+      _error = e.message;
     } catch (e) {
-      _error = 'Failed to enable firewall';
-      notifyListeners();
+      _error = 'Failed to enable firewall: $e';
     }
+
+    _isEnabled = _service.isEnabled;
+    notifyListeners();
+    return _isEnabled;
   }
 
-  /// Disable firewall
-  Future<void> disable() async {
-    if (!_isEnabled) return;
+  /// Disable firewall.
+  ///
+  /// Returns true when the firewall is actually off afterwards.
+  Future<bool> disable() async {
+    if (!_isEnabled) return true;
 
     try {
       await _service.disable();
-      _isEnabled = false;
-      notifyListeners();
+      _error = null;
+    } on StateError catch (e) {
+      _error = e.message;
     } catch (e) {
-      _error = 'Failed to disable firewall';
-      notifyListeners();
+      _error = 'Failed to disable firewall: $e';
     }
+
+    _isEnabled = _service.isEnabled;
+    notifyListeners();
+    return !_isEnabled;
   }
 
   /// Toggle firewall
@@ -254,11 +290,11 @@ class NetworkFirewallProvider extends ChangeNotifier {
   static int getStatusColor(ConnectionStatus status) {
     switch (status) {
       case ConnectionStatus.allowed:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
       case ConnectionStatus.blocked:
-        return 0xFFFF5252;
+        return AppColors.severityHigh.toARGB32();
       case ConnectionStatus.pending:
-        return 0xFFFF9800;
+        return AppColors.severityLow.toARGB32();
     }
   }
 

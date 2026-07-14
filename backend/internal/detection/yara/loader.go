@@ -79,15 +79,20 @@ func (l *Loader) LoadFile(filePath string) ([]*models.YARARule, error) {
 	return l.ParseRules(string(content))
 }
 
+// ruleBlockPattern matches YARA rule blocks:
+// rule <name> [: <tags>] { ... }
+// The body alternates brace-free runs with one level of nested {...} groups
+// (hex strings), so bodies containing `$h = { DE AD BE EF }` are captured
+// in full rather than being truncated at the hex string's closing brace.
+// Shared by ParseRules (best-effort loading) and ValidateSource (strict
+// validation) so both paths agree on what constitutes a rule.
+var ruleBlockPattern = regexp.MustCompile(`(?s)rule\s+(\w+)\s*(?::\s*([^\{]+))?\s*\{([^{}]*(?:\{[^}]*\}[^{}]*)*)\}`)
+
 // ParseRules parses YARA rules from a string
 func (l *Loader) ParseRules(content string) ([]*models.YARARule, error) {
 	var rules []*models.YARARule
 
-	// Regex to match rule blocks
-	// rule <name> [: <tags>] { ... }
-	rulePattern := regexp.MustCompile(`(?s)rule\s+(\w+)\s*(?::\s*([^\{]+))?\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}`)
-
-	matches := rulePattern.FindAllStringSubmatch(content, -1)
+	matches := ruleBlockPattern.FindAllStringSubmatch(content, -1)
 	for _, match := range matches {
 		if len(match) < 4 {
 			continue

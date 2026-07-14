@@ -5,6 +5,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../theme/colors.dart';
+
 /// App-wide icon identifiers mapped to SVG file names
 class AppIcons {
   AppIcons._();
@@ -362,7 +364,9 @@ class DuotoneIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = color ?? Theme.of(context).iconTheme.color ?? Colors.white;
+    final iconColor = color ??
+        Theme.of(context).iconTheme.color ??
+        Theme.of(context).colorScheme.onSurface;
 
     return SvgPicture.asset(
       'assets/icons/$icon.svg',
@@ -403,7 +407,9 @@ class GlassDuotoneIconBox extends StatelessWidget {
         child: DuotoneIcon(
           icon,
           size: iconSize,
-          color: color,
+          // Contrast-safe glyph: a too-bright fill (lime) stays readable on
+          // light while the box tint above keeps the raw color.
+          color: AppColors.glyphInk(color),
         ),
       ),
     );

@@ -1,12 +1,12 @@
-/// LLM-Powered Analysis Service
-///
-/// Uses Large Language Models for advanced threat analysis:
-/// - Natural language understanding of messages
-/// - Context-aware scam detection
-/// - Intent extraction and classification
-/// - Semantic similarity for phishing detection
-/// - Explanation generation for detected threats
-/// - Multi-language support
+// LLM-Powered Analysis Service
+//
+// Uses Large Language Models for advanced threat analysis:
+// - Natural language understanding of messages
+// - Context-aware scam detection
+// - Intent extraction and classification
+// - Semantic similarity for phishing detection
+// - Explanation generation for detected threats
+// - Multi-language support
 
 import 'dart:async';
 import 'dart:convert';
@@ -170,7 +170,6 @@ class LLMAnalysisService {
   // Caching
   final Map<String, LLMAnalysisResult> _cache = {};
   static const int _maxCacheSize = 100;
-  static const Duration _cacheTTL = Duration(hours: 1);
 
   // Rate limiting
   int _requestCount = 0;

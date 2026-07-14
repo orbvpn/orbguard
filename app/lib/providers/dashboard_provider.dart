@@ -1,5 +1,5 @@
-/// Dashboard Provider
-/// State management for dashboard data with API integration
+// Dashboard Provider
+// State management for dashboard data with API integration
 
 import 'dart:async';
 
@@ -96,8 +96,12 @@ class DashboardProvider extends ChangeNotifier {
 
     _connectionState = _connectionManager.connectionState;
 
-    // Load initial data
-    await refresh();
+    // Load initial data in the background so the first render is never blocked
+    // on the network. refresh() is self-contained (each fetch swallows its own
+    // errors) and notifies listeners when data arrives; awaiting it here would
+    // stall the dashboard for minutes when requests retry on timeout (30s ×
+    // retries). Cards render their own loading state until data lands.
+    unawaited(refresh());
 
     // Start auto-refresh
     _startAutoRefresh();
@@ -171,7 +175,7 @@ class DashboardProvider extends ChangeNotifier {
   Future<List<RecentAlert>> _fetchRecentAlerts() async {
     try {
       final summary = await _apiClient.getDashboardSummary();
-      return summary?.recentAlerts ?? [];
+      return summary.recentAlerts;
     } catch (e) {
       debugPrint('Failed to fetch recent alerts: $e');
       return [];

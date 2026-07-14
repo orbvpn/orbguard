@@ -1,8 +1,9 @@
-/// Threat Hunting Provider
-/// State management for proactive threat detection and investigation
+// Threat Hunting Provider
+// State management for proactive threat detection and investigation
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../presentation/theme/colors.dart';
 
 import '../services/api/orbguard_api_client.dart';
 import '../services/security/threat_hunting_service.dart';
@@ -13,7 +14,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
 
   // State
   List<ThreatHunt> _availableHunts = [];
-  Map<String, HuntResult> _huntResults = {};
+  final Map<String, HuntResult> _huntResults = {};
   List<InvestigationCase> _cases = [];
   Map<String, dynamic> _stats = {};
 
@@ -32,12 +33,14 @@ class ThreatHuntingProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _graphNodes = [];
   List<Map<String, dynamic>> _graphRelations = [];
   bool _isLoadingGraph = false;
+  String? _graphError;
 
   // Correlation and ML state
   List<Map<String, dynamic>> _correlationRules = [];
   List<Map<String, dynamic>> _mlModels = [];
   bool _isLoadingCorrelation = false;
   bool _isLoadingModels = false;
+  String? _correlationError;
 
   // Stream subscriptions
   StreamSubscription<HuntProgress>? _progressSub;
@@ -61,10 +64,16 @@ class ThreatHuntingProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get graphNodes => _graphNodes;
   List<Map<String, dynamic>> get graphRelations => _graphRelations;
   bool get isLoadingGraph => _isLoadingGraph;
+
+  /// Non-null when the last graph load failed (e.g. Neo4j unavailable, 503).
+  String? get graphError => _graphError;
   List<Map<String, dynamic>> get correlationRules => _correlationRules;
   List<Map<String, dynamic>> get mlModels => _mlModels;
   bool get isLoadingCorrelation => _isLoadingCorrelation;
   bool get isLoadingModels => _isLoadingModels;
+
+  /// Non-null when the last correlation load failed.
+  String? get correlationError => _correlationError;
 
   // Computed getters
   List<ThreatHunt> get criticalHunts =>
@@ -226,21 +235,21 @@ class ThreatHuntingProvider extends ChangeNotifier {
   static int getHuntTypeColor(HuntType type) {
     switch (type) {
       case HuntType.iocSweep:
-        return 0xFF2196F3;
+        return AppColors.chartColors[2].toARGB32();
       case HuntType.behaviorAnalysis:
-        return 0xFF9C27B0;
+        return AppColors.chartColors[4].toARGB32();
       case HuntType.anomalyDetection:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case HuntType.attackPattern:
-        return 0xFFE91E63;
+        return AppColors.chartColors[1].toARGB32();
       case HuntType.dataExfiltration:
-        return 0xFFF44336;
+        return AppColors.chartColors[7].toARGB32();
       case HuntType.persistenceMechanism:
-        return 0xFF795548;
+        return AppColors.chartColors[3].toARGB32();
       case HuntType.lateralMovement:
-        return 0xFF607D8B;
+        return AppColors.chartColors[6].toARGB32();
       case HuntType.privilegeEscalation:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
     }
   }
 
@@ -248,40 +257,40 @@ class ThreatHuntingProvider extends ChangeNotifier {
   static int getPriorityColor(HuntPriority priority) {
     switch (priority) {
       case HuntPriority.critical:
-        return 0xFFB71C1C;
+        return AppColors.severityCritical.toARGB32();
       case HuntPriority.high:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case HuntPriority.medium:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case HuntPriority.low:
-        return 0xFFFFEB3B;
+        return AppColors.severityLow.toARGB32();
     }
   }
 
   /// Get severity color
   static int getSeverityColor(double severity) {
-    if (severity >= 0.9) return 0xFFB71C1C;
-    if (severity >= 0.7) return 0xFFFF5722;
-    if (severity >= 0.5) return 0xFFFF9800;
-    if (severity >= 0.3) return 0xFFFFEB3B;
-    return 0xFF2196F3;
+    if (severity >= 0.9) return AppColors.severityCritical.toARGB32();
+    if (severity >= 0.7) return AppColors.severityHigh.toARGB32();
+    if (severity >= 0.5) return AppColors.severityMedium.toARGB32();
+    if (severity >= 0.3) return AppColors.severityLow.toARGB32();
+    return AppColors.chartColors[2].toARGB32();
   }
 
   /// Get case status color
   static int getCaseStatusColor(CaseStatus status) {
     switch (status) {
       case CaseStatus.open:
-        return 0xFF2196F3;
+        return AppColors.chartColors[2].toARGB32();
       case CaseStatus.investigating:
-        return 0xFFFF9800;
+        return AppColors.severityMedium.toARGB32();
       case CaseStatus.pendingAction:
-        return 0xFFFF5722;
+        return AppColors.severityHigh.toARGB32();
       case CaseStatus.resolved:
-        return 0xFF4CAF50;
+        return AppColors.success.toARGB32();
       case CaseStatus.falsePositive:
-        return 0xFF9E9E9E;
+        return AppColors.severityInfo.toARGB32();
       case CaseStatus.closed:
-        return 0xFF607D8B;
+        return AppColors.chartColors[6].toARGB32();
     }
   }
 
@@ -313,11 +322,16 @@ class ThreatHuntingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load graph data from API
+  /// Load graph data from the live graph endpoints
+  /// (GET /graph/nodes — {nodes:[{id,label,type,properties}],count} and
+  ///  GET /graph/relations — {relations:[{id,from,to,type,properties}],count}).
+  /// Failures (e.g. 503 when Neo4j is unavailable) are surfaced via
+  /// [graphError] instead of being silently rendered as an empty graph.
   Future<void> loadGraphData({String? query}) async {
     if (_isLoadingGraph) return;
 
     _isLoadingGraph = true;
+    _graphError = null;
     notifyListeners();
 
     try {
@@ -327,6 +341,7 @@ class ThreatHuntingProvider extends ChangeNotifier {
       _graphRelations = relations;
     } catch (e) {
       debugPrint('Failed to load graph data: $e');
+      _graphError = 'Failed to load graph data: $e';
       _graphNodes = [];
       _graphRelations = [];
     } finally {
@@ -335,17 +350,21 @@ class ThreatHuntingProvider extends ChangeNotifier {
     }
   }
 
-  /// Load correlation rules from API
+  /// Load persisted correlation events from GET /correlation
+  /// ({results:[CorrelationEvent...],count}). Failures are surfaced via
+  /// [correlationError].
   Future<void> loadCorrelationRules() async {
     if (_isLoadingCorrelation) return;
 
     _isLoadingCorrelation = true;
+    _correlationError = null;
     notifyListeners();
 
     try {
       _correlationRules = await _api.getCorrelationResults();
     } catch (e) {
-      debugPrint('Failed to load correlation rules: $e');
+      debugPrint('Failed to load correlation results: $e');
+      _correlationError = 'Failed to load correlation results: $e';
       _correlationRules = [];
     } finally {
       _isLoadingCorrelation = false;

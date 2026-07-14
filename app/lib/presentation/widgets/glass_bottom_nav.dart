@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/brand.dart';
 import '../theme/colors.dart';
 import '../theme/glass_theme.dart';
 import 'duotone_icon.dart';
@@ -104,10 +105,10 @@ class GlassBottomNavBar extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(26),
+                          // Kit: only the ACTIVE item takes lime — pill tint
+                          // + ink-safe icon/label (deep lime on light).
                           color: isSelected
-                              ? (isDark
-                                  ? AppColors.accent.withAlpha(35)
-                                  : AppColors.accent.withAlpha(20))
+                              ? Brand.navActivePill
                               : Colors.transparent,
                         ),
                         child: Column(
@@ -117,24 +118,22 @@ class GlassBottomNavBar extends StatelessWidget {
                               item.iconPath,
                               size: 22,
                               color: isSelected
-                                  ? AppColors.accent
-                                  : (isDark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black.withAlpha(100)),
+                                  ? Brand.navActive
+                                  : Brand.navInactive,
                             ),
                             const SizedBox(height: 3),
                             Text(
                               item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: isSelected
                                     ? FontWeight.w600
                                     : FontWeight.w500,
                                 color: isSelected
-                                    ? AppColors.accent
-                                    : (isDark
-                                        ? Colors.white.withAlpha(150)
-                                        : Colors.black.withAlpha(100)),
+                                    ? Brand.navActive
+                                    : Brand.navInactive,
                                 letterSpacing: -0.2,
                               ),
                             ),
@@ -198,6 +197,7 @@ class _GlassFloatingButtonState extends State<GlassFloatingButton>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Lime is a FILL color — pair with Brand.onLime content (kit rule 5).
     final buttonColor = widget.color ?? AppColors.accent;
 
     return GestureDetector(

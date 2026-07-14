@@ -1,10 +1,13 @@
-/// Dark Web Widgets
-/// Reusable widgets for dark web monitoring screens
+// Dark Web Widgets
+// Reusable widgets for dark web monitoring screens
 
 import 'package:flutter/material.dart';
 
 import '../../models/api/sms_analysis.dart';
 import '../../models/api/threat_indicator.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/darkweb_provider.dart';
 
@@ -28,7 +31,7 @@ class SeverityBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
           color: color.withAlpha(40),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         ),
         child: Text(
           severity.displayName,
@@ -45,7 +48,7 @@ class SeverityBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withAlpha(40),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
         border: Border.all(color: color.withAlpha(100)),
       ),
       child: Row(
@@ -99,15 +102,16 @@ class BreachCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white10),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+          border: Border.all(color: cs.outline),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,16 +124,16 @@ class BreachCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(40),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.error.withAlpha(40),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Center(
                     child: Text(
                       breach.name.isNotEmpty
                           ? breach.name[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        color: Colors.red,
+                      style: TextStyle(
+                        color: AppColors.errorInk,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -147,13 +151,17 @@ class BreachCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         breach.domain,
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -163,13 +171,13 @@ class BreachCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withAlpha(40),
-                      borderRadius: BorderRadius.circular(4),
+                      color: AppColors.info.withAlpha(40),
+                      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Verified',
                       style: TextStyle(
-                        color: Colors.blue,
+                        color: AppColors.secondaryInk,
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
@@ -182,20 +190,20 @@ class BreachCard extends StatelessWidget {
             Row(
               children: [
                 if (breach.breachDate != null) ...[
-                  DuotoneIcon(AppIcons.calendar, size: 14, color: Colors.grey[500]),
+                  DuotoneIcon(AppIcons.calendar, size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     _formatDate(breach.breachDate!),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
                   const SizedBox(width: 16),
                 ],
                 if (breach.pwnCount != null) ...[
-                  DuotoneIcon(AppIcons.usersGroup, size: 14, color: Colors.grey[500]),
+                  DuotoneIcon(AppIcons.usersGroup, size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     _formatCount(breach.pwnCount!),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
                 ],
               ],
@@ -215,21 +223,21 @@ class BreachCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withAlpha(25),
-                  borderRadius: BorderRadius.circular(6),
+                  color: AppColors.warning.withAlpha(25),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                 ),
                 child: Row(
                   children: [
-                    const DuotoneIcon(
+                    DuotoneIcon(
                       AppIcons.dangerTriangle,
                       size: 16,
-                      color: Colors.orange,
+                      color: AppColors.secondaryInk,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Sensitive data breach',
                       style: TextStyle(
-                        color: Colors.orange[300],
+                        color: AppColors.secondaryInk,
                         fontSize: 12,
                       ),
                     ),
@@ -267,13 +275,14 @@ class DataClassChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final iconName = DarkWebProvider.getDataClassIcon(dataClass);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(15),
-        borderRadius: BorderRadius.circular(4),
+        color: cs.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -281,13 +290,13 @@ class DataClassChip extends StatelessWidget {
           DuotoneIcon(
             _getIconString(iconName),
             size: 12,
-            color: Colors.grey[400],
+            color: cs.onSurfaceVariant,
           ),
           const SizedBox(width: 4),
           Text(
             dataClass,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 11,
             ),
           ),
@@ -339,18 +348,19 @@ class BreachAlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final color = Color(DarkWebProvider.getSeverityColor(alert.severity));
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
-          borderRadius: BorderRadius.circular(12),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(
-            color: alert.isRead ? Colors.white10 : color.withAlpha(75),
+            color: alert.isRead ? cs.outline : color.withAlpha(75),
           ),
         ),
         child: Column(
@@ -364,7 +374,7 @@ class BreachAlertCard extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -380,9 +390,12 @@ class BreachAlertCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
-                                color:
-                                    alert.isRead ? Colors.grey[400] : Colors.white,
+                                color: alert.isRead
+                                    ? cs.onSurfaceVariant
+                                    : cs.onSurface,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           SeverityBadge(
@@ -393,18 +406,20 @@ class BreachAlertCard extends StatelessWidget {
                       Text(
                         '${alert.assetType.toUpperCase()}: ${alert.assetValue}',
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 if (onDismiss != null)
                   IconButton(
-                    icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: Colors.grey[600]),
+                    icon: DuotoneIcon(AppIcons.closeCircle, size: 18, color: cs.onSurfaceVariant),
                     onPressed: onDismiss,
-                    color: Colors.grey[600],
+                    color: cs.onSurfaceVariant,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -415,7 +430,7 @@ class BreachAlertCard extends StatelessWidget {
               Text(
                 'Exposed: ${alert.breach.dataClasses.take(3).join(', ')}${alert.breach.dataClasses.length > 3 ? '...' : ''}',
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -424,7 +439,7 @@ class BreachAlertCard extends StatelessWidget {
             Text(
               _formatTimeAgo(alert.alertedAt),
               style: TextStyle(
-                color: Colors.grey[600],
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                 fontSize: 11,
               ),
             ),
@@ -468,18 +483,19 @@ class MonitoredAssetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1E33),
-          borderRadius: BorderRadius.circular(12),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
           border: Border.all(
             color: asset.breachCount > 0
-                ? Colors.red.withAlpha(75)
-                : Colors.white10,
+                ? AppColors.error.withAlpha(75)
+                : cs.outline,
           ),
         ),
         child: Row(
@@ -490,15 +506,15 @@ class MonitoredAssetCard extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 color: asset.breachCount > 0
-                    ? Colors.red.withAlpha(40)
-                    : const Color(0xFF00D9FF).withAlpha(40),
-                borderRadius: BorderRadius.circular(10),
+                    ? AppColors.error.withAlpha(40)
+                    : AppColors.info.withAlpha(40),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
               child: DuotoneIcon(
                 _getAssetIcon(),
                 color: asset.breachCount > 0
-                    ? Colors.red
-                    : const Color(0xFF00D9FF),
+                    ? AppColors.errorInk
+                    : AppColors.secondaryInk,
                 size: 22,
               ),
             ),
@@ -512,9 +528,9 @@ class MonitoredAssetCard extends StatelessWidget {
                     children: [
                       Text(
                         asset.type.displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                       if (!asset.isMonitoring) ...[
@@ -525,13 +541,13 @@ class MonitoredAssetCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey.withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Brand.surface2,
+                            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Paused',
                             style: TextStyle(
-                              color: Colors.grey,
+                              color: cs.onSurfaceVariant,
                               fontSize: 10,
                             ),
                           ),
@@ -545,17 +561,21 @@ class MonitoredAssetCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
-                      color: asset.isMonitoring ? Colors.white : Colors.grey,
+                      color: asset.isMonitoring ? cs.onSurface : cs.onSurfaceVariant,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (asset.lastChecked != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       'Last checked: ${_formatDate(asset.lastChecked!)}',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                         fontSize: 11,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -567,18 +587,18 @@ class MonitoredAssetCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.red.withAlpha(40),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.error.withAlpha(40),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const DuotoneIcon(AppIcons.dangerTriangle, size: 14, color: Colors.red),
+                    DuotoneIcon(AppIcons.dangerTriangle, size: 14, color: AppColors.errorInk),
                     const SizedBox(width: 4),
                     Text(
                       '${asset.breachCount}',
-                      style: const TextStyle(
-                        color: Colors.red,
+                      style: TextStyle(
+                        color: AppColors.errorInk,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -591,18 +611,18 @@ class MonitoredAssetCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(40),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.success.withAlpha(40),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DuotoneIcon(AppIcons.checkCircle, size: 14, color: Colors.green),
-                    SizedBox(width: 4),
+                    DuotoneIcon(AppIcons.checkCircle, size: 14, color: AppColors.accentInk),
+                    const SizedBox(width: 4),
                     Text(
                       'Safe',
                       style: TextStyle(
-                        color: Colors.green,
+                        color: AppColors.accentInk,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -613,8 +633,8 @@ class MonitoredAssetCard extends StatelessWidget {
             ],
             // Actions
             PopupMenuButton<String>(
-              icon: const DuotoneIcon(AppIcons.menuDots, color: Colors.grey),
-              color: const Color(0xFF2A2B40),
+              icon: DuotoneIcon(AppIcons.menuDots, color: cs.onSurfaceVariant),
+              color: cs.surfaceContainerHighest,
               onSelected: (value) {
                 switch (value) {
                   case 'toggle':
@@ -633,20 +653,20 @@ class MonitoredAssetCard extends StatelessWidget {
                       DuotoneIcon(
                         asset.isMonitoring ? AppIcons.pause : AppIcons.play,
                         size: 18,
-                        color: Colors.white70,
+                        color: cs.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(asset.isMonitoring ? 'Pause' : 'Resume'),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
-                      DuotoneIcon(AppIcons.trash, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Remove', style: TextStyle(color: Colors.red)),
+                      DuotoneIcon(AppIcons.trash, size: 18, color: AppColors.errorInk),
+                      const SizedBox(width: 8),
+                      Text('Remove', style: TextStyle(color: AppColors.errorInk)),
                     ],
                   ),
                 ),
@@ -693,22 +713,19 @@ class DarkWebStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Monitoring Overview',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: BrandText.title(color: cs.onSurface, size: 18),
           ),
           const SizedBox(height: 20),
           // Stats grid
@@ -716,18 +733,20 @@ class DarkWebStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Assets',
                   stats.totalAssets.toString(),
                   AppIcons.shield,
-                  const Color(0xFF00D9FF),
+                  AppColors.secondaryInk,
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Breaches',
                   stats.totalBreaches.toString(),
                   AppIcons.dangerTriangle,
-                  Colors.orange,
+                  AppColors.amberInk,
                 ),
               ),
             ],
@@ -737,18 +756,20 @@ class DarkWebStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'Critical',
                   stats.criticalBreaches.toString(),
                   AppIcons.dangerCircle,
-                  Colors.red,
+                  AppColors.severityCritical,
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
+                  context,
                   'High',
                   stats.highBreaches.toString(),
                   AppIcons.dangerTriangle,
-                  Colors.deepOrange,
+                  AppColors.severityHigh,
                 ),
               ),
             ],
@@ -758,21 +779,21 @@ class DarkWebStatsCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(25),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(
+                  DuotoneIcon(
                     AppIcons.bellBing,
-                    color: Colors.red,
+                    color: AppColors.errorInk,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     '${stats.unreadAlerts} unread alert${stats.unreadAlerts > 1 ? 's' : ''}',
-                    style: const TextStyle(
-                      color: Colors.red,
+                    style: TextStyle(
+                      color: AppColors.errorInk,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -785,13 +806,13 @@ class DarkWebStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(
+  Widget _buildStatItem(BuildContext context,
       String label, String value, String icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
       ),
       child: Row(
         children: [
@@ -802,18 +823,18 @@ class DarkWebStatsCard extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: BrandText.heading(color: color, size: 20),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -856,6 +877,7 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Form(
       key: _formKey,
       child: Column(
@@ -864,24 +886,24 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
           TextFormField(
             controller: _controller,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Enter email address',
-              hintStyle: TextStyle(color: Colors.grey[600]),
-              prefixIcon: const DuotoneIcon(AppIcons.letter, color: Colors.grey),
+              hintStyle: TextStyle(color: cs.onSurfaceVariant),
+              prefixIcon: DuotoneIcon(AppIcons.letter, color: cs.onSurfaceVariant),
               filled: true,
-              fillColor: const Color(0xFF2A2B40),
+              fillColor: cs.surfaceContainerHighest,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white10),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+                borderSide: BorderSide(color: cs.outline),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+                borderSide: BorderSide(color: Brand.focus),
               ),
             ),
             validator: (value) {
@@ -902,11 +924,11 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
             child: ElevatedButton(
               onPressed: widget.isChecking ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D9FF),
-                foregroundColor: Colors.black,
+                backgroundColor: Brand.lime,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
                 ),
               ),
               child: widget.isChecking
@@ -915,7 +937,7 @@ class _EmailCheckInputState extends State<EmailCheckInput> {
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Brand.onLime,
                       ),
                     )
                   : const Text(
@@ -963,21 +985,22 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: _controller,
           obscureText: _obscureText,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Enter password to check',
-            hintStyle: TextStyle(color: Colors.grey[600]),
-            prefixIcon: const DuotoneIcon(AppIcons.password, color: Colors.grey),
+            hintStyle: TextStyle(color: cs.onSurfaceVariant),
+            prefixIcon: DuotoneIcon(AppIcons.password, color: cs.onSurfaceVariant),
             suffixIcon: IconButton(
               icon: DuotoneIcon(
                 _obscureText ? AppIcons.eyeClosed : AppIcons.eye,
-                color: Colors.grey,
+                color: cs.onSurfaceVariant,
               ),
               onPressed: () {
                 setState(() {
@@ -986,18 +1009,18 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
               },
             ),
             filled: true,
-            fillColor: const Color(0xFF2A2B40),
+            fillColor: cs.surfaceContainerHighest,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white10),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+              borderSide: BorderSide(color: cs.outline),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+              borderSide: BorderSide(color: Brand.focus),
             ),
           ),
           onSubmitted: (_) => _submit(),
@@ -1006,7 +1029,7 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
         Text(
           'Your password is never sent to our servers. We use k-anonymity.',
           style: TextStyle(
-            color: Colors.grey[600],
+            color: cs.onSurfaceVariant,
             fontSize: 11,
           ),
         ),
@@ -1016,11 +1039,11 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
           child: ElevatedButton(
             onPressed: widget.isChecking ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: Brand.lime,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
               ),
             ),
             child: widget.isChecking
@@ -1029,7 +1052,7 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.black,
+                      color: Brand.onLime,
                     ),
                   )
                 : const Text(
@@ -1051,15 +1074,16 @@ class BreachCheckResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isBreached = result.isBreached;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         border: Border.all(
-          color: isBreached ? Colors.red.withAlpha(75) : Colors.green.withAlpha(75),
+          color: isBreached ? AppColors.error.withAlpha(75) : AppColors.success.withAlpha(75),
         ),
       ),
       child: Column(
@@ -1070,13 +1094,13 @@ class BreachCheckResultCard extends StatelessWidget {
             height: 64,
             decoration: BoxDecoration(
               color: isBreached
-                  ? Colors.red.withAlpha(40)
-                  : Colors.green.withAlpha(40),
+                  ? AppColors.error.withAlpha(40)
+                  : AppColors.success.withAlpha(40),
               shape: BoxShape.circle,
             ),
             child: DuotoneIcon(
               isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
-              color: isBreached ? Colors.red : Colors.green,
+              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
               size: 36,
             ),
           ),
@@ -1085,7 +1109,7 @@ class BreachCheckResultCard extends StatelessWidget {
           Text(
             isBreached ? 'Breaches Found' : 'No Breaches Found',
             style: TextStyle(
-              color: isBreached ? Colors.red : Colors.green,
+              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
@@ -1094,16 +1118,18 @@ class BreachCheckResultCard extends StatelessWidget {
           Text(
             result.email,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (isBreached) ...[
             const SizedBox(height: 8),
             Text(
               'Found in ${result.breachCount} data breach${result.breachCount > 1 ? 'es' : ''}',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -1122,15 +1148,16 @@ class PasswordCheckResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isBreached = result.isBreached;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
         border: Border.all(
-          color: isBreached ? Colors.red.withAlpha(75) : Colors.green.withAlpha(75),
+          color: isBreached ? AppColors.error.withAlpha(75) : AppColors.success.withAlpha(75),
         ),
       ),
       child: Column(
@@ -1141,13 +1168,13 @@ class PasswordCheckResultCard extends StatelessWidget {
             height: 64,
             decoration: BoxDecoration(
               color: isBreached
-                  ? Colors.red.withAlpha(40)
-                  : Colors.green.withAlpha(40),
+                  ? AppColors.error.withAlpha(40)
+                  : AppColors.success.withAlpha(40),
               shape: BoxShape.circle,
             ),
             child: DuotoneIcon(
               isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
-              color: isBreached ? Colors.red : Colors.green,
+              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
               size: 36,
             ),
           ),
@@ -1156,7 +1183,7 @@ class PasswordCheckResultCard extends StatelessWidget {
           Text(
             isBreached ? 'Password Compromised' : 'Password Not Found',
             style: TextStyle(
-              color: isBreached ? Colors.red : Colors.green,
+              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
@@ -1166,7 +1193,7 @@ class PasswordCheckResultCard extends StatelessWidget {
             Text(
               'Seen ${result.exposureCount} times in data breaches',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -1174,18 +1201,18 @@ class PasswordCheckResultCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withAlpha(25),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Row(
                 children: [
-                  const DuotoneIcon(AppIcons.infoCircle, color: Colors.red, size: 18),
+                  DuotoneIcon(AppIcons.infoCircle, color: AppColors.errorInk, size: 18),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Change this password immediately if used for any account.',
                       style: TextStyle(
-                        color: Colors.red[300],
+                        color: AppColors.errorInk,
                         fontSize: 12,
                       ),
                     ),
@@ -1198,7 +1225,7 @@ class PasswordCheckResultCard extends StatelessWidget {
             Text(
               'This password has not been found in known breaches.',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: cs.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),

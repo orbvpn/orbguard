@@ -1,12 +1,17 @@
 /// Enterprise Policy Screen
-/// Manage enterprise security policies and compliance
+/// Displays the organization's Zero Trust conditional access policies as
+/// served by the backend (GET /api/v1/enterprise/policies). Policies are
+/// authored and enforced server-side; this screen renders them.
+library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
-import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/enterprise_policy_provider.dart';
 import '../../services/security/enterprise/policy_management_service.dart';
@@ -23,7 +28,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EnterprisePolicyProvider>().initialize();
+      context.read<EnterprisePolicyProvider>().loadPolicies();
     });
   }
 
@@ -31,108 +36,69 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
   Widget build(BuildContext context) {
     return Consumer<EnterprisePolicyProvider>(
       builder: (context, provider, _) {
-        return GlassTabPage(
-          title: 'Enterprise Policies',
-          tabs: [
-            GlassTab(
-              label: 'Policies',
-              iconPath: 'shield',
-              content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                  : Column(
-                      children: [
-                        _buildStats(provider),
-                        Expanded(child: _buildPoliciesTab(provider)),
-                      ],
+        return GlassPage(
+          title: 'Conditional Access',
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+                      onPressed: provider.isLoading ? null : provider.loadPolicies,
+                      tooltip: 'Refresh',
                     ),
-            ),
-            GlassTab(
-              label: 'Violations',
-              iconPath: 'chart',
-              content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                  : Column(
-                      children: [
-                        _buildStats(provider),
-                        Expanded(child: _buildViolationsTab(provider)),
-                      ],
-                    ),
-            ),
-            GlassTab(
-              label: 'Templates',
-              iconPath: 'file',
-              content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                  : Column(
-                      children: [
-                        _buildStats(provider),
-                        Expanded(child: _buildTemplatesTab(provider)),
-                      ],
-                    ),
-            ),
-            GlassTab(
-              label: 'BYOD',
-              iconPath: 'settings',
-              content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
-                  : Column(
-                      children: [
-                        _buildStats(provider),
-                        Expanded(child: _buildBYODTab(provider)),
-                      ],
-                    ),
-            ),
-          ],
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const DuotoneIcon('add_circle', size: 22, color: Colors.white),
-                  onPressed: () => _showCreatePolicySheet(context, provider),
-                  tooltip: 'Add Policy',
+                  ],
                 ),
-                IconButton(
-                  icon: const DuotoneIcon('refresh', size: 22, color: Colors.white),
-                  onPressed: () => provider.loadPolicies(),
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
+              ),
+              Expanded(child: _buildBody(provider)),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildStats(EnterprisePolicyProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
+  Widget _buildBody(EnterprisePolicyProvider provider) {
+    if (provider.isLoading && !provider.hasLoaded) {
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
+      );
+    }
+    if (provider.error != null) {
+      return _buildErrorState(provider);
+    }
+    if (provider.policies.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: provider.loadPolicies,
+      color: AppColors.accentInk,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          _buildStatItem(
-            'Policies',
-            provider.policies.length.toString(),
-            GlassTheme.primaryAccent,
-          ),
-          _buildStatItem(
-            'Enabled',
-            provider.enabledPolicies.length.toString(),
-            GlassTheme.successColor,
-          ),
-          _buildStatItem(
-            'Violations',
-            provider.unresolvedViolations.toString(),
-            GlassTheme.warningColor,
-          ),
-          _buildStatItem(
-            'Critical',
-            provider.criticalViolations.toString(),
-            GlassTheme.errorColor,
-          ),
+          _buildStats(provider),
+          const SizedBox(height: 24),
+          const GlassSectionHeader(title: 'Policies'),
+          ...provider.policies.map((p) => _buildPolicyCard(p)),
         ],
       ),
+    );
+  }
+
+  Widget _buildStats(EnterprisePolicyProvider provider) {
+    return Row(
+      children: [
+        _buildStatItem('Total', provider.policies.length.toString(),
+            AppColors.accentInk),
+        _buildStatItem('Enabled', provider.enabledPolicies.length.toString(),
+            AppColors.accentInk),
+        _buildStatItem('Disabled', provider.disabledPolicies.length.toString(),
+            context.colors.onSurfaceVariant),
+      ],
     );
   }
 
@@ -154,7 +120,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: context.colors.onSurfaceVariant,
                 fontSize: 11,
               ),
             ),
@@ -164,203 +130,103 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     );
   }
 
-  Widget _buildPoliciesTab(EnterprisePolicyProvider provider) {
-    if (provider.policies.isEmpty) {
-      return _buildEmptyState(
-        icon: 'clipboard_text',
-        title: 'No Policies',
-        subtitle: 'Create a policy to get started',
-        action: TextButton.icon(
-          onPressed: () => _showCreatePolicySheet(context, provider),
-          icon: const DuotoneIcon('add_circle', size: 18),
-          label: const Text('Create Policy'),
-        ),
-      );
-    }
-
-    final groupedPolicies = <PolicyType, List<SecurityPolicy>>{};
-    for (final policy in provider.policies) {
-      groupedPolicies.putIfAbsent(policy.type, () => []).add(policy);
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: groupedPolicies.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Row(
-                children: [
-                  DuotoneIcon(
-                    _getPolicyTypeIcon(entry.key),
-                    size: 18,
-                    color: Color(EnterprisePolicyProvider.getPolicyTypeColor(entry.key)),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    entry.key.displayName,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ...entry.value.map((policy) => _buildPolicyCard(policy, provider)),
-            const SizedBox(height: 16),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildPolicyCard(SecurityPolicy policy, EnterprisePolicyProvider provider) {
-    final typeColor = Color(EnterprisePolicyProvider.getPolicyTypeColor(policy.type));
+  Widget _buildPolicyCard(ConditionalAccessPolicy policy) {
+    final statusColor =
+        policy.enabled ? GlassTheme.successColor : context.colors.onSurfaceVariant;
+    final requirementCount =
+        policy.conditions.summary.length + policy.grantControls.summary.length;
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () => _showPolicyDetails(context, policy, provider),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      onTap: () => _showPolicyDetails(context, policy),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: DuotoneIcon(
-                        _getPolicyTypeIcon(policy.type),
-                        color: typeColor,
-                        size: 24,
+              GlassSvgIconBox(
+                icon: 'clipboard_text',
+                color: statusColor,
+                size: 44,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      policy.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                policy.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            if (policy.isDefault)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: GlassTheme.primaryAccent
-                                      .withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'DEFAULT',
-                                  style: TextStyle(
-                                    color: GlassTheme.primaryAccent,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
+                    if (policy.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        policy.description,
+                        style: TextStyle(
+                          color: context.colors.onSurfaceVariant,
+                          fontSize: 12,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          policy.description,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: policy.isEnabled,
-                    onChanged: (value) =>
-                        provider.togglePolicyEnabled(policy.id, value),
-                    activeColor: GlassTheme.primaryAccent,
-                  ),
-                ],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildPolicyBadge(
-                    policy.enforcement.displayName,
-                    Color(EnterprisePolicyProvider.getEnforcementColor(
-                        policy.enforcement)),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildPolicyBadge(
-                    '${policy.rules.length} rules',
-                    Colors.white54,
-                  ),
-                  if (policy.assignedGroups.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    _buildPolicyBadge(
-                      '${policy.assignedGroups.length} groups',
-                      Colors.white54,
-                    ),
-                  ],
-                  if (policy.platforms.isNotEmpty) ...[
-                    const Spacer(),
-                    ...policy.platforms.map((p) => Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: DuotoneIcon(
-                            p.toLowerCase() == 'ios'
-                                ? 'apple'
-                                : 'smartphone',
-                            size: 16,
-                            color: Colors.white54,
-                          ),
-                        )),
-                  ],
-                ],
+              GlassBadge(
+                text: policy.enabled ? 'Enabled' : 'Disabled',
+                color: statusColor,
+                fontSize: 10,
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (policy.priority != null)
+                _buildBadge('Priority ${policy.priority}', context.colors.onSurfaceVariant),
+              _buildBadge(
+                requirementCount == 1
+                    ? '1 requirement'
+                    : '$requirementCount requirements',
+                context.colors.onSurfaceVariant,
+              ),
+              if (policy.grantControls.requireMfa)
+                _buildBadge('MFA', GlassTheme.primaryAccent, ink: AppColors.accentInk),
+              if (policy.conditions.requireCompliance)
+                _buildBadge('Compliance', GlassTheme.warningColor),
+              if (policy.conditions.requireManaged)
+                _buildBadge('Managed device', GlassTheme.warningColor),
+              if (policy.appliesToAll)
+                _buildBadge('All users', context.colors.onSurfaceVariant)
+              else
+                _buildBadge('Scoped', context.colors.onSurfaceVariant),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPolicyBadge(String text, Color color) {
+  Widget _buildBadge(String text, Color color, {Color? ink}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4),
+        color: color.withAlpha(51),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: color,
+          color: ink ?? color,
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),
@@ -368,607 +234,78 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     );
   }
 
-  Widget _buildViolationsTab(EnterprisePolicyProvider provider) {
-    if (provider.violations.isEmpty) {
-      return _buildEmptyState(
-        icon: 'check_circle',
-        title: 'No Violations',
-        subtitle: 'All devices are compliant',
-        color: GlassTheme.successColor,
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: provider.violations.length,
-      itemBuilder: (context, index) {
-        return _buildViolationCard(provider.violations[index], provider);
-      },
-    );
-  }
-
-  Widget _buildViolationCard(
-    PolicyViolation violation,
-    EnterprisePolicyProvider provider,
-  ) {
-    final severityColor =
-        Color(EnterprisePolicyProvider.getSeverityColor(violation.severity));
-
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: severityColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: DuotoneIcon(
-                      'danger_triangle',
-                      color: severityColor,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        violation.ruleName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        violation.deviceName,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: severityColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    violation.severity.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              violation.details,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                DuotoneIcon(
-                  'clock_circle',
-                  size: 14,
-                  color: Colors.white.withOpacity(0.5),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _formatDate(violation.detectedAt),
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () =>
-                      _showResolveDialog(context, violation, provider),
-                  child: const Text('Resolve'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTemplatesTab(EnterprisePolicyProvider provider) {
-    final templates = provider.templates;
-
-    if (templates.isEmpty) {
-      return _buildEmptyState(
-        icon: 'widget_5',
-        title: 'No Templates',
-        subtitle: 'Policy templates are loading...',
-      );
-    }
-
-    final groupedTemplates = <String, List<PolicyTemplate>>{};
-    for (final template in templates) {
-      groupedTemplates.putIfAbsent(template.category, () => []).add(template);
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: groupedTemplates.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
-              child: Text(
-                entry.key,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ...entry.value.map((template) => _buildTemplateCard(template, provider)),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTemplateCard(
-    PolicyTemplate template,
-    EnterprisePolicyProvider provider,
-  ) {
-    final typeColor =
-        Color(EnterprisePolicyProvider.getPolicyTypeColor(template.type));
-
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: typeColor.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(
-            child: DuotoneIcon(
-              _getPolicyTypeIcon(template.type),
-              color: typeColor,
-              size: 24,
-            ),
-          ),
-        ),
-        title: Text(
-          template.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(
-          '${template.rules.length} rules • ${template.type.displayName}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 12,
-          ),
-        ),
-        trailing: IconButton(
-          icon: const DuotoneIcon(
-            'add_circle',
-            color: GlassTheme.primaryAccent,
-            size: 24,
-          ),
-          onPressed: () =>
-              _showCreateFromTemplateDialog(context, template, provider),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBYODTab(EnterprisePolicyProvider provider) {
-    final byodTemplates = provider.getBYODTemplates();
-    final byodPolicies = provider.byodPolicies;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Existing BYOD policies
-        if (byodPolicies.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              'Active BYOD Policies',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          ...byodPolicies.map((policy) => _buildPolicyCard(policy, provider)),
-          const SizedBox(height: 16),
-        ],
-
-        // BYOD Templates
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'BYOD Templates',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ...byodTemplates.map((template) => _buildBYODTemplateCard(template, provider)),
-      ],
-    );
-  }
-
-  Widget _buildBYODTemplateCard(
-    PolicyTemplate template,
-    EnterprisePolicyProvider provider,
-  ) {
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: GlassTheme.successColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: DuotoneIcon(
-                      'smartphone',
-                      color: GlassTheme.successColor,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        template.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        template.description,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildPolicyBadge(
-                  '${template.rules.length} rules',
-                  Colors.white54,
-                ),
-                _buildPolicyBadge(
-                  template.category,
-                  GlassTheme.primaryAccent,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () =>
-                    _showCreateFromTemplateDialog(context, template, provider),
-                icon: const DuotoneIcon('add_circle', size: 18),
-                label: const Text('Create Policy'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: GlassTheme.primaryAccent,
-                  side: const BorderSide(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required String icon,
-    required String title,
-    required String subtitle,
-    Color color = GlassTheme.primaryAccent,
-    Widget? action,
-  }) {
+  Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withOpacity(0.5)),
+            DuotoneIcon('clipboard_text',
+                size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
             const SizedBox(height: 16),
             Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
+              'No Policies',
+              style: TextStyle(
+                color: context.colors.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              'No conditional access policies are configured on the server.',
+              style: TextStyle(color: context.colors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              action,
-            ],
           ],
         ),
       ),
     );
   }
 
-  String _getPolicyTypeIcon(PolicyType type) {
-    switch (type) {
-      case PolicyType.security:
-        return 'shield';
-      case PolicyType.compliance:
-        return 'verified_check';
-      case PolicyType.restriction:
-        return 'forbidden';
-      case PolicyType.configuration:
-        return 'settings';
-      case PolicyType.conditional:
-        return 'clipboard_text';
-      case PolicyType.byod:
-        return 'smartphone';
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-
-    if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}m ago';
-    } else if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  void _showCreatePolicySheet(
-    BuildContext context,
-    EnterprisePolicyProvider provider,
-  ) {
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
-    PolicyType selectedType = PolicyType.security;
-    EnforcementLevel selectedEnforcement = EnforcementLevel.warn;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                GlassTheme.gradientTop,
-                GlassTheme.gradientBottom,
-              ],
+  Widget _buildErrorState(EnterprisePolicyProvider provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const DuotoneIcon('danger_circle',
+                size: 64, color: GlassTheme.errorColor),
+            const SizedBox(height: 16),
+            Text(
+              'Error Loading Policies',
+              style: TextStyle(
+                color: context.colors.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            24,
-            24,
-            24,
-            24 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Create Policy',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Policy Name',
-                    labelStyle: TextStyle(color: Colors.white54),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descController,
-                  style: const TextStyle(color: Colors.white),
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    labelStyle: TextStyle(color: Colors.white54),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Policy Type',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: PolicyType.values.map((type) {
-                    final isSelected = type == selectedType;
-                    final color = Color(
-                      EnterprisePolicyProvider.getPolicyTypeColor(type),
-                    );
-                    return ChoiceChip(
-                      label: Text(type.displayName),
-                      selected: isSelected,
-                      selectedColor: color,
-                      backgroundColor: color.withOpacity(0.2),
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : color,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => selectedType = type);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Enforcement Level',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: EnforcementLevel.values.map((level) {
-                    final isSelected = level == selectedEnforcement;
-                    final color = Color(
-                      EnterprisePolicyProvider.getEnforcementColor(level),
-                    );
-                    return ChoiceChip(
-                      label: Text(level.displayName),
-                      selected: isSelected,
-                      selectedColor: color,
-                      backgroundColor: color.withOpacity(0.2),
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : color,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => selectedEnforcement = level);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (nameController.text.isNotEmpty) {
-                        await provider.createPolicy(
-                          name: nameController.text,
-                          description: descController.text,
-                          type: selectedType,
-                          enforcement: selectedEnforcement,
-                        );
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: GlassTheme.primaryAccent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text('Create Policy'),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              provider.error ?? 'An unknown error occurred',
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 14),
+              textAlign: TextAlign.center,
             ),
-          ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: provider.loadPolicies,
+              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+                foregroundColor: Brand.onLime,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   void _showPolicyDetails(
-    BuildContext context,
-    SecurityPolicy policy,
-    EnterprisePolicyProvider provider,
-  ) {
+      BuildContext context, ConditionalAccessPolicy policy) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -977,17 +314,18 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
         initialChildSize: 0.7,
         maxChildSize: 0.9,
         minChildSize: 0.5,
+        expand: false,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                GlassTheme.gradientTop,
-                GlassTheme.gradientBottom,
-              ],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [GlassTheme.gradientTopLight, GlassTheme.gradientBottomLight],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -998,128 +336,68 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                   Expanded(
                     child: Text(
                       policy.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.colors.onSurface,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const DuotoneIcon('trash_bin_minimalistic', color: Colors.red, size: 24),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _confirmDelete(context, policy, provider);
-                    },
+                  GlassBadge(
+                    text: policy.enabled ? 'Enabled' : 'Disabled',
+                    color: policy.enabled
+                        ? GlassTheme.successColor
+                        : context.colors.onSurfaceVariant,
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                policy.description,
-                style: TextStyle(color: Colors.white.withOpacity(0.7)),
-              ),
+              if (policy.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  policy.description,
+                  style: TextStyle(color: context.colors.onSurfaceVariant),
+                ),
+              ],
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  _buildPolicyBadge(
-                    policy.type.displayName,
-                    Color(EnterprisePolicyProvider.getPolicyTypeColor(policy.type)),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildPolicyBadge(
-                    policy.enforcement.displayName,
-                    Color(EnterprisePolicyProvider.getEnforcementColor(
-                        policy.enforcement)),
-                  ),
-                  const Spacer(),
-                  Text(
-                    policy.isEnabled ? 'Enabled' : 'Disabled',
-                    style: TextStyle(
-                      color: policy.isEnabled
-                          ? GlassTheme.successColor
-                          : Colors.white54,
-                    ),
-                  ),
-                ],
+              GlassContainer(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    _buildDetailRow(
+                        'Priority',
+                        policy.priority?.toString() ?? 'Not available'),
+                    _buildDetailRow('Scope',
+                        policy.appliesToAll ? 'All users' : 'Scoped'),
+                    _buildDetailRow(
+                        'Created',
+                        policy.createdAt != null
+                            ? _formatDate(policy.createdAt!)
+                            : 'Not available'),
+                    _buildDetailRow(
+                        'Updated',
+                        policy.updatedAt != null
+                            ? _formatDate(policy.updatedAt!)
+                            : 'Not available'),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Rules',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              _buildSummarySection(
+                'Conditions',
+                policy.conditions.summary,
+                'No conditions configured — policy applies unconditionally.',
               ),
-              const SizedBox(height: 12),
-              if (policy.rules.isEmpty)
-                Text(
-                  'No rules defined',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5)),
-                )
-              else
-                ...policy.rules.map((rule) => GlassContainer(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          DuotoneIcon(
-                            rule.isEnabled
-                                ? 'check_circle'
-                                : 'close_circle',
-                            size: 20,
-                            color: rule.isEnabled
-                                ? GlassTheme.successColor
-                                : Colors.white38,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  rule.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                Text(
-                                  rule.description,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.6),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-              if (policy.assignedGroups.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _buildSummarySection(
+                'Grant Controls',
+                policy.grantControls.summary,
+                'No grant controls configured.',
+              ),
+              if (!policy.appliesToAll) ...[
                 const SizedBox(height: 24),
-                const Text(
-                  'Assigned Groups',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: policy.assignedGroups
-                      .map((g) => Chip(
-                            label: Text(g),
-                            backgroundColor: Colors.white12,
-                            labelStyle: const TextStyle(color: Colors.white),
-                          ))
-                      .toList(),
-                ),
+                _buildScopeSection(policy),
               ],
             ],
           ),
@@ -1128,168 +406,123 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     );
   }
 
-  void _showCreateFromTemplateDialog(
-    BuildContext context,
-    PolicyTemplate template,
-    EnterprisePolicyProvider provider,
-  ) {
-    final nameController = TextEditingController(text: template.name);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
-          'Create from Template',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Create a new policy based on "${template.name}"',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Policy Name',
-                labelStyle: TextStyle(color: Colors.white54),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+  Widget _buildSummarySection(
+      String title, List<String> lines, String emptyText) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: context.colors.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
           ),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await provider.createFromTemplate(
-                  template.id,
-                  name: nameController.text,
-                );
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        if (lines.isEmpty)
+          Text(
+            emptyText,
+            style: TextStyle(color: context.colors.onSurfaceVariant),
+          )
+        else
+          ...lines.map((line) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DuotoneIcon('check_circle',
+                        size: 18, color: AppColors.accentInk),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        line,
+                        style: TextStyle(color: context.colors.onSurface),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+      ],
     );
   }
 
-  void _showResolveDialog(
-    BuildContext context,
-    PolicyViolation violation,
-    EnterprisePolicyProvider provider,
-  ) {
-    final notesController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
-          'Resolve Violation',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildScopeSection(ConditionalAccessPolicy policy) {
+    Widget chips(String label, List<String> values) {
+      if (values.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Mark this violation as resolved?',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              label,
+              style: TextStyle(
+                  color: context.colors.onSurfaceVariant, fontSize: 12),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                labelStyle: TextStyle(color: Colors.white54),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: GlassTheme.primaryAccent,
-                  ),
-                ),
-              ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: values
+                  .map((v) => Chip(
+                        label: Text(v),
+                        backgroundColor:
+                            context.colors.onSurface.withValues(alpha: 0.06),
+                        labelStyle: TextStyle(
+                            color: context.colors.onSurface, fontSize: 12),
+                      ))
+                  .toList(),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Assignment',
+          style: TextStyle(
+            color: context.colors.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
           ),
-          TextButton(
-            onPressed: () async {
-              await provider.resolveViolation(
-                violation.id,
-                notes: notesController.text.isNotEmpty
-                    ? notesController.text
-                    : null,
-              );
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Resolve'),
+        ),
+        const SizedBox(height: 12),
+        chips('Included users', policy.includeUsers),
+        chips('Excluded users', policy.excludeUsers),
+        chips('Included groups', policy.includeGroups),
+        chips('Excluded groups', policy.excludeGroups),
+        chips('Included apps', policy.includeApps),
+        chips('Excluded apps', policy.excludeApps),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                  color: context.colors.onSurface, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _confirmDelete(
-    BuildContext context,
-    SecurityPolicy policy,
-    EnterprisePolicyProvider provider,
-  ) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text(
-          'Delete Policy?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          'Are you sure you want to delete "${policy.name}"? This action cannot be undone.',
-          style: TextStyle(color: Colors.white.withOpacity(0.8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await provider.deletePolicy(policy.id);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: GlassTheme.errorColor),
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatDate(DateTime date) {
+    final local = date.toLocal();
+    return '${local.day}/${local.month}/${local.year}';
   }
 }

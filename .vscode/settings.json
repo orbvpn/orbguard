@@ -1,0 +1,5 @@
+{
+  // Hot reload fires on every save (Cmd+S) while debugging the Flutter app.
+  "dart.flutterHotReloadOnSave": "all",
+  "dart.projectSearchDepth": 3
+}

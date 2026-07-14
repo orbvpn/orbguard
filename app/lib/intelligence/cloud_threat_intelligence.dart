@@ -4,7 +4,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,7 +18,9 @@ class ThreatIntelligenceAPI {
   final Dio _dio;
   final String baseUrl;
 
-  // You can use your own API or public threat intelligence feeds
+  // Auth-token key shared with AuthInterceptor (lib/services/api/api_interceptors.dart).
+  static const String _authTokenKey = 'orbguard_auth_token';
+
   ThreatIntelligenceAPI({String? apiUrl, String? apiKey})
     : baseUrl = apiUrl ?? 'https://api.yourdomain.com/threat-intelligence',
       _dio = Dio(
@@ -25,10 +29,30 @@ class ThreatIntelligenceAPI {
           receiveTimeout: const Duration(seconds: 30),
           headers: {
             'Content-Type': 'application/json',
-            if (apiKey != null) 'Authorization': 'Bearer $apiKey',
+            if (apiKey != null && apiKey.isNotEmpty)
+              'Authorization': 'Bearer $apiKey',
           },
         ),
-      );
+      ) {
+    // The intelligence endpoints require device auth. Attach the same bearer
+    // token AuthInterceptor uses (persisted by OrbGuardApiClient on device
+    // registration) so these fetches don't 401 at startup when no explicit
+    // apiKey is supplied. Reads the token per-request so it stays current.
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (options.headers['Authorization'] == null) {
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString(_authTokenKey);
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          }
+          handler.next(options);
+        },
+      ),
+    );
+  }
 
   /// Fetch latest indicators of compromise from multiple sources
   Future<ThreatIntelligenceData> fetchLatestIoCs() async {
@@ -43,7 +67,7 @@ class ThreatIntelligenceAPI {
       // Merge all sources
       return _mergeIntelligence(results);
     } catch (e) {
-      print('Error fetching threat intelligence: $e');
+      debugPrint('Error fetching threat intelligence: $e');
       rethrow;
     }
   }
@@ -54,7 +78,7 @@ class ThreatIntelligenceAPI {
       final response = await _dio.get('$baseUrl/pegasus');
       return ThreatIntelligenceData.fromJson(response.data);
     } catch (e) {
-      print('Error fetching Pegasus IoCs: $e');
+      debugPrint('Error fetching Pegasus IoCs: $e');
       return ThreatIntelligenceData.empty();
     }
   }
@@ -65,7 +89,7 @@ class ThreatIntelligenceAPI {
       final response = await _dio.get('$baseUrl/community');
       return ThreatIntelligenceData.fromJson(response.data);
     } catch (e) {
-      print('Error fetching community IoCs: $e');
+      debugPrint('Error fetching community IoCs: $e');
       return ThreatIntelligenceData.empty();
     }
   }
@@ -93,13 +117,13 @@ class ThreatIntelligenceAPI {
           final feedData = _parseFeed(entry.key, response.data);
           allData.merge(feedData);
         } catch (e) {
-          print('Error fetching ${entry.key}: $e');
+          debugPrint('Error fetching ${entry.key}: $e');
         }
       }
 
       return allData;
     } catch (e) {
-      print('Error fetching public feeds: $e');
+      debugPrint('Error fetching public feeds: $e');
       return ThreatIntelligenceData.empty();
     }
   }
@@ -129,7 +153,7 @@ class ThreatIntelligenceAPI {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print('Error reporting threat: $e');
+      debugPrint('Error reporting threat: $e');
       return false;
     }
   }
@@ -146,7 +170,7 @@ class ThreatIntelligenceAPI {
       );
       return response.data['isMalicious'] ?? false;
     } catch (e) {
-      print('Error checking indicator: $e');
+      debugPrint('Error checking indicator: $e');
       return false;
     }
   }
@@ -343,9 +367,9 @@ class LocalIntelligenceCache {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
 
-      print('[Cache] Saved ${data.totalIndicators} indicators');
+      debugPrint('[Cache] Saved ${data.totalIndicators} indicators');
     } catch (e) {
-      print('[Cache] Error saving intelligence: $e');
+      debugPrint('[Cache] Error saving intelligence: $e');
     }
   }
 
@@ -363,7 +387,7 @@ class LocalIntelligenceCache {
 
       return ThreatIntelligenceData.fromJson(json);
     } catch (e) {
-      print('[Cache] Error loading intelligence: $e');
+      debugPrint('[Cache] Error loading intelligence: $e');
       return null;
     }
   }
@@ -400,7 +424,7 @@ class LocalIntelligenceCache {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_lastUpdateKey);
     } catch (e) {
-      print('[Cache] Error clearing cache: $e');
+      debugPrint('[Cache] Error clearing cache: $e');
     }
   }
 }
@@ -420,20 +444,20 @@ class ThreatIntelligenceManager {
 
   /// Initialize - load from cache or fetch from cloud
   Future<void> initialize() async {
-    print('[ThreatIntel] Initializing...');
+    debugPrint('[ThreatIntel] Initializing...');
 
     // Try to load from cache first
     _currentIntelligence = await cache.loadIntelligence();
 
     if (_currentIntelligence != null) {
-      print(
+      debugPrint(
         '[ThreatIntel] Loaded ${_currentIntelligence!.totalIndicators} indicators from cache',
       );
     }
 
     // Check if needs update
     if (await cache.needsUpdate()) {
-      print('[ThreatIntel] Cache outdated, fetching updates...');
+      debugPrint('[ThreatIntel] Cache outdated, fetching updates...');
       await updateIntelligence();
     }
   }
@@ -441,7 +465,7 @@ class ThreatIntelligenceManager {
   /// Fetch latest intelligence from cloud and update cache
   Future<void> updateIntelligence() async {
     try {
-      print('[ThreatIntel] Fetching latest intelligence...');
+      debugPrint('[ThreatIntel] Fetching latest intelligence...');
 
       final newIntelligence = await api.fetchLatestIoCs();
 
@@ -455,11 +479,11 @@ class ThreatIntelligenceManager {
       // Save to cache
       await cache.saveIntelligence(_currentIntelligence!);
 
-      print(
+      debugPrint(
         '[ThreatIntel] Updated with ${_currentIntelligence!.totalIndicators} indicators',
       );
     } catch (e) {
-      print('[ThreatIntel] Error updating intelligence: $e');
+      debugPrint('[ThreatIntel] Error updating intelligence: $e');
     }
   }
 
@@ -647,18 +671,18 @@ class ThreatIntelligenceAutoUpdater {
 
   /// Start automatic updates
   void startAutoUpdate({Duration interval = const Duration(hours: 6)}) {
-    print('[AutoUpdate] Starting with ${interval.inHours}h interval');
+    debugPrint('[AutoUpdate] Starting with ${interval.inHours}h interval');
 
     _updateTimer?.cancel();
     _updateTimer = Timer.periodic(interval, (timer) async {
-      print('[AutoUpdate] Running scheduled update...');
+      debugPrint('[AutoUpdate] Running scheduled update...');
       await manager.updateIntelligence();
     });
   }
 
   /// Stop automatic updates
   void stopAutoUpdate() {
-    print('[AutoUpdate] Stopping');
+    debugPrint('[AutoUpdate] Stopping');
     _updateTimer?.cancel();
     _updateTimer = null;
   }

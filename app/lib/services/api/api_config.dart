@@ -1,5 +1,5 @@
-/// OrbGuard Lab API Configuration
-/// Endpoints and configuration for communicating with the threat intelligence backend
+// OrbGuard Lab API Configuration
+// Endpoints and configuration for communicating with the threat intelligence backend
 
 class ApiConfig {
   /// Base URL for OrbGuard Lab API
@@ -109,6 +109,10 @@ class ApiEndpoints {
   /// Body: { "content": "...", "content_type": "url" }
   static const String qrScan = '$_v1/qr/scan';
 
+  /// Report QR scan false positive
+  /// POST /api/v1/qr/report-false-positive
+  static const String qrReportFalsePositive = '$_v1/qr/report-false-positive';
+
   /// Batch QR scan
   /// POST /api/v1/qr/scan/batch
   static const String qrScanBatch = '$_v1/qr/scan/batch';
@@ -137,6 +141,7 @@ class ApiEndpoints {
 
   /// Get breach alerts
   /// GET /api/v1/darkweb/alerts
+  /// Response: { "unread": [...], "read": [...], "unread_count": N, "total_count": N }
   static const String darkwebAlerts = '$_v1/darkweb/alerts';
 
   /// Get breach details
@@ -189,9 +194,19 @@ class ApiEndpoints {
   /// DELETE /api/v1/network/rogue-ap/trusted/{id}
   static String rogueApTrustedRemove(String id) => '$_v1/network/rogue-ap/trusted/$id';
 
+  /// Get detected network threats
+  /// GET /api/v1/network/threats
+  /// Response: { "threats": [...], "count": N }
+  static const String networkThreats = '$_v1/network/threats';
+
   /// Check DNS configuration
   /// POST /api/v1/network/dns/check
   static const String networkDnsCheck = '$_v1/network/dns/check';
+
+  /// DNS leak-check canary configuration
+  /// GET /api/v1/network/dns/leak-config
+  /// Response: { "leak_check_available": bool, "canary_zone": "..." }
+  static const String networkDnsLeakConfig = '$_v1/network/dns/leak-config';
 
   /// Get VPN recommendations
   /// POST /api/v1/network/vpn/recommend
@@ -280,7 +295,8 @@ class ApiEndpoints {
   // ============================================
 
   /// Health check / ping
-  /// GET /api/v1/health
+  /// GET /api/v1/health (backend also serves /health; the /api/v1 alias is
+  /// the canonical client path)
   static const String health = '$_v1/health';
 
   /// Get threat statistics
@@ -327,9 +343,17 @@ class ApiEndpoints {
   // CORRELATION & GRAPH
   // ============================================
 
-  /// Get correlated indicators
-  /// GET /api/v1/correlation/{id}
-  static String correlation(String id) => '$_v1/correlation/$id';
+  /// Get correlated indicators for a single indicator
+  /// GET /api/v1/correlation/indicator/{id}
+  static String correlation(String id) => '$_v1/correlation/indicator/$id';
+
+  /// List correlation results
+  /// GET /api/v1/correlation
+  static const String correlations = '$_v1/correlation';
+
+  /// Run correlation analysis
+  /// POST /api/v1/correlation/run
+  static const String correlationRun = '$_v1/correlation/run';
 
   /// Get related entities from graph
   /// GET /api/v1/graph/related/{id}
@@ -359,14 +383,6 @@ class ApiEndpoints {
   /// GET /api/v1/enterprise/stats
   static const String enterpriseStats = '$_v1/enterprise/stats';
 
-  /// Get enterprise security events
-  /// GET /api/v1/enterprise/events
-  static const String enterpriseEvents = '$_v1/enterprise/events';
-
-  /// Get enterprise device health
-  /// GET /api/v1/enterprise/devices
-  static const String enterpriseDevices = '$_v1/enterprise/devices';
-
   /// Get compliance frameworks
   /// GET /api/v1/enterprise/compliance/frameworks
   static const String complianceFrameworks = '$_v1/enterprise/compliance/frameworks';
@@ -375,53 +391,23 @@ class ApiEndpoints {
   /// GET /api/v1/enterprise/compliance/reports
   static const String complianceReports = '$_v1/enterprise/compliance/reports';
 
-  /// Get compliance controls
+  /// Get compliance control catalogs (GDPR / SOC 2 / CIS definitions).
   /// GET /api/v1/enterprise/compliance/controls
+  /// Supports ?framework=gdpr|soc2|cis. Controls are returned with
+  /// status "unknown" — they are catalog definitions, not assessments.
   static const String complianceControls = '$_v1/enterprise/compliance/controls';
 
   /// Generate compliance report
-  /// POST /api/v1/enterprise/compliance/reports/generate
-  static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports/generate';
+  /// POST /api/v1/enterprise/compliance/reports
+  /// Body: {framework, start_date, end_date}; framework must be one of
+  /// gdpr|soc2|cis (the catalogs the backend can assess against).
+  static const String complianceReportGenerate = '$_v1/enterprise/compliance/reports';
 
-  /// Get enterprise policies
+  /// List conditional access policies (Zero Trust).
   /// GET /api/v1/enterprise/policies
+  /// Client-path alias for /enterprise/zerotrust/policies; returns
+  /// {policies: [ConditionalAccessPolicy...], count}.
   static const String enterprisePolicies = '$_v1/enterprise/policies';
-
-  /// Assign policy to groups
-  /// POST /api/v1/enterprise/policies/{id}/assign-groups
-  static String policyAssignGroups(String id) => '$_v1/enterprise/policies/$id/assign-groups';
-
-  /// Assign policy to devices
-  /// POST /api/v1/enterprise/policies/{id}/assign-devices
-  static String policyAssignDevices(String id) => '$_v1/enterprise/policies/$id/assign-devices';
-
-  /// Remove policy assignment
-  /// POST /api/v1/enterprise/policies/{id}/unassign
-  static String policyUnassign(String id) => '$_v1/enterprise/policies/$id/unassign';
-
-  /// Evaluate device compliance
-  /// POST /api/v1/enterprise/devices/{id}/evaluate-compliance
-  static String deviceEvaluateCompliance(String id) => '$_v1/enterprise/devices/$id/evaluate-compliance';
-
-  /// BYOD enrollment
-  /// POST /api/v1/enterprise/byod/enroll
-  static const String byodEnroll = '$_v1/enterprise/byod/enroll';
-
-  /// Get BYOD enrollment status
-  /// GET /api/v1/enterprise/byod/{deviceId}/status
-  static String byodStatus(String deviceId) => '$_v1/enterprise/byod/$deviceId/status';
-
-  /// BYOD unenrollment
-  /// POST /api/v1/enterprise/byod/{deviceId}/unenroll
-  static String byodUnenroll(String deviceId) => '$_v1/enterprise/byod/$deviceId/unenroll';
-
-  /// Detect device ownership
-  /// GET /api/v1/enterprise/devices/{id}/ownership
-  static String deviceOwnership(String id) => '$_v1/enterprise/devices/$id/ownership';
-
-  /// Set device ownership
-  /// POST /api/v1/enterprise/devices/{id}/ownership
-  static String deviceOwnershipSet(String id) => '$_v1/enterprise/devices/$id/ownership';
 
   // ============================================
   // SIEM INTEGRATION
@@ -455,6 +441,18 @@ class ApiEndpoints {
   /// DELETE /api/v1/webhooks/{id}
   static String webhookDelete(String id) => '$_v1/webhooks/$id';
 
+  /// Enable webhook
+  /// POST /api/v1/webhooks/{id}/enable
+  static String webhookEnable(String id) => '$_v1/webhooks/$id/enable';
+
+  /// Disable webhook
+  /// POST /api/v1/webhooks/{id}/disable
+  static String webhookDisable(String id) => '$_v1/webhooks/$id/disable';
+
+  /// Send a test delivery for a webhook
+  /// POST /api/v1/webhooks/{id}/test
+  static String webhookTest(String id) => '$_v1/webhooks/$id/test';
+
   // ============================================
   // INTELLIGENCE SOURCES
   // ============================================
@@ -466,6 +464,14 @@ class ApiEndpoints {
   /// Get intelligence source details
   /// GET /api/v1/intel/sources/{id}
   static String intelSource(String id) => '$_v1/intel/sources/$id';
+
+  /// Create intelligence source
+  /// POST /api/v1/sources
+  static const String sourcesCreate = '$_v1/sources';
+
+  /// Update intelligence source
+  /// PATCH /api/v1/sources/{slug}
+  static String sourceUpdate(String slug) => '$_v1/sources/$slug';
 
   // ============================================
   // INTEGRATIONS
@@ -485,18 +491,28 @@ class ApiEndpoints {
 
   /// Get ML models
   /// GET /api/v1/ml/models
+  /// Response: { "models": [...] }
   static const String mlModels = '$_v1/ml/models';
 
   /// Get anomaly detections
   /// GET /api/v1/ml/anomalies
+  /// Response: { "anomalies": [...], "count": N }
+  /// Returns 409 with code "models_not_trained" when models are untrained.
   static const String mlAnomalies = '$_v1/ml/anomalies';
 
-  /// Run ML analysis
+  /// Run anomaly detection over indicators (ID list or filter; {} = recent indicators)
+  /// POST /api/v1/ml/anomalies/detect
+  /// Response: { "result": { "scores": [...], "anomaly_count": N, ... }, "processed": N }
+  static const String mlAnomaliesDetect = '$_v1/ml/anomalies/detect';
+
+  /// Run ML analysis on a raw value
   /// POST /api/v1/ml/analyze
+  /// Body: { "value": "...", "type": "domain" } — "value" is REQUIRED (400 otherwise)
   static const String mlAnalyze = '$_v1/ml/analyze';
 
   /// Get ML insights
   /// GET /api/v1/ml/insights
+  /// Response: { "insights": [...], "count": N }
   static const String mlInsights = '$_v1/ml/insights';
 
   // ============================================
@@ -515,20 +531,31 @@ class ApiEndpoints {
   /// POST /api/v1/playbooks/{id}/execute
   static String playbookExecute(String id) => '$_v1/playbooks/$id/execute';
 
+  /// Enable playbook
+  /// POST /api/v1/playbooks/{id}/enable
+  static String playbookEnable(String id) => '$_v1/playbooks/$id/enable';
+
+  /// Disable playbook
+  /// POST /api/v1/playbooks/{id}/disable
+  static String playbookDisable(String id) => '$_v1/playbooks/$id/disable';
+
   // ============================================
   // DESKTOP SECURITY
   // ============================================
 
   /// Get persistence items
   /// GET /api/v1/desktop/persistence
+  /// Response: { "items": [...], "scanned_at": "..." }
   static const String desktopPersistence = '$_v1/desktop/persistence';
 
   /// Get signed apps
   /// GET /api/v1/desktop/apps
+  /// Response: { "apps": [...], "scanned_at": "..." }
   static const String desktopApps = '$_v1/desktop/apps';
 
   /// Get firewall rules
   /// GET /api/v1/desktop/firewall
+  /// Response: { "rules": [...], ... }
   static const String desktopFirewall = '$_v1/desktop/firewall';
 
   /// Scan persistence items
@@ -649,10 +676,12 @@ class ApiEndpoints {
 
   /// Get graph nodes
   /// GET /api/v1/graph/nodes
+  /// Response: { "nodes": [...], "count": N }
   static const String graphNodes = '$_v1/graph/nodes';
 
   /// Get graph relations
   /// GET /api/v1/graph/relations
+  /// Response: { "relations": [...], "count": N }
   static const String graphRelations = '$_v1/graph/relations';
 
   /// Search graph
@@ -663,17 +692,19 @@ class ApiEndpoints {
   // SUPPLY CHAIN SECURITY
   // ============================================
 
-  /// Get known vulnerabilities
-  /// GET /api/v1/supply-chain/vulnerabilities
-  static const String supplyChainVulnerabilities = '$_v1/supply-chain/vulnerabilities';
+  // NOTE: supplyChainVulnerabilities (GET /supply-chain/vulnerabilities) was
+  // removed with its only client consumer; version-aware vulnerability
+  // matching uses supplyChainCheck below.
 
-  /// Check library vulnerabilities
+  /// Check package vulnerabilities
   /// POST /api/v1/supply-chain/check
-  /// Body: { "libraries": [{ "name": "...", "version": "..." }] }
+  /// Body: { "packages": [{ "name": "...", "version": "...", "ecosystem": "..."? }] }
+  /// Response: { "results": [...] }
   static const String supplyChainCheck = '$_v1/supply-chain/check';
 
   /// Get tracker signatures
   /// GET /api/v1/supply-chain/trackers
+  /// Response: { "trackers": [...], "count": N }
   static const String supplyChainTrackers = '$_v1/supply-chain/trackers';
 
   // ============================================
@@ -702,7 +733,22 @@ class ApiEndpoints {
 
   /// Send device command
   /// POST /api/v1/device/{id}/command
+  /// Body: models.RemoteCommand — { "type": "...", "payload": "(json string)" }
   static String deviceCommand(String id) => '$_v1/device/$id/command';
+
+  /// Lock device
+  /// POST /api/v1/device/{id}/lock
+  /// Body (optional): { "pin", "message", "phone" }
+  static String deviceLock(String id) => '$_v1/device/$id/lock';
+
+  /// Wipe device
+  /// POST /api/v1/device/{id}/wipe
+  /// Body: { "confirmation_id" (REQUIRED), "factory_reset", "wipe_sd_card", "wipe_esim" }
+  static String deviceWipe(String id) => '$_v1/device/$id/wipe';
+
+  /// Ring device
+  /// POST /api/v1/device/{id}/ring
+  static String deviceRing(String id) => '$_v1/device/$id/ring';
 
   /// Mark device as lost
   /// POST /api/v1/device/{id}/mark-lost
@@ -728,9 +774,23 @@ class ApiEndpoints {
   /// POST /api/v1/device/{id}/sim/trusted
   static String deviceTrustedSim(String id) => '$_v1/device/$id/sim/trusted';
 
-  /// Audit OS vulnerabilities
+  /// Audit OS vulnerabilities (no device segment — global audit route)
   /// POST /api/v1/device/vulnerabilities/audit
-  static String deviceAuditOs(String id) => '$_v1/device/vulnerabilities/audit';
+  /// Body: { "device_id", "platform", "os_version", "security_patch", "api_level" }
+  /// "platform" and "os_version" are REQUIRED (400 otherwise)
+  static const String deviceVulnerabilitiesAudit = '$_v1/device/vulnerabilities/audit';
+
+  /// Register a push (FCM/APNs) token for a device so the backend can wake the
+  /// device-agent with a high-priority data push instead of waiting for the
+  /// next HTTP poll.
+  /// POST /api/v1/device/{device_id}/push-token
+  /// Body: { "token": "`<fcm/apns token>`", "platform": "android"|"ios" }
+  ///
+  /// ACTIVATION: the backend handler + migration 022 (device push_token column
+  /// already exists; 022 adds the route wiring + FCM sender config) ship with
+  /// the FCM rollout — see docs/FCM_SETUP.md. Until Firebase provides a token
+  /// on-device this endpoint is never called, so it is inert in current builds.
+  static String devicePushToken(String id) => '$_v1/device/$id/push-token';
 
   // ============================================
   // FORENSICS
@@ -776,6 +836,44 @@ class ApiEndpoints {
   /// POST /api/v1/forensics/quick-check
   static const String forensicsQuickCheck = '$_v1/forensics/quick-check';
 
+  /// Upload iOS backup for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/ios/backup/upload
+  static const String forensicsIosBackupUpload = '$_v1/forensics/ios/backup/upload';
+
+  /// Upload iOS sysdiagnose archive for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/ios/sysdiagnose/upload
+  static const String forensicsIosSysdiagnoseUpload = '$_v1/forensics/ios/sysdiagnose/upload';
+
+  /// Upload Android bugreport for analysis (multipart: file + device_id)
+  /// POST /api/v1/forensics/android/bugreport/upload
+  static const String forensicsAndroidBugreportUpload = '$_v1/forensics/android/bugreport/upload';
+
+  // ============================================
+  // DIGITAL FOOTPRINT
+  // ============================================
+
+  /// Get data brokers list (response is a bare JSON array of brokers)
+  /// GET /api/v1/footprint/brokers
+  static const String footprintBrokers = '$_v1/footprint/brokers';
+
+  /// Scan digital footprint
+  /// POST /api/v1/footprint/scan
+  /// Body: { "email": "...", ... } — "email" is REQUIRED
+  static const String footprintScan = '$_v1/footprint/scan';
+
+  /// Quick footprint scan
+  /// POST /api/v1/footprint/quick-scan
+  static const String footprintQuickScan = '$_v1/footprint/quick-scan';
+
+  /// Request data removal from a broker
+  /// POST /api/v1/footprint/removal
+  /// Body: { "broker_id": "(uuid)", "email": "...", "user_id": "..." }
+  static const String footprintRemoval = '$_v1/footprint/removal';
+
+  /// Get removal request status
+  /// GET /api/v1/footprint/removal/{id}
+  static String footprintRemovalStatus(String id) => '$_v1/footprint/removal/$id';
+
   // ============================================
   // PRIVACY
   // ============================================
@@ -795,6 +893,13 @@ class ApiEndpoints {
   /// Check clipboard
   /// POST /api/v1/privacy/clipboard/check
   static const String privacyClipboardCheck = '$_v1/privacy/clipboard/check';
+
+  /// Check whether a domain is a tracker that should be blocked
+  /// POST /api/v1/privacy/trackers/should-block
+  /// Body: { "domain": "...", "settings"?: {...} }
+  /// Response: { "domain", "should_block", "tracker" }
+  static const String privacyTrackersShouldBlock =
+      '$_v1/privacy/trackers/should-block';
 
   // ============================================
   // SCAM DETECTION

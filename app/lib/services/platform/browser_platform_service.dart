@@ -1,6 +1,6 @@
 /// Browser Platform Service
 /// Flutter-side platform channel for Android browser URL monitoring
-library browser_platform_service;
+library;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';

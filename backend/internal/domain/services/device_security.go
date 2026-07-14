@@ -3,91 +3,109 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 
 	"orbguard-lab/internal/domain/models"
+	"orbguard-lab/internal/domain/services/push"
 	"orbguard-lab/internal/infrastructure/cache"
+	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
 
-// DeviceRepository defines the interface for device persistence
-type DeviceRepository interface {
-	FindByHardwareID(ctx context.Context, hardwareID string) (interface{}, error)
-	UpdateLastSeen(ctx context.Context, deviceID string, ip string) error
-}
+// ErrDeviceSecurityPersistenceUnavailable is returned when the service is
+// running without a database connection. No anti-theft state can be stored
+// or retrieved in that mode.
+var ErrDeviceSecurityPersistenceUnavailable = errors.New("device security persistence unavailable: database not configured")
 
-// DeviceSecurityService handles device security operations
+// maxLocationHistory bounds the per-device location history kept in Postgres.
+const maxLocationHistory = 100
+
+// deviceCacheTTL is how long device records are cached in Redis. Postgres is
+// the source of truth; the cache only absorbs hot read paths (status polls).
+const deviceCacheTTL = 60 * time.Second
+
+// DeviceSecurityService handles device security operations (anti-theft,
+// remote commands, SIM monitoring, OS vulnerability auditing). All durable
+// state lives in Postgres via DeviceSecurityRepository.
 type DeviceSecurityService struct {
+	repo   *repository.DeviceSecurityRepository
 	cache  *cache.RedisCache
+	push   push.Sender
 	logger *logger.Logger
-	mu     sync.RWMutex
-
-	// Device store (in-memory with cache fallback)
-	devices      map[string]*models.SecureDeviceInfo
-
-	// Ephemeral stores (session-based, not persisted to DB)
-	commands     map[string][]*models.RemoteCommand
-	simInfo      map[string][]*models.SIMInfo
-	simEvents    map[string][]*models.SIMChangeEvent
-	selfies      map[string][]*models.ThiefSelfie
-	settings     map[string]*models.AntiTheftSettings
-	locations    map[string][]*models.Location
-
-	// Stats
-	commandsIssued   atomic.Int64
-	commandsExecuted atomic.Int64
-	simAlertsRaised  atomic.Int64
-	selfiesTaken     atomic.Int64
-	devicesTracked   atomic.Int64
 }
 
-// NewDeviceSecurityService creates a new device security service
-func NewDeviceSecurityService(c *cache.RedisCache, log *logger.Logger) *DeviceSecurityService {
+// NewDeviceSecurityService creates a new device security service. repo may be
+// nil when the API runs without a database; persistence-dependent operations
+// then return ErrDeviceSecurityPersistenceUnavailable.
+//
+// pushSender delivers real-time "command pending" notifications so devices
+// poll immediately after a remote command is issued. It may be nil (or a
+// disabled no-op Sender) — command creation never depends on push success.
+func NewDeviceSecurityService(repo *repository.DeviceSecurityRepository, c *cache.RedisCache, pushSender push.Sender, log *logger.Logger) *DeviceSecurityService {
 	return &DeviceSecurityService{
-		cache:     c,
-		logger:    log.WithComponent("device-security"),
-		devices:   make(map[string]*models.SecureDeviceInfo),
-		commands:  make(map[string][]*models.RemoteCommand),
-		simInfo:   make(map[string][]*models.SIMInfo),
-		simEvents: make(map[string][]*models.SIMChangeEvent),
-		selfies:   make(map[string][]*models.ThiefSelfie),
-		settings:  make(map[string]*models.AntiTheftSettings),
-		locations: make(map[string][]*models.Location),
+		repo:   repo,
+		cache:  c,
+		push:   pushSender,
+		logger: log.WithComponent("device-security"),
 	}
 }
 
-// RegisterDevice registers a new device for tracking
-func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *models.SecureDeviceInfo) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if device.ID == uuid.Nil {
-		device.ID = uuid.New()
+// RegisterPushToken stores/refreshes a device's FCM token so anti-theft
+// commands can be delivered in real time. platform is "android" or "ios".
+func (s *DeviceSecurityService) RegisterPushToken(ctx context.Context, deviceID, token, platform string) error {
+	if err := s.requireRepo(); err != nil {
+		return err
 	}
-	device.RegisteredAt = time.Now()
-	device.UpdatedAt = time.Now()
-	device.LastSeen = time.Now()
-	device.Status = models.DeviceStatusActive
-
-	s.devices[device.DeviceID] = device
-	s.devicesTracked.Add(1)
-
-	// Persist device to Redis cache for recovery after restart
-	cacheKey := "device:security:" + device.DeviceID
-	if err := s.cache.SetJSON(ctx, cacheKey, device, 0); err != nil {
-		s.logger.Warn().Err(err).Str("device_id", device.DeviceID).Msg("failed to cache device")
+	if err := s.repo.UpsertToken(ctx, deviceID, token, platform); err != nil {
+		return fmt.Errorf("persist push token: %w", err)
 	}
+	s.invalidateDeviceCache(ctx, deviceID)
+	s.logger.Info().Str("device_id", deviceID).Str("platform", platform).Msg("push token registered")
+	return nil
+}
 
-	// Initialize default settings
-	settings := &models.AntiTheftSettings{
-		DeviceID:             device.DeviceID,
+// notifyCommandPending best-effort delivers a real-time push so the device
+// polls immediately. Any failure is logged and swallowed: the command is still
+// delivered by polling, so push must never affect command-creation outcome.
+func (s *DeviceSecurityService) notifyCommandPending(ctx context.Context, deviceID string) {
+	if s.push == nil {
+		return
+	}
+	if err := s.push.NotifyCommand(ctx, deviceID); err != nil {
+		s.logger.Warn().Err(err).Str("device_id", deviceID).Msg("command push notification failed (command still polled)")
+	}
+}
+
+func (s *DeviceSecurityService) requireRepo() error {
+	if s.repo == nil {
+		return ErrDeviceSecurityPersistenceUnavailable
+	}
+	return nil
+}
+
+func (s *DeviceSecurityService) deviceCacheKey(deviceID string) string {
+	return "device:security:" + deviceID
+}
+
+func (s *DeviceSecurityService) invalidateDeviceCache(ctx context.Context, deviceID string) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.Delete(ctx, s.deviceCacheKey(deviceID)); err != nil {
+		s.logger.Warn().Err(err).Str("device_id", deviceID).Msg("failed to invalidate device cache")
+	}
+}
+
+// defaultAntiTheftSettings returns the default settings document for a device.
+func defaultAntiTheftSettings(deviceID string) *models.AntiTheftSettings {
+	return &models.AntiTheftSettings{
+		DeviceID:             deviceID,
 		EnableRemoteLocate:   true,
 		EnableRemoteLock:     true,
 		EnableRemoteWipe:     false, // Disabled by default for safety
@@ -99,11 +117,33 @@ func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *mode
 		AlertPushEnabled:     true,
 		UpdatedAt:            time.Now(),
 	}
-	s.settings[device.DeviceID] = settings
+}
 
-	// Persist settings to cache
-	settingsKey := "device:settings:" + device.DeviceID
-	_ = s.cache.SetJSON(ctx, settingsKey, settings, 0)
+// RegisterDevice registers a new device for tracking
+func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *models.SecureDeviceInfo) error {
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
+
+	if device.ID == uuid.Nil {
+		device.ID = uuid.New()
+	}
+	device.RegisteredAt = time.Now()
+	device.UpdatedAt = time.Now()
+	device.LastSeen = time.Now()
+	device.Status = models.DeviceStatusActive
+
+	if err := s.repo.UpsertDevice(ctx, device); err != nil {
+		return fmt.Errorf("persist device: %w", err)
+	}
+
+	// Initialize default settings without clobbering an existing config
+	// (re-registration after app reinstall must not reset user choices).
+	if err := s.repo.InsertDefaultSettings(ctx, defaultAntiTheftSettings(device.DeviceID)); err != nil {
+		return fmt.Errorf("persist default settings: %w", err)
+	}
+
+	s.invalidateDeviceCache(ctx, device.DeviceID)
 
 	s.logger.Info().
 		Str("device_id", device.DeviceID).
@@ -116,12 +156,13 @@ func (s *DeviceSecurityService) RegisterDevice(ctx context.Context, device *mode
 
 // UpdateDevice updates device information
 func (s *DeviceSecurityService) UpdateDevice(ctx context.Context, deviceID string, update *models.SecureDeviceInfo) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
-	device, exists := s.devices[deviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", deviceID)
+	device, err := s.repo.GetDevice(ctx, deviceID)
+	if err != nil {
+		return err
 	}
 
 	// Update fields
@@ -144,93 +185,90 @@ func (s *DeviceSecurityService) UpdateDevice(ctx context.Context, deviceID strin
 		device.BiometricType = update.BiometricType
 	}
 	device.LastSeen = time.Now()
-	device.UpdatedAt = time.Now()
 
+	if err := s.repo.UpsertDevice(ctx, device); err != nil {
+		return fmt.Errorf("persist device update: %w", err)
+	}
+
+	s.invalidateDeviceCache(ctx, deviceID)
 	return nil
 }
 
 // GetDevice returns device information
 func (s *DeviceSecurityService) GetDevice(ctx context.Context, deviceID string) (*models.SecureDeviceInfo, error) {
-	s.mu.RLock()
-	device, exists := s.devices[deviceID]
-	s.mu.RUnlock()
-
-	if exists {
-		return device, nil
+	if err := s.requireRepo(); err != nil {
+		return nil, err
 	}
 
-	// Try to recover from cache
-	cacheKey := "device:security:" + deviceID
-	var cached models.SecureDeviceInfo
-	if err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil {
-		s.mu.Lock()
-		s.devices[deviceID] = &cached
-		s.mu.Unlock()
-
-		// Also recover settings from cache
-		settingsKey := "device:settings:" + deviceID
-		var settings models.AntiTheftSettings
-		if err := s.cache.GetJSON(ctx, settingsKey, &settings); err == nil {
-			s.mu.Lock()
-			s.settings[deviceID] = &settings
-			s.mu.Unlock()
+	// Hot path: short-TTL Redis cache in front of Postgres.
+	if s.cache != nil {
+		var cached models.SecureDeviceInfo
+		if err := s.cache.GetJSON(ctx, s.deviceCacheKey(deviceID), &cached); err == nil && cached.DeviceID == deviceID {
+			return &cached, nil
 		}
-
-		return &cached, nil
 	}
 
-	return nil, fmt.Errorf("device not found: %s", deviceID)
+	device, err := s.repo.GetDevice(ctx, deviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil {
+		if err := s.cache.SetJSON(ctx, s.deviceCacheKey(deviceID), device, deviceCacheTTL); err != nil {
+			s.logger.Warn().Err(err).Str("device_id", deviceID).Msg("failed to cache device")
+		}
+	}
+
+	return device, nil
 }
 
 // UpdateLocation updates device location
 func (s *DeviceSecurityService) UpdateLocation(ctx context.Context, deviceID string, location *models.Location) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
-	device, exists := s.devices[deviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", deviceID)
+	// Validate device exists before recording.
+	if _, err := s.repo.GetDevice(ctx, deviceID); err != nil {
+		return err
 	}
 
 	location.Timestamp = time.Now()
-	device.LastLocation = location
-	device.LastSeen = time.Now()
 
-	// Store location history (keep last 100)
-	s.locations[deviceID] = append(s.locations[deviceID], location)
-	if len(s.locations[deviceID]) > 100 {
-		s.locations[deviceID] = s.locations[deviceID][1:]
+	// Persist the fix, update last known location, trim history to bound.
+	if err := s.repo.InsertLocation(ctx, deviceID, location, maxLocationHistory); err != nil {
+		return fmt.Errorf("persist location: %w", err)
 	}
 
+	s.invalidateDeviceCache(ctx, deviceID)
 	return nil
 }
 
 // GetLocationHistory returns location history for a device
 func (s *DeviceSecurityService) GetLocationHistory(ctx context.Context, deviceID string, limit int) ([]*models.Location, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	locations := s.locations[deviceID]
-	if limit > 0 && len(locations) > limit {
-		locations = locations[len(locations)-limit:]
+	if err := s.requireRepo(); err != nil {
+		return nil, err
 	}
-
-	return locations, nil
+	return s.repo.GetLocations(ctx, deviceID, limit)
 }
 
 // IssueCommand issues a remote command to a device
 func (s *DeviceSecurityService) IssueCommand(ctx context.Context, cmd *models.RemoteCommand) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
 	// Validate device exists
-	device, exists := s.devices[cmd.DeviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", cmd.DeviceID)
+	device, err := s.repo.GetDevice(ctx, cmd.DeviceID)
+	if err != nil {
+		return err
 	}
 
 	// Check settings
-	settings := s.settings[cmd.DeviceID]
+	settings, err := s.repo.GetSettings(ctx, cmd.DeviceID)
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
+	}
 	if settings != nil {
 		switch cmd.Type {
 		case models.CommandLocate:
@@ -265,16 +303,22 @@ func (s *DeviceSecurityService) IssueCommand(ctx context.Context, cmd *models.Re
 	cmd.CreatedAt = time.Now()
 	cmd.ExpiresAt = time.Now().Add(24 * time.Hour) // Commands expire after 24 hours
 
-	// Store command
-	s.commands[cmd.DeviceID] = append(s.commands[cmd.DeviceID], cmd)
-	s.commandsIssued.Add(1)
+	if err := s.repo.InsertCommand(ctx, cmd); err != nil {
+		return fmt.Errorf("persist command: %w", err)
+	}
 
 	// Update device status based on command
 	switch cmd.Type {
 	case models.CommandLock:
-		device.Status = models.DeviceStatusLocked
+		if err := s.repo.UpdateDeviceStatus(ctx, device.DeviceID, models.DeviceStatusLocked); err != nil {
+			s.logger.Error().Err(err).Str("device_id", device.DeviceID).Msg("failed to update device status to locked")
+		}
+		s.invalidateDeviceCache(ctx, device.DeviceID)
 	case models.CommandWipe:
-		device.Status = models.DeviceStatusWiped
+		if err := s.repo.UpdateDeviceStatus(ctx, device.DeviceID, models.DeviceStatusWiped); err != nil {
+			s.logger.Error().Err(err).Str("device_id", device.DeviceID).Msg("failed to update device status to wiped")
+		}
+		s.invalidateDeviceCache(ctx, device.DeviceID)
 	}
 
 	s.logger.Info().
@@ -283,80 +327,81 @@ func (s *DeviceSecurityService) IssueCommand(ctx context.Context, cmd *models.Re
 		Str("command_id", cmd.ID.String()).
 		Msg("command issued")
 
+	// Best-effort real-time delivery: tell the device to poll now. Push
+	// failure never fails command creation — the command is already persisted
+	// and will be delivered by polling.
+	s.notifyCommandPending(ctx, cmd.DeviceID)
+
 	return nil
 }
 
 // GetPendingCommands returns pending commands for a device
 func (s *DeviceSecurityService) GetPendingCommands(ctx context.Context, deviceID string) ([]*models.RemoteCommand, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	commands := s.commands[deviceID]
-	pending := make([]*models.RemoteCommand, 0)
-
-	now := time.Now()
-	for _, cmd := range commands {
-		if cmd.Status == models.CommandStatusPending && cmd.ExpiresAt.After(now) {
-			pending = append(pending, cmd)
-		}
+	if err := s.requireRepo(); err != nil {
+		return nil, err
 	}
-
-	return pending, nil
+	return s.repo.GetPendingCommands(ctx, deviceID)
 }
 
 // AcknowledgeCommand marks a command as executed
 func (s *DeviceSecurityService) AcknowledgeCommand(ctx context.Context, deviceID string, commandID uuid.UUID, result string, err error) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	commands := s.commands[deviceID]
-	for _, cmd := range commands {
-		if cmd.ID == commandID {
-			now := time.Now()
-			cmd.ExecutedAt = &now
-			cmd.Result = result
-			if err != nil {
-				cmd.Status = models.CommandStatusFailed
-				cmd.Error = err.Error()
-			} else {
-				cmd.Status = models.CommandStatusExecuted
-				s.commandsExecuted.Add(1)
-			}
-			return nil
-		}
+	if repoErr := s.requireRepo(); repoErr != nil {
+		return repoErr
 	}
 
-	return fmt.Errorf("command not found: %s", commandID)
+	status := models.CommandStatusExecuted
+	errMsg := ""
+	if err != nil {
+		status = models.CommandStatusFailed
+		errMsg = err.Error()
+	}
+
+	found, ackErr := s.repo.AckCommand(ctx, deviceID, commandID, status, result, errMsg, time.Now())
+	if ackErr != nil {
+		return fmt.Errorf("persist command ack: %w", ackErr)
+	}
+	if !found {
+		return fmt.Errorf("command not found: %s", commandID)
+	}
+	return nil
 }
 
 // ReportSIMInfo reports current SIM information
 func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID string, sims []*models.SIMInfo) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
-	oldSIMs := s.simInfo[deviceID]
+	oldSIMs, err := s.repo.GetSIMs(ctx, deviceID, true)
+	if err != nil {
+		return fmt.Errorf("load current SIMs: %w", err)
+	}
 
-	// Check for changes
+	// Context for risk scoring (device may legitimately be unregistered yet).
+	device, _ := s.repo.GetDevice(ctx, deviceID)
+	settings, settingsErr := s.repo.GetSettings(ctx, deviceID)
+	if settingsErr != nil {
+		s.logger.Warn().Err(settingsErr).Str("device_id", deviceID).Msg("failed to load settings for SIM risk scoring")
+	}
+
+	// Check for new / refreshed SIMs
 	for _, newSIM := range sims {
-		if newSIM.ID == uuid.Nil {
-			newSIM.ID = uuid.New()
-		}
-		newSIM.LastSeen = time.Now()
+		newSIM.DeviceID = deviceID
 
-		// Check if this is a new SIM
 		isNew := true
 		for _, oldSIM := range oldSIMs {
 			if oldSIM.ICCID == newSIM.ICCID {
 				isNew = false
-				oldSIM.LastSeen = time.Now()
-				oldSIM.IsActive = newSIM.IsActive
 				break
 			}
 		}
 
-		if isNew {
-			newSIM.FirstSeen = time.Now()
+		// Upsert refreshes last_seen/is_active and preserves first_seen.
+		if err := s.repo.UpsertSIM(ctx, newSIM); err != nil {
+			return fmt.Errorf("persist SIM %s: %w", newSIM.ICCID, err)
+		}
 
+		if isNew {
 			// Create SIM change event
 			event := &models.SIMChangeEvent{
 				ID:         uuid.New(),
@@ -367,13 +412,10 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 			}
 
 			// Calculate risk level
-			event.RiskLevel = s.calculateSIMRisk(deviceID, event)
-
-			s.simEvents[deviceID] = append(s.simEvents[deviceID], event)
+			event.RiskLevel = s.calculateSIMRisk(device, settings, event)
 
 			// Alert if high risk
 			if event.RiskLevel == models.SIMRiskCritical || event.RiskLevel == models.SIMRiskHigh {
-				s.simAlertsRaised.Add(1)
 				event.IsAlerted = true
 				now := time.Now()
 				event.AlertedAt = &now
@@ -384,6 +426,10 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 					Str("carrier", newSIM.Carrier).
 					Str("risk", string(event.RiskLevel)).
 					Msg("SIM change alert")
+			}
+
+			if err := s.repo.InsertSIMEvent(ctx, event); err != nil {
+				return fmt.Errorf("persist SIM event: %w", err)
 			}
 		}
 	}
@@ -397,17 +443,31 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 				break
 			}
 		}
-		if !found && oldSIM.IsActive {
+		if found {
+			continue
+		}
+
+		wasActive := oldSIM.IsActive
+
+		if err := s.repo.MarkSIMAbsent(ctx, deviceID, oldSIM.ICCID); err != nil {
+			return fmt.Errorf("mark SIM absent %s: %w", oldSIM.ICCID, err)
+		}
+
+		if wasActive {
+			now := time.Now()
 			event := &models.SIMChangeEvent{
 				ID:         uuid.New(),
 				DeviceID:   deviceID,
 				EventType:  models.SIMEventRemoved,
 				OldSIM:     oldSIM,
 				RiskLevel:  models.SIMRiskHigh,
-				DetectedAt: time.Now(),
+				IsAlerted:  true,
+				AlertedAt:  &now,
+				DetectedAt: now,
 			}
-			s.simEvents[deviceID] = append(s.simEvents[deviceID], event)
-			s.simAlertsRaised.Add(1)
+			if err := s.repo.InsertSIMEvent(ctx, event); err != nil {
+				return fmt.Errorf("persist SIM removal event: %w", err)
+			}
 
 			s.logger.Warn().
 				Str("device_id", deviceID).
@@ -416,14 +476,11 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 		}
 	}
 
-	s.simInfo[deviceID] = sims
 	return nil
 }
 
 // calculateSIMRisk calculates the risk level of a SIM change
-func (s *DeviceSecurityService) calculateSIMRisk(deviceID string, event *models.SIMChangeEvent) models.SIMRiskLevel {
-	settings := s.settings[deviceID]
-
+func (s *DeviceSecurityService) calculateSIMRisk(device *models.SecureDeviceInfo, settings *models.AntiTheftSettings, event *models.SIMChangeEvent) models.SIMRiskLevel {
 	// Check if SIM is in trusted list
 	if settings != nil && event.NewSIM != nil {
 		for _, trustedICCID := range settings.TrustedSIMICCIDs {
@@ -434,7 +491,6 @@ func (s *DeviceSecurityService) calculateSIMRisk(deviceID string, event *models.
 	}
 
 	// Check for suspicious patterns
-	device := s.devices[deviceID]
 	if device != nil {
 		// If device was reported lost/stolen, any SIM change is critical
 		if device.Status == models.DeviceStatusLost || device.Status == models.DeviceStatusStolen {
@@ -464,29 +520,32 @@ func (s *DeviceSecurityService) calculateSIMRisk(deviceID string, event *models.
 
 // GetSIMHistory returns SIM change history for a device
 func (s *DeviceSecurityService) GetSIMHistory(ctx context.Context, deviceID string) ([]*models.SIMChangeEvent, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.simEvents[deviceID], nil
+	if err := s.requireRepo(); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSIMEvents(ctx, deviceID, 200)
 }
 
 // GetCurrentSIMs returns current SIM information for a device
 func (s *DeviceSecurityService) GetCurrentSIMs(ctx context.Context, deviceID string) ([]*models.SIMInfo, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.simInfo[deviceID], nil
+	if err := s.requireRepo(); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSIMs(ctx, deviceID, true)
 }
 
 // AddTrustedSIM adds a SIM to the trusted list
 func (s *DeviceSecurityService) AddTrustedSIM(ctx context.Context, deviceID string, iccid string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
-	settings := s.settings[deviceID]
+	settings, err := s.repo.GetSettings(ctx, deviceID)
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
+	}
 	if settings == nil {
-		settings = &models.AntiTheftSettings{DeviceID: deviceID}
-		s.settings[deviceID] = settings
+		settings = defaultAntiTheftSettings(deviceID)
 	}
 
 	// Check if already trusted
@@ -499,21 +558,26 @@ func (s *DeviceSecurityService) AddTrustedSIM(ctx context.Context, deviceID stri
 	settings.TrustedSIMICCIDs = append(settings.TrustedSIMICCIDs, iccid)
 	settings.UpdatedAt = time.Now()
 
+	if err := s.repo.UpsertSettings(ctx, settings); err != nil {
+		return fmt.Errorf("persist settings: %w", err)
+	}
 	return nil
 }
 
 // RecordThiefSelfie records a thief selfie capture
 func (s *DeviceSecurityService) RecordThiefSelfie(ctx context.Context, selfie *models.ThiefSelfie) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
 	if selfie.ID == uuid.Nil {
 		selfie.ID = uuid.New()
 	}
 	selfie.CapturedAt = time.Now()
 
-	s.selfies[selfie.DeviceID] = append(s.selfies[selfie.DeviceID], selfie)
-	s.selfiesTaken.Add(1)
+	if err := s.repo.InsertSelfie(ctx, selfie); err != nil {
+		return fmt.Errorf("persist selfie: %w", err)
+	}
 
 	s.logger.Warn().
 		Str("device_id", selfie.DeviceID).
@@ -526,46 +590,41 @@ func (s *DeviceSecurityService) RecordThiefSelfie(ctx context.Context, selfie *m
 
 // GetThiefSelfies returns thief selfies for a device
 func (s *DeviceSecurityService) GetThiefSelfies(ctx context.Context, deviceID string) ([]*models.ThiefSelfie, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.selfies[deviceID], nil
+	if err := s.requireRepo(); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSelfies(ctx, deviceID, 100)
 }
 
 // GetSettings returns anti-theft settings for a device
 func (s *DeviceSecurityService) GetSettings(ctx context.Context, deviceID string) (*models.AntiTheftSettings, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	settings := s.settings[deviceID]
-	if settings == nil {
-		// Return default settings
-		return &models.AntiTheftSettings{
-			DeviceID:             deviceID,
-			EnableRemoteLocate:   true,
-			EnableRemoteLock:     true,
-			EnableRemoteWipe:     false,
-			EnableThiefSelfie:    true,
-			EnableSIMAlert:       true,
-			SelfieOnWrongPIN:     true,
-			SelfieOnWrongPattern: true,
-			SelfieAfterAttempts:  3,
-			AlertPushEnabled:     true,
-		}, nil
+	if err := s.requireRepo(); err != nil {
+		return nil, err
 	}
 
+	settings, err := s.repo.GetSettings(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("load settings: %w", err)
+	}
+	if settings == nil {
+		// Return default settings
+		return defaultAntiTheftSettings(deviceID), nil
+	}
 	return settings, nil
 }
 
 // UpdateSettings updates anti-theft settings
 func (s *DeviceSecurityService) UpdateSettings(ctx context.Context, deviceID string, update *models.AntiTheftSettings) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.requireRepo(); err != nil {
+		return err
+	}
 
-	settings := s.settings[deviceID]
+	settings, err := s.repo.GetSettings(ctx, deviceID)
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
+	}
 	if settings == nil {
 		settings = &models.AntiTheftSettings{DeviceID: deviceID}
-		s.settings[deviceID] = settings
 	}
 
 	settings.EnableRemoteLocate = update.EnableRemoteLocate
@@ -581,76 +640,60 @@ func (s *DeviceSecurityService) UpdateSettings(ctx context.Context, deviceID str
 	settings.AlertPushEnabled = update.AlertPushEnabled
 	settings.UpdatedAt = time.Now()
 
-	// Persist to cache
-	settingsKey := "device:settings:" + deviceID
-	_ = s.cache.SetJSON(ctx, settingsKey, settings, 0)
-
+	if err := s.repo.UpsertSettings(ctx, settings); err != nil {
+		return fmt.Errorf("persist settings: %w", err)
+	}
 	return nil
 }
 
 // MarkDeviceLost marks a device as lost
 func (s *DeviceSecurityService) MarkDeviceLost(ctx context.Context, deviceID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	device, exists := s.devices[deviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", deviceID)
+	if err := s.requireRepo(); err != nil {
+		return err
 	}
-
-	device.Status = models.DeviceStatusLost
-	device.UpdatedAt = time.Now()
-
+	if err := s.repo.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusLost); err != nil {
+		return err
+	}
+	s.invalidateDeviceCache(ctx, deviceID)
 	s.logger.Warn().Str("device_id", deviceID).Msg("device marked as lost")
-
 	return nil
 }
 
 // MarkDeviceStolen marks a device as stolen
 func (s *DeviceSecurityService) MarkDeviceStolen(ctx context.Context, deviceID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	device, exists := s.devices[deviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", deviceID)
+	if err := s.requireRepo(); err != nil {
+		return err
 	}
-
-	device.Status = models.DeviceStatusStolen
-	device.UpdatedAt = time.Now()
-
+	if err := s.repo.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusStolen); err != nil {
+		return err
+	}
+	s.invalidateDeviceCache(ctx, deviceID)
 	s.logger.Warn().Str("device_id", deviceID).Msg("device marked as stolen")
-
 	return nil
 }
 
 // MarkDeviceRecovered marks a device as recovered/active
 func (s *DeviceSecurityService) MarkDeviceRecovered(ctx context.Context, deviceID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	device, exists := s.devices[deviceID]
-	if !exists {
-		return fmt.Errorf("device not found: %s", deviceID)
+	if err := s.requireRepo(); err != nil {
+		return err
 	}
-
-	device.Status = models.DeviceStatusActive
-	device.UpdatedAt = time.Now()
-
+	if err := s.repo.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusActive); err != nil {
+		return err
+	}
+	s.invalidateDeviceCache(ctx, deviceID)
 	s.logger.Info().Str("device_id", deviceID).Msg("device marked as recovered")
-
 	return nil
 }
 
 // AuditOSVulnerabilities checks device OS for known vulnerabilities
 func (s *DeviceSecurityService) AuditOSVulnerabilities(ctx context.Context, deviceID string, platform string, osVersion string, securityPatch string, apiLevel int) *models.OSSecurityAuditResult {
 	result := &models.OSSecurityAuditResult{
-		DeviceID:      deviceID,
-		Platform:      platform,
-		OSVersion:     osVersion,
-		SecurityPatch: securityPatch,
-		APILevel:      apiLevel,
-		AuditedAt:     time.Now(),
+		DeviceID:        deviceID,
+		Platform:        platform,
+		OSVersion:       osVersion,
+		SecurityPatch:   securityPatch,
+		APILevel:        apiLevel,
+		AuditedAt:       time.Now(),
 		Vulnerabilities: make([]models.OSVulnerability, 0),
 		Recommendations: make([]models.SecurityRecommendation, 0),
 	}
@@ -927,12 +970,13 @@ func (s *DeviceSecurityService) generateOSRecommendations(result *models.OSSecur
 
 // GetDeviceSecurityStatus returns comprehensive security status
 func (s *DeviceSecurityService) GetDeviceSecurityStatus(ctx context.Context, deviceID string) (*models.DeviceSecurityStatus, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	if err := s.requireRepo(); err != nil {
+		return nil, err
+	}
 
-	device := s.devices[deviceID]
-	if device == nil {
-		return nil, fmt.Errorf("device not found: %s", deviceID)
+	device, err := s.repo.GetDevice(ctx, deviceID)
+	if err != nil {
+		return nil, err
 	}
 
 	status := &models.DeviceSecurityStatus{
@@ -956,7 +1000,10 @@ func (s *DeviceSecurityService) GetDeviceSecurityStatus(ctx context.Context, dev
 	}
 
 	// Get anti-theft status
-	settings := s.settings[deviceID]
+	settings, err := s.repo.GetSettings(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("load settings: %w", err)
+	}
 	if settings != nil {
 		status.AntiTheftEnabled = settings.EnableRemoteLocate || settings.EnableRemoteLock || settings.EnableRemoteWipe
 	}
@@ -965,14 +1012,17 @@ func (s *DeviceSecurityService) GetDeviceSecurityStatus(ctx context.Context, dev
 	status.LastLocation = device.LastLocation
 
 	// Count pending commands
-	for _, cmd := range s.commands[deviceID] {
-		if cmd.Status == models.CommandStatusPending {
-			status.PendingCommands++
-		}
+	pendingCount, err := s.repo.CountPendingCommands(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("count pending commands: %w", err)
 	}
+	status.PendingCommands = pendingCount
 
 	// Get SIM info
-	sims := s.simInfo[deviceID]
+	sims, err := s.repo.GetSIMs(ctx, deviceID, true)
+	if err != nil {
+		return nil, fmt.Errorf("load SIMs: %w", err)
+	}
 	for _, sim := range sims {
 		if sim.IsActive {
 			status.CurrentSIM = sim
@@ -981,11 +1031,11 @@ func (s *DeviceSecurityService) GetDeviceSecurityStatus(ctx context.Context, dev
 	}
 
 	// Count SIM alerts
-	for _, event := range s.simEvents[deviceID] {
-		if event.IsAlerted {
-			status.SIMChangeAlerts++
-		}
+	alertCount, err := s.repo.CountAlertedSIMEvents(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("count SIM alerts: %w", err)
 	}
+	status.SIMChangeAlerts = alertCount
 
 	// Run OS vulnerability audit
 	osAudit := s.AuditOSVulnerabilities(ctx, deviceID, device.Platform, device.OSVersion, device.SecurityPatch, device.APILevel)
@@ -1030,15 +1080,37 @@ func (s *DeviceSecurityService) GetDeviceSecurityStatus(ctx context.Context, dev
 	return status, nil
 }
 
-// GetStats returns service statistics
+// GetStats returns service statistics sourced from the database.
 func (s *DeviceSecurityService) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"devices_tracked":     s.devicesTracked.Load(),
-		"commands_issued":     s.commandsIssued.Load(),
-		"commands_executed":   s.commandsExecuted.Load(),
-		"sim_alerts_raised":   s.simAlertsRaised.Load(),
-		"selfies_taken":       s.selfiesTaken.Load(),
-		"android_vulns":       len(models.KnownAndroidVulnerabilities),
-		"ios_vulns":           len(models.KnowniOSVulnerabilities),
+	stats := map[string]interface{}{
+		"devices_tracked":   int64(0),
+		"commands_issued":   int64(0),
+		"commands_executed": int64(0),
+		"sim_alerts_raised": int64(0),
+		"selfies_taken":     int64(0),
+		"android_vulns":     len(models.KnownAndroidVulnerabilities),
+		"ios_vulns":         len(models.KnowniOSVulnerabilities),
 	}
+
+	if s.repo == nil {
+		stats["error"] = ErrDeviceSecurityPersistenceUnavailable.Error()
+		return stats
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	dbStats, err := s.repo.GetStats(ctx)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to load device security stats")
+		stats["error"] = "failed to load stats from database"
+		return stats
+	}
+
+	stats["devices_tracked"] = dbStats.DevicesTracked
+	stats["commands_issued"] = dbStats.CommandsIssued
+	stats["commands_executed"] = dbStats.CommandsExecuted
+	stats["sim_alerts_raised"] = dbStats.SIMAlertsRaised
+	stats["selfies_taken"] = dbStats.SelfiesTaken
+	return stats
 }

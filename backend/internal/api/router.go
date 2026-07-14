@@ -63,6 +63,9 @@ func (r *Router) Setup() http.Handler {
 		// Health check
 		pub.Get("/health", r.handlers.Health.Check)
 		pub.Get("/ready", r.handlers.Health.Ready)
+		// /api/v1/health alias must stay public: the client pings health
+		// before login, and the /api/v1 Route block applies APIKeyAuth.
+		pub.Get("/api/v1/health", r.handlers.Health.Check)
 
 		// Public stats
 		pub.Get("/api/v1/stats", r.handlers.Stats.Get)
@@ -119,7 +122,9 @@ func (r *Router) Setup() http.Handler {
 		// Sources endpoints
 		api.Route("/sources", func(sources chi.Router) {
 			sources.Get("/", r.handlers.Sources.List)
+			sources.Post("/", r.handlers.Sources.Create)
 			sources.Get("/{slug}", r.handlers.Sources.Get)
+			sources.Patch("/{slug}", r.handlers.Sources.Update)
 		})
 
 		// Alerts endpoints
@@ -129,6 +134,13 @@ func (r *Router) Setup() http.Handler {
 			alerts.Post("/{id}/read", r.handlers.Alerts.MarkRead)
 		})
 
+		// Supply-chain security endpoints
+		api.Route("/supply-chain", func(sc chi.Router) {
+			sc.Get("/vulnerabilities", r.handlers.SupplyChain.GetVulnerabilities)
+			sc.Post("/check", r.handlers.SupplyChain.CheckPackages)
+			sc.Get("/trackers", r.handlers.SupplyChain.GetTrackers)
+		})
+
 		// SMS/Smishing protection endpoints
 		api.Route("/sms", func(sms chi.Router) {
 			sms.Post("/analyze", r.handlers.SMS.Analyze)
@@ -136,16 +148,19 @@ func (r *Router) Setup() http.Handler {
 			sms.Post("/check-url", r.handlers.SMS.CheckURL)
 			sms.Get("/patterns", r.handlers.SMS.GetPatterns)
 			sms.Get("/stats", r.handlers.SMS.GetStats)
-			sms.Post("/report-false-positive", r.handlers.SMS.GetStats) // Alias for now, returns stats
+			sms.Post("/report-false-positive", r.handlers.SMS.ReportFalsePositive)
 		})
 
 		// Path aliases: /api/v1/indicators -> /api/v1/intelligence (Flutter compatibility)
 		api.Get("/indicators", r.handlers.Intelligence.List)
 		api.Post("/indicators/check", r.handlers.Intelligence.Check)
+		api.Get("/indicators/{id}", r.handlers.Indicators.GetByID)
 
 		// Path aliases: /api/v1/intel/sources -> /api/v1/sources (Flutter compatibility)
 		api.Get("/intel/sources", r.handlers.Sources.List)
 		api.Get("/intel/sources/{slug}", r.handlers.Sources.Get)
+		api.Post("/intel/sources", r.handlers.Sources.Create)
+		api.Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
 
 		// URL/Safe Web protection endpoints
 		api.Route("/url", func(url chi.Router) {
@@ -233,6 +248,7 @@ func (r *Router) Setup() http.Handler {
 
 			// DNS protection
 			net.Post("/dns/check", r.handlers.NetworkSecurity.CheckDNS)
+			net.Get("/dns/leak-config", r.handlers.NetworkSecurity.GetDNSLeakConfig)
 			net.Get("/dns/providers", r.handlers.NetworkSecurity.GetDNSProviders)
 			net.Get("/dns/providers/{ip}", r.handlers.NetworkSecurity.GetDNSProvider)
 			net.Post("/dns/configure", r.handlers.NetworkSecurity.ConfigureDNS)
@@ -281,6 +297,10 @@ func (r *Router) Setup() http.Handler {
 			graph.Post("/sync", r.handlers.Graph.SyncFromPostgres)
 			graph.Post("/build-relationships", r.handlers.Graph.BuildRelationships)
 			graph.Get("/stats", r.handlers.Graph.GetStats)
+
+			// Graph exploration (node/relation listings)
+			graph.Get("/nodes", r.handlers.Graph.GetNodes)
+			graph.Get("/relations", r.handlers.Graph.GetRelations)
 		})
 
 		// YARA Rules Engine endpoints
@@ -314,7 +334,9 @@ func (r *Router) Setup() http.Handler {
 		// Correlation Engine endpoints
 		api.Route("/correlation", func(corr chi.Router) {
 			// Main correlation
+			corr.Get("/", r.handlers.Correlation.ListCorrelations)
 			corr.Post("/", r.handlers.Correlation.Correlate)
+			corr.Post("/run", r.handlers.Correlation.RunCorrelation)
 			corr.Post("/batch", r.handlers.Correlation.CorrelateBatch)
 			corr.Post("/analyze", r.handlers.Correlation.AnalyzeValue)
 
@@ -333,6 +355,11 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats
 			corr.Get("/stats", r.handlers.Correlation.GetStats)
+
+			// Correlate by indicator ID (Flutter compatibility: GET /correlation/{id}).
+			// chi gives static segments (run, stats, batch, analyze, indicator,
+			// campaigns, cluster) priority over this wildcard, so no shadowing.
+			corr.Get("/{id}", r.handlers.Correlation.CorrelateIndicator)
 		})
 
 		// MITRE ATT&CK endpoints
@@ -363,6 +390,7 @@ func (r *Router) Setup() http.Handler {
 
 			// Navigator export
 			mitre.Post("/navigator/export", r.handlers.MITRE.ExportNavigatorLayer)
+			mitre.Get("/navigator/export", r.handlers.MITRE.ExportNavigatorLayer)
 
 			// Stats and admin
 			mitre.Get("/stats", r.handlers.MITRE.GetStats)
@@ -389,7 +417,7 @@ func (r *Router) Setup() http.Handler {
 			ml.Post("/severity/predict", r.handlers.ML.PredictSeverity)
 
 			// Model management
-			ml.Get("/models", r.handlers.ML.GetStats)
+			ml.Get("/models", r.handlers.ML.GetModels)
 			ml.Get("/models/{model}", r.handlers.ML.GetModelInfo)
 			ml.Post("/models/train", r.handlers.ML.Train)
 			ml.Post("/models/{model}/train", r.handlers.ML.TrainModel)
@@ -477,6 +505,9 @@ func (r *Router) Setup() http.Handler {
 			dev.Get("/{device_id}/settings", r.handlers.DeviceSecurity.GetSettings)
 			dev.Put("/{device_id}/settings", r.handlers.DeviceSecurity.UpdateSettings)
 
+			// FCM push token registration (real-time command delivery)
+			dev.Post("/{device_id}/push-token", r.handlers.DeviceSecurity.RegisterPushToken)
+
 			// OS vulnerability auditing
 			dev.Post("/vulnerabilities/audit", r.handlers.DeviceSecurity.AuditOSVulnerabilities)
 
@@ -504,6 +535,9 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats
 			qr.Get("/stats", r.handlers.QRSecurity.GetStats)
+
+			// False-positive reporting
+			qr.Post("/report-false-positive", r.handlers.QRSecurity.ReportFalsePositive)
 		})
 
 		// Enterprise endpoints (MDM, Zero Trust, SIEM, Compliance)
@@ -511,6 +545,10 @@ func (r *Router) Setup() http.Handler {
 			// Overview and stats
 			ent.Get("/overview", r.handlers.Enterprise.GetEnterpriseOverview)
 			ent.Get("/stats", r.handlers.Enterprise.GetEnterpriseStats)
+
+			// Client-path alias for the Zero Trust policy list (the Flutter
+			// client uses /enterprise/policies).
+			ent.Get("/policies", r.handlers.Enterprise.ListPolicies)
 
 			// MDM/UEM Integration
 			ent.Route("/mdm", func(mdm chi.Router) {
@@ -543,12 +581,14 @@ func (r *Router) Setup() http.Handler {
 				siem.Get("/integrations/{id}", r.handlers.Enterprise.GetSIEMIntegration)
 				siem.Delete("/integrations/{id}", r.handlers.Enterprise.DeleteSIEMIntegration)
 				siem.Post("/events", r.handlers.Enterprise.SendSIEMEvent)
+				siem.Get("/alerts", r.handlers.Enterprise.GetSIEMAlerts)
 				siem.Get("/stats", r.handlers.Enterprise.GetSIEMStats)
 			})
 
 			// Compliance Reporting
 			ent.Route("/compliance", func(comp chi.Router) {
 				comp.Get("/frameworks", r.handlers.Enterprise.GetSupportedFrameworks)
+				comp.Get("/controls", r.handlers.Enterprise.GetComplianceControls)
 				comp.Get("/reports", r.handlers.Enterprise.ListComplianceReports)
 				comp.Post("/reports", r.handlers.Enterprise.GenerateComplianceReport)
 				comp.Get("/reports/{id}", r.handlers.Enterprise.GetComplianceReport)
@@ -603,7 +643,10 @@ func (r *Router) Setup() http.Handler {
 
 			// iOS upload variants
 			fr.Post("/ios/shutdown-log/upload", r.handlers.Forensics.UploadShutdownLog)
+			fr.Post("/ios/backup/upload", r.handlers.Forensics.UploadIOSBackup)
+			fr.Post("/ios/sysdiagnose/upload", r.handlers.Forensics.UploadSysdiagnose)
 			fr.Post("/android/logcat/upload", r.handlers.Forensics.UploadLogcat)
+			fr.Post("/android/bugreport/upload", r.handlers.Forensics.UploadBugreport)
 
 			// Comprehensive Analysis
 			fr.Post("/full-analysis", r.handlers.Forensics.FullAnalysis)
@@ -628,6 +671,9 @@ func (r *Router) Setup() http.Handler {
 			desktop.Post("/persistence/scan", r.handlers.DesktopSecurity.ScanPersistence)
 			desktop.Post("/persistence/quick-scan", r.handlers.DesktopSecurity.QuickScanPersistence)
 			desktop.Post("/persistence/scan-path", r.handlers.DesktopSecurity.ScanPath)
+			desktop.Get("/persistence", r.handlers.DesktopSecurity.GetCachedPersistence)
+			desktop.Get("/apps", r.handlers.DesktopSecurity.GetCachedApps)
+			desktop.Get("/firewall", r.handlers.DesktopSecurity.GetCachedFirewall)
 			desktop.Post("/codesign/verify", r.handlers.DesktopSecurity.VerifyCodeSigning)
 			desktop.Post("/codesign/verify-batch", r.handlers.DesktopSecurity.VerifyCodeSigningBatch)
 			desktop.Get("/network/connections", r.handlers.DesktopSecurity.GetNetworkConnections)
@@ -637,7 +683,9 @@ func (r *Router) Setup() http.Handler {
 			desktop.Post("/network/rules", r.handlers.DesktopSecurity.AddFirewallRule)
 			desktop.Delete("/network/rules/{id}", r.handlers.DesktopSecurity.DeleteFirewallRule)
 			desktop.Post("/network/block-ip", r.handlers.DesktopSecurity.BlockIP)
+			desktop.Post("/network/analyze", r.handlers.DesktopSecurity.AnalyzeNetworkConnections)
 			desktop.Post("/browser/extensions/scan", r.handlers.DesktopSecurity.ScanBrowserExtensions)
+			desktop.Post("/browser/analyze", r.handlers.DesktopSecurity.AnalyzeBrowserExtensions)
 			desktop.Get("/virustotal/hash/{hash}", r.handlers.DesktopSecurity.LookupHash)
 			desktop.Post("/virustotal/file", r.handlers.DesktopSecurity.LookupFile)
 			desktop.Post("/virustotal/batch", r.handlers.DesktopSecurity.LookupHashBatch)
@@ -686,6 +734,7 @@ func (r *Router) Setup() http.Handler {
 			an.Get("/reports", r.handlers.Analytics.ListReports)
 			an.Post("/reports", r.handlers.Analytics.CreateReport)
 			an.Get("/reports/{id}", r.handlers.Analytics.GetReport)
+			an.Get("/reports/{id}/download", r.handlers.Analytics.DownloadReport)
 		})
 
 		// Integrations endpoints (Slack, Teams, PagerDuty)
@@ -709,21 +758,23 @@ func (r *Router) Setup() http.Handler {
 		// /api/v1/siem/* -> /api/v1/enterprise/siem/*
 		api.Get("/siem/connections", r.handlers.Enterprise.ListSIEMIntegrations)
 		api.Get("/siem/forwarders", r.handlers.Enterprise.ListSIEMIntegrations) // alias
-		api.Get("/siem/alerts", r.handlers.Enterprise.GetSIEMStats)
+		api.Get("/siem/alerts", r.handlers.Enterprise.GetSIEMAlerts)
 
 		// /api/v1/vpn/* -> /api/v1/orbnet/*
 		api.Get("/vpn/servers", r.handlers.OrbNet.ListServers)
 		api.Get("/vpn/blocked", r.handlers.OrbNet.ListBlockRules)
 		api.Get("/vpn/stats", r.handlers.OrbNet.GetDashboardStats)
 
-		// ML insights alias
-		api.Get("/ml/insights", r.handlers.ML.GetStats)
-		api.Get("/ml/anomalies", r.handlers.ML.GetStats)
+		// ML insights and anomaly listings
+		api.Get("/ml/insights", r.handlers.ML.GetInsights)
+		api.Get("/ml/anomalies", r.handlers.ML.GetAnomalies)
 
-		// Network rogue-ap endpoints (map to wifi/audit for now)
-		api.Post("/network/rogue-ap/scan", r.handlers.NetworkSecurity.AuditWiFi)
-		api.Get("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.GetWiFiSecurityInfo)
-		api.Post("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.AuditWiFi)
+		// Network rogue-AP detection and trusted-AP management
+		api.Post("/network/rogue-ap/scan", r.handlers.NetworkSecurity.ScanRogueAPs)
+		api.Get("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.GetTrustedAPs)
+		api.Post("/network/rogue-ap/trusted", r.handlers.NetworkSecurity.AddTrustedAP)
+		api.Delete("/network/rogue-ap/trusted/{id}", r.handlers.NetworkSecurity.RemoveTrustedAP)
+		api.Get("/network/threats", r.handlers.NetworkSecurity.GetNetworkThreats)
 
 		// Admin endpoints
 		api.Route("/admin", func(admin chi.Router) {
@@ -739,6 +790,11 @@ func (r *Router) Setup() http.Handler {
 			admin.Get("/reports/{id}", r.handlers.Admin.GetReport)
 			admin.Post("/reports/{id}/approve", r.handlers.Admin.ApproveReport)
 			admin.Post("/reports/{id}/reject", r.handlers.Admin.RejectReport)
+
+			// Community YARA rule submission review
+			admin.Get("/yara/submissions", r.handlers.YARA.ListSubmissions)
+			admin.Post("/yara/submissions/{id}/approve", r.handlers.YARA.ApproveSubmission)
+			admin.Post("/yara/submissions/{id}/reject", r.handlers.YARA.RejectSubmission)
 
 			// Stats
 			admin.Get("/stats/detailed", r.handlers.Admin.DetailedStats)

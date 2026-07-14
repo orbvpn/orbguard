@@ -1,18 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
-class RootInstructionsScreen extends StatelessWidget {
+class RootInstructionsScreen extends StatefulWidget {
   const RootInstructionsScreen({super.key});
+
+  @override
+  State<RootInstructionsScreen> createState() => _RootInstructionsScreenState();
+}
+
+class _RootInstructionsScreenState extends State<RootInstructionsScreen> {
+  /// Same native channel used by DeviceSecurityProvider/_checkRootedAndroid —
+  /// MainActivity handles "checkRootAccess" and returns
+  /// {hasRoot, accessLevel, method}.
+  static const _systemChannel = MethodChannel('com.orb.guard/system');
+  static final Uri _xdaUrl = Uri.parse('https://forum.xda-developers.com/');
+
+  bool _isTesting = false;
+
+  Future<void> _openXdaForum() async {
+    final launched =
+        await launchUrl(_xdaUrl, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${_xdaUrl.host}')),
+      );
+    }
+  }
+
+  Future<void> _testRootAccess() async {
+    setState(() => _isTesting = true);
+    String title;
+    String message;
+    try {
+      final result = await _systemChannel.invokeMethod('checkRootAccess');
+      final map = result is Map ? result : const {};
+      final hasRoot = map['hasRoot'] == true;
+      final method = map['method']?.toString();
+      final accessLevel = map['accessLevel']?.toString();
+      title = hasRoot ? 'Root Access Detected' : 'No Root Access';
+      message = hasRoot
+          ? 'This device has root access'
+              '${method != null && method.isNotEmpty ? ' via $method' : ''}. '
+              'Access level: ${accessLevel ?? 'Full'}. '
+              'Deep spyware scans can use elevated privileges.'
+          : 'No root access was detected on this device. Scans will run '
+              'with standard (non-root) privileges.';
+    } on PlatformException catch (e) {
+      title = 'Root Check Failed';
+      message = 'The native root check could not run: '
+          '${e.message ?? e.code}';
+    } on MissingPluginException {
+      title = 'Root Check Unavailable';
+      message = 'The native root check is not available on this platform.';
+    } finally {
+      if (mounted) setState(() => _isTesting = false);
+    }
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Android Root Guide')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           const Card(
-            color: Color(0xFF1D1E33),
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Column(
@@ -35,7 +107,7 @@ class RootInstructionsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           _buildMethodCard(
             'Method 1: Magisk (Recommended)',
@@ -70,24 +142,28 @@ class RootInstructionsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {
-              // Open XDA Developers
-            },
-            icon: const DuotoneIcon(AppIcons.share, color: Colors.white),
+            onPressed: _openXdaForum,
+            icon: const DuotoneIcon(AppIcons.share, color: Brand.onLime),
             label: const Text('Visit XDA Developers Forum'),
             style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: () {
-              // Test root access
-              Navigator.pop(context);
-            },
-            icon: const DuotoneIcon(AppIcons.checkCircle, color: Colors.black),
-            label: const Text('Test Root Access'),
+            onPressed: _isTesting ? null : _testRootAccess,
+            icon: _isTesting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Brand.onLime,
+                    ),
+                  )
+                : const DuotoneIcon(AppIcons.checkCircle, color: Brand.onLime),
+            label: Text(_isTesting ? 'Testing...' : 'Test Root Access'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
+              backgroundColor: GlassTheme.primaryAccent,
+              foregroundColor: Brand.onLime,
               padding: const EdgeInsets.all(16),
             ),
           ),
@@ -102,7 +178,6 @@ class RootInstructionsScreen extends StatelessWidget {
     String note,
   ) {
     return Card(
-      color: const Color(0xFF1D1E33),
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -124,12 +199,12 @@ class RootInstructionsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               ),
               child: Text(
                 '💡 $note',
-                style: const TextStyle(fontSize: 12, color: Colors.blue),
+                style: TextStyle(fontSize: 12, color: AppColors.secondaryInk),
               ),
             ),
           ],

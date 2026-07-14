@@ -1,5 +1,5 @@
-/// Notification Actions
-/// Action identifiers and iOS notification categories
+// Notification Actions
+// Action identifiers and iOS notification categories
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -465,7 +465,7 @@ class NotificationActionHandler {
           navigate('/dashboard', null);
       }
     } catch (_) {
-      navigate?.call('/dashboard', null);
+      navigate('/dashboard', null);
     }
   }
 

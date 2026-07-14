@@ -1,9 +1,12 @@
-/// Digital Footprint Screen
-/// Data broker removal and personal data exposure tracking interface
+// Digital Footprint Screen
+// Data broker removal and personal data exposure tracking interface
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../presentation/theme/app_theme.dart';
+import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -54,7 +57,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: Colors.white),
+                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
                   onPressed: provider.isLoading ? null : () => provider.loadBrokers(),
                   tooltip: 'Refresh',
                 ),
@@ -64,7 +67,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           tabs: [
             GlassTab(
               label: 'Scan',
-              iconPath: 'magnifier',
+              iconPath: 'magnifer',
               content: _buildScanTab(provider),
             ),
             GlassTab(
@@ -85,14 +88,14 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
 
   Widget _buildScanTab(DigitalFootprintProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Privacy Score
           if (provider.lastScan != null) ...[
             _buildPrivacyScoreCard(provider.lastScan!.privacyScore),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             // Stats row
             Row(
               children: [
@@ -105,16 +108,16 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           ],
 
           // Scan form
-          const Text(
+          Text(
             'Scan Your Digital Footprint',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Enter your information to find where your data is being sold',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Email field
           _buildInputField(
@@ -152,7 +155,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               onPressed: provider.isScanning ? null : () => _startScan(provider),
               style: ElevatedButton.styleFrom(
                 backgroundColor: GlassTheme.primaryAccent,
-                foregroundColor: Colors.white,
+                foregroundColor: Brand.onLime,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: Row(
@@ -162,10 +165,10 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                     const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Brand.onLime),
                     )
                   else
-                    DuotoneIcon(AppIcons.search, size: 20, color: Colors.white),
+                    DuotoneIcon(AppIcons.search, size: 20, color: Brand.onLime),
                   const SizedBox(width: 8),
                   Text(provider.isScanning ? 'Scanning...' : 'Start Scan'),
                 ],
@@ -177,17 +180,18 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           if (provider.isScanning) ...[
             const SizedBox(height: 16),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
               child: LinearProgressIndicator(
                 value: provider.scanProgress,
-                backgroundColor: Colors.white12,
-                valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
+                backgroundColor:
+                    context.colors.onSurface.withValues(alpha: 0.06),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentInk),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Scanning ${(provider.scanProgress * 100).toInt()}%...',
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -198,9 +202,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Found on These Sites',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 TextButton(
                   onPressed: () => _requestBatchRemoval(provider, provider.lastScan!.brokers),
@@ -222,8 +226,11 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         : score >= 50
             ? GlassTheme.warningColor
             : GlassTheme.errorColor;
+    // Ink variant — lime is invisible as text/icon on light; tint fill stays `color`.
+    final inkColor = score >= 80 ? AppColors.accentInk : color;
 
     return GlassCard(
+      margin: EdgeInsets.zero,
       tintColor: color,
       child: Row(
         children: [
@@ -236,12 +243,13 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 CircularProgressIndicator(
                   value: score / 100,
                   strokeWidth: 8,
-                  backgroundColor: Colors.white12,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  backgroundColor:
+                      context.colors.onSurface.withValues(alpha: 0.06),
+                  valueColor: AlwaysStoppedAnimation<Color>(inkColor),
                 ),
                 Text(
                   '$score',
-                  style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: inkColor, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -251,9 +259,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Privacy Score',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -262,7 +270,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                       : score >= 50
                           ? 'Your data is moderately exposed'
                           : 'Your data is highly exposed',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
                 ),
               ],
             ),
@@ -283,7 +291,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
+            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
           ],
         ),
       ),
@@ -302,7 +310,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 6),
         GlassContainer(
@@ -310,13 +318,16 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           child: TextField(
             controller: controller,
             keyboardType: keyboardType,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: context.colors.onSurface),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+              hintStyle: TextStyle(
+                  color: context.colors.onSurfaceVariant
+                      .withValues(alpha: 0.7)),
               prefixIcon: Padding(
                 padding: const EdgeInsets.all(12),
-                child: DuotoneIcon(svgIcon, size: 20, color: Colors.white54),
+                child: DuotoneIcon(svgIcon,
+                    size: 20, color: context.colors.onSurfaceVariant),
               ),
               border: InputBorder.none,
             ),
@@ -328,7 +339,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
 
   Widget _buildBrokersTab(DigitalFootprintProvider provider) {
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
 
     if (provider.brokers.isEmpty) {
@@ -345,7 +356,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: groupedBrokers.entries.map((entry) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,7 +374,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         ? GlassTheme.errorColor
         : broker.difficulty >= 0.4
             ? GlassTheme.warningColor
-            : GlassTheme.successColor;
+            : AppColors.accentInk;
 
     return GlassCard(
       onTap: () => _showBrokerDetails(context, broker, provider),
@@ -380,11 +391,11 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                   children: [
                     Text(
                       broker.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       broker.website,
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -404,7 +415,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               _buildBrokerInfoChip(
                 AppIcons.clock,
                 '~${broker.estimatedDays} days',
-                Colors.white54,
+                context.colors.onSurfaceVariant,
               ),
               const SizedBox(width: 8),
               _buildBrokerInfoChip(
@@ -423,8 +434,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: GlassTheme.errorColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    color: GlassTheme.errorColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
                   ),
                   child: Text(
                     data,
@@ -443,8 +454,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
+        color: context.colors.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -467,14 +478,14 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stats
         Row(
           children: [
-            _buildStatCard('Submitted', provider.requestsSubmitted.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Submitted', provider.requestsSubmitted.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Completed', provider.requestsCompleted.toString(), GlassTheme.successColor),
+            _buildStatCard('Completed', provider.requestsCompleted.toString(), AppColors.accentInk),
           ],
         ),
         const SizedBox(height: 24),
@@ -511,11 +522,11 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               children: [
                 Text(
                   request.broker.name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   '${request.daysPending} days pending',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -535,16 +546,16 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withOpacity(0.5)),
+          DuotoneIcon(svgIcon, size: 64, color: AppColors.accentInk.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            style: TextStyle(color: context.colors.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
@@ -573,11 +584,14 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: GlassTheme.gradientTop,
-        title: const Text('Remove from All', style: TextStyle(color: Colors.white)),
+        backgroundColor: context.isDark
+            ? GlassTheme.gradientTop
+            : GlassTheme.gradientTopLight,
+        title: Text('Remove from All',
+            style: TextStyle(color: context.colors.onSurface)),
         content: Text(
           'Request removal from ${brokers.length} data brokers?',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -607,13 +621,19 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [GlassTheme.gradientTop, GlassTheme.gradientBottom],
+              colors: context.isDark
+                  ? const [GlassTheme.gradientTop, GlassTheme.gradientBottom]
+                  : const [
+                      GlassTheme.gradientTopLight,
+                      GlassTheme.gradientBottomLight,
+                    ],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(GlassTheme.radiusLarge)),
           ),
           child: ListView(
             controller: scrollController,
@@ -634,9 +654,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                       children: [
                         Text(
                           broker.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
                         ),
-                        Text(broker.website, style: const TextStyle(color: GlassTheme.primaryAccent)),
+                        Text(broker.website, style: TextStyle(color: AppColors.accentInk)),
                       ],
                     ),
                   ),
@@ -646,7 +666,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 const SizedBox(height: 20),
                 Text(
                   broker.description!,
-                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  style: TextStyle(color: context.colors.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 20),
@@ -663,9 +683,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
               ),
               if (broker.dataCollected.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Data They Collect',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -689,13 +709,13 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GlassTheme.errorColor,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Brand.onDanger,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      DuotoneIcon(AppIcons.trash, size: 20, color: Colors.white),
+                      DuotoneIcon(AppIcons.trash, size: 20, color: Brand.onDanger),
                       const SizedBox(width: 8),
                       const Text('Request Data Removal'),
                     ],
@@ -715,8 +735,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: context.colors.onSurfaceVariant)),
+          Text(value, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -725,17 +745,17 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
   Color _getCategoryColor(BrokerCategory category) {
     switch (category) {
       case BrokerCategory.peopleSearch:
-        return const Color(0xFF2196F3);
+        return AppColors.secondaryInk;
       case BrokerCategory.marketing:
-        return const Color(0xFF9C27B0);
+        return AppColors.chartColors[4];
       case BrokerCategory.financial:
-        return const Color(0xFF4CAF50);
+        return AppColors.accentInk;
       case BrokerCategory.health:
-        return const Color(0xFFFF5722);
+        return AppColors.errorInk;
       case BrokerCategory.background:
-        return const Color(0xFFFF9800);
+        return AppColors.amberInk;
       default:
-        return Colors.grey;
+        return context.colors.onSurfaceVariant;
     }
   }
 
