@@ -295,7 +295,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   icon: DuotoneIcon(
                     'bolt',
                     size: 22,
-                    color: _isFlashOn ? GlassTheme.primaryAccent : context.colors.onSurface,
+                    color: _isFlashOn ? AppColors.accentInk : context.colors.onSurface,
                   ),
                   tooltip: 'Flash',
                 ),

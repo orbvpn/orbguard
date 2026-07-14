@@ -108,7 +108,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             icon: 'shield_check',
             title: 'Full Forensic Scan',
             description: 'Comprehensive analysis for all known spyware',
-            color: GlassTheme.primaryAccent,
+            color: AppColors.accentInk,
             onTap: provider.isAnalyzing
                 ? null
                 : () => provider.runFullAnalysis(),
@@ -209,7 +209,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               children: [
                 Row(
                   children: [
-                    DuotoneIcon('info_circle', size: 24, color: GlassTheme.primaryAccent),
+                    DuotoneIcon('info_circle', size: 24, color: AppColors.accentInk),
                     const SizedBox(width: 12),
                     Text(
                       'About Forensic Analysis',
@@ -246,7 +246,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    GlassTheme.primaryAccent,
+                    AppColors.accentInk,
                   ),
                 ),
               ),
@@ -275,7 +275,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               value: provider.progress,
               backgroundColor: cs.onSurface.withValues(alpha: 0.08),
               valueColor: AlwaysStoppedAnimation<Color>(
-                GlassTheme.primaryAccent,
+                AppColors.accentInk,
               ),
               minHeight: 6,
             ),
@@ -616,7 +616,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               children: [
                 Row(
                   children: [
-                    DuotoneIcon('database', size: 24, color: GlassTheme.primaryAccent),
+                    DuotoneIcon('database', size: 24, color: AppColors.accentInk),
                     const SizedBox(width: 12),
                     Text(
                       'IOC Database',
@@ -631,7 +631,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                     _buildStatItem(
                       'Total IOCs',
                       stats.totalIOCs.toString(),
-                      GlassTheme.primaryAccent,
+                      AppColors.accentInk,
                     ),
                     _buildStatItem(
                       'Last Updated',

@@ -101,8 +101,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               label: 'Accounts',
               iconPath: 'user_circle',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildAccountsTab(provider),
             ),
@@ -110,8 +110,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               label: 'Alerts',
               iconPath: 'danger_triangle',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildAlertsTab(provider),
             ),
@@ -119,8 +119,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               label: 'Privacy',
               iconPath: 'shield',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildPrivacyTab(provider),
             ),
@@ -128,8 +128,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               label: 'Exposure',
               iconPath: 'magnifer',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildExposuresTab(provider),
             ),
@@ -160,7 +160,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                 child: DuotoneIcon(
                   hasAlerts ? 'danger_triangle' : 'verified_check',
                   size: 28,
-                  color: hasAlerts ? GlassTheme.errorColor : GlassTheme.successColor,
+                  color: hasAlerts ? GlassTheme.errorColor : AppColors.accentInk,
                 ),
               ),
             ),
@@ -174,7 +174,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         ? '${provider.activeAlerts.length} Active Alerts'
                         : 'All Clear', maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: hasAlerts ? GlassTheme.errorColor : GlassTheme.successColor,
+                      color: hasAlerts ? GlassTheme.errorColor : AppColors.accentInk,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -191,12 +191,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               ),
             ),
             if (provider.isScanning)
-              const SizedBox(
+              SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                 ),
               ),
           ],
@@ -404,7 +404,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: GlassTheme.tintedGlassDecoration(
-        tintColor: _getPrivacyColor(score),
+        tintColor: _getPrivacyFillColor(score),
         radius: GlassTheme.radiusXSmall,
       ),
       child: Row(
@@ -556,8 +556,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                     const SizedBox(width: 8),
                     Text(
                       '@${alert.targetUsername}',
-                      style: const TextStyle(
-                        color: GlassTheme.primaryAccent,
+                      style: TextStyle(
+                        color: AppColors.accentInk,
                         fontSize: 13,
                       ),
                     ),
@@ -761,7 +761,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                     DuotoneIcon(
                       setting.isOptimal ? 'check_circle' : 'danger_triangle',
                       color: setting.isOptimal
-                          ? GlassTheme.successColor
+                          ? AppColors.accentInk
                           : GlassTheme.warningColor,
                       size: 16,
                     ),
@@ -795,10 +795,10 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             const SizedBox(height: 12),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              title: const Text(
+              title: Text(
                 'Recommendations',
                 style: TextStyle(
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                   fontSize: 13,
                 ),
               ),
@@ -808,9 +808,9 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const DuotoneIcon(
+                      DuotoneIcon(
                         'alt_arrow_right',
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                         size: 18,
                       ),
                       const SizedBox(width: 4),
@@ -935,9 +935,9 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             ),
             child: Row(
               children: [
-                const DuotoneIcon(
+                DuotoneIcon(
                   'lightbulb_bolt',
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                   size: 16,
                 ),
                 const SizedBox(width: 8),
@@ -1159,7 +1159,17 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     }
   }
 
+  // Ink (contrast-safe) color for the privacy score — text, icons, progress.
   Color _getPrivacyColor(int score) {
+    if (score >= 80) return AppColors.accentInk;
+    if (score >= 60) return AppColors.accentInk;
+    if (score >= 40) return GlassTheme.warningColor;
+    if (score >= 20) return AppColors.severityHigh;
+    return AppColors.severityCritical;
+  }
+
+  // Fill color for the privacy score — glass tints/pills.
+  Color _getPrivacyFillColor(int score) {
     if (score >= 80) return GlassTheme.successColor;
     if (score >= 60) return AppColors.successDark;
     if (score >= 40) return GlassTheme.warningColor;

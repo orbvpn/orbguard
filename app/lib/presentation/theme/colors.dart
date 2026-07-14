@@ -134,6 +134,18 @@ class AppColors {
   /// Theme-aware secondary text (brand --text-2). NOT const.
   static Color get text2 => _dark ? textSecondaryDark : textSecondary;
 
+  /// Contrast-safe glyph/ink for a given FILL color. A very bright fill (e.g.
+  /// Volt Lime) rendered as an icon/glyph on a pale tint of itself is invisible
+  /// on light backgrounds; in light mode this darkens such fills. Dark mode and
+  /// normal-luminance colors pass through unchanged. Used by the glass icon-box
+  /// widgets, which paint the box tint from `color` and the glyph from this.
+  static Color glyphInk(Color fill) {
+    if (uiBrightness == Brightness.light && fill.computeLuminance() > 0.5) {
+      return Color.lerp(fill, Colors.black, 0.45) ?? fill;
+    }
+    return fill;
+  }
+
   // Kit rule: raw lime (#C6FF3D) is a FILL color — as ink it fails contrast on
   // light. Use these for any lime/pink/red-colored text, icon or indicator;
   // they resolve to the vivid hue on dark and the contrast-safe deep variant

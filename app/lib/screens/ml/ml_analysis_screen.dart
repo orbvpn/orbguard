@@ -175,7 +175,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     if (_isLoading) {
       return GlassPage(
         title: 'ML Analysis',
-        body: const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+        body: Center(child: CircularProgressIndicator(color: AppColors.accentInk)),
       );
     }
 
@@ -186,14 +186,14 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
       searchHint: 'Search anomalies...',
       actions: [
         _isRunningAnalysis
-            ? const Padding(
-                padding: EdgeInsets.all(12),
+            ? Padding(
+                padding: const EdgeInsets.all(12),
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: GlassTheme.primaryAccent,
+                    color: AppColors.accentInk,
                   ),
                 ),
               )
@@ -240,9 +240,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard(context, 'Models', _models.length.toString(), GlassTheme.primaryAccent),
+            _buildStatCard(context, 'Models', _models.length.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard(context, 'Trained', _models.where((m) => m.isReady).length.toString(), GlassTheme.successColor),
+            _buildStatCard(context, 'Trained', _models.where((m) => m.isReady).length.toString(), AppColors.accentInk),
           ],
         ),
         const SizedBox(height: 24),
@@ -305,7 +305,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
     final accuracyColor = accuracy == null
         ? cs.onSurfaceVariant
         : accuracy >= 0.9
-            ? GlassTheme.successColor
+            ? AppColors.accentInk
             : accuracy >= 0.7
                 ? GlassTheme.warningColor
                 : GlassTheme.errorColor;
@@ -318,7 +318,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             children: [
               GlassSvgIconBox(
                 icon: _getModelIcon(model.type),
-                color: model.isReady ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                color: model.isReady ? AppColors.accentInk : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -335,7 +335,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
               ),
               GlassBadge(
                 text: model.isReady ? 'READY' : 'NOT TRAINED',
-                color: model.isReady ? GlassTheme.successColor : GlassTheme.warningColor,
+                color: model.isReady ? AppColors.accentInk : GlassTheme.warningColor,
                 fontSize: 10,
               ),
               const SizedBox(width: 8),
@@ -645,7 +645,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
               Text(
                 value != null ? '${(value * 100).toInt()}%' : 'n/a',
                 style: TextStyle(
-                  color: value != null ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                  color: value != null ? AppColors.accentInk : cs.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -657,7 +657,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
             child: LinearProgressIndicator(
               value: value ?? 0,
               backgroundColor: cs.onSurface.withValues(alpha: 0.06),
-              valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentInk),
               minHeight: 6,
             ),
           ),

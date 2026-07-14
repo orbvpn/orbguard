@@ -674,10 +674,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             size: 120,
             tintColor: AppColors.accent,
             onTap: () => _startScan(),
-            child: const DuotoneIcon(
+            child: DuotoneIcon(
               AppIcons.search,
               size: 56,
-              color: AppColors.accent,
+              color: AppColors.accentInk,
             ),
           ),
           const SizedBox(height: 24),
@@ -775,8 +775,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: AppColors.accent.withAlpha(30),
                             border: Border.all(color: AppColors.accent.withAlpha(60), width: 1),
                           ),
-                          child: const Center(
-                            child: DuotoneIcon(AppIcons.shield, size: 28, color: AppColors.accent),
+                          child: Center(
+                            child: DuotoneIcon(AppIcons.shield, size: 28, color: AppColors.accentInk),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -1240,7 +1240,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: DuotoneIcon(
                       svgIcon,
                       size: 18,
-                      color: AppColors.accent,
+                      color: AppColors.accentInk,
                     ),
                   ),
                 ),

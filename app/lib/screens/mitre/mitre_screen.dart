@@ -104,8 +104,8 @@ class _MatrixTab extends StatelessWidget {
     return Consumer<MitreProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+          return Center(
+            child: CircularProgressIndicator(color: AppColors.accentInk),
           );
         }
 

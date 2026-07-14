@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -62,8 +63,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
 
   Widget _buildBody(EnterprisePolicyProvider provider) {
     if (provider.isLoading && !provider.hasLoaded) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     if (provider.error != null) {
@@ -75,7 +76,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
 
     return RefreshIndicator(
       onRefresh: provider.loadPolicies,
-      color: GlassTheme.primaryAccent,
+      color: AppColors.accentInk,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
@@ -92,9 +93,9 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     return Row(
       children: [
         _buildStatItem('Total', provider.policies.length.toString(),
-            GlassTheme.primaryAccent),
+            AppColors.accentInk),
         _buildStatItem('Enabled', provider.enabledPolicies.length.toString(),
-            GlassTheme.successColor),
+            AppColors.accentInk),
         _buildStatItem('Disabled', provider.disabledPolicies.length.toString(),
             context.colors.onSurfaceVariant),
       ],
@@ -199,7 +200,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                 context.colors.onSurfaceVariant,
               ),
               if (policy.grantControls.requireMfa)
-                _buildBadge('MFA', GlassTheme.primaryAccent),
+                _buildBadge('MFA', GlassTheme.primaryAccent, ink: AppColors.accentInk),
               if (policy.conditions.requireCompliance)
                 _buildBadge('Compliance', GlassTheme.warningColor),
               if (policy.conditions.requireManaged)
@@ -215,7 +216,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
     );
   }
 
-  Widget _buildBadge(String text, Color color) {
+  Widget _buildBadge(String text, Color color, {Color? ink}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -225,7 +226,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       child: Text(
         text,
         style: TextStyle(
-          color: color,
+          color: ink ?? color,
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),
@@ -430,8 +431,8 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DuotoneIcon('check_circle',
-                        size: 18, color: GlassTheme.primaryAccent),
+                    DuotoneIcon('check_circle',
+                        size: 18, color: AppColors.accentInk),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

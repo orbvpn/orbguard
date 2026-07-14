@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -169,7 +170,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: GlassTheme.primaryAccent),
+            CircularProgressIndicator(color: AppColors.accentInk),
             const SizedBox(height: 16),
             Text(
               'Loading indicators...',
@@ -269,10 +270,10 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                         backgroundColor: cs.onSurface.withValues(alpha: 0.06),
                         selectedColor: GlassTheme.primaryAccent.withAlpha(50),
                         labelStyle: TextStyle(
-                          color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                          color: isSelected ? AppColors.accentInk : cs.onSurfaceVariant,
                           fontSize: 12,
                         ),
-                        checkmarkColor: GlassTheme.primaryAccent,
+                        checkmarkColor: AppColors.accentInk,
                       ),
                     );
                   }).toList(),
@@ -286,7 +287,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              _buildStatCard('Total', _indicators.length.toString(), GlassTheme.primaryAccent),
+              _buildStatCard('Total', _indicators.length.toString(), AppColors.accentInk),
               const SizedBox(width: 12),
               _buildStatCard('Critical', _indicators.where((i) => i.severity == api.SeverityLevel.critical || i.severity == api.SeverityLevel.high).length.toString(), GlassTheme.errorColor),
               const SizedBox(width: 12),
@@ -361,7 +362,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    GlassBadge(text: _getTypeDisplayName(indicator.type), color: GlassTheme.primaryAccent, fontSize: 10),
+                    GlassBadge(text: _getTypeDisplayName(indicator.type), color: AppColors.accentInk, fontSize: 10),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -491,7 +492,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         onTap: () => _showQuickCheckDialog(context, title),
         child: Row(
           children: [
-            GlassSvgIconBox(icon: icon, color: GlassTheme.primaryAccent, size: 40),
+            GlassSvgIconBox(icon: icon, color: AppColors.accentInk, size: 40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -514,7 +515,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon('history', size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon('history', size: 64, color: AppColors.accentInk.withAlpha(128)),
             const SizedBox(height: 16),
             Text(
               'No Check History',
@@ -546,7 +547,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         children: [
           GlassSvgIconBox(
             icon: result.isThreat ? 'danger_triangle' : 'check_circle',
-            color: result.isThreat ? GlassTheme.errorColor : GlassTheme.successColor,
+            color: result.isThreat ? GlassTheme.errorColor : AppColors.accentInk,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -559,7 +560,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                 ),
                 Row(
                   children: [
-                    GlassBadge(text: result.type?.name ?? 'Unknown', color: GlassTheme.primaryAccent, fontSize: 10),
+                    GlassBadge(text: result.type?.name ?? 'Unknown', color: AppColors.accentInk, fontSize: 10),
                     const SizedBox(width: 8),
                     if (result.severity != null)
                       GlassBadge(text: result.severity!.displayName, color: Color(result.severity!.color), fontSize: 10),
@@ -570,7 +571,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
           ),
           GlassBadge(
             text: result.isThreat ? 'Threat' : 'Clean',
-            color: result.isThreat ? GlassTheme.errorColor : GlassTheme.successColor,
+            color: result.isThreat ? GlassTheme.errorColor : AppColors.accentInk,
             fontSize: 10,
           ),
         ],
@@ -648,7 +649,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                       children: [
                         Text(
                           _getTypeDisplayName(indicator.type), maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: GlassTheme.primaryAccent, fontSize: 14),
+                          style: TextStyle(color: AppColors.accentInk, fontSize: 14),
                         ),
                         const SizedBox(height: 4),
                         SelectableText(
@@ -691,7 +692,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: indicator.tags.map((tag) => GlassBadge(text: tag, color: GlassTheme.primaryAccent)).toList(),
+                children: indicator.tags.map((tag) => GlassBadge(text: tag, color: AppColors.accentInk)).toList(),
               ),
               if (indicator.mitreTechniques != null && indicator.mitreTechniques!.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -720,8 +721,8 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
                   icon: const DuotoneIcon('copy', size: 20),
                   label: const Text('Copy Indicator'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: GlassTheme.primaryAccent,
-                    side: const BorderSide(color: GlassTheme.primaryAccent),
+                    foregroundColor: AppColors.accentInk,
+                    side: BorderSide(color: AppColors.accentInk),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),

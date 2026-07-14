@@ -275,7 +275,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                             child: LinearProgressIndicator(
                               value: progress,
                               backgroundColor: context.colors.onSurface.withValues(alpha: 0.06),
-                              color: GlassTheme.primaryAccent,
+                              color: AppColors.accentInk,
                               minHeight: 4,
                             ),
                           ),

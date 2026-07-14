@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/colors.dart';
 import '../theme/glass_theme.dart';
 
 // Re-export core glass widgets from glass_theme.dart for convenience
@@ -73,19 +74,25 @@ class GlassBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = color ?? GlassTheme.primaryAccent;
+    // Default to the contrast-safe accent ink (deep lime on light); for any
+    // explicit color, glyphInk keeps a too-bright fill (lime) readable on light
+    // while the tint fill below still uses the raw color.
+    final rawColor = color ?? AppColors.accentInk;
+    // Tint fill uses the raw color; text/icon ink uses the contrast-safe glyph
+    // color so a too-bright fill (lime) stays readable on light.
+    final inkColor = AppColors.glyphInk(rawColor);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: GlassTheme.badgeGlassDecoration(
         isDark: isDark,
-        tintColor: badgeColor,
+        tintColor: rawColor,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: badgeColor),
+            Icon(icon, size: 14, color: inkColor),
             const SizedBox(width: 4),
           ],
           Text(
@@ -93,7 +100,7 @@ class GlassBadge extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: badgeColor,
+              color: inkColor,
               fontSize: fontSize ?? 12,
               fontWeight: FontWeight.w600,
             ),
@@ -135,7 +142,7 @@ class GlassIconBox extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: Icon(icon, color: color, size: iconSize),
+        child: Icon(icon, color: AppColors.glyphInk(color), size: iconSize),
       ),
     );
   }
@@ -176,7 +183,7 @@ class GlassSvgIconBox extends StatelessWidget {
           'assets/icons/$icon.svg',
           width: iconSize,
           height: iconSize,
-          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(AppColors.glyphInk(color), BlendMode.srcIn),
         ),
       ),
     );

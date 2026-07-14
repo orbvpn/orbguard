@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -107,7 +108,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     return GlassPage(
       title: 'Enterprise Overview',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : Column(
@@ -130,7 +131,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
                     Expanded(
                       child: RefreshIndicator(
                         onRefresh: _loadData,
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                         child: ListView(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           children: [
@@ -167,14 +168,14 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
             _buildMetricCard(
               'Policies',
               _fmt(_policyCount),
-              GlassTheme.primaryAccent,
+              AppColors.accentInk,
               'clipboard_text',
             ),
             const SizedBox(width: 12),
             _buildMetricCard(
               'Enabled',
               _fmt(_enabledPolicyCount),
-              GlassTheme.successColor,
+              AppColors.accentInk,
               'check_circle',
             ),
             const SizedBox(width: 12),
@@ -208,7 +209,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         _buildMetricCard(
           'Integrations',
           _fmt(_stats.mdmIntegrations),
-          GlassTheme.primaryAccent,
+          AppColors.accentInk,
           'settings',
         ),
         const SizedBox(width: 12),
@@ -222,7 +223,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         _buildMetricCard(
           'Compliant',
           _fmt(_stats.mdmCompliantDevices),
-          GlassTheme.successColor,
+          AppColors.accentInk,
           'check_circle',
         ),
       ],
@@ -235,14 +236,14 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
         _buildMetricCard(
           'Integrations',
           _fmt(_stats.siemIntegrations),
-          GlassTheme.primaryAccent,
+          AppColors.accentInk,
           'server',
         ),
         const SizedBox(width: 12),
         _buildMetricCard(
           'Events Sent Today',
           _fmt(_stats.eventsSentToday),
-          GlassTheme.successColor,
+          AppColors.accentInk,
           'upload_minimalistic',
         ),
       ],
@@ -257,7 +258,7 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
             _buildMetricCard(
               'Reports',
               _fmt(_stats.complianceReports),
-              GlassTheme.primaryAccent,
+              AppColors.accentInk,
               'document',
             ),
             const SizedBox(width: 12),

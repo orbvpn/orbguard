@@ -54,28 +54,28 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               label: 'Overview',
               iconPath: 'shield',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildOverviewTab(provider),
             ),
             GlassTab(
               label: 'Camera/Mic',
               iconPath: 'camera',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildCameraMicTab(provider),
             ),
             GlassTab(
               label: 'Trackers',
               iconPath: 'forbidden',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildTrackersTab(provider),
             ),
             GlassTab(
               label: 'Events',
               iconPath: 'history',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildEventsTab(provider),
             ),
           ],
@@ -110,7 +110,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             subtitle: 'Get alerts when apps access camera',
             value: provider.cameraMonitoringEnabled,
             onChanged: provider.setCameraMonitoring,
-            color: GlassTheme.primaryAccent,
+            color: AppColors.accentInk,
           ),
           _buildSettingsTile(
             icon: AppIcons.microphone,
@@ -148,7 +148,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildStatCard('Apps Audited', provider.lastAudit!.totalAppsAudited.toString(), GlassTheme.primaryAccent),
+                _buildStatCard('Apps Audited', provider.lastAudit!.totalAppsAudited.toString(), AppColors.accentInk),
                 const SizedBox(width: 12),
                 _buildStatCard('Trackers Found', provider.lastAudit!.totalTrackers.toString(), GlassTheme.errorColor),
               ],
@@ -220,6 +220,8 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
         : score >= 50
             ? GlassTheme.warningColor
             : GlassTheme.errorColor;
+    // Ink variant — lime is invisible as text/icon on light; tint fill stays `color`.
+    final inkColor = score >= 80 ? AppColors.accentInk : color;
 
     return GlassCard(
       margin: EdgeInsets.zero,
@@ -237,11 +239,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   strokeWidth: 8,
                   backgroundColor:
                       context.colors.onSurface.withValues(alpha: 0.06),
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  valueColor: AlwaysStoppedAnimation<Color>(inkColor),
                 ),
                 Text(
                   '$score',
-                  style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: inkColor, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -259,7 +261,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                     ),
                     if (audit.grade != null) ...[
                       const SizedBox(width: 8),
-                      GlassBadge(text: 'Grade ${audit.grade}', color: color),
+                      GlassBadge(text: 'Grade ${audit.grade}', color: inkColor),
                     ],
                   ],
                 ),
@@ -276,7 +278,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Risk level: ${audit.riskLevel}',
-                    style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: inkColor, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],
               ],
@@ -310,11 +312,11 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                 ),
               ),
               if (provider.isAuditing)
-                const SizedBox(
+                SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: GlassTheme.primaryAccent),
+                      strokeWidth: 2, color: AppColors.accentInk),
                 ),
             ],
           ),
@@ -392,7 +394,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           // Camera Events
           Row(
             children: [
-              DuotoneIcon(AppIcons.camera, color: GlassTheme.primaryAccent, size: 24),
+              DuotoneIcon(AppIcons.camera, color: AppColors.accentInk, size: 24),
               const SizedBox(width: 8),
               Text(
                 'Recent Camera Access',
@@ -471,7 +473,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
   }
 
   Widget _buildEventCard(PrivacyEvent event) {
-    final color = event.isBackground ? GlassTheme.errorColor : GlassTheme.primaryAccent;
+    final color = event.isBackground ? GlassTheme.errorColor : AppColors.accentInk;
 
     return GlassCard(
       child: Row(
@@ -531,7 +533,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
           tintColor: GlassTheme.successColor,
           child: Row(
             children: [
-              const GlassSvgIconBox(icon: AppIcons.forbidden, color: GlassTheme.successColor),
+              GlassSvgIconBox(icon: AppIcons.forbidden, color: AppColors.accentInk),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -572,7 +574,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
         children: [
           GlassSvgIconBox(
             icon: tracker.isBlocked ? AppIcons.forbidden : AppIcons.chartSquare,
-            color: tracker.isBlocked ? GlassTheme.successColor : GlassTheme.warningColor,
+            color: tracker.isBlocked ? AppColors.accentInk : GlassTheme.warningColor,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -628,7 +630,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(icon, size: 64, color: AppColors.accentInk.withAlpha(128)),
           const SizedBox(height: 16),
           Text(
             title,

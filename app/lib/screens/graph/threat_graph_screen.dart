@@ -93,9 +93,9 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
         return GlassPage(
           title: 'Threat Graph',
           body: provider.isLoadingGraph
-              ? const Center(
+              ? Center(
                   child: CircularProgressIndicator(
-                      color: GlassTheme.primaryAccent))
+                      color: AppColors.accentInk))
               : Column(
                   children: [
                     // Actions row

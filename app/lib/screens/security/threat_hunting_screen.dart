@@ -95,14 +95,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           headerContent: _buildHeaderContent(provider),
           actions: [
             if (provider.isHunting)
-              const Padding(
-                padding: EdgeInsets.all(12),
+              Padding(
+                padding: const EdgeInsets.all(12),
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: GlassTheme.primaryAccent,
+                    color: AppColors.accentInk,
                   ),
                 ),
               )
@@ -134,8 +134,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildHuntsContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildHuntsTab(provider);
@@ -143,8 +143,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildFindingsContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildFindingsTab(provider);
@@ -152,8 +152,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildCasesContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildCasesTab(provider);
@@ -161,8 +161,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildMitreContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildMitreTab(provider);
@@ -170,8 +170,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildGraphContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildGraphTab(provider);
@@ -179,8 +179,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildCorrelationContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildCorrelationTab(provider);
@@ -188,8 +188,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
 
   Widget _buildMLContent(ThreatHuntingProvider provider) {
     if (provider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentInk),
       );
     }
     return _buildMLTab(provider);
@@ -207,12 +207,12 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         children: [
           Row(
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                 ),
               ),
               const SizedBox(width: 12),
@@ -239,8 +239,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               ),
               Text(
                 '${(progress.progress * 100).toInt()}%',
-                style: const TextStyle(
-                  color: GlassTheme.primaryAccent,
+                style: TextStyle(
+                  color: AppColors.accentInk,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -252,8 +252,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             child: LinearProgressIndicator(
               value: progress.progress,
               backgroundColor: context.onSurface.withValues(alpha: 0.06),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                GlassTheme.primaryAccent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppColors.accentInk,
               ),
             ),
           ),
@@ -270,7 +270,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           _buildStatItem(
             'Hunts',
             provider.availableHunts.length.toString(),
-            GlassTheme.primaryAccent,
+            AppColors.accentInk,
           ),
           _buildStatItem(
             'Findings',
@@ -463,7 +463,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       child: Text(
                         badgeText,
                         style: TextStyle(
-                          color: badgeColor,
+                          color: AppColors.glyphInk(badgeColor),
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -538,7 +538,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         icon: 'check_circle',
         title: 'No Findings',
         subtitle: 'Run threat hunts to detect security issues',
-        color: GlassTheme.successColor,
+        color: AppColors.accentInk,
       );
     }
 
@@ -689,10 +689,10 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const DuotoneIcon(
+                        DuotoneIcon(
                           'arrow_right',
                           size: 16,
-                          color: GlassTheme.primaryAccent,
+                          color: AppColors.accentInk,
                         ),
                         Expanded(
                           child: Text(
@@ -948,15 +948,16 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
     required String icon,
     required String title,
     required String subtitle,
-    Color color = GlassTheme.primaryAccent,
+    Color? color,
   }) {
+    final iconColor = color ?? AppColors.accentInk;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
+            DuotoneIcon(icon, size: 64, color: iconColor.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -1453,7 +1454,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
             children: [
               Row(
                 children: [
-                  const DuotoneIcon('structure', color: GlassTheme.primaryAccent, size: 24),
+                  DuotoneIcon('structure', color: AppColors.accentInk, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -1585,7 +1586,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('${allNodes.length}', style: const TextStyle(color: GlassTheme.primaryAccent, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('${allNodes.length}', style: TextStyle(color: AppColors.accentInk, fontSize: 24, fontWeight: FontWeight.bold)),
                     Text('Nodes', style: TextStyle(color: context.onSurfaceMuted, fontSize: 12)),
                   ],
                 ),
@@ -1881,9 +1882,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         // Stats
         Row(
           children: [
-            _buildCorrelationStat('Correlations', '${events.length}', GlassTheme.primaryAccent),
+            _buildCorrelationStat('Correlations', '${events.length}', AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildCorrelationStat('High Confidence', '${events.where((e) => e.confidence >= 0.8).length}', GlassTheme.successColor),
+            _buildCorrelationStat('High Confidence', '${events.where((e) => e.confidence >= 0.8).length}', AppColors.accentInk),
             const SizedBox(width: 12),
             _buildCorrelationStat('Strong', '${events.where((e) => e.strength == 'strong' || e.strength == 'very_strong').length}', GlassTheme.warningColor),
           ],
@@ -1897,14 +1898,14 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
           child: Row(
             children: [
               if (_isRunningCorrelation)
-                const SizedBox(
+                SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: GlassTheme.primaryAccent),
+                      strokeWidth: 2, color: AppColors.accentInk),
                 )
               else
-                const DuotoneIcon('play', color: GlassTheme.primaryAccent, size: 24),
+                DuotoneIcon('play', color: AppColors.accentInk, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1974,7 +1975,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
   Widget _buildCorrelationEventCard(_CorrelationEvent event) {
     final engineColor = _getCorrelationEngineColor(event.engine);
     final confidenceColor = event.confidence >= 0.8
-        ? GlassTheme.successColor
+        ? AppColors.accentInk
         : event.confidence >= 0.5
             ? GlassTheme.warningColor
             : context.onSurfaceMuted;
@@ -2103,8 +2104,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                   shape: BoxShape.circle,
                   color: GlassTheme.primaryAccent.withAlpha(40),
                 ),
-                child: const Center(
-                  child: DuotoneIcon('cpu', size: 40, color: GlassTheme.primaryAccent),
+                child: Center(
+                  child: DuotoneIcon('cpu', size: 40, color: AppColors.accentInk),
                 ),
               ),
               const SizedBox(width: 20),
@@ -2118,9 +2119,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const DuotoneIcon('check_circle', size: 14, color: GlassTheme.successColor),
+                        DuotoneIcon('check_circle', size: 14, color: AppColors.accentInk),
                         const SizedBox(width: 4),
-                        const Text('Healthy', style: TextStyle(color: GlassTheme.successColor, fontSize: 12)),
+                        Text('Healthy', style: TextStyle(color: AppColors.accentInk, fontSize: 12)),
                         const SizedBox(width: 16),
                         Text(
                           '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)} anomalies today',
@@ -2139,9 +2140,9 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         // Model stats
         Row(
           children: [
-            _buildMLStat('Models', '${models.length}', GlassTheme.primaryAccent),
+            _buildMLStat('Models', '${models.length}', AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildMLStat('Avg Accuracy', models.isEmpty ? 'N/A' : '${(models.fold(0.0, (sum, m) => sum + m.accuracy) / models.length * 100).toStringAsFixed(1)}%', GlassTheme.successColor),
+            _buildMLStat('Avg Accuracy', models.isEmpty ? 'N/A' : '${(models.fold(0.0, (sum, m) => sum + m.accuracy) / models.length * 100).toStringAsFixed(1)}%', AppColors.accentInk),
             const SizedBox(width: 12),
             _buildMLStat('Anomalies', '${models.fold(0, (sum, m) => sum + m.anomaliesDetected)}', GlassTheme.warningColor),
           ],
@@ -2192,7 +2193,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                     'cpu',
                     size: 24,
                     color: model.isActive
-                        ? GlassTheme.primaryAccent
+                        ? AppColors.accentInk
                         : context.onSurfaceMuted,
                   ),
                 ),
@@ -2210,7 +2211,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${model.accuracy}%', style: TextStyle(color: GlassTheme.successColor, fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text('${model.accuracy}%', style: TextStyle(color: AppColors.accentInk, fontWeight: FontWeight.bold, fontSize: 18)),
                   Text('accuracy', style: TextStyle(color: context.onSurfaceMuted.withValues(alpha: 0.7), fontSize: 10)),
                 ],
               ),
@@ -2262,7 +2263,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
                       color: GlassTheme.primaryAccent.withAlpha(40),
                       borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
                     ),
-                    child: const DuotoneIcon('cpu', color: GlassTheme.primaryAccent, size: 28),
+                    child: DuotoneIcon('cpu', color: AppColors.accentInk, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

@@ -185,7 +185,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                 value: provider.scanProgress,
                 backgroundColor:
                     context.colors.onSurface.withValues(alpha: 0.06),
-                valueColor: const AlwaysStoppedAnimation<Color>(GlassTheme.primaryAccent),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentInk),
               ),
             ),
             const SizedBox(height: 8),
@@ -226,6 +226,8 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         : score >= 50
             ? GlassTheme.warningColor
             : GlassTheme.errorColor;
+    // Ink variant — lime is invisible as text/icon on light; tint fill stays `color`.
+    final inkColor = score >= 80 ? AppColors.accentInk : color;
 
     return GlassCard(
       margin: EdgeInsets.zero,
@@ -243,11 +245,11 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                   strokeWidth: 8,
                   backgroundColor:
                       context.colors.onSurface.withValues(alpha: 0.06),
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  valueColor: AlwaysStoppedAnimation<Color>(inkColor),
                 ),
                 Text(
                   '$score',
-                  style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: inkColor, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -337,7 +339,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
 
   Widget _buildBrokersTab(DigitalFootprintProvider provider) {
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
 
     if (provider.brokers.isEmpty) {
@@ -372,7 +374,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         ? GlassTheme.errorColor
         : broker.difficulty >= 0.4
             ? GlassTheme.warningColor
-            : GlassTheme.successColor;
+            : AppColors.accentInk;
 
     return GlassCard(
       onTap: () => _showBrokerDetails(context, broker, provider),
@@ -481,9 +483,9 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Submitted', provider.requestsSubmitted.toString(), GlassTheme.primaryAccent),
+            _buildStatCard('Submitted', provider.requestsSubmitted.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Completed', provider.requestsCompleted.toString(), GlassTheme.successColor),
+            _buildStatCard('Completed', provider.requestsCompleted.toString(), AppColors.accentInk),
           ],
         ),
         const SizedBox(height: 24),
@@ -544,7 +546,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withValues(alpha: 0.5)),
+          DuotoneIcon(svgIcon, size: 64, color: AppColors.accentInk.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -654,7 +656,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
                           broker.name,
                           style: TextStyle(color: context.colors.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
                         ),
-                        Text(broker.website, style: const TextStyle(color: GlassTheme.primaryAccent)),
+                        Text(broker.website, style: TextStyle(color: AppColors.accentInk)),
                       ],
                     ),
                   ),

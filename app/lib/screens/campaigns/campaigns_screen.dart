@@ -86,7 +86,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Active',
           iconPath: 'shield',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns.where((c) => c.isActive).toList()),
@@ -95,7 +95,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Critical',
           iconPath: 'danger_triangle',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns.where((c) => c.severity == SeverityLevel.critical).toList()),
@@ -104,7 +104,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'Stats',
           iconPath: 'chart',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildStatsView(),
@@ -113,7 +113,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
           label: 'History',
           iconPath: 'history',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildCampaignsList(_campaigns),
@@ -163,7 +163,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          DuotoneIcon(icon, size: 20, color: GlassTheme.primaryAccent),
+          DuotoneIcon(icon, size: 20, color: AppColors.accentInk),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -459,7 +459,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                             Text(
                               campaign.isActive ? 'Active Campaign' : 'Inactive',
                               style: TextStyle(
-                                color: campaign.isActive ? GlassTheme.successColor : cs.onSurfaceVariant,
+                                color: campaign.isActive ? AppColors.accentInk : cs.onSurfaceVariant,
                               ),
                             ),
                           ],

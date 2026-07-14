@@ -84,7 +84,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           label: 'Connections',
           iconPath: 'server',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState(_error!)
                   : _buildConnectionsTab(),
@@ -93,7 +93,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           label: 'Forwarders',
           iconPath: 'cloud_storage',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState(_error!)
                   : _buildForwardersTab(),
@@ -102,7 +102,7 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
           label: 'Alerts',
           iconPath: 'shield',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState(_error!)
                   : _buildAlertsTab(),
@@ -131,9 +131,9 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Connected', _connections.where((c) => c.isConnected).length.toString(), GlassTheme.successColor),
+            _buildStatCard('Connected', _connections.where((c) => c.isConnected).length.toString(), AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Events/min', _formatEventsPerMin(_connections.fold(0, (sum, c) => sum + c.eventsPerMinute)), GlassTheme.primaryAccent),
+            _buildStatCard('Events/min', _formatEventsPerMin(_connections.fold(0, (sum, c) => sum + c.eventsPerMinute)), AppColors.accentInk),
             const SizedBox(width: 12),
             _buildStatCard('Errors', _connections.fold(0, (sum, c) => sum + c.errors).toString(), GlassTheme.errorColor),
           ],
@@ -360,11 +360,11 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Total', '${_alerts.length}', GlassTheme.primaryAccent),
+            _buildStatCard('Total', '${_alerts.length}', AppColors.accentInk),
             const SizedBox(width: 12),
             _buildStatCard('Critical', '$criticalCount', GlassTheme.errorColor),
             const SizedBox(width: 12),
-            _buildStatCard('Forwarded', '$forwardedCount', GlassTheme.successColor),
+            _buildStatCard('Forwarded', '$forwardedCount', AppColors.accentInk),
           ],
         ),
         const SizedBox(height: 24),
@@ -506,8 +506,8 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
               icon: const DuotoneIcon('refresh', size: 18),
               label: const Text('Retry'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: GlassTheme.primaryAccent,
-                side: const BorderSide(color: GlassTheme.primaryAccent),
+                foregroundColor: AppColors.accentInk,
+                side: BorderSide(color: AppColors.accentInk),
               ),
             ),
           ],

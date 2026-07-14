@@ -161,10 +161,14 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () => _confirmMarkLost(context, provider),
                           icon: DuotoneIcon('object_scan', size: 18),
-                          label: const Text('Mark Lost'),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Mark Lost', maxLines: 1),
+                          ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.secondaryInk,
                             side: BorderSide(color: AppColors.secondaryInk),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                         ),
                       ),
@@ -173,10 +177,14 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () => _confirmMarkStolen(context, provider),
                           icon: DuotoneIcon('danger_circle', size: 18),
-                          label: const Text('Mark Stolen'),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Mark Stolen', maxLines: 1),
+                          ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.errorInk,
                             side: BorderSide(color: AppColors.errorInk),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                         ),
                       ),
@@ -292,7 +300,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     final color = score == null
         ? context.colors.onSurfaceVariant.withValues(alpha: 0.7)
         : score >= 80
-            ? GlassTheme.successColor
+            ? AppColors.accentInk
             : score >= 50
                 ? GlassTheme.warningColor
                 : GlassTheme.errorColor;
@@ -1121,7 +1129,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(svgIcon, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+            DuotoneIcon(svgIcon, size: 64, color: AppColors.accentInk.withAlpha(128)),
             const SizedBox(height: 16),
             Text(
               title,

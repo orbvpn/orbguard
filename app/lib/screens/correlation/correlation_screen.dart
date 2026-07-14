@@ -81,7 +81,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     return GlassPage(
       title: 'Correlation Engine',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : Column(
               children: [
                 // Actions row
@@ -119,7 +119,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                           backgroundColor: GlassTheme.glassColor(isDark),
                           selectedColor: GlassTheme.primaryAccent.withAlpha(77),
                           labelStyle: TextStyle(
-                            color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                            color: isSelected ? AppColors.accentInk : cs.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -133,9 +133,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      _buildStatCard(context, 'Correlations', _results.length.toString(), GlassTheme.primaryAccent),
+                      _buildStatCard(context, 'Correlations', _results.length.toString(), AppColors.accentInk),
                       const SizedBox(width: 12),
-                      _buildStatCard(context, 'High Confidence', _results.where((r) => r.confidence >= 0.8).length.toString(), GlassTheme.successColor),
+                      _buildStatCard(context, 'High Confidence', _results.where((r) => r.confidence >= 0.8).length.toString(), AppColors.accentInk),
                     ],
                   ),
                 ),
@@ -178,10 +178,10 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                       tintColor: GlassTheme.primaryAccent,
                       child: Row(
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: GlassTheme.primaryAccent),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentInk),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -239,7 +239,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   Widget _buildResultCard(BuildContext context, CorrelationResult result) {
     final cs = Theme.of(context).colorScheme;
     final confidenceColor = result.confidence >= 0.8
-        ? GlassTheme.successColor
+        ? AppColors.accentInk
         : result.confidence >= 0.5
             ? GlassTheme.warningColor
             : cs.onSurfaceVariant;

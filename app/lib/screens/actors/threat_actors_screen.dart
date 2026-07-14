@@ -79,7 +79,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
     return GlassPage(
       title: 'Threat Actors',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : Column(
@@ -120,7 +120,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                               Theme.of(context).brightness == Brightness.dark),
                           selectedColor: GlassTheme.primaryAccent.withAlpha(77),
                           labelStyle: TextStyle(
-                            color: isSelected ? GlassTheme.primaryAccent : cs.onSurfaceVariant,
+                            color: isSelected ? AppColors.accentInk : cs.onSurfaceVariant,
                           ),
                         ),
                       );
@@ -253,9 +253,9 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'Active',
-                      style: TextStyle(color: GlassTheme.successColor, fontSize: 10),
+                      style: TextStyle(color: AppColors.accentInk, fontSize: 10),
                     ),
                   ],
                 ),
@@ -386,7 +386,7 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
                             ),
                             const SizedBox(width: 8),
                             if (actor.isActive)
-                              const GlassBadge(text: 'Active', color: GlassTheme.successColor),
+                              GlassBadge(text: 'Active', color: AppColors.accentInk),
                           ],
                         ),
                       ],

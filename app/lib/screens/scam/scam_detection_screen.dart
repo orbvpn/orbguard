@@ -108,7 +108,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           // Stats row
           Row(
             children: [
-              _buildStatCard('Scanned', provider.totalScanned.toString(), GlassTheme.primaryAccent),
+              _buildStatCard('Scanned', provider.totalScanned.toString(), AppColors.accentInk),
               const SizedBox(width: 12),
               _buildStatCard('Detected', provider.scamsDetected.toString(), GlassTheme.errorColor),
             ],
@@ -145,7 +145,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                     selectedColor: GlassTheme.primaryAccent.withValues(alpha: 0.3),
                     labelStyle: TextStyle(
                       color: isSelected
-                          ? GlassTheme.primaryAccent
+                          ? AppColors.accentInk
                           : cs.onSurfaceVariant,
                     ),
                   ),
@@ -670,7 +670,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
 
   Widget _buildPatternsTab(ScamDetectionProvider provider) {
     if (provider.isLoadingPatterns) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
 
     if (provider.patterns.isEmpty) {
@@ -788,7 +788,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(icon, size: 64, color: GlassTheme.primaryAccent.withValues(alpha: 0.5)),
+          DuotoneIcon(icon, size: 64, color: AppColors.accentInk.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             title,

@@ -45,7 +45,7 @@ class AppSecurityScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             if (option == currentSort)
-                              DuotoneIcon('check_circle', size: 18, color: GlassTheme.primaryAccent)
+                              DuotoneIcon('check_circle', size: 18, color: AppColors.accentInk)
                             else
                               const SizedBox(width: 18),
                             const SizedBox(width: 8),

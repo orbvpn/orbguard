@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/brand.dart';
+import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
@@ -41,21 +42,21 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               label: 'Dashboard',
               iconPath: 'chart',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildDashboardTab(provider),
             ),
             GlassTab(
               label: 'Alerts',
               iconPath: 'shield',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildAlertsTab(provider),
             ),
             GlassTab(
               label: 'VIPs',
               iconPath: 'lock',
               content: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
                   : _buildVIPsTab(provider),
             ),
           ],
@@ -140,7 +141,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                 size: 40,
                 color: hasAlerts
                     ? GlassTheme.errorColor
-                    : GlassTheme.successColor,
+                    : AppColors.accentInk,
               ),
             ),
             const SizedBox(width: 20),
@@ -172,6 +173,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                       _buildStatusBadge(
                         '${provider.executives.length} VIPs',
                         GlassTheme.primaryAccent,
+                        ink: AppColors.accentInk,
                       ),
                       const SizedBox(width: 8),
                       _buildStatusBadge(
@@ -189,7 +191,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String text, Color color) {
+  Widget _buildStatusBadge(String text, Color color, {Color? ink}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -199,7 +201,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       child: Text(
         text,
         style: TextStyle(
-          color: color,
+          color: ink ?? color,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -214,7 +216,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
           'Total Alerts',
           provider.totalAlertsCount.toString(),
           'bell',
-          GlassTheme.primaryAccent,
+          AppColors.accentInk,
         ),
         const SizedBox(width: 12),
         _buildStatCard(
@@ -228,7 +230,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
           'VIPs Protected',
           provider.highValueExecutives.length.toString(),
           'shield_check',
-          GlassTheme.successColor,
+          AppColors.accentInk,
         ),
       ],
     );
@@ -317,12 +319,12 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(icon, size: 16, color: GlassTheme.primaryAccent),
+          DuotoneIcon(icon, size: 16, color: AppColors.accentInk),
           const SizedBox(width: 6),
           Text(
             type.displayName,
-            style: const TextStyle(
-              color: GlassTheme.primaryAccent,
+            style: TextStyle(
+              color: AppColors.accentInk,
               fontSize: 12,
             ),
           ),
@@ -503,7 +505,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                   DuotoneIcon(
                     'lightbulb',
                     size: 18,
-                    color: GlassTheme.primaryAccent,
+                    color: AppColors.accentInk,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -569,7 +571,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
               style: TextStyle(
                 color: exec.isHighValue
                     ? GlassTheme.warningColor
-                    : GlassTheme.primaryAccent,
+                    : AppColors.accentInk,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -764,9 +766,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: const OutlineInputBorder(
+                    focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                   ),
@@ -785,9 +787,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: const OutlineInputBorder(
+                    focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                   ),
@@ -808,9 +810,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: cs.outline),
                     ),
-                    focusedBorder: const OutlineInputBorder(
+                    focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                   ),
@@ -959,9 +961,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: const OutlineInputBorder(
+                        focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                       ),
@@ -976,9 +978,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: const OutlineInputBorder(
+                        focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                       ),
@@ -993,9 +995,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: const OutlineInputBorder(
+                        focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                       ),
@@ -1012,9 +1014,9 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: cs.outline),
                         ),
-                        focusedBorder: const OutlineInputBorder(
+                        focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                       ),
@@ -1080,7 +1082,7 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
           children: [
             DuotoneIcon(
               result.isImpersonation ? 'danger_triangle' : 'check_circle',
-              color: result.isImpersonation ? riskColor : GlassTheme.successColor,
+              color: result.isImpersonation ? riskColor : AppColors.accentInk,
               size: 24,
             ),
             const SizedBox(width: 12),

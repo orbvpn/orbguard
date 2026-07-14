@@ -81,8 +81,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               label: 'CVEs',
               iconPath: 'danger_triangle',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildVulnerabilitiesTab(provider),
             ),
@@ -90,8 +90,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               label: 'Trackers',
               iconPath: 'magnifer',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildTrackersTab(provider),
             ),
@@ -99,8 +99,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               label: 'Libraries',
               iconPath: 'chart',
               content: provider.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: GlassTheme.primaryAccent),
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppColors.accentInk),
                     )
                   : _buildLibrariesTab(provider),
             ),
@@ -136,12 +136,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 children: [
                   Row(
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: GlassTheme.primaryAccent,
+                          color: AppColors.accentInk,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -161,7 +161,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                     child: LinearProgressIndicator(
                       value: provider.scanProgress,
                       backgroundColor: context.onSurface.withValues(alpha: 0.04),
-                      color: GlassTheme.primaryAccent,
+                      color: AppColors.accentInk,
                       minHeight: 6,
                     ),
                   ),
@@ -274,7 +274,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                 ),
                 child: DuotoneIcon(
                   hasIssues ? 'danger_triangle' : 'verified_check',
-                  color: hasIssues ? GlassTheme.errorColor : GlassTheme.successColor,
+                  color: hasIssues ? GlassTheme.errorColor : AppColors.accentInk,
                   size: 28,
                 ),
               ),
@@ -288,7 +288,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                           ? '${provider.totalVulnerabilities} Vulnerabilities Found'
                           : 'No Vulnerabilities', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: hasIssues ? GlassTheme.errorColor : GlassTheme.successColor,
+                        color: hasIssues ? GlassTheme.errorColor : AppColors.accentInk,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -373,7 +373,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
         'verified_check',
         'No Vulnerabilities',
         'No known vulnerabilities found in your apps',
-        GlassTheme.successColor,
+        AppColors.accentInk,
       );
     }
 
@@ -483,12 +483,12 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const DuotoneIcon('check_circle', size: 14, color: GlassTheme.successColor),
+                  DuotoneIcon('check_circle', size: 14, color: AppColors.accentInk),
                   const SizedBox(width: 4),
                   Text(
                     'Fixed in ${vuln.fixedVersion}',
-                    style: const TextStyle(
-                      color: GlassTheme.successColor,
+                    style: TextStyle(
+                      color: AppColors.accentInk,
                       fontSize: 12,
                     ),
                   ),
@@ -512,7 +512,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
         'eye_closed',
         'No Trackers Found',
         'No tracking libraries detected in your apps',
-        GlassTheme.successColor,
+        AppColors.accentInk,
       );
     }
 
@@ -653,7 +653,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           tilePadding: EdgeInsets.zero,
           leading: DuotoneIcon(
             _getCategoryIcon(entry.value.first.category),
-            color: GlassTheme.primaryAccent,
+            color: AppColors.accentInk,
           ),
           title: Text(
             entry.key,
@@ -667,8 +667,8 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
             ),
             child: Text(
               '${entry.value.length}',
-              style: const TextStyle(
-                color: GlassTheme.primaryAccent,
+              style: TextStyle(
+                color: AppColors.accentInk,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -905,14 +905,14 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                           DuotoneIcon(
                             'link',
                             size: 14,
-                            color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
+                            color: AppColors.accentInk.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               ref,
                               style: TextStyle(
-                                color: GlassTheme.primaryAccent.withValues(alpha: 0.7),
+                                color: AppColors.accentInk.withValues(alpha: 0.7),
                                 fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,

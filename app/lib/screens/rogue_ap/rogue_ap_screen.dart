@@ -175,8 +175,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             child: LinearProgressIndicator(
               value: provider.scanProgress,
               backgroundColor: cs.onSurface.withValues(alpha: 0.06),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                GlassTheme.primaryAccent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppColors.accentInk,
               ),
             ),
           ),
@@ -791,7 +791,7 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
     required String icon,
     required String title,
     required String subtitle,
-    Color color = GlassTheme.primaryAccent,
+    Color? color,
   }) {
     final cs = Theme.of(context).colorScheme;
     return Center(
@@ -800,7 +800,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
+            DuotoneIcon(icon, size: 64,
+                color: (color ?? AppColors.accentInk).withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,

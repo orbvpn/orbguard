@@ -105,7 +105,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
     return GlassPage(
       title: 'Intelligence Sources',
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : _sources.isEmpty
@@ -139,9 +139,9 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                           // Stats
                           Row(
                             children: [
-                              _buildStatCard('Active', _sources.where((s) => s.isEnabled).length.toString(), GlassTheme.successColor),
+                              _buildStatCard('Active', _sources.where((s) => s.isEnabled).length.toString(), AppColors.accentInk),
                               const SizedBox(width: 12),
-                              _buildStatCard('Total IOCs', _formatIOCCount(_sources.fold(0, (sum, s) => sum + s.indicatorCount)), GlassTheme.primaryAccent),
+                              _buildStatCard('Total IOCs', _formatIOCCount(_sources.fold(0, (sum, s) => sum + s.indicatorCount)), AppColors.accentInk),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -272,13 +272,13 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                 ),
               ),
               if (isUpdating)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: GlassTheme.primaryAccent),
+                        strokeWidth: 2, color: AppColors.accentInk),
                   ),
                 )
               else
@@ -391,7 +391,7 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DuotoneIcon(AppIcons.intelligence, size: 64, color: GlassTheme.primaryAccent.withAlpha(128)),
+          DuotoneIcon(AppIcons.intelligence, size: 64, color: AppColors.accentInk.withAlpha(128)),
           const SizedBox(height: 16),
           Text(
             'No Intelligence Sources',
@@ -681,13 +681,13 @@ class _AddSourceDialogState extends State<_AddSourceDialog> {
         TextButton(
           onPressed: _isSubmitting ? null : _submit,
           child: _isSubmitting
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: GlassTheme.primaryAccent),
+                      strokeWidth: 2, color: AppColors.accentInk),
                 )
-              : const Text('Add', style: TextStyle(color: GlassTheme.primaryAccent)),
+              : Text('Add', style: TextStyle(color: AppColors.accentInk)),
         ),
       ],
     );

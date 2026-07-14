@@ -916,7 +916,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   value: score / 100,
                   strokeWidth: 10,
                   backgroundColor: cs.onSurface.withValues(alpha: 0.06),
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  // Lime ring on a lime-tinted card is near-invisible on light;
+                  // use the contrast-safe deep-lime ink for the high (lime)
+                  // state. Pink/red states stay on their fill hue.
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      score >= 80 ? AppColors.accentInk : color),
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.min,

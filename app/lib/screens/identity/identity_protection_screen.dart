@@ -46,14 +46,14 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (provider.isScanning)
-                  const Padding(
-                    padding: EdgeInsets.all(12),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
                     child: SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                   )
@@ -76,9 +76,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               label: 'Overview',
               iconPath: 'user',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildOverviewTab(provider),
@@ -87,9 +87,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               label: 'Assets',
               iconPath: 'shield_check',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildAssetsTab(provider),
@@ -98,9 +98,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               label: 'Alerts',
               iconPath: 'danger_triangle',
               content: provider.isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     )
                   : _buildAlertsTab(provider),
@@ -249,8 +249,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            color: GlassTheme.primaryAccent,
+          style: TextStyle(
+            color: AppColors.accentInk,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -290,7 +290,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               .length
               .toString(),
           'shield_check',
-          GlassTheme.successColor,
+          AppColors.accentInk,
         ),
       ],
     );
@@ -339,9 +339,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           children: [
             Row(
               children: [
-                const DuotoneIcon(
+                DuotoneIcon(
                   'shield_check',
-                  color: GlassTheme.primaryAccent,
+                  color: AppColors.accentInk,
                   size: 24,
                 ),
                 const SizedBox(width: 8),
@@ -358,7 +358,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   '${provider.frozenBureausCount}/3 Self-Reported',
                   style: TextStyle(
                     color: provider.frozenBureausCount == 3
-                        ? GlassTheme.successColor
+                        ? AppColors.accentInk
                         : context.colors.onSurfaceVariant,
                     fontSize: 12,
                   ),
@@ -428,7 +428,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: isFrozen
-                                  ? GlassTheme.successColor
+                                  ? AppColors.accentInk
                                   : context.colors.onSurfaceVariant,
                               fontSize: 11,
                             ),
@@ -439,10 +439,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     IconButton(
                       tooltip: 'Open ${bureau.displayName}\'s official '
                           'freeze page',
-                      icon: const DuotoneIcon(
+                      icon: DuotoneIcon(
                         'link',
                         size: 18,
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                       onPressed: () => _openOfficialFreezePage(
                         context,
@@ -506,10 +506,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
             color: GlassTheme.primaryAccent.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
           ),
-          child: const Center(
+          child: Center(
             child: DuotoneIcon(
               'lightbulb',
-              color: GlassTheme.primaryAccent,
+              color: AppColors.accentInk,
               size: 20,
             ),
           ),
@@ -562,7 +562,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                   DuotoneIcon(
                     _getAssetIcon(entry.key),
                     size: 18,
-                    color: GlassTheme.primaryAccent,
+                    color: AppColors.accentInk,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -673,7 +673,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
         icon: 'bell',
         title: 'No Alerts',
         subtitle: 'Your identity appears to be safe',
-        color: GlassTheme.successColor,
+        color: AppColors.accentInk,
       );
     }
 
@@ -820,10 +820,10 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '• ',
                           style: TextStyle(
-                            color: GlassTheme.primaryAccent,
+                            color: AppColors.accentInk,
                           ),
                         ),
                         Expanded(
@@ -869,16 +869,17 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
     required String icon,
     required String title,
     required String subtitle,
-    Color color = GlassTheme.primaryAccent,
+    Color? color,
     Widget? action,
   }) {
+    final iconColor = color ?? AppColors.accentInk;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DuotoneIcon(icon, size: 64, color: color.withValues(alpha: 0.5)),
+            DuotoneIcon(icon, size: 64, color: iconColor.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -1099,9 +1100,9 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: context.colors.outline),
                     ),
-                    focusedBorder: const OutlineInputBorder(
+                    focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: GlassTheme.primaryAccent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                     disabledBorder: OutlineInputBorder(

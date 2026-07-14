@@ -86,7 +86,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
 
   Widget _buildTabContent(Widget content) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent));
+      return Center(child: CircularProgressIndicator(color: AppColors.accentInk));
     }
     if (_error != null) {
       return _buildErrorState(_error!);
@@ -124,8 +124,8 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
               icon: const DuotoneIcon('refresh', size: 18),
               label: const Text('Retry'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: GlassTheme.primaryAccent,
-                side: const BorderSide(color: GlassTheme.primaryAccent),
+                foregroundColor: AppColors.accentInk,
+                side: BorderSide(color: AppColors.accentInk),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
@@ -208,9 +208,9 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         // Stats
         Row(
           children: [
-            _buildStatCard('Servers', '${_servers.length}', GlassTheme.primaryAccent),
+            _buildStatCard('Servers', '${_servers.length}', AppColors.accentInk),
             const SizedBox(width: 12),
-            _buildStatCard('Connected', '${_servers.where((s) => s.isConnected).length}', GlassTheme.successColor),
+            _buildStatCard('Connected', '${_servers.where((s) => s.isConnected).length}', AppColors.accentInk),
             const SizedBox(width: 12),
             _buildStatCard('Collections', '${_collections.length}', AppColors.chartColors[4]),
           ],
@@ -365,10 +365,10 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
         selectedColor: GlassTheme.primaryAccent.withAlpha(50),
         labelStyle: TextStyle(
             color: selected
-                ? GlassTheme.primaryAccent
+                ? AppColors.accentInk
                 : context.colors.onSurfaceVariant,
             fontSize: 12),
-        checkmarkColor: GlassTheme.primaryAccent,
+        checkmarkColor: AppColors.accentInk,
       ),
     );
   }
@@ -781,7 +781,7 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
       case 'tool':
         return AppColors.severityInfo;
       default:
-        return GlassTheme.primaryAccent;
+        return AppColors.accentInk;
     }
   }
 

@@ -127,7 +127,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           label: 'Frameworks',
           iconPath: 'shield',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildFrameworksTab(),
@@ -136,7 +136,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           label: 'Reports',
           iconPath: 'file',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildReportsTab(),
@@ -145,7 +145,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           label: 'Controls',
           iconPath: 'settings',
           content: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: GlassTheme.primaryAccent))
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
               : _error != null
                   ? _buildErrorState()
                   : _buildControlsTab(),
@@ -239,8 +239,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                 icon: const DuotoneIcon('file', size: 18),
                 label: const Text('Generate Report'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: GlassTheme.primaryAccent,
-                  side: const BorderSide(color: GlassTheme.primaryAccent),
+                  foregroundColor: AppColors.accentInk,
+                  side: BorderSide(color: AppColors.accentInk),
                 ),
               ),
             ),
@@ -480,7 +480,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              const DuotoneIcon('info_circle', size: 18, color: GlassTheme.primaryAccent),
+              DuotoneIcon('info_circle', size: 18, color: AppColors.accentInk),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -507,17 +507,17 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
         const SizedBox(height: 24),
 
         if (_isLoadingControls)
-          const Padding(
-            padding: EdgeInsets.all(32),
+          Padding(
+            padding: const EdgeInsets.all(32),
             child: Center(
-                child: CircularProgressIndicator(color: GlassTheme.primaryAccent)),
+                child: CircularProgressIndicator(color: AppColors.accentInk)),
           )
         else ...[
           Row(
             children: [
-              _buildStatCard('Controls', '${_controls.length}', GlassTheme.primaryAccent),
+              _buildStatCard('Controls', '${_controls.length}', AppColors.accentInk),
               const SizedBox(width: 12),
-              _buildStatCard('Frameworks', '$frameworkCount', GlassTheme.successColor),
+              _buildStatCard('Frameworks', '$frameworkCount', AppColors.accentInk),
               const SizedBox(width: 12),
               _buildStatCard('Not assessed', '${_controls.length}',
                   context.colors.onSurfaceVariant),
@@ -705,8 +705,8 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const DuotoneIcon('check_circle',
-                              size: 16, color: GlassTheme.primaryAccent),
+                          DuotoneIcon('check_circle',
+                              size: 16, color: AppColors.accentInk),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(r, style: TextStyle(color: cs.onSurface)),
@@ -898,7 +898,7 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   Color _statusColor(String? status) {
     switch (status) {
       case 'compliant':
-        return GlassTheme.successColor;
+        return AppColors.accentInk;
       case 'non_compliant':
         return GlassTheme.errorColor;
       case 'partial':
