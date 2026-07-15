@@ -141,6 +141,16 @@ embed.dst_path = ''
 build_file = embed.add_file_reference(ext.product_reference)
 build_file.settings = { 'ATTRIBUTES' => %w[CodeSignOnCopy RemoveHeadersOnCopy] }
 
+# new_copy_files_build_phase appends the embed phase LAST. In a Flutter app that
+# creates a build cycle ("Cycle inside Runner"): Flutter's "Thin Binary" phase
+# processes the whole .app (including PlugIns), so the extension must be embedded
+# BEFORE Thin Binary runs. Move the embed phase to immediately before it.
+thin = runner.build_phases.find { |p| p.display_name.to_s == 'Thin Binary' }
+if thin
+  runner.build_phases.delete(embed)
+  runner.build_phases.insert(runner.build_phases.index(thin), embed)
+end
+
 project.save
 
 puts "[add_filter_target] Added app-extension '#{TARGET_NAME}' (#{EXT_BUNDLE_ID})"
