@@ -1,12 +1,21 @@
 // Privacy Protection Screen
-// Camera/microphone monitoring, clipboard protection, and tracker blocking
+//
+// Two honest surfaces, and nothing that implies monitoring the OS does not
+// allow:
+//  1. Trackers   — the real backend catalogue of known trackers, shown as an
+//                  informational reference (OrbGuard does not block traffic on
+//                  this device). Real empty/error states, never a fabricated
+//                  list.
+//  2. Camera & Mic — an honest explanation that iOS/Android do not expose other
+//                  apps' camera or microphone access to third-party apps, so
+//                  OrbGuard cannot monitor it, plus a pointer to the OS's own
+//                  privacy indicators and per-app permission settings.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/colors.dart';
-import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -16,7 +25,8 @@ class PrivacyProtectionScreen extends StatefulWidget {
   const PrivacyProtectionScreen({super.key});
 
   @override
-  State<PrivacyProtectionScreen> createState() => _PrivacyProtectionScreenState();
+  State<PrivacyProtectionScreen> createState() =>
+      _PrivacyProtectionScreenState();
 }
 
 class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
@@ -34,49 +44,20 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
       builder: (context, provider, _) {
         return GlassTabPage(
           title: 'Privacy Protection',
-          hasSearch: true,
-          searchHint: 'Search permissions...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.shield, size: 22, color: context.colors.onSurface),
-                  onPressed: provider.isAuditing ? null : () => provider.runAudit(),
-                  tooltip: 'Run Audit',
-                ),
-              ],
-            ),
-          ),
           tabs: [
             GlassTab(
-              label: 'Overview',
-              iconPath: 'shield',
-              content: provider.isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
-                  : _buildOverviewTab(provider),
-            ),
-            GlassTab(
-              label: 'Camera/Mic',
-              iconPath: 'camera',
-              content: provider.isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
-                  : _buildCameraMicTab(provider),
-            ),
-            GlassTab(
               label: 'Trackers',
-              iconPath: 'forbidden',
+              iconPath: 'chart_square',
               content: provider.isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
+                  ? Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.accentInk))
                   : _buildTrackersTab(provider),
             ),
             GlassTab(
-              label: 'Events',
-              iconPath: 'history',
-              content: provider.isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
-                  : _buildEventsTab(provider),
+              label: 'Camera & Mic',
+              iconPath: 'camera',
+              content: _buildCameraMicTab(),
             ),
           ],
         );
@@ -84,437 +65,26 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     );
   }
 
-  Widget _buildOverviewTab(PrivacyProvider provider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Privacy Score — or the honest reason no audit result exists.
-          if (provider.lastAudit != null)
-            _buildPrivacyScoreCard(provider.lastAudit!)
-          else
-            _buildAuditUnavailableCard(provider),
-          const SizedBox(height: 24),
-
-          // Quick Settings
-          Text(
-            'Protection Settings',
-            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          _buildSettingsTile(
-            icon: AppIcons.camera,
-            title: 'Camera Monitoring',
-            subtitle: 'Get alerts when apps access camera',
-            value: provider.cameraMonitoringEnabled,
-            onChanged: provider.setCameraMonitoring,
-            color: AppColors.accentInk,
-          ),
-          _buildSettingsTile(
-            icon: AppIcons.microphone,
-            title: 'Microphone Monitoring',
-            subtitle: 'Get alerts when apps access microphone',
-            value: provider.micMonitoringEnabled,
-            onChanged: provider.setMicMonitoring,
-            color: AppColors.errorInk,
-          ),
-          _buildSettingsTile(
-            icon: AppIcons.clipboard,
-            title: 'Clipboard Protection',
-            subtitle: 'Scan clipboard for threats',
-            value: provider.clipboardProtectionEnabled,
-            onChanged: provider.setClipboardProtection,
-            color: AppColors.chartColors[4],
-          ),
-          _buildSettingsTile(
-            icon: AppIcons.forbidden,
-            title: 'Tracker Blocking',
-            subtitle: 'Block known trackers and analytics',
-            value: provider.trackerBlockingEnabled,
-            onChanged: provider.setTrackerBlocking,
-            color: GlassTheme.warningColor,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Stats
-          if (provider.lastAudit != null) ...[
-            Text(
-              'Privacy Stats',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildStatCard('Apps Audited', provider.lastAudit!.totalAppsAudited.toString(), AppColors.accentInk),
-                const SizedBox(width: 12),
-                _buildStatCard('Trackers Found', provider.lastAudit!.totalTrackers.toString(), GlassTheme.errorColor),
-              ],
-            ),
-          ],
-
-          // Issues found by the audit
-          if (provider.lastAudit != null && provider.lastAudit!.issues.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text(
-              'Issues Found',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...provider.lastAudit!.issues.map((issue) => GlassCard(
-                  child: Row(
-                    children: [
-                      const GlassSvgIconBox(
-                          icon: AppIcons.dangerTriangle,
-                          color: GlassTheme.errorColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          issue,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-          ],
-
-          // Recommendations
-          if (provider.lastAudit != null && provider.lastAudit!.recommendations.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text(
-              'Recommendations',
-              style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...provider.lastAudit!.recommendations.map((rec) => GlassCard(
-                  child: Row(
-                    children: [
-                      const GlassSvgIconBox(icon: AppIcons.lightbulb, color: GlassTheme.warningColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          rec,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrivacyScoreCard(PrivacyAuditResult audit) {
-    final score = audit.privacyScore;
-    final color = score >= 80
-        ? GlassTheme.successColor
-        : score >= 50
-            ? GlassTheme.warningColor
-            : GlassTheme.errorColor;
-    // Ink variant — lime is invisible as text/icon on light; tint fill stays `color`.
-    final inkColor = score >= 80 ? AppColors.accentInk : color;
-
-    return GlassCard(
-      margin: EdgeInsets.zero,
-      tintColor: color,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: score / 100,
-                  strokeWidth: 8,
-                  backgroundColor:
-                      context.colors.onSurface.withValues(alpha: 0.06),
-                  valueColor: AlwaysStoppedAnimation<Color>(inkColor),
-                ),
-                Text(
-                  '$score',
-                  style: TextStyle(color: inkColor, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Privacy Score',
-                      style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    if (audit.grade != null) ...[
-                      const SizedBox(width: 8),
-                      GlassBadge(text: 'Grade ${audit.grade}', color: inkColor),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  score >= 80
-                      ? 'Your privacy is well protected'
-                      : score >= 50
-                          ? 'Some privacy improvements needed'
-                          : 'Your privacy needs attention', maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
-                ),
-                if (audit.riskLevel != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Risk level: ${audit.riskLevel}',
-                    style: TextStyle(color: inkColor, fontSize: 12, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Honest empty state shown instead of a fabricated score when no audit
-  /// result exists — including the provider's specific unavailability reason.
-  Widget _buildAuditUnavailableCard(PrivacyProvider provider) {
-    return GlassCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              GlassSvgIconBox(
-                  icon: AppIcons.shield,
-                  color: context.colors.onSurfaceVariant),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Privacy Audit Not Available',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              if (provider.isAuditing)
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.accentInk),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            provider.auditUnavailableReason ??
-                'No audit has been run yet. Tap the shield icon above to run '
-                    'a privacy audit.',
-            style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsTile({
-    required String icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    required Color color,
-  }) {
-    return GlassCard(
-      child: Row(
-        children: [
-          GlassSvgIconBox(icon: icon, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500)),
-                Text(
-                  subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String label, String value, Color color) {
-    return Expanded(
-      child: GlassContainer(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraMicTab(PrivacyProvider provider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Camera Events
-          Row(
-            children: [
-              DuotoneIcon(AppIcons.camera, color: AppColors.accentInk, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Recent Camera Access',
-                style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          if (provider.recentCameraEvents.isEmpty)
-            _buildEmptyCard('No camera access recorded')
-          else
-            ...provider.recentCameraEvents.map((event) => _buildEventCard(event)),
-
-          const SizedBox(height: 24),
-
-          // Microphone Events
-          Row(
-            children: [
-              DuotoneIcon(AppIcons.microphone, color: AppColors.errorInk, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Recent Microphone Access',
-                style: TextStyle(color: context.colors.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          if (provider.recentMicEvents.isEmpty)
-            _buildEmptyCard('No microphone access recorded')
-          else
-            ...provider.recentMicEvents.map((event) => _buildEventCard(event)),
-
-          // Background Access Warning
-          if (provider.backgroundEvents.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            GlassCard(
-              tintColor: GlassTheme.errorColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      DuotoneIcon(AppIcons.dangerTriangle, color: GlassTheme.errorColor, size: 24),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Background Access Detected',
-                        style: TextStyle(color: GlassTheme.errorColor, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${provider.backgroundEvents.length} apps accessed camera/mic in the background',
-                    style: TextStyle(color: context.colors.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyCard(String message) {
-    return GlassCard(
-      child: Center(
-        child: Text(
-          message,
-          style: TextStyle(color: context.colors.onSurfaceVariant),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventCard(PrivacyEvent event) {
-    final color = event.isBackground ? GlassTheme.errorColor : AppColors.accentInk;
-
-    return GlassCard(
-      child: Row(
-        children: [
-          GlassSvgIconBox(
-            icon: event.type == PrivacyEventType.cameraAccess ? AppIcons.camera : AppIcons.microphone,
-            color: color,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.appName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  event.isBackground ? 'Background access' : 'Foreground access', maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: color, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            _formatTime(event.timestamp),
-            style: TextStyle(
-                color:
-                    context.colors.onSurfaceVariant.withValues(alpha: 0.7),
-                fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Trackers tab — the real backend catalogue (informational reference).
+  // ---------------------------------------------------------------------------
 
   Widget _buildTrackersTab(PrivacyProvider provider) {
+    // Honest failure: surface the real load error, never a fabricated list.
+    if (provider.trackersLoadError != null) {
+      return _buildUnavailableState(
+        icon: AppIcons.forbidden,
+        title: 'Tracker Catalogue Unavailable',
+        message: provider.trackersLoadError!,
+      );
+    }
+
     if (provider.trackers.isEmpty) {
-      return _buildEmptyState(
+      return _buildUnavailableState(
         icon: AppIcons.chartSquare,
-        title: 'No Trackers Found',
-        subtitle: 'Known trackers will appear here',
+        title: 'No Trackers in Catalogue',
+        message: 'The backend returned no known trackers. This reference list '
+            'will populate once the catalogue is available.',
       );
     }
 
@@ -526,25 +96,35 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // Blocked count
+        // Honest informational header — a reference catalogue, NOT active
+        // blocking. Nothing here is enforced on-device.
         GlassCard(
           margin: EdgeInsets.zero,
-          tintColor: GlassTheme.successColor,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GlassSvgIconBox(icon: AppIcons.forbidden, color: AppColors.accentInk),
+              GlassSvgIconBox(icon: AppIcons.infoCircle, color: AppColors.info),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${provider.blockedTrackers.length} Trackers Blocked', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.bold),
+                      '${provider.trackers.length} known trackers',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: context.colors.onSurface,
+                          fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 4),
                     Text(
-                      'Out of ${provider.trackers.length} known trackers', maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
+                      'A reference list of tracking SDKs and analytics services '
+                      'OrbGuard recognizes. This is informational — OrbGuard '
+                      'does not intercept or block network traffic on this '
+                      'device.',
+                      style: TextStyle(
+                          color: context.colors.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ),
@@ -552,14 +132,13 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
-
+        const SizedBox(height: 8),
         ...groupedTrackers.entries.map((entry) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GlassSectionHeader(title: entry.key),
-              ...entry.value.map((tracker) => _buildTrackerCard(tracker, provider)),
+              ...entry.value.map(_buildTrackerCard),
             ],
           );
         }),
@@ -567,13 +146,14 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     );
   }
 
-  Widget _buildTrackerCard(TrackerInfo tracker, PrivacyProvider provider) {
+  Widget _buildTrackerCard(TrackerInfo tracker) {
     return GlassCard(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GlassSvgIconBox(
-            icon: tracker.isBlocked ? AppIcons.forbidden : AppIcons.chartSquare,
-            color: tracker.isBlocked ? AppColors.accentInk : GlassTheme.warningColor,
+            icon: AppIcons.chartSquare,
+            color: context.colors.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -581,76 +161,209 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tracker.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurface, fontWeight: FontWeight.w500),
+                  tracker.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: context.colors.onSurface,
+                      fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  tracker.company, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
+                  tracker.company,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: context.colors.onSurfaceVariant, fontSize: 12),
+                ),
+                if (tracker.dataTypes.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Collects: ${tracker.dataTypes.join(', ')}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color:
+                          context.colors.onSurfaceVariant.withValues(alpha: 0.8),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Camera & Mic tab — honest "cannot monitor on-device" explanation.
+  // ---------------------------------------------------------------------------
+
+  Widget _buildCameraMicTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GlassCard(
+            margin: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GlassSvgIconBox(
+                        icon: AppIcons.camera, color: AppColors.info),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "Camera & mic monitoring isn't possible on-device",
+                        style: TextStyle(
+                          color: context.colors.onSurface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "iOS and Android deliberately do not expose other apps' "
+                  'camera or microphone use to third-party apps like OrbGuard. '
+                  'No API lets one app see when another app turns on the camera '
+                  'or mic, so OrbGuard cannot monitor this — and does not '
+                  'pretend to.',
+                  style: TextStyle(
+                    color: context.colors.onSurfaceVariant,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'The same applies to other apps’ clipboard, location, '
+                  'and contacts access — the OS keeps that private to each app.',
+                  style: TextStyle(
+                    color: context.colors.onSurfaceVariant,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
           ),
-          Switch(
-            value: tracker.isBlocked,
-            onChanged: (_) => provider.toggleTrackerBlocking(tracker.id),
+          const SizedBox(height: 20),
+          Text(
+            "Use your device's built-in privacy tools",
+            style: TextStyle(
+              color: context.colors.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildGuidanceCard(
+            icon: AppIcons.eye,
+            title: 'Watch the on-screen indicators',
+            body: 'A green dot (camera) or orange dot (microphone) appears in '
+                'the status bar whenever an app is using them. iOS and '
+                'Android 12+ both show these.',
+          ),
+          _buildGuidanceCard(
+            icon: AppIcons.settings,
+            title: 'Review per-app permissions',
+            body: 'Open Settings > Privacy & Security (iOS) or Settings > '
+                'Privacy > Permission manager (Android) to see and revoke which '
+                'apps can use your camera and microphone.',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEventsTab(PrivacyProvider provider) {
-    if (provider.events.isEmpty) {
-      return _buildEmptyState(
-        icon: AppIcons.timer,
-        title: 'No Events',
-        subtitle: 'Privacy events will appear here',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: provider.events.length,
-      itemBuilder: (context, index) {
-        final event = provider.events[index];
-        return _buildEventCard(event);
-      },
-    );
-  }
-
-  Widget _buildEmptyState({
+  Widget _buildGuidanceCard({
     required String icon,
     required String title,
-    required String subtitle,
+    required String body,
   }) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return GlassCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DuotoneIcon(icon, size: 64, color: AppColors.accentInk.withAlpha(128)),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(color: context.colors.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(color: context.colors.onSurfaceVariant),
-            textAlign: TextAlign.center,
+          GlassSvgIconBox(icon: icon, color: context.colors.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: context.colors.onSurface,
+                      fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(
+                    color: context.colors.onSurfaceVariant,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
+  // ---------------------------------------------------------------------------
+  // Shared honest empty/unavailable state.
+  // ---------------------------------------------------------------------------
 
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+  Widget _buildUnavailableState({
+    required String icon,
+    required String title,
+    required String message,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DuotoneIcon(
+              icon,
+              size: 64,
+              color: context.colors.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.colors.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: context.colors.onSurfaceVariant, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
