@@ -1,6 +1,7 @@
 // lib/main.dart - OrbGuard with iOS 26 Liquid Glass Design
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'utils/platform_info.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -848,7 +849,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             border: Border.all(color: AppColors.accent.withAlpha(60), width: 1),
                           ),
                           child: Center(
-                            child: DuotoneIcon(AppIcons.shield, size: 28, color: AppColors.accentInk),
+                            child: SvgPicture.asset('assets/branding/orbguard_icon.svg', width: 36, height: 36),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -1357,7 +1358,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('About OrbGuard'),
+        title: Row(
+          children: [
+            SvgPicture.asset('assets/branding/orbguard_icon.svg', width: 26, height: 26),
+            const SizedBox(width: 10),
+            const Text('About OrbGuard'),
+          ],
+        ),
         content: const Text(
           'OrbGuard - Advanced Spyware Defense\n\n'
           'Detects and removes sophisticated threats including Pegasus using multiple access methods:\n\n'

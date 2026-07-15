@@ -65,6 +65,37 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# App launcher icons across every platform, generated from the OrbGuard brand
+# logo (assets/branding/). Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/branding/icon_master.png"
+  remove_alpha_ios: true
+  android: "ic_launcher"
+  adaptive_icon_background: "#08080A"
+  adaptive_icon_foreground: "assets/branding/adaptive_foreground.png"
+  ios: true
+  web:
+    generate: true
+    background_color: "#08080A"
+    theme_color: "#08080A"
+  macos:
+    generate: true
+  windows:
+    generate: true
+
+# Launch/splash screen across every platform + Android 12+ (which ignores the
+# legacy launch_background.xml and uses the system splash API). Obsidian bed with
+# the padded brand ring centered. Regenerate with:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#08080A"
+  image: "assets/branding/adaptive_foreground.png"
+  android_12:
+    color: "#08080A"
+    image: "assets/branding/adaptive_foreground.png"
+  web: false
 
 flutter:
   # CocoaPods-only iOS build: Flutter's Swift Package Manager migration pulls
@@ -74,6 +105,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/branding/
 
   # Brand type stack — bundled (no runtime font fetch), shared with OrbVPN.
   # Display = Archivo · body/UI = IBM Plex Sans · labels/data = IBM Plex Mono.
