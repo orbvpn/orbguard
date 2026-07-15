@@ -177,6 +177,7 @@ class DarkWebStats {
 /// Dark Web Provider
 class DarkWebProvider extends ChangeNotifier {
   static const _prefsAssetsKey = 'darkweb_monitored_assets';
+  static const _prefsReadAlertsKey = 'darkweb_read_alert_ids';
 
   static final String _monitorPath = '${ApiConfig.apiVersion}/darkweb/monitor';
   static String _monitorAssetPath(String id) =>
@@ -202,6 +203,13 @@ class DarkWebProvider extends ChangeNotifier {
   // State
   final List<MonitoredAsset> _assets = [];
   final List<BreachAlert> _alerts = [];
+
+  /// Ids of alerts the user has marked read locally. Persisted to
+  /// SharedPreferences so read state survives restarts — the backend alert
+  /// feed has no per-device read endpoint, so this is the source of truth
+  /// for local read state.
+  final Set<String> _readAlertIds = {};
+
   final Map<String, BreachCheckResult> _checkResults = {};
   DarkWebStats _stats = DarkWebStats();
   BreachCheckResult? _lastCheckResult;
@@ -214,7 +222,11 @@ class DarkWebProvider extends ChangeNotifier {
 
   // Getters
   List<MonitoredAsset> get assets => List.unmodifiable(_assets);
-  List<BreachAlert> get alerts => List.unmodifiable(_alerts);
+
+  /// All alerts, with [BreachAlert.isRead] reflecting the locally-persisted
+  /// read set so read/unread styling stays correct without a backend call.
+  List<BreachAlert> get alerts =>
+      List.unmodifiable(_alerts.map(_reflectRead));
   DarkWebStats get stats => _stats;
   BreachCheckResult? get lastCheckResult => _lastCheckResult;
   PasswordBreachResult? get lastPasswordResult => _lastPasswordResult;
@@ -223,9 +235,9 @@ class DarkWebProvider extends ChangeNotifier {
   bool get isCheckingPassword => _isCheckingPassword;
   String? get error => _error;
 
-  /// Unread alerts
+  /// Unread alerts (excludes ids in the locally-persisted read set).
   List<BreachAlert> get unreadAlerts =>
-      _alerts.where((a) => !a.isRead).toList();
+      _alerts.where((a) => !_isAlertRead(a)).toList();
 
   /// Recent breaches
   List<BreachAlert> get recentBreaches => _alerts.take(10).toList();
@@ -240,6 +252,7 @@ class DarkWebProvider extends ChangeNotifier {
   /// Initialize provider
   Future<void> init() async {
     await loadAssets();
+    await _loadReadAlerts();
     await refreshAlerts();
     _updateStats();
   }
@@ -475,20 +488,51 @@ class DarkWebProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mark alert as read
-  void markAlertAsRead(String id) {
-    final index = _alerts.indexWhere((a) => a.id == id);
-    if (index >= 0) {
-      // Create updated alert (BreachAlert is immutable, would need API call)
-      _updateStats();
-      notifyListeners();
-    }
+  /// Mark a single alert as read. Records its id in the locally-persisted
+  /// read set (BreachAlert is immutable and the backend has no per-device
+  /// read endpoint), refreshes unread state, and survives restarts.
+  Future<void> markAlertAsRead(String id) async {
+    if (id.isEmpty || _readAlertIds.contains(id)) return;
+    _readAlertIds.add(id);
+    _updateStats();
+    await _saveReadAlerts();
+    notifyListeners();
   }
 
-  /// Mark all alerts as read
-  void markAllAlertsAsRead() {
+  /// Mark every current alert as read.
+  Future<void> markAllAlertsAsRead() async {
+    final ids = _alerts.map((a) => a.id).where((id) => id.isNotEmpty).toSet();
+    final before = _readAlertIds.length;
+    _readAlertIds.addAll(ids);
+    if (_readAlertIds.length == before) return;
     _updateStats();
+    await _saveReadAlerts();
     notifyListeners();
+  }
+
+  /// True when an alert is read: either the backend already marked it read,
+  /// or the user marked it read locally.
+  bool _isAlertRead(BreachAlert alert) =>
+      alert.isRead || _readAlertIds.contains(alert.id);
+
+  /// Returns [alert] with [BreachAlert.isRead] reflecting the local read set.
+  /// BreachAlert is immutable with no copyWith, so a locally-read alert is
+  /// rebuilt through the public constructor.
+  BreachAlert _reflectRead(BreachAlert alert) {
+    if (alert.isRead || !_readAlertIds.contains(alert.id)) return alert;
+    return BreachAlert(
+      id: alert.id,
+      assetId: alert.assetId,
+      breachId: alert.breachId,
+      assetType: alert.assetType,
+      assetValue: alert.assetValue,
+      breach: alert.breach,
+      dataExposed: alert.dataExposed,
+      severity: alert.severity,
+      alertedAt: alert.alertedAt,
+      ackedAt: alert.ackedAt,
+      isRead: true,
+    );
   }
 
   /// Get check result for email
@@ -607,6 +651,30 @@ class DarkWebProvider extends ChangeNotifier {
     }
   }
 
+  /// Restore the locally-persisted set of read alert ids.
+  Future<void> _loadReadAlerts() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to open preferences: $e');
+      return;
+    }
+    _readAlertIds
+      ..clear()
+      ..addAll(_prefs!.getStringList(_prefsReadAlertsKey) ?? const []);
+  }
+
+  /// Persist the set of read alert ids.
+  Future<void> _saveReadAlerts() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    try {
+      await prefs.setStringList(_prefsReadAlertsKey, _readAlertIds.toList());
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to persist read alerts: $e');
+    }
+  }
+
   /// Update stats
   void _updateStats() {
     int critical = 0;
@@ -616,7 +684,7 @@ class DarkWebProvider extends ChangeNotifier {
     int unread = 0;
 
     for (final alert in _alerts) {
-      if (!alert.isRead) unread++;
+      if (!_isAlertRead(alert)) unread++;
       switch (alert.severity) {
         case SeverityLevel.critical:
           critical++;

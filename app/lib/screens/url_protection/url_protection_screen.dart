@@ -4,7 +4,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -466,6 +465,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   }
 
   Widget _buildProtectionStatus() {
+    final scanning = _scanningStatus();
+    final threatIntel = _threatIntelStatus();
     return GlassCard(
       margin: EdgeInsets.zero,
       child: Column(
@@ -479,26 +480,49 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
           _StatusRow(
             icon: 'shield_check',
             label: 'URL Scanning',
-            status: 'Active',
-            statusColor: AppColors.accentInk,
+            status: scanning.$1,
+            statusColor: scanning.$2,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             icon: 'refresh',
             label: 'Threat Intelligence',
-            status: 'Connected',
-            statusColor: AppColors.accentInk,
+            status: threatIntel.$1,
+            statusColor: threatIntel.$2,
           ),
-          const SizedBox(height: 12),
-          _StatusRow(
-            icon: 'server',
-            label: 'DNS Filtering',
-            status: 'Via OrbNet VPN',
-            statusColor: AppColors.accentInk,
-          ),
+          if (_provider.listSyncError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Threat intelligence sync error: ${_provider.listSyncError}',
+              style: TextStyle(color: AppColors.errorInk, fontSize: 12),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// URL scanning pipeline state derived from real provider signals: a check
+  /// in flight, a completed backend round-trip, or an error. Never claims
+  /// "Active" before a real URL check has actually returned.
+  (String, Color) _scanningStatus() {
+    final cs = Theme.of(context).colorScheme;
+    if (_provider.isCheckingUrl) return ('Checking...', cs.onSurfaceVariant);
+    if (_provider.history.any((e) => e.result != null)) {
+      return ('Active', AppColors.accentInk);
+    }
+    if (_provider.error != null) return ('Error', AppColors.errorInk);
+    return ('Ready', cs.onSurfaceVariant);
+  }
+
+  /// Threat-intelligence backend connectivity, from the outcome of the
+  /// custom-list sync round-trip fired on init. Never claims "Connected"
+  /// before a real backend call has succeeded.
+  (String, Color) _threatIntelStatus() {
+    final cs = Theme.of(context).colorScheme;
+    if (_provider.listsSynced) return ('Connected', AppColors.accentInk);
+    if (_provider.listSyncError != null) return ('Error', AppColors.errorInk);
+    return ('Checking...', cs.onSurfaceVariant);
   }
 
   Widget _buildListSummary() {
