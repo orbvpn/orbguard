@@ -31,6 +31,7 @@ import MachO
 
     private var wifiHandler: WifiChannelHandler?
     private var contentFilterHandler: ContentFilterChannelHandler?
+    private var callDirectoryHandler: CallDirectoryChannelHandler?
     private let batterySampler = BatteryDrainSampler()
 
     // MARK: - App Lifecycle
@@ -92,6 +93,16 @@ import MachO
         let contentFilterHandler = ContentFilterChannelHandler()
         self.contentFilterHandler = contentFilterHandler
         contentFilterHandler.register(with: controller.binaryMessenger)
+
+        // Call-directory bridge (com.orb.guard/call_directory): writes the
+        // block/identify number lists into the shared App Group container that
+        // the OrbGuardCallDirectory CXCallDirectoryProvider extension reads, and
+        // asks iOS to reload it. DATA SYNC + reload only — actual blocking
+        // requires the user to enable it in Settings > Phone > Call Blocking &
+        // Identification; see CallDirectoryChannelHandler for details.
+        let callDirectoryHandler = CallDirectoryChannelHandler()
+        self.callDirectoryHandler = callDirectoryHandler
+        callDirectoryHandler.register(with: controller.binaryMessenger)
 
         // Start battery sampling so getBatteryDrain can report a measured rate.
         batterySampler.start()

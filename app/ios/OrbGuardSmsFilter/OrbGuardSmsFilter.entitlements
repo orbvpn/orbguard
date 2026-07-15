@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- IdentityLookup Message Filter capability. REQUIRED for iOS to load and
+	     run this extension. The matching capability must be enabled on the App
+	     ID in the Apple Developer portal and present in the signing profile;
+	     until then the extension builds and ships but iOS will not invoke it. -->
+	<key>com.apple.developer.identitylookup.message-filter</key>
+	<true/>
+</dict>
+</plist>

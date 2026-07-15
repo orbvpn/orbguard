@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Groups — the extension reads the block/identify lists the host app
+	     writes into this shared container (CallDirectoryStore's JSON file).
+	     Must also be enabled on the App ID / signing profile. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.orb.guard.shared</string>
+	</array>
+</dict>
+</plist>
