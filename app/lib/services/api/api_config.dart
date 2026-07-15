@@ -91,6 +91,18 @@ class ApiEndpoints {
   static const String smsReportFalsePositive = '$_v1/sms/report-false-positive';
 
   // ============================================
+  // SOCIAL MEDIA (username presence enumeration)
+  // ============================================
+
+  /// Enumerate public username presence across a curated platform list (OSINT).
+  /// POST /api/v1/social/username-scan
+  /// Body: { "username": "..." }
+  /// Response: { "username", "results": [{ "platform", "url", "status" }],
+  ///   "found_count", "not_found_count", "unknown_count", "platform_count",
+  ///   "scanned_at" } where status is "found" | "not_found" | "unknown".
+  static const String socialUsernameScan = '$_v1/social/username-scan';
+
+  // ============================================
   // URL PROTECTION (Safe Web)
   // ============================================
 

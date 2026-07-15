@@ -151,6 +151,12 @@ func (r *Router) Setup() http.Handler {
 			sms.Post("/report-false-positive", r.handlers.SMS.ReportFalsePositive)
 		})
 
+		// Social media username presence enumeration (OSINT). Checks whether a
+		// username exists as a public profile across a curated platform list.
+		api.Route("/social", func(social chi.Router) {
+			social.Post("/username-scan", r.handlers.Social.ScanUsername)
+		})
+
 		// Path aliases: /api/v1/indicators -> /api/v1/intelligence (Flutter compatibility)
 		api.Get("/indicators", r.handlers.Intelligence.List)
 		api.Post("/indicators/check", r.handlers.Intelligence.Check)

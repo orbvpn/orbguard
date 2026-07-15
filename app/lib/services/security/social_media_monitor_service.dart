@@ -11,8 +11,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api/orbguard_api_client.dart';
 
 /// Social media platform
 enum SocialPlatform {
@@ -259,15 +260,111 @@ class MonitoringResult {
       (privacyScore != null && privacyScore!.overallScore < 60);
 }
 
+/// Presence verdict for a username on one platform, as returned by the real
+/// backend username-scan. [unknown] means the platform blocked/ratelimited or
+/// was unreachable — it is NOT a guess of absence.
+enum PresenceStatus {
+  found,
+  notFound,
+  unknown;
+
+  static PresenceStatus fromApi(String? raw) {
+    switch (raw) {
+      case 'found':
+        return PresenceStatus.found;
+      case 'not_found':
+        return PresenceStatus.notFound;
+      default:
+        // 'unknown' and any unexpected value are treated as not-determinable.
+        return PresenceStatus.unknown;
+    }
+  }
+}
+
+/// One platform's username-presence result from the real backend scan.
+class UsernamePresence {
+  final String platform;
+  final String url;
+  final PresenceStatus status;
+
+  UsernamePresence({
+    required this.platform,
+    required this.url,
+    required this.status,
+  });
+
+  factory UsernamePresence.fromJson(Map<String, dynamic> json) {
+    return UsernamePresence(
+      platform: json['platform'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      status: PresenceStatus.fromApi(json['status'] as String?),
+    );
+  }
+}
+
+/// Result of a real username presence enumeration across public platforms
+/// (POST /api/v1/social/username-scan). This is genuinely available — the
+/// backend HTTP-checks each platform's public profile URL.
+class UsernameScanResult {
+  final String username;
+  final List<UsernamePresence> results;
+  final DateTime scannedAt;
+
+  UsernameScanResult({
+    required this.username,
+    required this.results,
+    DateTime? scannedAt,
+  }) : scannedAt = scannedAt ?? DateTime.now();
+
+  List<UsernamePresence> get found =>
+      results.where((r) => r.status == PresenceStatus.found).toList();
+
+  List<UsernamePresence> get notFound =>
+      results.where((r) => r.status == PresenceStatus.notFound).toList();
+
+  /// Platforms that could not be determined (blocked / ratelimited /
+  /// unreachable). These are explicitly NOT counted as absent.
+  List<UsernamePresence> get unknown =>
+      results.where((r) => r.status == PresenceStatus.unknown).toList();
+
+  int get foundCount => found.length;
+  int get platformCount => results.length;
+
+  factory UsernameScanResult.fromJson(Map<String, dynamic> json) {
+    final rawResults = json['results'];
+    final parsed = <UsernamePresence>[];
+    if (rawResults is List) {
+      for (final entry in rawResults.whereType<Map>()) {
+        parsed.add(UsernamePresence.fromJson(entry.cast<String, dynamic>()));
+      }
+    }
+
+    DateTime? scannedAt;
+    final rawScannedAt = json['scanned_at'];
+    if (rawScannedAt is String) {
+      scannedAt = DateTime.tryParse(rawScannedAt);
+    }
+
+    return UsernameScanResult(
+      username: json['username'] as String? ?? '',
+      results: parsed,
+      scannedAt: scannedAt,
+    );
+  }
+}
+
 /// Social Media Monitor Service
 class SocialMediaMonitorService {
-  // API configuration.
+  // Analysis backend configuration.
   //
-  // NOTE: there is currently NO live social-media analysis backend. This host
-  // has no deployment and [_apiKey] is never set, so [isBackendConfigured] is
-  // always false and every analysis path below honestly returns "not
-  // analyzable" instead of contacting this URL or fabricating a result.
-  static const String _apiBaseUrl = 'https://api.orbguard.io/v1/social';
+  // Username presence enumeration ([scanUsername]) is REAL: it calls the live
+  // OrbGuard backend (POST /api/v1/social/username-scan).
+  //
+  // The other three capabilities — privacy audit, impersonation detection and
+  // data-exposure scanning — genuinely require platform search APIs (Meta /
+  // X / etc.) that we do not have. There is no backend for them, so [_apiKey]
+  // is never set, [isBackendConfigured] is always false, and each of those
+  // paths honestly returns "not analyzable" rather than fabricating a result.
   String? _apiKey;
 
   // Persistence key for the user-entered account list.
@@ -349,6 +446,20 @@ class SocialMediaMonitorService {
 
   /// Get all monitored accounts
   List<SocialAccount> getAccounts() => _accounts.values.toList();
+
+  /// Enumerate public username presence across platforms via the REAL backend
+  /// (POST /api/v1/social/username-scan).
+  ///
+  /// This is genuinely available and does not depend on [isBackendConfigured]
+  /// (which gates the still-unavailable privacy/impersonation/exposure
+  /// features). The backend HTTP-checks each platform's public profile URL and
+  /// classifies it as found / not_found / unknown — "unknown" for platforms
+  /// that block or ratelimit, never a fabricated absence. Throws [ApiError] on
+  /// failure so callers can surface a real error state.
+  Future<UsernameScanResult> scanUsername(String username) async {
+    final data = await OrbGuardApiClient.instance.scanUsername(username);
+    return UsernameScanResult.fromJson(data);
+  }
 
   /// Load the persisted account list. Analysis fields are intentionally not
   /// restored (they are never fabricated); accounts come back with no score.
@@ -462,113 +573,21 @@ class SocialMediaMonitorService {
   /// backend is configured (or the call fails) this returns null, which the
   /// UI must treat as "not analyzable" — never as a measured score.
   Future<PrivacyScore?> _auditPrivacy(SocialAccount account) async {
-    if (_apiKey == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('$_apiBaseUrl/privacy-audit'
-            '?platform=${account.platform.name}'
-            '&username=${Uri.encodeComponent(account.username)}'),
-        headers: {'Authorization': 'Bearer $_apiKey'},
-      );
-
-      if (response.statusCode != 200) return null;
-
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final score = data['overall_score'];
-      if (score is! num) return null;
-
-      final settings = <String, PrivacySetting>{};
-      final rawSettings = data['settings'];
-      if (rawSettings is Map<String, dynamic>) {
-        rawSettings.forEach((key, value) {
-          if (value is Map<String, dynamic>) {
-            settings[key] = PrivacySetting(
-              name: value['name'] as String? ?? key,
-              currentValue: value['current_value'] as String? ?? '',
-              recommendedValue: value['recommended_value'] as String? ?? '',
-              isOptimal: value['is_optimal'] as bool? ?? false,
-              description: value['description'] as String? ?? '',
-            );
-          }
-        });
-      }
-
-      final risks = <PrivacyRisk>[];
-      final rawRisks = data['risks'];
-      if (rawRisks is List) {
-        for (final raw in rawRisks.whereType<Map<String, dynamic>>()) {
-          risks.add(PrivacyRisk(
-            id: raw['id'] as String? ??
-                'risk_${DateTime.now().millisecondsSinceEpoch}',
-            title: raw['title'] as String? ?? '',
-            description: raw['description'] as String? ?? '',
-            severity: RiskSeverity.values.firstWhere(
-              (s) => s.name == raw['severity'],
-              orElse: () => RiskSeverity.informational,
-            ),
-            remediation: raw['remediation'] as String? ?? '',
-          ));
-        }
-      }
-
-      return PrivacyScore(
-        overallScore: score.toInt().clamp(0, 100),
-        settings: settings,
-        risks: risks,
-        recommendations: (data['recommendations'] as List?)
-                ?.whereType<String>()
-                .toList() ??
-            const [],
-      );
-    } catch (e) {
-      debugPrint('Privacy audit failed: $e');
-      return null;
-    }
+    // No privacy-audit backend exists (reading a user's actual platform
+    // privacy settings needs platform APIs we don't have). Return null =
+    // "not analyzable"; the UI surfaces this honestly and never as a score.
+    return null;
   }
 
-  /// Check for impersonation
-  Future<List<ImpersonationAlert>> _checkImpersonation(SocialAccount account) async {
-    final alerts = <ImpersonationAlert>[];
-
-    // Impersonation detection requires a live similar-account search API.
-    // Without one this check honestly returns no alerts rather than
-    // fabricating matches from username patterns.
-    if (_apiKey != null) {
-      try {
-        final response = await http.get(
-          Uri.parse('$_apiBaseUrl/impersonation-check'),
-          headers: {'Authorization': 'Bearer $_apiKey'},
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body) as Map<String, dynamic>;
-          final rawAlerts = data['alerts'];
-          if (rawAlerts is List) {
-            for (final raw in rawAlerts.whereType<Map<String, dynamic>>()) {
-              alerts.add(ImpersonationAlert(
-                id: raw['id'] as String? ??
-                    'imp_${DateTime.now().millisecondsSinceEpoch}',
-                platform: account.platform,
-                impersonatorUsername:
-                    raw['impersonator_username'] as String? ?? '',
-                targetUsername: account.username,
-                similarityScore:
-                    (raw['similarity_score'] as num?)?.toDouble() ?? 0.0,
-                indicators: (raw['indicators'] as List?)
-                        ?.whereType<String>()
-                        .toList() ??
-                    const [],
-              ));
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Impersonation check failed: $e');
-      }
-    }
-
-    return alerts;
+  /// Check for impersonation.
+  ///
+  /// Detecting OTHER accounts that impersonate the user requires a live
+  /// similar-account search API (Meta / X / etc.) that we do not have, so this
+  /// honestly returns no alerts rather than fabricating matches from username
+  /// patterns.
+  Future<List<ImpersonationAlert>> _checkImpersonation(
+      SocialAccount account) async {
+    return const <ImpersonationAlert>[];
   }
 
   /// Check for data exposure.
@@ -578,48 +597,10 @@ class SocialMediaMonitorService {
   /// could not be performed (no backend configured, or the request failed),
   /// which callers surface as an explicit "not analyzable" state.
   Future<List<DataExposure>?> _checkDataExposure(SocialAccount account) async {
-    if (_apiKey == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('$_apiBaseUrl/data-exposure'
-            '?platform=${account.platform.name}'
-            '&username=${Uri.encodeComponent(account.username)}'),
-        headers: {'Authorization': 'Bearer $_apiKey'},
-      );
-
-      if (response.statusCode != 200) return null;
-
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final rawExposures = data['exposures'];
-      if (rawExposures is! List) return null;
-
-      final exposures = <DataExposure>[];
-      for (final raw in rawExposures.whereType<Map<String, dynamic>>()) {
-        exposures.add(DataExposure(
-          id: raw['id'] as String? ??
-              'exp_${account.id}_${DateTime.now().millisecondsSinceEpoch}',
-          type: ExposureType.values.firstWhere(
-            (t) => t.name == raw['type'],
-            orElse: () => ExposureType.personalInfo,
-          ),
-          description: raw['description'] as String? ?? '',
-          source: raw['source'] as String? ?? account.platform.displayName,
-          exposedData: raw['exposed_data'] as String? ?? '',
-          severity: RiskSeverity.values.firstWhere(
-            (s) => s.name == raw['severity'],
-            orElse: () => RiskSeverity.informational,
-          ),
-          recommendation: raw['recommendation'] as String? ?? '',
-        ));
-      }
-
-      // An empty list here is a real "analyzed and clean" verdict.
-      return exposures;
-    } catch (e) {
-      debugPrint('Data exposure check failed: $e');
-      return null;
-    }
+    // No data-exposure scan backend exists. Return null = "not analyzable"
+    // (distinct from an empty list, which would mean "scanned and clean"); the
+    // UI surfaces this honestly rather than implying the data was checked.
+    return null;
   }
 
   /// Start continuous monitoring
@@ -680,32 +661,11 @@ class SocialMediaMonitorService {
   /// is no client-side reporting capability, so without a configured backend
   /// this honestly returns false instead of faking success.
   Future<bool> reportImpersonator(String alertId) async {
-    final alert = _alerts.firstWhere(
-      (a) => a.id == alertId,
-      orElse: () => throw ArgumentError('Alert not found'),
-    );
-
-    if (_apiKey == null) return false;
-
-    try {
-      final response = await http.post(
-        Uri.parse('$_apiBaseUrl/report-impersonator'),
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'alert_id': alert.id,
-          'platform': alert.platform.name,
-          'impersonator_username': alert.impersonatorUsername,
-          'target_username': alert.targetUsername,
-        }),
-      );
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      debugPrint('Impersonator report failed: $e');
-      return false;
-    }
+    // Impersonation alerts only ever originate from a live similar-account
+    // search backend, which does not exist — so this list is always empty and
+    // there is nothing (and no backend) to report to. Honestly returns false
+    // instead of faking a "reported" success.
+    return false;
   }
 
   /// Get service statistics

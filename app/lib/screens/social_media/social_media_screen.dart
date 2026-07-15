@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
@@ -22,6 +23,9 @@ class SocialMediaScreen extends StatefulWidget {
 
 class _SocialMediaScreenState extends State<SocialMediaScreen> {
   final _usernameController = TextEditingController();
+  // Separate controller for the REAL username presence scanner (distinct from
+  // the add-account username field).
+  final _scanUsernameController = TextEditingController();
   SocialPlatform _selectedPlatform = SocialPlatform.twitter;
 
   @override
@@ -35,6 +39,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _scanUsernameController.dispose();
     super.dispose();
   }
 
@@ -97,6 +102,11 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   ],
                 ),
           tabs: [
+            GlassTab(
+              label: 'Username',
+              iconPath: 'magnifer',
+              content: _buildUsernameScanTab(provider),
+            ),
             GlassTab(
               label: 'Accounts',
               iconPath: 'user_circle',
@@ -1066,6 +1076,347 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
         ],
       ),
     );
+  }
+
+  // REAL capability: username presence enumeration across public platforms via
+  // the live backend (POST /api/v1/social/username-scan). This is the one
+  // genuinely-working analysis on this screen — impersonation/privacy/exposure
+  // stay honestly unavailable because they need platform APIs we don't have.
+  Widget _buildUsernameScanTab(SocialMediaProvider provider) {
+    final cs = Theme.of(context).colorScheme;
+    final result = provider.usernameScanResult;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        // Intro / what this does
+        GlassCard(
+          margin: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  DuotoneIcon('global', size: 22, color: AppColors.accentInk),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Username Presence',
+                      style: TextStyle(
+                        color: cs.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check whether a username exists as a public profile across '
+                'popular platforms. This is a real check — each public profile '
+                'URL is requested live. Platforms that block automated checks '
+                'are shown as "couldn\'t check", never as "not found".',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Input + scan action
+        GlassCard(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              TextField(
+                controller: _scanUsernameController,
+                style: TextStyle(color: cs.onSurface),
+                textInputAction: TextInputAction.search,
+                autocorrect: false,
+                enableSuggestions: false,
+                onSubmitted: (_) => _runUsernameScan(provider),
+                decoration: InputDecoration(
+                  hintText: 'Username (without @)',
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: DuotoneIcon('hashtag',
+                        color: cs.onSurfaceVariant, size: 24),
+                  ),
+                  filled: true,
+                  fillColor: cs.onSurface.withValues(alpha: 0.04),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: provider.isUsernameScanning
+                      ? null
+                      : () => _runUsernameScan(provider),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GlassTheme.primaryAccent,
+                    foregroundColor: Brand.onLime,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: provider.isUsernameScanning
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Brand.onLime,
+                          ),
+                        )
+                      : const DuotoneIcon('magnifer',
+                          size: 20, color: Brand.onLime),
+                  label: Text(
+                    provider.isUsernameScanning ? 'Scanning…' : 'Scan Username',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (provider.usernameScanError != null) ...[
+          const SizedBox(height: 12),
+          _buildScanErrorCard(provider.usernameScanError!),
+        ],
+        if (result != null) ...[
+          const SizedBox(height: 16),
+          _buildScanSummaryCard(result),
+          const SizedBox(height: 12),
+          ..._buildPresenceRows(result),
+        ] else if (!provider.isUsernameScanning &&
+            provider.usernameScanError == null) ...[
+          const SizedBox(height: 32),
+          _buildEmptyState(
+            'magnifer',
+            'No Scan Yet',
+            'Enter a username above to check where it exists.',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _runUsernameScan(SocialMediaProvider provider) async {
+    final username = _scanUsernameController.text.trim();
+    if (username.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    HapticFeedback.mediumImpact();
+    await provider.scanUsername(username);
+  }
+
+  Widget _buildScanErrorCard(String message) {
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      tintColor: GlassTheme.errorColor,
+      child: Row(
+        children: [
+          DuotoneIcon('danger_triangle', size: 22, color: GlassTheme.errorColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: cs.onSurface, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanSummaryCard(UsernameScanResult result) {
+    final cs = Theme.of(context).colorScheme;
+    final found = result.foundCount;
+    final total = result.platformCount;
+    final unknown = result.unknown.length;
+    final hasFound = found > 0;
+
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: (hasFound ? GlassTheme.successColor : cs.onSurfaceVariant)
+                  .withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+            ),
+            child: Center(
+              child: DuotoneIcon(
+                hasFound ? 'check_circle' : 'minus_circle',
+                size: 28,
+                color: hasFound ? AppColors.accentInk : cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Found on $found of $total platform${total == 1 ? '' : 's'}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: hasFound ? AppColors.accentInk : cs.onSurface,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '@${result.username}'
+                  '${unknown > 0 ? ' · $unknown couldn\'t be checked' : ''}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Order: found first (actionable), then unknown (honest "couldn't check"),
+  // then not-found.
+  List<Widget> _buildPresenceRows(UsernameScanResult result) {
+    int rank(PresenceStatus s) {
+      switch (s) {
+        case PresenceStatus.found:
+          return 0;
+        case PresenceStatus.unknown:
+          return 1;
+        case PresenceStatus.notFound:
+          return 2;
+      }
+    }
+
+    final sorted = [...result.results]
+      ..sort((a, b) => rank(a.status).compareTo(rank(b.status)));
+
+    return sorted.map(_buildPresenceCard).toList();
+  }
+
+  Widget _buildPresenceCard(UsernamePresence presence) {
+    final cs = Theme.of(context).colorScheme;
+    final color = _presenceColor(presence.status);
+    final isFound = presence.status == PresenceStatus.found;
+
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      onTap: isFound ? () => _openUrl(presence.url) : null,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
+            ),
+            child: Center(
+              child: DuotoneIcon(
+                _presenceIconName(presence.status),
+                size: 20,
+                color: color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  presence.platform,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  _presenceLabel(presence.status),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (isFound)
+            DuotoneIcon('square_arrow_right_up',
+                size: 20, color: AppColors.accentInk),
+        ],
+      ),
+    );
+  }
+
+  Color _presenceColor(PresenceStatus status) {
+    switch (status) {
+      case PresenceStatus.found:
+        return AppColors.accentInk;
+      case PresenceStatus.notFound:
+        return Theme.of(context).colorScheme.onSurfaceVariant;
+      case PresenceStatus.unknown:
+        return GlassTheme.warningColor;
+    }
+  }
+
+  String _presenceLabel(PresenceStatus status) {
+    switch (status) {
+      case PresenceStatus.found:
+        return 'Profile found — tap to open';
+      case PresenceStatus.notFound:
+        return 'No public profile';
+      case PresenceStatus.unknown:
+        return 'Couldn\'t check (blocked or unreachable)';
+    }
+  }
+
+  String _presenceIconName(PresenceStatus status) {
+    switch (status) {
+      case PresenceStatus.found:
+        return 'check_circle';
+      case PresenceStatus.notFound:
+        return 'close_circle';
+      case PresenceStatus.unknown:
+        return 'question_circle';
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Couldn\'t open $url')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Couldn\'t open $url')),
+        );
+      }
+    }
   }
 
   Widget _buildEmptyState(String iconName, String title, String subtitle) {

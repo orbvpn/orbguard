@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import '../services/api/api_interceptors.dart';
 import '../services/security/social_media_monitor_service.dart';
 
 class SocialMediaProvider extends ChangeNotifier {
@@ -14,6 +15,12 @@ class SocialMediaProvider extends ChangeNotifier {
   List<ImpersonationAlert> _alerts = [];
   List<DataExposure> _exposures = [];
   MonitoringResult? _lastScanResult;
+
+  // Username presence scan (REAL backend capability, independent of the
+  // still-unavailable impersonation/privacy/exposure features).
+  UsernameScanResult? _usernameScanResult;
+  bool _isUsernameScanning = false;
+  String? _usernameScanError;
 
   // Loading states
   bool _isLoading = false;
@@ -35,6 +42,11 @@ class SocialMediaProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
   String? get error => _error;
+
+  // Username presence scan getters
+  UsernameScanResult? get usernameScanResult => _usernameScanResult;
+  bool get isUsernameScanning => _isUsernameScanning;
+  String? get usernameScanError => _usernameScanError;
 
   // Computed getters
   List<ImpersonationAlert> get activeAlerts =>
@@ -189,6 +201,41 @@ class SocialMediaProvider extends ChangeNotifier {
       _isScanning = false;
       notifyListeners();
     }
+  }
+
+  /// Run a REAL username presence scan across public platforms.
+  ///
+  /// Unlike the impersonation/privacy/exposure features (which have no backend
+  /// and stay unavailable), this hits the live backend and returns real
+  /// per-platform existence results. Each platform is "found", "not_found" or
+  /// "unknown" — "unknown" is honest (blocked/unreachable), never a guessed
+  /// absence.
+  Future<void> scanUsername(String username) async {
+    final trimmed = username.trim();
+    if (trimmed.isEmpty) return;
+
+    _isUsernameScanning = true;
+    _usernameScanError = null;
+    notifyListeners();
+
+    try {
+      _usernameScanResult = await _service.scanUsername(trimmed);
+    } on ApiError catch (e) {
+      _usernameScanError = e.message;
+    } catch (e) {
+      _usernameScanError = 'Username scan failed';
+      debugPrint('Username scan error: $e');
+    } finally {
+      _isUsernameScanning = false;
+      notifyListeners();
+    }
+  }
+
+  /// Clear the last username presence scan result and error.
+  void clearUsernameScan() {
+    _usernameScanResult = null;
+    _usernameScanError = null;
+    notifyListeners();
   }
 
   /// Update accounts list

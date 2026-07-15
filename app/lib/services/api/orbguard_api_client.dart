@@ -1060,6 +1060,38 @@ class OrbGuardApiClient {
   }
 
   // ============================================
+  // SOCIAL MEDIA (username presence enumeration)
+  // ============================================
+
+  /// Enumerate public username presence across platforms (OSINT).
+  /// POST /api/v1/social/username-scan — Body: { "username": "..." }
+  ///
+  /// Returns the decoded response:
+  /// { username, results: [{ platform, url, status }], found_count,
+  ///   not_found_count, unknown_count, platform_count, scanned_at }.
+  /// Each result status is one of "found" | "not_found" | "unknown"; the
+  /// backend returns "unknown" when a platform blocks/ratelimits/is
+  /// unreachable — it never guesses "not_found".
+  Future<Map<String, dynamic>> scanUsername(String username) async {
+    final trimmed = username.trim();
+    if (trimmed.isEmpty) {
+      throw ApiError(
+        message: 'A username is required',
+        code: 'INVALID_ARGUMENT',
+      );
+    }
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.socialUsernameScan,
+        data: {'username': trimmed},
+      );
+      return response.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  // ============================================
   // URL PROTECTION
   // ============================================
 

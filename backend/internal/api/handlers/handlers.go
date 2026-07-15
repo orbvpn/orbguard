@@ -50,6 +50,7 @@ type Handlers struct {
 	Playbooks       *PlaybookHandler
 	Analytics       *AnalyticsHandler
 	Integrations    *IntegrationsHandler
+	Social          *SocialHandler
 }
 
 // Dependencies holds dependencies for handlers
@@ -150,5 +151,6 @@ func NewHandlers(deps Dependencies) *Handlers {
 		Playbooks:    NewPlaybookHandler(deps.Logger, deps.PlaybookService),
 		Analytics:    NewAnalyticsHandler(deps.Logger, deps.AnalyticsService),
 		Integrations: NewIntegrationsHandler(deps.IntegrationService, deps.Logger),
+		Social:       NewSocialHandler(deps.Logger),
 	}
 }
