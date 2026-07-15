@@ -58,29 +58,25 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       title: 'Threat Campaigns',
       hasSearch: true,
       searchHint: 'Search campaigns...',
-      headerContent: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: DuotoneIcon(
-                _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
-                size: 24,
-                color: cs.onSurface,
-              ),
-              onPressed: () {
-                setState(() => _showActiveOnly = !_showActiveOnly);
-                _loadCampaigns();
-              },
-            ),
-            IconButton(
-              icon: DuotoneIcon(AppIcons.refresh, size: 24, color: cs.onSurface),
-              onPressed: _isLoading ? null : _loadCampaigns,
-            ),
-          ],
+      actions: [
+        GestureDetector(
+          onTap: () {
+            setState(() => _showActiveOnly = !_showActiveOnly);
+            _loadCampaigns();
+          },
+          child: DuotoneIcon(
+            _showActiveOnly ? AppIcons.filter : AppIcons.closeCircle,
+            size: 22,
+            color: cs.onSurface,
+          ),
         ),
-      ),
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadCampaigns();
+          },
+          child: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
+        ),
+      ],
       tabs: [
         GlassTab(
           label: 'Active',

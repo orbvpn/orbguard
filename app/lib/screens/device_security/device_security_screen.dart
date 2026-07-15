@@ -40,21 +40,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           title: 'Device Security',
           hasSearch: true,
           searchHint: 'Search...',
-          headerContent: (provider.status.isLost || provider.status.isStolen)
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon('check_circle', size: 24, color: AppColors.accentInk),
-                        tooltip: 'Mark as Recovered',
-                        onPressed: () => provider.markAsRecovered(),
-                      ),
-                    ],
-                  ),
-                )
-              : null,
+          actions: [
+            if (provider.status.isLost || provider.status.isStolen)
+              GestureDetector(
+                onTap: () => provider.markAsRecovered(),
+                child: DuotoneIcon('check_circle', size: 22, color: AppColors.accentInk),
+              ),
+          ],
           tabs: [
             GlassTab(
               label: 'Status',

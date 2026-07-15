@@ -91,6 +91,15 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
   Widget build(BuildContext context) {
     return GlassTabPage(
       title: 'SIEM Integration',
+      actions: [
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadData();
+          },
+          child:
+              DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+        ),
+      ],
       tabs: [
         GlassTab(
           label: 'Connections',
@@ -120,19 +129,6 @@ class _SiemIntegrationScreenState extends State<SiemIntegrationScreen> {
                   : _buildAlertsTab(),
         ),
       ],
-      headerContent: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-              onPressed: _isLoading ? null : _loadData,
-              tooltip: 'Refresh',
-            ),
-          ],
-        ),
-      ),
     );
   }
 

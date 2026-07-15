@@ -37,6 +37,20 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
       builder: (context, provider, _) {
         return GlassTabPage(
           title: 'Executive Protection',
+          actions: [
+            GestureDetector(
+              onTap: () => _showAnalyzeMessageSheet(context, provider),
+              child: DuotoneIcon('letter',
+                  size: 22, color: context.colors.onSurface),
+            ),
+          ],
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _showAddExecutiveSheet(context, provider),
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Brand.onLime,
+            tooltip: 'Add VIP',
+            child: DuotoneIcon('user_plus', size: 26, color: Brand.onLime),
+          ),
           tabs: [
             GlassTab(
               label: 'Dashboard',
@@ -60,24 +74,6 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
                   : _buildVIPsTab(provider),
             ),
           ],
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon('user_plus', size: 22, color: context.colors.onSurface),
-                  onPressed: () => _showAddExecutiveSheet(context, provider),
-                  tooltip: 'Add VIP',
-                ),
-                IconButton(
-                  icon: DuotoneIcon('letter', size: 22, color: context.colors.onSurface),
-                  onPressed: () => _showAnalyzeMessageSheet(context, provider),
-                  tooltip: 'Analyze Message',
-                ),
-              ],
-            ),
-          ),
         );
       },
     );

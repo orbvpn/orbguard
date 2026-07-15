@@ -31,27 +31,20 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           title: 'Dark Web Monitor',
           hasSearch: true,
           searchHint: 'Search breaches...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                FloatingActionButton.extended(
-                  onPressed: () => _showAddAssetSheet(context),
-                  backgroundColor: GlassTheme.primaryAccent,
-                  foregroundColor: Brand.onLime,
-                  icon: const DuotoneIcon('add_circle', size: 20),
-                  label: const Text('Add Asset'),
-                ),
-                IconButton(
-                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
-                  onPressed: () {
-                    context.read<DarkWebProvider>().refreshAssets();
-                  },
-                  tooltip: 'Refresh',
-                ),
-              ],
+          // Issue 2: screen-level action icon lives in the header pill.
+          actions: [
+            GestureDetector(
+              onTap: () => context.read<DarkWebProvider>().refreshAssets(),
+              child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
             ),
+          ],
+          // Issue 3: the primary "Add" action floats bottom-right, not inline.
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _showAddAssetSheet(context),
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Brand.onLime,
+            tooltip: 'Add Asset',
+            child: DuotoneIcon('add_circle', size: 26, color: Brand.onLime),
           ),
           tabs: [
             GlassTab(

@@ -92,40 +92,26 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
 
         return GlassPage(
           title: 'Threat Graph',
+          actions: [
+            GestureDetector(
+              onTap: () => _showSearchDialog(context, provider),
+              child: DuotoneIcon(AppIcons.search,
+                  size: 22, color: Theme.of(context).colorScheme.onSurface),
+            ),
+            GestureDetector(
+              onTap: () {
+                if (!provider.isLoadingGraph) provider.loadGraphData();
+              },
+              child: DuotoneIcon(AppIcons.refresh,
+                  size: 22, color: Theme.of(context).colorScheme.onSurface),
+            ),
+          ],
           body: provider.isLoadingGraph
               ? Center(
                   child: CircularProgressIndicator(
                       color: AppColors.accentInk))
               : Column(
                   children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: DuotoneIcon(AppIcons.search,
-                                size: 22,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface),
-                            onPressed: () =>
-                                _showSearchDialog(context, provider),
-                            tooltip: 'Search',
-                          ),
-                          IconButton(
-                            icon: DuotoneIcon(AppIcons.refresh,
-                                size: 22,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface),
-                            onPressed: provider.isLoadingGraph
-                                ? null
-                                : () => provider.loadGraphData(),
-                            tooltip: 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
                     if (provider.graphError != null)
                       Expanded(child: _buildErrorState(provider))
                     else if (_nodes.isEmpty)

@@ -134,6 +134,15 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
   Widget build(BuildContext context) {
     return GlassTabPage(
       title: 'Compliance Reporting',
+      actions: [
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadData();
+          },
+          child:
+              DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+        ),
+      ],
       tabs: [
         GlassTab(
           label: 'Frameworks',
@@ -163,19 +172,6 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                   : _buildControlsTab(),
         ),
       ],
-      headerContent: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-              onPressed: _isLoading ? null : _loadData,
-              tooltip: 'Refresh',
-            ),
-          ],
-        ),
-      ),
     );
   }
 

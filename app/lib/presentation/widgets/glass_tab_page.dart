@@ -34,6 +34,11 @@ class GlassTabPage extends StatefulWidget {
   final ValueChanged<String>? onSearchChanged;
   final List<Widget>? actions;
   final Widget? headerContent;
+
+  /// Bottom-right floating action button. On standalone tab pages it floats
+  /// above the bottom tab bar (kit: primary "Add"-style actions live here, not
+  /// inline in the body).
+  final Widget? floatingActionButton;
   final int initialIndex;
 
   /// When true, skips the outer GlassPage wrapper (for embedding in other screens)
@@ -55,6 +60,7 @@ class GlassTabPage extends StatefulWidget {
     this.onSearchChanged,
     this.actions,
     this.headerContent,
+    this.floatingActionButton,
     this.initialIndex = 0,
     this.embedded = false,
     this.showBackButton = true,
@@ -182,6 +188,14 @@ class GlassTabPageState extends State<GlassTabPage>
           ],
         ),
 
+        // Floating action button — bottom-right, above the tab bar
+        if (widget.floatingActionButton != null)
+          Positioned(
+            right: 20,
+            bottom: 60 + 12 + 16,
+            child: widget.floatingActionButton!,
+          ),
+
         // Bottom navigation
         Positioned(
           bottom: 0,
@@ -197,7 +211,7 @@ class GlassTabPageState extends State<GlassTabPage>
   /// bottom navigation bar — render the tab selector at the top instead of
   /// stacking a second pill above it.
   Widget _buildEmbeddedLayout() {
-    return Column(
+    final column = Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -205,6 +219,17 @@ class GlassTabPageState extends State<GlassTabPage>
         ),
         if (widget.headerContent != null) widget.headerContent!,
         Expanded(child: _buildTabContent()),
+      ],
+    );
+    if (widget.floatingActionButton == null) return column;
+    return Stack(
+      children: [
+        column,
+        Positioned(
+          right: 20,
+          bottom: 16,
+          child: widget.floatingActionButton!,
+        ),
       ],
     );
   }

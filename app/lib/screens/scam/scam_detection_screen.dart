@@ -78,21 +78,13 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
               content: _buildPatternsTab(provider),
             ),
           ],
-          headerContent: provider.analysisHistory.isNotEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon('trash_bin_minimalistic', size: 22, color: Theme.of(context).colorScheme.onSurface),
-                        onPressed: () => _confirmClearHistory(context, provider),
-                        tooltip: 'Clear History',
-                      ),
-                    ],
-                  ),
-                )
-              : null,
+          actions: [
+            if (provider.analysisHistory.isNotEmpty)
+              GestureDetector(
+                onTap: () => _confirmClearHistory(context, provider),
+                child: DuotoneIcon('trash_bin_minimalistic', size: 22, color: Theme.of(context).colorScheme.onSurface),
+              ),
+          ],
         );
       },
     );

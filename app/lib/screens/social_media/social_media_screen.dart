@@ -51,48 +51,36 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
           title: 'Social Media Monitor',
           hasSearch: true,
           searchHint: 'Search accounts...',
+          // Screen-level refresh action lives in the header pill.
+          actions: [
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                if (!provider.isScanning) {
+                  provider.scanAllAccounts();
+                }
+              },
+              child: DuotoneIcon(
+                provider.isScanning ? 'stop' : 'refresh',
+                size: 22,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+          // Primary "Add Account" action floats bottom-right.
+          floatingActionButton: FloatingActionButton(
+            onPressed: _showAddAccountDialog,
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Brand.onLime,
+            tooltip: 'Add Account',
+            child: DuotoneIcon('add_circle', size: 26, color: Brand.onLime),
+          ),
+          // Non-action header content (status + stats) stays, still guarded by
+          // the loading state.
           headerContent: provider.isLoading
               ? const SizedBox.shrink()
               : Column(
                   children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Add Account button
-                          ElevatedButton.icon(
-                            onPressed: _showAddAccountDialog,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: GlassTheme.primaryAccent,
-                              foregroundColor: Brand.onLime,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                            icon: const DuotoneIcon('add_circle', size: 20),
-                            label: const Text('Add Account'),
-                          ),
-                          IconButton(
-                            icon: DuotoneIcon(
-                              provider.isScanning ? 'stop' : 'refresh',
-                              size: 22,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                            onPressed: () {
-                              HapticFeedback.mediumImpact();
-                              if (!provider.isScanning) {
-                                provider.scanAllAccounts();
-                              }
-                            },
-                            tooltip: provider.isScanning ? 'Stop Scan' : 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     // Status card
                     _buildStatusCard(provider),
                     const SizedBox(height: 16),

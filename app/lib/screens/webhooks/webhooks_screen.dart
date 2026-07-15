@@ -56,31 +56,25 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Webhooks',
+      actions: [
+        GestureDetector(
+          onTap: () { if (!_isLoading) _loadWebhooks(); },
+          child: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+        ),
+      ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddWebhookDialog(context),
+        backgroundColor: GlassTheme.primaryAccent,
+        foregroundColor: Brand.onLime,
+        tooltip: 'Add Webhook',
+        child: DuotoneIcon('add_circle', size: 26, color: Brand.onLime),
+      ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _error != null
               ? _buildErrorState()
               : Column(
               children: [
-                // Actions row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon('add_circle', size: 22, color: context.colors.onSurface),
-                        onPressed: () => _showAddWebhookDialog(context),
-                        tooltip: 'Add Webhook',
-                      ),
-                      IconButton(
-                        icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-                        onPressed: _isLoading ? null : _loadWebhooks,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                ),
                 Expanded(
                   child: _webhooks.isEmpty
                       ? _buildEmptyState()

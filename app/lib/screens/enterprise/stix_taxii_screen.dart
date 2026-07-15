@@ -149,6 +149,15 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
   Widget build(BuildContext context) {
     return GlassTabPage(
       title: 'STIX/TAXII 2.1',
+      actions: [
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadData();
+          },
+          child:
+              DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+        ),
+      ],
       tabs: [
         GlassTab(
           label: 'Servers',
@@ -166,19 +175,6 @@ class _StixTaxiiScreenState extends State<StixTaxiiScreen> {
           content: _buildTabContent(_buildObjectsTab()),
         ),
       ],
-      headerContent: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-              onPressed: _isLoading ? null : _loadData,
-              tooltip: 'Refresh',
-            ),
-          ],
-        ),
-      ),
     );
   }
 

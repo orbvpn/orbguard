@@ -40,36 +40,31 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
           title: 'Identity Protection',
           hasSearch: true,
           searchHint: 'Search assets...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (provider.isScanning)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.accentInk,
-                      ),
-                    ),
-                  )
-                else
-                  IconButton(
-                    icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-                    onPressed: () => provider.scanAllAssets(),
-                    tooltip: 'Refresh',
+          actions: [
+            if (provider.isScanning)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.accentInk,
                   ),
-                IconButton(
-                  icon: DuotoneIcon('add_circle', size: 22, color: context.colors.onSurface),
-                  onPressed: () => _showAddAssetSheet(context, provider),
-                  tooltip: 'Add Asset',
                 ),
-              ],
-            ),
+              )
+            else
+              GestureDetector(
+                onTap: () => provider.scanAllAssets(),
+                child: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+              ),
+          ],
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _showAddAssetSheet(context, provider),
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Brand.onLime,
+            tooltip: 'Add Asset',
+            child: DuotoneIcon('add_circle', size: 26, color: Brand.onLime),
           ),
           tabs: [
             GlassTab(

@@ -39,38 +39,23 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
           title: 'Supply Chain Monitor',
           hasSearch: true,
           searchHint: 'Search vulnerabilities...',
+          actions: [
+            GestureDetector(
+              onTap: () => _startScan(),
+              child: DuotoneIcon('refresh', size: 22, color: context.onSurface),
+            ),
+          ],
+          floatingActionButton: FloatingActionButton(
+            onPressed: _startScan,
+            backgroundColor: GlassTheme.primaryAccent,
+            foregroundColor: Brand.onLime,
+            tooltip: 'Scan Apps',
+            child: DuotoneIcon('magnifer', size: 26, color: Brand.onLime),
+          ),
           headerContent: provider.isLoading
               ? const SizedBox.shrink()
               : Column(
                   children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Scan Apps button
-                          ElevatedButton.icon(
-                            onPressed: _startScan,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: GlassTheme.primaryAccent,
-                              foregroundColor: Brand.onLime,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                            icon: const DuotoneIcon('magnifer', size: 20),
-                            label: const Text('Scan Apps'),
-                          ),
-                          IconButton(
-                            icon: DuotoneIcon('refresh', size: 22, color: context.onSurface),
-                            onPressed: () => _startScan(),
-                            tooltip: 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
                     // Stats summary
                     _buildStatsSummary(provider),
                     const SizedBox(height: 16),

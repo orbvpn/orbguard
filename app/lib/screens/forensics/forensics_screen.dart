@@ -39,21 +39,14 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           title: 'Forensic Analysis',
           hasSearch: true,
           searchHint: 'Search analysis...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon('info_circle',
-                      size: 22,
-                      color: Theme.of(context).colorScheme.onSurface),
-                  onPressed: () => _showInfoDialog(context),
-                  tooltip: 'Info',
-                ),
-              ],
+          actions: [
+            GestureDetector(
+              onTap: () => _showInfoDialog(context),
+              child: DuotoneIcon('info_circle',
+                  size: 22,
+                  color: Theme.of(context).colorScheme.onSurface),
             ),
-          ),
+          ],
           tabs: [
             GlassTab(
               label: 'Analyze',

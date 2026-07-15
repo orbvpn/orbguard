@@ -104,6 +104,19 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Intelligence Sources',
+      actions: [
+        GestureDetector(
+          onTap: () { if (!_isLoading) _loadSources(); },
+          child: DuotoneIcon(AppIcons.refresh, size: 22, color: context.onSurface),
+        ),
+      ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddSourceDialog(context),
+        backgroundColor: GlassTheme.primaryAccent,
+        foregroundColor: Brand.onLime,
+        tooltip: 'Add Source',
+        child: DuotoneIcon(AppIcons.addCircle, size: 26, color: Brand.onLime),
+      ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
@@ -112,25 +125,6 @@ class _IntelligenceSourcesScreenState extends State<IntelligenceSourcesScreen> {
                   ? _buildEmptyState()
                   : Column(
                   children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: DuotoneIcon(AppIcons.addCircle, size: 22, color: context.onSurface),
-                            onPressed: () => _showAddSourceDialog(context),
-                            tooltip: 'Add Source',
-                          ),
-                          IconButton(
-                            icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.onSurface),
-                            onPressed: _isLoading ? null : _loadSources,
-                            tooltip: 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
                     // Content
                     Expanded(
                       child: ListView(

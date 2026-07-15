@@ -51,19 +51,14 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
           title: 'Digital Footprint',
           hasSearch: true,
           searchHint: 'Search assets...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
-                  onPressed: provider.isLoading ? null : () => provider.loadBrokers(),
-                  tooltip: 'Refresh',
-                ),
-              ],
+          actions: [
+            GestureDetector(
+              onTap: () {
+                if (!provider.isLoading) provider.loadBrokers();
+              },
+              child: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
             ),
-          ),
+          ],
           tabs: [
             GlassTab(
               label: 'Scan',

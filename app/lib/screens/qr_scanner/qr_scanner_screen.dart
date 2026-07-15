@@ -285,32 +285,29 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           title: 'QR Scanner',
           hasSearch: true,
           searchHint: 'Search history...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  onPressed: _isCameraActive ? _toggleFlash : null,
-                  icon: DuotoneIcon(
-                    'bolt',
-                    size: 22,
-                    color: _isFlashOn ? AppColors.accentInk : context.colors.onSurface,
-                  ),
-                  tooltip: 'Flash',
-                ),
-                IconButton(
-                  onPressed: _isCameraActive ? _switchCamera : null,
-                  icon: DuotoneIcon(
-                    'camera',
-                    size: 22,
-                    color: context.colors.onSurface,
-                  ),
-                  tooltip: 'Switch Camera',
-                ),
-              ],
+          // Screen-level scanner action icons live in the header pill.
+          actions: [
+            GestureDetector(
+              onTap: () {
+                if (_isCameraActive) _toggleFlash();
+              },
+              child: DuotoneIcon(
+                'bolt',
+                size: 22,
+                color: _isFlashOn ? AppColors.accentInk : context.colors.onSurface,
+              ),
             ),
-          ),
+            GestureDetector(
+              onTap: () {
+                if (_isCameraActive) _switchCamera();
+              },
+              child: DuotoneIcon(
+                'camera',
+                size: 22,
+                color: context.colors.onSurface,
+              ),
+            ),
+          ],
           tabs: [
             GlassTab(
               label: 'Scan',

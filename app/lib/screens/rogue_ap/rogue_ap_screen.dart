@@ -51,40 +51,31 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
           hasSearch: true,
           searchHint: 'Search networks...',
           onSearchChanged: (query) => setState(() => _searchQuery = query),
+          actions: [
+            if (provider.isScanning)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.accentInk,
+                  ),
+                ),
+              )
+            else
+              GestureDetector(
+                onTap: () => provider.scanForAPs(),
+                child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
+              ),
+            GestureDetector(
+              onTap: () => _showSettings(context, provider),
+              child: DuotoneIcon('settings', size: 22, color: cs.onSurface),
+            ),
+          ],
           headerContent: Column(
             children: [
-              // Actions row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (provider.isScanning)
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.accentInk,
-                          ),
-                        ),
-                      )
-                    else
-                      IconButton(
-                        icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
-                        onPressed: () => provider.scanForAPs(),
-                        tooltip: 'Scan',
-                      ),
-                    IconButton(
-                      icon: DuotoneIcon('settings', size: 22, color: cs.onSurface),
-                      onPressed: () => _showSettings(context, provider),
-                      tooltip: 'Settings',
-                    ),
-                  ],
-                ),
-              ),
               // Scan progress
               if (provider.isScanning) _buildScanProgress(provider),
               // Current connection status

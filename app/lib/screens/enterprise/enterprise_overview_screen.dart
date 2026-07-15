@@ -119,26 +119,20 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Enterprise Overview',
+      actions: [
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadData();
+          },
+          child: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+        ),
+      ],
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : Column(
                   children: [
-                    // Actions row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-                            onPressed: _isLoading ? null : _loadData,
-                            tooltip: 'Refresh',
-                          ),
-                        ],
-                      ),
-                    ),
                     // Content
                     Expanded(
                       child: RefreshIndicator(

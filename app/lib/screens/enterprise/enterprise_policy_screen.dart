@@ -38,21 +38,16 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
       builder: (context, provider, _) {
         return GlassPage(
           title: 'Conditional Access',
+          actions: [
+            GestureDetector(
+              onTap: () {
+                if (!provider.isLoading) provider.loadPolicies();
+              },
+              child: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
+            ),
+          ],
           body: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-                      onPressed: provider.isLoading ? null : provider.loadPolicies,
-                      tooltip: 'Refresh',
-                    ),
-                  ],
-                ),
-              ),
               Expanded(child: _buildBody(provider)),
             ],
           ),

@@ -80,29 +80,20 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GlassPage(
       title: 'Correlation Engine',
+      actions: [
+        GestureDetector(
+          onTap: () { if (!_isCorrelating) _runCorrelation(); },
+          child: DuotoneIcon(AppIcons.play, size: 22, color: cs.onSurface),
+        ),
+        GestureDetector(
+          onTap: () { if (!_isLoading) _loadResults(); },
+          child: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
+        ),
+      ],
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : Column(
               children: [
-                // Actions row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.play, size: 22, color: cs.onSurface),
-                        onPressed: _isCorrelating ? null : _runCorrelation,
-                        tooltip: 'Run Correlation',
-                      ),
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
-                        onPressed: _isLoading ? null : _loadResults,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                ),
                 // Engine filter
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,

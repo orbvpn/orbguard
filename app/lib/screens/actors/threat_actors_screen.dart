@@ -87,31 +87,22 @@ class _ThreatActorsScreenState extends State<ThreatActorsScreen> {
 
     return GlassPage(
       title: 'Threat Actors',
+      actions: [
+        GestureDetector(
+          onTap: () => _showSearchDialog(context),
+          child: DuotoneIcon(AppIcons.search, size: 22, color: cs.onSurface),
+        ),
+        GestureDetector(
+          onTap: () { if (!_isLoading) _loadActors(); },
+          child: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
+        ),
+      ],
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
           : _errorMessage != null
               ? _buildErrorState()
               : Column(
               children: [
-                // Actions row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.search, size: 22, color: cs.onSurface),
-                        onPressed: () => _showSearchDialog(context),
-                        tooltip: 'Search',
-                      ),
-                      IconButton(
-                        icon: DuotoneIcon(AppIcons.refresh, size: 22, color: cs.onSurface),
-                        onPressed: _isLoading ? null : _loadActors,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                ),
                 // Category filter
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,

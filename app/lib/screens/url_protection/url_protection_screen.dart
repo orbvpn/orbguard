@@ -190,23 +190,6 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
     );
   }
 
-  Widget _buildActionsRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          IconButton(
-            icon: DuotoneIcon('clipboard_text',
-                size: 22, color: Theme.of(context).colorScheme.onSurface),
-            onPressed: _showListManagementSheet,
-            tooltip: 'Manage Lists',
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
@@ -238,7 +221,14 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
       hasSearch: true,
       searchHint: 'Search URLs...',
       onSearchChanged: _onSearchChanged,
-      headerContent: _buildActionsRow(),
+      // Screen-level action icon lives in the header pill.
+      actions: [
+        GestureDetector(
+          onTap: _showListManagementSheet,
+          child: DuotoneIcon('clipboard_text',
+              size: 22, color: Theme.of(context).colorScheme.onSurface),
+        ),
+      ],
       tabs: [
         GlassTab(
           label: 'Check',

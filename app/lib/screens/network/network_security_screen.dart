@@ -90,22 +90,15 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           hasSearch: true,
           searchHint: 'Search networks...',
           onSearchChanged: _onSearchChanged,
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
-                  onPressed: () {
-                    provider.refreshNetworkInfo();
-                    provider.scanNetworks();
-                  },
-                  tooltip: 'Refresh',
-                ),
-              ],
+          actions: [
+            GestureDetector(
+              onTap: () {
+                provider.refreshNetworkInfo();
+                provider.scanNetworks();
+              },
+              child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
             ),
-          ),
+          ],
           tabs: [
             GlassTab(
               label: 'WiFi',

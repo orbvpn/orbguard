@@ -135,6 +135,13 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
       hasSearch: true,
       searchHint: 'Search messages...',
       onSearchChanged: _onSearchChanged,
+      actions: [
+        GestureDetector(
+          onTap: () => _showBlockedSendersSheet(),
+          child: DuotoneIcon('forbidden',
+              size: 22, color: Theme.of(context).colorScheme.onSurface),
+        ),
+      ],
       headerContent: _buildActionsRow(),
       tabs: [
         GlassTab(
@@ -180,11 +187,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                     : 'Scan All (${_provider.unanalyzedCount})',
               ),
             ),
-          IconButton(
-            icon: DuotoneIcon('forbidden', size: 22, color: cs.onSurface),
-            onPressed: () => _showBlockedSendersSheet(),
-            tooltip: 'Blocked Senders',
-          ),
         ],
       ),
     );

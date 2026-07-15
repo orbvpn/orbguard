@@ -24,41 +24,35 @@ class AppSecurityScreen extends StatelessWidget {
           title: 'App Security',
           hasSearch: true,
           searchHint: 'Search apps...',
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                PopupMenuButton<AppSortOption>(
-                  icon: DuotoneIcon('sort_vertical',
-                      size: 24,
-                      color: Theme.of(context).colorScheme.onSurface),
-                  onSelected: (option) {
-                    context.read<AppSecurityProvider>().setSortOption(option);
-                  },
-                  itemBuilder: (context) {
-                    final currentSort =
-                        context.read<AppSecurityProvider>().sortOption;
-                    return AppSortOption.values.map((option) {
-                      return PopupMenuItem(
-                        value: option,
-                        child: Row(
-                          children: [
-                            if (option == currentSort)
-                              DuotoneIcon('check_circle', size: 18, color: AppColors.accentInk)
-                            else
-                              const SizedBox(width: 18),
-                            const SizedBox(width: 8),
-                            Text(option.displayName),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  },
-                ),
-              ],
+          actions: [
+            PopupMenuButton<AppSortOption>(
+              icon: DuotoneIcon('sort_vertical',
+                  size: 24,
+                  color: Theme.of(context).colorScheme.onSurface),
+              onSelected: (option) {
+                context.read<AppSecurityProvider>().setSortOption(option);
+              },
+              itemBuilder: (context) {
+                final currentSort =
+                    context.read<AppSecurityProvider>().sortOption;
+                return AppSortOption.values.map((option) {
+                  return PopupMenuItem(
+                    value: option,
+                    child: Row(
+                      children: [
+                        if (option == currentSort)
+                          DuotoneIcon('check_circle', size: 18, color: AppColors.accentInk)
+                        else
+                          const SizedBox(width: 18),
+                        const SizedBox(width: 8),
+                        Text(option.displayName),
+                      ],
+                    ),
+                  );
+                }).toList();
+              },
             ),
-          ),
+          ],
           tabs: [
             GlassTab(
               label: 'Apps',

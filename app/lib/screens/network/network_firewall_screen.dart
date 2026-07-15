@@ -47,6 +47,15 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
         final cs = Theme.of(context).colorScheme;
         return GlassTabPage(
           title: 'Network Firewall',
+          actions: [
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                provider.toggle();
+              },
+              child: DuotoneIcon('shield_check', size: 22, color: cs.onSurface),
+            ),
+          ],
           tabs: [
             GlassTab(
               label: 'Live',
@@ -71,23 +80,6 @@ class _NetworkFirewallScreenState extends State<NetworkFirewallScreen> {
           ],
           headerContent: Column(
             children: [
-              // Actions row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: DuotoneIcon('shield_check', size: 22, color: cs.onSurface),
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        provider.toggle();
-                      },
-                      tooltip: 'Toggle Firewall',
-                    ),
-                  ],
-                ),
-              ),
               if (!provider.isLoading) ...[
                 // Status card
                 _buildStatusCard(provider),

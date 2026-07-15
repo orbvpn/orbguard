@@ -123,6 +123,29 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
 
         return GlassTabPage(
           title: 'Analytics',
+          actions: [
+            PopupMenuButton<String>(
+              icon: DuotoneIcon('calendar', size: 22, color: cs.onSurface),
+              color: cs.surfaceContainerHighest,
+              onSelected: _onTimeRangeChanged,
+              itemBuilder: (context) => [
+                _buildTimeRangeItem('24h', 'Last 24 Hours'),
+                _buildTimeRangeItem('7d', 'Last 7 Days'),
+                _buildTimeRangeItem('30d', 'Last 30 Days'),
+                _buildTimeRangeItem('90d', 'Last 90 Days'),
+              ],
+            ),
+            GestureDetector(
+              onTap: _showReportDialog,
+              child: DuotoneIcon('document_add', size: 22, color: cs.onSurface),
+            ),
+            GestureDetector(
+              onTap: () {
+                if (!provider.isLoading) provider.refresh();
+              },
+              child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
+            ),
+          ],
           tabs: [
             GlassTab(
               label: 'Overview',
@@ -140,35 +163,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               content: _buildProtectionTab(context, provider),
             ),
           ],
-          headerContent: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                PopupMenuButton<String>(
-                  icon: DuotoneIcon('calendar', size: 22, color: cs.onSurface),
-                  color: cs.surfaceContainerHighest,
-                  onSelected: _onTimeRangeChanged,
-                  itemBuilder: (context) => [
-                    _buildTimeRangeItem('24h', 'Last 24 Hours'),
-                    _buildTimeRangeItem('7d', 'Last 7 Days'),
-                    _buildTimeRangeItem('30d', 'Last 30 Days'),
-                    _buildTimeRangeItem('90d', 'Last 90 Days'),
-                  ],
-                ),
-                IconButton(
-                  icon: DuotoneIcon('document_add', size: 22, color: cs.onSurface),
-                  onPressed: _showReportDialog,
-                  tooltip: 'Generate Report',
-                ),
-                IconButton(
-                  icon: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
-                  onPressed: provider.isLoading ? null : () => provider.refresh(),
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
         );
       },
     );

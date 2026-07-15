@@ -64,22 +64,16 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Integrations',
+      actions: [
+        GestureDetector(
+          onTap: () {
+            if (!_isLoading) _loadIntegrations();
+          },
+          child: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
+        ),
+      ],
       body: Column(
         children: [
-          // Actions row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: DuotoneIcon(AppIcons.refresh, size: 22, color: context.colors.onSurface),
-                  onPressed: _isLoading ? null : _loadIntegrations,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
           // Content
           Expanded(
             child: _isLoading
