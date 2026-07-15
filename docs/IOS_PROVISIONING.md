@@ -13,14 +13,15 @@ Shared App Group (already in `ios/Runner/Runner.entitlements`): **`group.com.orb
 ## 1. Push notifications (APNs) — for FCM push on iOS
 
 The FCM pipeline is live end-to-end on the backend + Android (verified: 4 real tokens).
-iOS delivery needs APNs:
+iOS delivery needs APNs. **APNs key already created: `AuthKey_CNVSQQAPM9.p8` (Key ID `CNVSQQAPM9`).**
 
-1. Apple Developer portal → Keys → create an **APNs Auth Key** (`.p8`), note the Key ID.
-2. Firebase console → project **orb-guard** → Project Settings → Cloud Messaging → iOS app
-   `com.orb.guard` → upload the APNs key (Key ID + Team ID `33T4RDL646`).
-3. Enable the **Push Notifications** capability on App ID `com.orb.guard`.
-4. For release builds, set `aps-environment` = `production` in `ios/Runner/Runner.entitlements`
-   (currently `development`).
+1. ✅ `aps-environment` = `production` set in `ios/Runner/Runner.entitlements` (done in code).
+2. **YOU (Firebase Console — no CLI/API exists for this):** Firebase console → project **orb-guard**
+   → Project Settings → **Cloud Messaging** → Apple app config → **APNs Authentication Key** →
+   Upload → the `.p8` file, **Key ID `CNVSQQAPM9`**, **Team ID `33T4RDL646`**.
+3. **Push Notifications** capability on App ID `com.orb.guard` — with automatic signing (now
+   configured on all targets, team `33T4RDL646`) Xcode registers this on archive; or enable it
+   manually in the portal.
 
 ## 2. Content filter — `OrbGuardFilter` (enterprise/MDM only)
 
@@ -28,19 +29,34 @@ Wired into the Xcode build (`ios/scripts/add_filter_target.rb`), builds green. A
 **runs** an `NEFilterDataProvider` on **MDM-supervised** devices — not consumer iPhones.
 
 1. App ID `com.orb.guard.OrbGuardFilter` → enable **Network Extensions** capability
-   (`content-filter-provider`).
-2. Sign both Runner and the extension with a profile carrying that capability.
+   (`content-filter-provider`). Automatic signing registers this on Archive.
+2. Signing: handled by automatic signing (all targets carry team `33T4RDL646`).
 3. Activation requires an **MDM profile** that turns on the content filter (managed devices).
-   There is no consumer toggle — this is by Apple's design.
+   There is no consumer toggle — this is Apple's design; nothing in code changes it.
+
+> **Honest product note:** because the content filter only activates under MDM, it does
+> **nothing for consumer users**. If OrbGuard ships to consumers, consider dropping the
+> `OrbGuardFilter` target (and the `content-filter-provider` / unused
+> `packet-tunnel-provider` / `dns-proxy` / `app-proxy-provider` entitlements on Runner) from
+> the consumer build to simplify review — keep it only in an enterprise/MDM variant. The
+> **SMS filter and Call Directory extensions are the real consumer iOS wins.**
 
 ## 3. SMS filter — `OrbGuardSmsFilter` (real consumer anti-smishing)
 
 `ILMessageFilterExtension`: iOS routes messages **from unknown senders** to the extension,
 which classifies them (on-device heuristic + defer to `guard.orbai.world/api/v1/sms/analyze`).
 
-1. App ID `com.orb.guard.OrbGuardSmsFilter` → enable **SMS and Call Reporting** /
-   `com.apple.developer.identitylookup.message-filter` capability.
-2. Sign with a profile carrying that entitlement.
+1. Capability = `com.apple.developer.identitylookup.message-filter` (portal name: **"SMS and
+   Call Reporting"**). **IMPORTANT — this goes on the EXTENSION's App ID
+   `com.orb.guard.OrbGuardSmsFilter`, NOT the main `com.orb.guard`.** If you couldn't find the
+   capability, it's almost certainly because that extension App ID doesn't exist in the portal
+   yet (it's brand-new). Easiest path: with **automatic signing** (now set on every target,
+   team `33T4RDL646`), open `ios/Runner.xcworkspace` in Xcode signed into the team and **Archive**
+   — Xcode auto-creates the 3 extension App IDs and registers their capabilities. If you prefer
+   manual: create App ID `com.orb.guard.OrbGuardSmsFilter` first, then "SMS and Call Reporting"
+   appears in its capability list. (Note: some Apple accounts must *request* the message-filter
+   entitlement — if the toggle is greyed with a "request" link, submit that form.)
+2. Sign with a profile carrying that entitlement (automatic signing handles this on Archive).
 3. On the device: **Settings → Messages → Unknown & Spam → Filter Unknown Senders** and select
    **OrbGuard** as the SMS filtering app. (The user must opt in — Apple requirement.)
 4. QA: text the device from an unknown number with a smishing-style link; confirm it lands in
