@@ -84,24 +84,25 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     super.dispose();
   }
 
-  int _securityScore(ProtectionSettings prot) {
-    if (!_isInitialized) return 0;
+  /// Sentinel returned by [_securityScore] when the backend has not
+  /// produced a real device-protection assessment. Rendered as "—" /
+  /// "Not assessed yet" — never as a fabricated number.
+  static const int _scoreNotAssessed = -1;
+
+  /// The REAL device protection score, straight from the backend
+  /// (`GET /api/v1/stats/dashboard` → `protection.score`, 0–100).
+  ///
+  /// Returns [_scoreNotAssessed] when there is no genuine measurement to
+  /// show: either the dashboard summary has not loaded yet, or the backend
+  /// omitted the protection section (no device identity), in which case
+  /// `protection.available` is false and its score is only a placeholder.
+  /// We never synthesise a score from local toggles or feed counts.
+  int _securityScore() {
     final protection = _provider.summary?.protection;
-    if (protection == null) return 85; // Default score
-
-    int score = 100;
-
-    // Deduct points for disabled protections
-    if (!prot.smsProtectionEnabled) score -= 10;
-    if (!prot.urlProtectionEnabled) score -= 10;
-    if (!prot.qrProtectionEnabled) score -= 5;
-    if (!prot.networkProtectionEnabled) score -= 10;
-
-    // Deduct for active threats
-    final threatCount = _provider.stats?.criticalAndHighCount ?? 0;
-    score -= (threatCount * 15).clamp(0, 40);
-
-    return score.clamp(0, 100);
+    if (protection == null || !protection.available) {
+      return _scoreNotAssessed;
+    }
+    return protection.protectionScore.round();
   }
 
   int get _threatCount => _provider.stats?.criticalAndHighCount ?? 0;
@@ -109,6 +110,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   /// Score FILL (ring, tint, glow) — brand status fills.
   Color _getScoreColor(int score) {
+    if (score < 0) return context.onSurfaceMuted; // not assessed — neutral
     if (score >= 90) return AppColors.success;
     if (score >= 70) return AppColors.successLight;
     if (score >= 50) return AppColors.severityLow;
@@ -117,12 +119,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   /// Contrast-safe INK for score text (lime is fill-only on light).
   Color _getScoreInk(int score) {
+    if (score < 0) return context.onSurfaceMuted; // not assessed — neutral
     if (score >= 70) return AppColors.accentInk;
     if (score >= 50) return AppColors.amberInk;
     return AppColors.errorInk;
   }
 
   String _getStatusText(int score) {
+    if (score < 0) return 'Not assessed yet';
     if (score >= 90) return 'Excellent Protection';
     if (score >= 70) return 'Good Protection';
     if (score >= 50) return 'Needs Attention';
@@ -137,7 +141,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.watch<SettingsProvider>();
-    final score = _securityScore(settings.protection);
+    final score = _securityScore();
     final scoreColor = _getScoreColor(score);
     final scoreInk = _getScoreInk(score);
 
@@ -207,7 +211,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   Widget _buildSecurityScoreCard(
       bool isDark, int score, Color scoreColor, Color scoreInk) {
-    final shouldPulse = score < 70;
+    // Only pulse for a real, low score — never for the "not assessed"
+    // sentinel, which must read as neutral, not urgent.
+    final shouldPulse = score >= 0 && score < 70;
 
     return GlassCard(
       isDark: isDark,
@@ -257,7 +263,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                '$score',
+                                score < 0 ? '—' : '$score',
                                 style: BrandText.display(
                                     size: 40, color: scoreInk),
                               ),
@@ -310,7 +316,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                           _buildMiniStat(
                             'danger_triangle',
                             '$_threatCount',
-                            'Threats',
+                            'Critical IOCs',
                             _threatCount > 0
                                 ? AppColors.errorInk
                                 : context.onSurfaceMuted,
@@ -325,7 +331,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
             ),
 
             // Warning Banner (if threats detected)
-            if (_threatCount > 0 || score < 50)
+            if (_threatCount > 0 || (score >= 0 && score < 50))
               Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: GestureDetector(
@@ -350,7 +356,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                         Expanded(
                           child: Text(
                             _threatCount > 0
-                                ? 'Security threats detected. Tap to review.'
+                                ? 'Critical threats in the intelligence feed. Tap to review.'
                                 : 'Your device needs attention. Review settings.',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -680,7 +686,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
         ),
         const SizedBox(width: 4),
         Text(
-          '$count%',
+          '$count',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
