@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -141,6 +140,12 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   }
 
   Widget _buildStatusCard(SocialMediaProvider provider) {
+    // Never claim "All Clear" when no analysis backend is connected — there is
+    // no live source, so accounts have NOT been checked.
+    if (!provider.analysisAvailable) {
+      return _buildUnavailableStatusCard(provider);
+    }
+
     final hasAlerts = provider.activeAlerts.isNotEmpty;
 
     return Padding(
@@ -206,16 +211,88 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     );
   }
 
+  // Honest replacement for the old green "All Clear" card. With no live
+  // analysis backend the accounts cannot be checked, so we say exactly that
+  // instead of implying they were scanned and found safe.
+  Widget _buildUnavailableStatusCard(SocialMediaProvider provider) {
+    final cs = Theme.of(context).colorScheme;
+    final count = provider.accounts.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GlassCard(
+        margin: EdgeInsets.zero,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(GlassTheme.radiusMedium),
+              ),
+              child: Center(
+                child: DuotoneIcon(
+                  'info_circle',
+                  size: 28,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Monitoring Not Connected',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    count == 0
+                        ? 'No live analysis backend, so accounts can\'t be '
+                            'checked for impersonation, privacy or exposure.'
+                        : '$count account${count == 1 ? '' : 's'} saved on '
+                            'this device. No live analysis backend, so they '
+                            'have not been checked.',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsRow(SocialMediaProvider provider) {
+    // Without a live analysis backend, impersonation/exposure counts of 0 are
+    // "not measured", not "none found" — show N/A rather than a fake-clean 0.
+    final available = provider.analysisAvailable;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           _buildStatCard(
             'Impersonation',
-            provider.alerts.length.toString(),
+            available ? provider.alerts.length.toString() : 'N/A',
             'user_block',
-            GlassTheme.errorColor,
+            available ? GlassTheme.errorColor : muted,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
@@ -229,14 +306,14 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             'shield_check',
             provider.privacyAnalysisAvailable
                 ? _getPrivacyColor(provider.averagePrivacyScore)
-                : Theme.of(context).colorScheme.onSurfaceVariant,
+                : muted,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             'Exposures',
-            provider.exposures.length.toString(),
+            available ? provider.exposures.length.toString() : 'N/A',
             'eye',
-            GlassTheme.warningColor,
+            available ? GlassTheme.warningColor : muted,
           ),
         ],
       ),
@@ -298,7 +375,6 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      onTap: () => _showAccountDetails(account, provider),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -438,6 +514,13 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   }
 
   Widget _buildAlertsTab(SocialMediaProvider provider) {
+    if (!provider.analysisAvailable) {
+      return _buildUnavailableState(
+        'Impersonation Detection',
+        'Not connected to a live analysis backend, so your accounts have not '
+        'been scanned for impersonation. No result can be shown.',
+      );
+    }
     if (provider.alerts.isEmpty) {
       return _buildEmptyState(
         'check_circle',
@@ -625,7 +708,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () {},
+                onPressed: () => provider.dismissAlert(alert.id),
                 child: Text(
                   'Dismiss',
                   style: TextStyle(color: cs.onSurfaceVariant),
@@ -648,6 +731,13 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   }
 
   Widget _buildPrivacyTab(SocialMediaProvider provider) {
+    if (!provider.analysisAvailable) {
+      return _buildUnavailableState(
+        'Privacy Analysis',
+        'Not connected to a live analysis backend, so no privacy audit has '
+        'run for your accounts. No score can be shown.',
+      );
+    }
     if (provider.accounts.isEmpty) {
       return _buildEmptyState(
         'shield_check',
@@ -845,11 +935,21 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   }
 
   Widget _buildExposuresTab(SocialMediaProvider provider) {
+    // An empty exposure list only means "secure" if a real backend scan
+    // actually ran. Without one, say the data was NOT checked instead of
+    // claiming it is safe.
+    if (!provider.exposureAnalysisPerformed) {
+      return _buildUnavailableState(
+        'Exposure Scan',
+        'Not connected to a live analysis backend, so your data has not been '
+        'checked for exposure. This is not a "clean" result.',
+      );
+    }
     if (provider.exposures.isEmpty) {
       return _buildEmptyState(
-        'eye_closed',
+        'shield_check',
         'No Exposures Found',
-        'Your data appears to be secure',
+        'Your accounts were scanned and no data exposure was found',
       );
     }
 
@@ -997,6 +1097,43 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     );
   }
 
+  // Honest "no live data source" state, matching how the network/identity
+  // screens present an unavailable result: neutral info tone (never a green
+  // success check), an explicit title and the reason it can't be shown.
+  Widget _buildUnavailableState(String feature, String detail) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DuotoneIcon('info_circle',
+                size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text(
+              '$feature Unavailable',
+              style: TextStyle(
+                color: cs.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              detail,
+              style: TextStyle(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.8)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAddAccountDialog() {
     _usernameController.clear();
     _selectedPlatform = SocialPlatform.twitter;
@@ -1136,10 +1273,6 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
         ),
       ),
     );
-  }
-
-  void _showAccountDetails(SocialAccount account, SocialMediaProvider provider) {
-    // Navigate to detailed view or show modal
   }
 
   String _getPlatformSvgIcon(SocialPlatform platform) {

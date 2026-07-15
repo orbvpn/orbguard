@@ -12,6 +12,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Social media platform
 enum SocialPlatform {
@@ -260,9 +261,17 @@ class MonitoringResult {
 
 /// Social Media Monitor Service
 class SocialMediaMonitorService {
-  // API configuration
+  // API configuration.
+  //
+  // NOTE: there is currently NO live social-media analysis backend. This host
+  // has no deployment and [_apiKey] is never set, so [isBackendConfigured] is
+  // always false and every analysis path below honestly returns "not
+  // analyzable" instead of contacting this URL or fabricating a result.
   static const String _apiBaseUrl = 'https://api.orbguard.io/v1/social';
   String? _apiKey;
+
+  // Persistence key for the user-entered account list.
+  static const String _accountsPrefsKey = 'social_media_monitor.accounts.v1';
 
   // Connected accounts
   final Map<String, SocialAccount> _accounts = {};
@@ -293,9 +302,14 @@ class SocialMediaMonitorService {
   /// "not analyzable" rather than fabricated.
   bool get isBackendConfigured => _apiKey != null;
 
-  /// Initialize the service
+  /// Initialize the service.
+  ///
+  /// Loads the user-entered account list from disk so it survives restarts.
+  /// Only the accounts the user typed are persisted — never any analysis
+  /// output, since none is ever fabricated.
   Future<void> initialize({String? apiKey}) async {
     _apiKey = apiKey;
+    await _loadAccounts();
   }
 
   /// Add a social account to monitor
@@ -315,20 +329,60 @@ class SocialMediaMonitorService {
     );
 
     _accounts[accountId] = account;
+    await _persistAccounts();
 
-    // Perform initial scan
-    await scanAccount(accountId);
+    // Only run an analysis pass when a live backend actually exists. Without
+    // one there is nothing to check, so we do NOT fabricate a "last checked"
+    // timestamp or any result — the account is stored exactly as entered.
+    if (isBackendConfigured) {
+      await scanAccount(accountId);
+    }
 
-    return account;
+    return _accounts[accountId]!;
   }
 
   /// Remove a monitored account
-  void removeAccount(String accountId) {
+  Future<void> removeAccount(String accountId) async {
     _accounts.remove(accountId);
+    await _persistAccounts();
   }
 
   /// Get all monitored accounts
   List<SocialAccount> getAccounts() => _accounts.values.toList();
+
+  /// Load the persisted account list. Analysis fields are intentionally not
+  /// restored (they are never fabricated); accounts come back with no score.
+  Future<void> _loadAccounts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_accountsPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final decoded = json.decode(raw);
+      if (decoded is! List) return;
+
+      _accounts.clear();
+      for (final entry in decoded.whereType<Map>()) {
+        final account = SocialAccount.fromJson(entry.cast<String, dynamic>());
+        _accounts[account.id] = account;
+      }
+    } catch (e) {
+      debugPrint('SocialMediaMonitor: failed to load persisted accounts: $e');
+    }
+  }
+
+  /// Persist the user-entered account list.
+  Future<void> _persistAccounts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _accountsPrefsKey,
+        json.encode(_accounts.values.map((a) => a.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('SocialMediaMonitor: failed to persist accounts: $e');
+    }
+  }
 
   /// Scan a single account
   Future<MonitoringResult> scanAccount(String accountId) async {
@@ -584,6 +638,16 @@ class SocialMediaMonitorService {
   void stopMonitoring() {
     _monitorTimer?.cancel();
     _monitorTimer = null;
+  }
+
+  /// Dismiss an impersonation alert the user has reviewed.
+  ///
+  /// This only clears it from the on-device list — there is no backend to
+  /// notify. Impersonation alerts only ever originate from a live backend
+  /// scan, so without one this list is empty and dismiss is a no-op by nature
+  /// (never a fabricated "handled" state).
+  void dismissAlert(String alertId) {
+    _alerts.removeWhere((a) => a.id == alertId);
   }
 
   /// Get all alerts

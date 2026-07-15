@@ -65,6 +65,12 @@ class SocialMediaProvider extends ChangeNotifier {
   bool get privacyAnalysisAvailable =>
       _accounts.any((a) => a.privacyScore != null);
 
+  /// True only when a live analysis backend is connected. There is currently
+  /// no social-media analysis backend, so this is false and the UI must show
+  /// an explicit "not connected / unavailable" state for every result rather
+  /// than implying the user's accounts were checked and found safe.
+  bool get analysisAvailable => _service.isBackendConfigured;
+
   /// True only when the last scan actually performed a backend data-exposure
   /// analysis. When false, an empty [exposures] list means "not analyzable"
   /// (no backend signal), NOT "no exposures found".
@@ -133,9 +139,16 @@ class SocialMediaProvider extends ChangeNotifier {
   }
 
   /// Remove account from monitoring
-  void removeAccount(String accountId) {
-    _service.removeAccount(accountId);
+  Future<void> removeAccount(String accountId) async {
+    await _service.removeAccount(accountId);
     _accounts = _service.getAccounts();
+    notifyListeners();
+  }
+
+  /// Dismiss an impersonation alert the user has reviewed (local only).
+  void dismissAlert(String alertId) {
+    _service.dismissAlert(alertId);
+    _alerts = _service.getAlerts();
     notifyListeners();
   }
 
