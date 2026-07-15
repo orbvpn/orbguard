@@ -4,9 +4,11 @@
 <dict>
 	<!-- Apple Push Notifications (FCM anti-theft wake-ups). Requires the Push
 	     Notifications capability on the App ID + an APNs auth key uploaded to
-	     Firebase (Apple Developer account). Until configured, iOS uses polling. -->
+	     Firebase (Apple Developer account). Set to `production` for release /
+	     TestFlight / App Store builds (required by APNs for those). For a direct
+	     Xcode debug build to a device you can flip this back to `development`. -->
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 
 	<!-- App Groups - Required for sharing data with Network Extension -->
 	<key>com.apple.security.application-groups</key>
