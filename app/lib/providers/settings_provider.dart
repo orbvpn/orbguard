@@ -58,7 +58,6 @@ class NotificationSettings {
   final bool threatAlertsEnabled;
   final bool breachAlertsEnabled;
   final bool scanCompletedAlerts;
-  final bool weeklyReportEnabled;
   final bool soundEnabled;
   final bool vibrationEnabled;
   final bool quietHoursEnabled;
@@ -70,7 +69,6 @@ class NotificationSettings {
     this.threatAlertsEnabled = true,
     this.breachAlertsEnabled = true,
     this.scanCompletedAlerts = false,
-    this.weeklyReportEnabled = true,
     this.soundEnabled = true,
     this.vibrationEnabled = true,
     this.quietHoursEnabled = false,
@@ -83,7 +81,6 @@ class NotificationSettings {
     bool? threatAlertsEnabled,
     bool? breachAlertsEnabled,
     bool? scanCompletedAlerts,
-    bool? weeklyReportEnabled,
     bool? soundEnabled,
     bool? vibrationEnabled,
     bool? quietHoursEnabled,
@@ -95,7 +92,6 @@ class NotificationSettings {
       threatAlertsEnabled: threatAlertsEnabled ?? this.threatAlertsEnabled,
       breachAlertsEnabled: breachAlertsEnabled ?? this.breachAlertsEnabled,
       scanCompletedAlerts: scanCompletedAlerts ?? this.scanCompletedAlerts,
-      weeklyReportEnabled: weeklyReportEnabled ?? this.weeklyReportEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
@@ -151,14 +147,12 @@ class ScanSettings {
   final bool autoScanEnabled;
   final int scanFrequencyHours; // Hours between auto scans
   final bool scanOnWifiOnly;
-  final bool scanNewApps;
   final bool deepScanEnabled;
 
   ScanSettings({
     this.autoScanEnabled = true,
     this.scanFrequencyHours = 24,
     this.scanOnWifiOnly = true,
-    this.scanNewApps = true,
     this.deepScanEnabled = false,
   });
 
@@ -166,14 +160,12 @@ class ScanSettings {
     bool? autoScanEnabled,
     int? scanFrequencyHours,
     bool? scanOnWifiOnly,
-    bool? scanNewApps,
     bool? deepScanEnabled,
   }) {
     return ScanSettings(
       autoScanEnabled: autoScanEnabled ?? this.autoScanEnabled,
       scanFrequencyHours: scanFrequencyHours ?? this.scanFrequencyHours,
       scanOnWifiOnly: scanOnWifiOnly ?? this.scanOnWifiOnly,
-      scanNewApps: scanNewApps ?? this.scanNewApps,
       deepScanEnabled: deepScanEnabled ?? this.deepScanEnabled,
     );
   }
@@ -212,43 +204,6 @@ class ApiSettings {
   }
 }
 
-/// VPN settings
-class VpnSettings {
-  final bool autoConnectEnabled;
-  final bool connectOnUnsecuredWifi;
-  final bool connectOnMobileData;
-  final String preferredServer;
-  final bool killSwitchEnabled;
-  final List<String> excludedApps;
-
-  VpnSettings({
-    this.autoConnectEnabled = false,
-    this.connectOnUnsecuredWifi = true,
-    this.connectOnMobileData = false,
-    this.preferredServer = 'auto',
-    this.killSwitchEnabled = false,
-    this.excludedApps = const [],
-  });
-
-  VpnSettings copyWith({
-    bool? autoConnectEnabled,
-    bool? connectOnUnsecuredWifi,
-    bool? connectOnMobileData,
-    String? preferredServer,
-    bool? killSwitchEnabled,
-    List<String>? excludedApps,
-  }) {
-    return VpnSettings(
-      autoConnectEnabled: autoConnectEnabled ?? this.autoConnectEnabled,
-      connectOnUnsecuredWifi: connectOnUnsecuredWifi ?? this.connectOnUnsecuredWifi,
-      connectOnMobileData: connectOnMobileData ?? this.connectOnMobileData,
-      preferredServer: preferredServer ?? this.preferredServer,
-      killSwitchEnabled: killSwitchEnabled ?? this.killSwitchEnabled,
-      excludedApps: excludedApps ?? this.excludedApps,
-    );
-  }
-}
-
 /// Settings Provider
 class SettingsProvider extends ChangeNotifier {
   SharedPreferences? _prefs;
@@ -259,7 +214,6 @@ class SettingsProvider extends ChangeNotifier {
   PrivacySettings _privacy = PrivacySettings();
   ScanSettings _scan = ScanSettings();
   ApiSettings _api = ApiSettings();
-  VpnSettings _vpn = VpnSettings();
 
   bool _isLoading = false;
   String? _error;
@@ -274,7 +228,6 @@ class SettingsProvider extends ChangeNotifier {
   PrivacySettings get privacy => _privacy;
   ScanSettings get scan => _scan;
   ApiSettings get api => _api;
-  VpnSettings get vpn => _vpn;
   bool get isLoading => _isLoading;
   String? get error => _error;
   ThemeMode get themeMode => _themeMode;
@@ -339,7 +292,6 @@ class SettingsProvider extends ChangeNotifier {
       threatAlertsEnabled: _prefs!.getBool('notif_threats') ?? true,
       breachAlertsEnabled: _prefs!.getBool('notif_breaches') ?? true,
       scanCompletedAlerts: _prefs!.getBool('notif_scan') ?? false,
-      weeklyReportEnabled: _prefs!.getBool('notif_weekly') ?? true,
       soundEnabled: _prefs!.getBool('notif_sound') ?? true,
       vibrationEnabled: _prefs!.getBool('notif_vibration') ?? true,
       quietHoursEnabled: _prefs!.getBool('notif_quiet') ?? false,
@@ -363,7 +315,6 @@ class SettingsProvider extends ChangeNotifier {
       autoScanEnabled: _prefs!.getBool('scan_auto') ?? true,
       scanFrequencyHours: _prefs!.getInt('scan_freq') ?? 24,
       scanOnWifiOnly: _prefs!.getBool('scan_wifi') ?? true,
-      scanNewApps: _prefs!.getBool('scan_new_apps') ?? true,
       deepScanEnabled: _prefs!.getBool('scan_deep') ?? false,
     );
 
@@ -374,16 +325,6 @@ class SettingsProvider extends ChangeNotifier {
       connectionTimeout: _prefs!.getInt('api_timeout') ?? 30,
       enableWebSocket: _prefs!.getBool('api_websocket') ?? true,
       apiKey: _prefs!.getString('api_key'),
-    );
-
-    // VPN settings
-    _vpn = VpnSettings(
-      autoConnectEnabled: _prefs!.getBool('vpn_auto') ?? false,
-      connectOnUnsecuredWifi: _prefs!.getBool('vpn_unsecured') ?? true,
-      connectOnMobileData: _prefs!.getBool('vpn_mobile') ?? false,
-      preferredServer: _prefs!.getString('vpn_server') ?? 'auto',
-      killSwitchEnabled: _prefs!.getBool('vpn_killswitch') ?? false,
-      excludedApps: _prefs!.getStringList('vpn_excluded') ?? [],
     );
   }
 
@@ -414,7 +355,6 @@ class SettingsProvider extends ChangeNotifier {
       await _prefs!.setBool('notif_threats', settings.threatAlertsEnabled);
       await _prefs!.setBool('notif_breaches', settings.breachAlertsEnabled);
       await _prefs!.setBool('notif_scan', settings.scanCompletedAlerts);
-      await _prefs!.setBool('notif_weekly', settings.weeklyReportEnabled);
       await _prefs!.setBool('notif_sound', settings.soundEnabled);
       await _prefs!.setBool('notif_vibration', settings.vibrationEnabled);
       await _prefs!.setBool('notif_quiet', settings.quietHoursEnabled);
@@ -484,7 +424,6 @@ class SettingsProvider extends ChangeNotifier {
       await _prefs!.setBool('scan_auto', settings.autoScanEnabled);
       await _prefs!.setInt('scan_freq', settings.scanFrequencyHours);
       await _prefs!.setBool('scan_wifi', settings.scanOnWifiOnly);
-      await _prefs!.setBool('scan_new_apps', settings.scanNewApps);
       await _prefs!.setBool('scan_deep', settings.deepScanEnabled);
     }
   }
@@ -505,21 +444,6 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  /// Update VPN settings
-  Future<void> updateVpn(VpnSettings settings) async {
-    _vpn = settings;
-    notifyListeners();
-
-    if (_prefs != null) {
-      await _prefs!.setBool('vpn_auto', settings.autoConnectEnabled);
-      await _prefs!.setBool('vpn_unsecured', settings.connectOnUnsecuredWifi);
-      await _prefs!.setBool('vpn_mobile', settings.connectOnMobileData);
-      await _prefs!.setString('vpn_server', settings.preferredServer);
-      await _prefs!.setBool('vpn_killswitch', settings.killSwitchEnabled);
-      await _prefs!.setStringList('vpn_excluded', settings.excludedApps);
-    }
-  }
-
   /// Reset all settings to defaults
   Future<void> resetAllSettings() async {
     _protection = ProtectionSettings();
@@ -527,7 +451,6 @@ class SettingsProvider extends ChangeNotifier {
     _privacy = PrivacySettings();
     _scan = ScanSettings();
     _api = ApiSettings();
-    _vpn = VpnSettings();
     notifyListeners();
 
     if (_prefs != null) {
@@ -553,7 +476,6 @@ class SettingsProvider extends ChangeNotifier {
         'threats': _notifications.threatAlertsEnabled,
         'breaches': _notifications.breachAlertsEnabled,
         'scan': _notifications.scanCompletedAlerts,
-        'weekly': _notifications.weeklyReportEnabled,
         'sound': _notifications.soundEnabled,
         'vibration': _notifications.vibrationEnabled,
         'quiet': _notifications.quietHoursEnabled,
@@ -573,7 +495,6 @@ class SettingsProvider extends ChangeNotifier {
         'auto': _scan.autoScanEnabled,
         'freq': _scan.scanFrequencyHours,
         'wifi': _scan.scanOnWifiOnly,
-        'newApps': _scan.scanNewApps,
         'deep': _scan.deepScanEnabled,
       },
     };

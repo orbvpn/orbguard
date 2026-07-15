@@ -168,11 +168,7 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
             children: [
               _buildWebhookStat('forward', '${webhook.sentCount} sent'),
               const SizedBox(width: 16),
-              _buildWebhookStat(
-                webhook.lastStatus == 'success' ? 'check_circle' : 'danger_circle',
-                webhook.lastStatus == 'success' ? 'Healthy' : 'Failed',
-                color: webhook.lastStatus == 'success' ? AppColors.accentInk : AppColors.errorInk,
-              ),
+              _buildWebhookHealth(webhook),
             ],
           ),
           const SizedBox(height: 8),
@@ -187,6 +183,21 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Health chip for a webhook. One that has never delivered (no status
+  /// reported by the backend) reads as a neutral "Unknown" — not a green
+  /// "Healthy" it hasn't earned.
+  Widget _buildWebhookHealth(Webhook webhook) {
+    if (!webhook.hasDelivered) {
+      return _buildWebhookStat('question_circle', 'Unknown');
+    }
+    final healthy = webhook.lastStatus == 'success';
+    return _buildWebhookStat(
+      healthy ? 'check_circle' : 'danger_circle',
+      healthy ? 'Healthy' : 'Failed',
+      color: healthy ? AppColors.accentInk : AppColors.errorInk,
     );
   }
 
@@ -442,7 +453,8 @@ class _WebhooksScreenState extends State<WebhooksScreen> {
                 child: Column(
                   children: [
                     _buildDetailRow('Status', webhook.isEnabled ? 'Active' : 'Disabled'),
-                    _buildDetailRow('Last Status', webhook.lastStatus.toUpperCase()),
+                    _buildDetailRow('Last Status',
+                        webhook.hasDelivered ? webhook.lastStatus.toUpperCase() : 'Unknown'),
                     _buildDetailRow('Total Sent', '${webhook.sentCount}'),
                   ],
                 ),
@@ -542,9 +554,13 @@ class Webhook {
     required this.type,
     required this.events,
     this.sentCount = 0,
-    this.lastStatus = 'success',
+    this.lastStatus = '',
     this.isEnabled = true,
   });
+
+  /// Whether the backend has reported a delivery outcome yet. A webhook that
+  /// has never delivered has no status, so it must not read as "Healthy".
+  bool get hasDelivered => lastStatus.isNotEmpty;
 
   factory Webhook.fromJson(Map<String, dynamic> json) {
     return Webhook(
@@ -554,7 +570,7 @@ class Webhook {
       type: json['type'] as String? ?? 'Custom',
       events: (json['events'] as List<dynamic>?)?.cast<String>() ?? [],
       sentCount: json['sent_count'] as int? ?? json['sentCount'] as int? ?? 0,
-      lastStatus: json['last_status'] as String? ?? json['lastStatus'] as String? ?? 'success',
+      lastStatus: json['last_status'] as String? ?? json['lastStatus'] as String? ?? '',
       isEnabled: json['is_enabled'] as bool? ?? json['isEnabled'] as bool? ?? true,
     );
   }

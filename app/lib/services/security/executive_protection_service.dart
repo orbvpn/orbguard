@@ -9,7 +9,9 @@
 // - AI-powered impersonation scoring
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Executive contact profile
 class ExecutiveProfile {
@@ -179,6 +181,9 @@ class ImpersonationIndicator {
 
 /// Executive Impersonation Protection Service
 class ExecutiveProtectionService {
+  // Persisted VIP (executive) list — survives app restarts.
+  static const String _executivesPrefsKey = 'executive_protection.vips';
+
   // Executive profiles database
   final Map<String, ExecutiveProfile> _executives = {};
 
@@ -202,6 +207,36 @@ class ExecutiveProtectionService {
   Future<void> initialize() async {
     _loadPatterns();
     _loadHomoglyphMap();
+    await _loadExecutives();
+  }
+
+  /// Load persisted VIP profiles so monitored executives survive a restart.
+  Future<void> _loadExecutives() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_executivesPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        for (final entry in decoded.whereType<Map>()) {
+          _indexExecutive(
+              ExecutiveProfile.fromJson(entry.cast<String, dynamic>()));
+        }
+      }
+    } catch (e) {
+      debugPrint('ExecutiveProtection: failed to load VIPs: $e');
+    }
+  }
+
+  /// Persist the current VIP list.
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_executivesPrefsKey,
+          jsonEncode(_executives.values.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      debugPrint('ExecutiveProtection: failed to persist VIPs: $e');
+    }
   }
 
   /// Load detection patterns
@@ -282,7 +317,14 @@ class ExecutiveProtectionService {
   }
 
   /// Add an executive profile to monitor
-  void addExecutive(ExecutiveProfile executive) {
+  Future<void> addExecutive(ExecutiveProfile executive) async {
+    _indexExecutive(executive);
+    await _persist();
+  }
+
+  /// Register an executive (and its corporate domains) in memory without
+  /// persisting — shared by [addExecutive] and the restart-time loader.
+  void _indexExecutive(ExecutiveProfile executive) {
     _executives[executive.id] = executive;
 
     // Extract domain from email
@@ -298,8 +340,9 @@ class ExecutiveProtectionService {
   }
 
   /// Remove an executive profile
-  void removeExecutive(String id) {
+  Future<void> removeExecutive(String id) async {
     _executives.remove(id);
+    await _persist();
   }
 
   /// Add corporate domain
@@ -693,13 +736,14 @@ class ExecutiveProtectionService {
     for (final entry in directory) {
       try {
         final profile = ExecutiveProfile.fromJson(entry);
-        addExecutive(profile);
+        _indexExecutive(profile);
         imported++;
       } catch (e) {
         debugPrint('Failed to import executive: $e');
       }
     }
 
+    if (imported > 0) await _persist();
     return imported;
   }
 

@@ -596,15 +596,6 @@ class NotificationSettingsScreen extends StatelessWidget {
                   notif.copyWith(scanCompletedAlerts: value),
                 ),
               ),
-              _buildSwitchTile(
-                context,
-                'Weekly Report',
-                'Send weekly security summary',
-                notif.weeklyReportEnabled,
-                (value) => settings.updateNotifications(
-                  notif.copyWith(weeklyReportEnabled: value),
-                ),
-              ),
               const SizedBox(height: 24),
               _buildSectionHeader(context, 'Sound & Vibration'),
               _buildSwitchTile(
@@ -1068,15 +1059,6 @@ class ScanSettingsScreen extends StatelessWidget {
               ),
               _buildSwitchTile(
                 context,
-                'Scan New Apps',
-                'Automatically scan newly installed apps',
-                scan.scanNewApps,
-                (value) => settings.updateScan(
-                  scan.copyWith(scanNewApps: value),
-                ),
-              ),
-              _buildSwitchTile(
-                context,
                 'Deep Scan',
                 'More thorough scanning (uses more battery)',
                 scan.deepScanEnabled,
@@ -1132,103 +1114,11 @@ class VpnSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'VPN Settings',
-      body: Consumer<SettingsProvider>(
-        builder: (context, settings, child) {
-          final vpn = settings.vpn;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              _buildOrbVpnHandoffCard(context),
-              const SizedBox(height: 20),
-              _buildSwitchTile(
-                context,
-                'Auto Connect',
-                'Automatically connect VPN when needed',
-                vpn.autoConnectEnabled,
-                (value) => settings.updateVpn(
-                  vpn.copyWith(autoConnectEnabled: value),
-                ),
-              ),
-              if (vpn.autoConnectEnabled) ...[
-                const SizedBox(height: 8),
-                _buildSwitchTile(
-                  context,
-                  'Connect on Unsecured WiFi',
-                  'Auto-connect when on open networks',
-                  vpn.connectOnUnsecuredWifi,
-                  (value) => settings.updateVpn(
-                    vpn.copyWith(connectOnUnsecuredWifi: value),
-                  ),
-                ),
-                _buildSwitchTile(
-                  context,
-                  'Connect on Mobile Data',
-                  'Auto-connect when using cellular',
-                  vpn.connectOnMobileData,
-                  (value) => settings.updateVpn(
-                    vpn.copyWith(connectOnMobileData: value),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Preferred Server',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButton<String>(
-                      value: vpn.preferredServer,
-                      dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      isExpanded: true,
-                      underline: Container(),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'auto', child: Text('Auto (Fastest)')),
-                        DropdownMenuItem(
-                            value: 'us', child: Text('United States')),
-                        DropdownMenuItem(
-                            value: 'uk', child: Text('United Kingdom')),
-                        DropdownMenuItem(value: 'de', child: Text('Germany')),
-                        DropdownMenuItem(value: 'jp', child: Text('Japan')),
-                        DropdownMenuItem(
-                            value: 'au', child: Text('Australia')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          settings.updateVpn(
-                            vpn.copyWith(preferredServer: value),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildSwitchTile(
-                context,
-                'Kill Switch',
-                'Block internet if VPN disconnects',
-                vpn.killSwitchEnabled,
-                (value) => settings.updateVpn(
-                  vpn.copyWith(killSwitchEnabled: value),
-                ),
-              ),
-            ],
-          );
-        },
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          _buildOrbVpnHandoffCard(context),
+        ],
       ),
     );
   }
@@ -1265,8 +1155,7 @@ class VpnSettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'OrbGuard uses the OrbVPN app for the VPN tunnel. Open OrbVPN to '
-            "connect — or download it if you don't have it yet. The options "
-            'below apply once the VPN is active.',
+            "connect — or download it if you don't have it yet.",
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 13,
@@ -1287,38 +1176,6 @@ class VpnSettingsScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSwitchTile(
-    BuildContext context,
-    String title,
-    String subtitle,
-    bool value,
-    Function(bool) onChanged,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
-      ),
-      child: SwitchListTile(
-        title: Text(
-          title,
-          style: TextStyle(color: cs.onSurface),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: cs.onSurfaceVariant,
-            fontSize: 12,
-          ),
-        ),
-        value: value,
-        onChanged: onChanged,
       ),
     );
   }
