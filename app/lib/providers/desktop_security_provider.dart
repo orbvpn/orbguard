@@ -9,7 +9,9 @@ import '../services/security/desktop_scan_config.dart';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/api/threat_indicator.dart';
 import '../services/api/orbguard_api_client.dart';
+import '../services/security/desktop_firewall_enforcer.dart';
 import '../services/security/desktop_host_collector.dart';
 import '../services/security/macos_persistence_scanner_service.dart';
 import '../services/security/windows_persistence_scanner_service.dart';
@@ -226,6 +228,12 @@ class DesktopSecurityProvider extends ChangeNotifier {
   // Host firewall state (real OS firewall, read via platform tooling)
   HostFirewallStatus? _hostFirewallStatus;
 
+  // Threat-intel malicious-IP enforcement engine (real pf/iptables/netsh
+  // rules driven by the backend block list).
+  final DesktopFirewallEnforcer _firewallEnforcer = DesktopFirewallEnforcer();
+  FirewallEnforcementStatus? _firewallEnforcementStatus;
+  bool _isMutatingFirewallEnforcement = false;
+
   // Host-local network connection collection
   List<Map<String, dynamic>> _hostNetworkConnections = [];
   List<String> _hostNetworkErrors = [];
@@ -252,6 +260,15 @@ class DesktopSecurityProvider extends ChangeNotifier {
   List<DesktopPersistenceItem> get items => _items;
 
   HostFirewallStatus? get hostFirewallStatus => _hostFirewallStatus;
+
+  /// Real state of the threat-intel malicious-IP firewall enforcement.
+  FirewallEnforcementStatus? get firewallEnforcementStatus =>
+      _firewallEnforcementStatus;
+
+  /// True while an enable/disable enforcement mutation is in flight (an
+  /// elevation prompt may be showing).
+  bool get isMutatingFirewallEnforcement => _isMutatingFirewallEnforcement;
+
   List<Map<String, dynamic>> get hostNetworkConnections => _hostNetworkConnections;
   List<String> get hostNetworkErrors => _hostNetworkErrors;
   String get hostNetworkSource => _hostNetworkSource;
@@ -1186,6 +1203,83 @@ class DesktopSecurityProvider extends ChangeNotifier {
     _hostFirewallStatus = status;
     notifyListeners();
     return status;
+  }
+
+  // =========================================================================
+  // Threat-intel malicious-IP firewall enforcement (real pf/iptables/netsh)
+  // =========================================================================
+
+  /// Re-read the REAL enforcement state of the OS packet filter for the
+  /// OrbGuard block list.
+  Future<FirewallEnforcementStatus> refreshFirewallEnforcementStatus() async {
+    final status = await _firewallEnforcer.queryStatus();
+    _firewallEnforcementStatus = status;
+    notifyListeners();
+    return status;
+  }
+
+  /// Pull the critical malicious IPv4 indicators from threat intelligence —
+  /// the SAME backend feed the in-app firewall matcher uses — so OS-level
+  /// enforcement blocks exactly the confirmed-critical IPs.
+  Future<({List<String> ips, String? error})>
+      _fetchCriticalMaliciousIps() async {
+    try {
+      final response = await _api.listIndicators(
+        type: IndicatorType.ipv4,
+        severity: SeverityLevel.critical,
+        limit: 500,
+      );
+      final ips = <String>{};
+      for (final indicator in response.items) {
+        final value = indicator.value.trim();
+        if (value.isNotEmpty) ips.add(value);
+      }
+      return (ips: ips.toList(), error: null);
+    } catch (e) {
+      return (ips: <String>[], error: 'Failed to load threat-intel IPs: $e');
+    }
+  }
+
+  /// Enable OS firewall enforcement of the malicious-IP block list. Fetches
+  /// the block list from threat intelligence, then installs real pf/iptables/
+  /// netsh rules via the enforcer. The returned status reflects what was
+  /// ACTUALLY applied (never a fabricated success).
+  Future<FirewallEnforcementStatus> enableFirewallEnforcement() async {
+    _isMutatingFirewallEnforcement = true;
+    notifyListeners();
+    try {
+      final fetched = await _fetchCriticalMaliciousIps();
+      if (fetched.error != null) {
+        final status = FirewallEnforcementStatus(
+          state: FirewallEnforcementState.notEnforcing,
+          reason: fetched.error!,
+          source: 'threat-intel fetch',
+          errored: true,
+        );
+        _firewallEnforcementStatus = status;
+        return status;
+      }
+      final status = await _firewallEnforcer.apply(fetched.ips);
+      _firewallEnforcementStatus = status;
+      return status;
+    } finally {
+      _isMutatingFirewallEnforcement = false;
+      notifyListeners();
+    }
+  }
+
+  /// Disable OS firewall enforcement — remove all OrbGuard block rules.
+  Future<FirewallEnforcementStatus> disableFirewallEnforcement() async {
+    _isMutatingFirewallEnforcement = true;
+    notifyListeners();
+    try {
+      final status = await _firewallEnforcer.remove();
+      _firewallEnforcementStatus = status;
+      return status;
+    } finally {
+      _isMutatingFirewallEnforcement = false;
+      notifyListeners();
+    }
   }
 
   Future<HostFirewallStatus> _readMacFirewallStatus() async {

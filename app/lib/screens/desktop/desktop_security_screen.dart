@@ -17,6 +17,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/desktop_security_provider.dart';
+import '../../services/security/desktop_firewall_enforcer.dart';
 import '../../services/security/desktop_scan_config.dart';
 import '../../services/api/orbguard_api_client.dart';
 
@@ -89,6 +90,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       // Each call manages its own state and surfaces its own errors.
       await Future.wait([
         provider.refreshHostFirewallStatus(),
+        provider.refreshFirewallEnforcementStatus(),
         provider.loadHostNetworkConnections(),
         provider.loadHostBrowserExtensions(),
       ]);
@@ -975,9 +977,197 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               ),
             ),
           ],
+          // Threat-intel malicious-IP enforcement — a distinct control that
+          // installs real pf/iptables/netsh DROP rules for the block list.
+          const SizedBox(height: 14),
+          Divider(
+            height: 1,
+            color: context.colors.onSurfaceVariant.withValues(alpha: 0.15),
+          ),
+          const SizedBox(height: 14),
+          _buildFirewallEnforcementSection(provider),
         ],
       ),
     );
+  }
+
+  /// Enforcement sub-control inside the host firewall card: honestly reflects
+  /// whether OrbGuard is ACTUALLY blocking the threat-intel malicious IPs at
+  /// the OS packet-filter level, including an "Administrator privileges
+  /// required" state when elevation is needed or was denied.
+  Widget _buildFirewallEnforcementSection(DesktopSecurityProvider provider) {
+    final status = provider.firewallEnforcementStatus;
+    final mutating = provider.isMutatingFirewallEnforcement;
+
+    Color color;
+    Color ink;
+    String stateText;
+    String icon;
+    bool switchValue = false;
+    bool showSwitch = true;
+
+    if (status == null) {
+      color = context.colors.onSurfaceVariant;
+      ink = context.colors.onSurfaceVariant;
+      stateText = 'Checking malicious-IP enforcement…';
+      icon = 'shield';
+    } else {
+      switch (status.state) {
+        case FirewallEnforcementState.enforcing:
+          color = GlassTheme.successColor;
+          ink = AppColors.accentInk;
+          stateText = status.reason;
+          icon = 'shield_check';
+          switchValue = true;
+          break;
+        case FirewallEnforcementState.notEnforcing:
+          color = status.errored
+              ? GlassTheme.errorColor
+              : context.colors.onSurfaceVariant;
+          ink = status.errored ? AppColors.errorInk : context.colors.onSurfaceVariant;
+          stateText = status.reason;
+          icon = status.errored ? 'danger_triangle' : 'shield';
+          break;
+        case FirewallEnforcementState.needsElevation:
+          color = GlassTheme.warningColor;
+          ink = AppColors.secondaryInk;
+          stateText = 'Administrator privileges required. ${status.reason}';
+          icon = 'danger_triangle';
+          break;
+        case FirewallEnforcementState.unavailable:
+          color = context.colors.onSurfaceVariant;
+          ink = context.colors.onSurfaceVariant;
+          stateText = status.reason;
+          icon = 'danger_circle';
+          showSwitch = false;
+          break;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            GlassSvgIconBox(icon: icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Block Malicious IPs (threat intel)',
+                    style: TextStyle(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    stateText,
+                    style: TextStyle(color: ink, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            if (mutating)
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.accentInk),
+                ),
+              )
+            else if (showSwitch)
+              Switch(
+                value: switchValue,
+                onChanged: (v) => _toggleFirewallEnforcement(v),
+              ),
+          ],
+        ),
+        Text(
+          'OS packet-filter DROP rules for the critical malicious IPs in your '
+          'threat feed. Blocks IP addresses, not domains.',
+          style: TextStyle(
+            color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+            fontSize: 10,
+          ),
+        ),
+        if (status != null && status.blockedIpCount > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Source: ${status.source}',
+            style: TextStyle(
+              color: context.colors.onSurfaceVariant.withValues(alpha: 0.7),
+              fontSize: 10,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Enable/disable REAL OS firewall enforcement of the malicious-IP block
+  /// list. Shows an honest confirmation (admin will be requested) and reports
+  /// the true outcome, including elevation cancellation.
+  Future<void> _toggleFirewallEnforcement(bool enable) async {
+    final provider = context.read<DesktopSecurityProvider>();
+    final scaffold = ScaffoldMessenger.of(context);
+
+    if (enable) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: GlassTheme.glassColor(context.isDark),
+          title: Text('Block Malicious IPs',
+              style: TextStyle(color: context.colors.onSurface)),
+          content: Text(
+            'OrbGuard will install OS firewall rules that drop all traffic to '
+            'and from the critical malicious IP addresses in your threat '
+            'intelligence feed. This modifies the system firewall and requires '
+            'administrator privileges — you will be asked to authorize it.',
+            style: TextStyle(color: context.colors.onSurfaceVariant),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GlassTheme.primaryAccent,
+              ),
+              child: const Text('Enable Blocking'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    final status = enable
+        ? await provider.enableFirewallEnforcement()
+        : await provider.disableFirewallEnforcement();
+    if (!mounted) return;
+
+    final isSuccess = status.state == FirewallEnforcementState.enforcing ||
+        (!enable &&
+            status.state == FirewallEnforcementState.notEnforcing &&
+            !status.errored);
+    final isWarning =
+        status.state == FirewallEnforcementState.needsElevation ||
+            status.state == FirewallEnforcementState.unavailable;
+    scaffold.showSnackBar(SnackBar(
+      content: Text(status.reason),
+      backgroundColor: isSuccess
+          ? GlassTheme.successColor
+          : isWarning
+              ? GlassTheme.warningColor
+              : GlassTheme.errorColor,
+      duration: const Duration(seconds: 6),
+    ));
   }
 
   Future<void> _toggleHostFirewall(bool enable) async {
