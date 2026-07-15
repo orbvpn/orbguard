@@ -275,6 +275,13 @@ class NetworkFirewallService {
   static const _channel = MethodChannel('com.orbvpn.orbguard/firewall');
   static const _eventChannel = EventChannel('com.orbvpn.orbguard/firewall_events');
 
+  // iOS-only content-filter data bridge. Writes the domain block list into the
+  // shared App Group container that the OrbGuardFilter NEFilterDataProvider
+  // content-filter extension reads. Registered only by the iOS host app; absent
+  // (and silently ignored) on every other platform.
+  static const _contentFilterChannel =
+      MethodChannel('com.orb.guard/content_filter');
+
   final List<NetworkConnection> _connections = [];
   final List<FirewallRule> _rules = [];
   final Map<String, AppNetworkProfile> _appProfiles = {};
@@ -458,8 +465,40 @@ class NetworkFirewallService {
       // Push the freshly-loaded lists to the native engine so enforcement uses
       // them (the block decision happens in native, per-packet).
       await _pushBlockListsToNative();
+
+      // iOS: also mirror the domain block list into the App Group container the
+      // on-device content-filter Network Extension (OrbGuardFilter) reads. This
+      // runs regardless of [_engineStatus] because the content filter is a
+      // separate, MDM-gated mechanism from the consumer firewall engine. No-ops
+      // on platforms without the channel (e.g. Android, which uses the
+      // com.orbvpn.orbguard/firewall VpnService path instead).
+      await _syncContentFilterBlocklist();
     } catch (e) {
       debugPrint('Failed to load malicious indicators: $e');
+    }
+  }
+
+  /// iOS only: mirror the current threat-intel domain block list into the shared
+  /// App Group container that the on-device content-filter Network Extension
+  /// (OrbGuardFilter) reads.
+  ///
+  /// This is a one-way DATA sync — it does not start filtering. Apple only
+  /// activates an NEFilterDataProvider on MDM-supervised devices, and the
+  /// `com.orb.guard/content_filter` channel is registered only by the iOS host
+  /// app, so on every other platform this throws [MissingPluginException] and is
+  /// intentionally ignored — the Android on-device firewall uses the separate
+  /// `com.orbvpn.orbguard/firewall` path and is unaffected.
+  Future<void> _syncContentFilterBlocklist() async {
+    try {
+      await _contentFilterChannel.invokeMethod('syncBlocklist', {
+        'domains': _blockedDomains.toList(),
+        'ips': _blockedIps.toList(),
+      });
+    } on MissingPluginException {
+      // Channel only present on iOS; ignore elsewhere.
+    } on PlatformException catch (e) {
+      debugPrint(
+          'NetworkFirewallService: content-filter blocklist sync failed: ${e.message}');
     }
   }
 

@@ -96,23 +96,13 @@ class FilterDataProvider: NEFilterDataProvider {
         return .allow()
     }
 
-    override func handleRemediationForFlow(_ flow: NEFilterFlow) -> NEFilterRemediationVerdict {
-        // Show remediation page for blocked content
-        guard let browserFlow = flow as? NEFilterBrowserFlow,
-              let url = browserFlow.url else {
-            return .needRules()
-        }
-
-        let domain = url.host ?? "unknown"
-        let (_, rule) = blocklist.shouldBlock(domain)
-
-        // Create remediation URL (would point to your block page)
-        let remediationURL = URL(string: "https://block.orbguard.com/?domain=\(domain)&category=\(rule?.category.rawValue ?? "unknown")")
-
-        if let remediation = remediationURL {
-            return .needRules()  // In production, return remediation URL
-        }
-
+    // NOTE: `handleRemediationForFlow` was renamed to `handleRemediation(for:)`
+    // in the modern NetworkExtension API.
+    override func handleRemediation(for flow: NEFilterFlow) -> NEFilterRemediationVerdict {
+        // A blocked flow reached remediation. Serving a custom block page would
+        // require a hosted remediation URL (e.g. https://block.orbguard.com/…);
+        // until that is configured we ask the system to re-evaluate the flow
+        // against the current rule set. Every path returns .needRules().
         return .needRules()
     }
 
@@ -179,13 +169,12 @@ class FilterControlProvider: NEFilterControlProvider {
         }
     }
 
-    override func handleRemediationForFlow(_ flow: NEFilterFlow, completionHandler: @escaping (NEFilterControlVerdict) -> Void) {
+    // NOTE: `handleRemediationForFlow` was renamed to `handleRemediation(for:)`
+    // in the modern NetworkExtension API. (NEFilterControlProvider exposes no
+    // overridable "rules changed" hook — the control provider calls
+    // `notifyRulesChanged()` itself — so no such override exists here.)
+    override func handleRemediation(for flow: NEFilterFlow, completionHandler: @escaping (NEFilterControlVerdict) -> Void) {
         // Handle remediation requests
         completionHandler(.allow(withUpdateRules: false))
-    }
-
-    override func handleRulesChanged() {
-        // Called when rules are updated
-        logger.info("Filter rules changed - reloading")
     }
 }

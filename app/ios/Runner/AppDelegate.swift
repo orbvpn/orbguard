@@ -30,6 +30,7 @@ import MachO
     private let LOGS_CHANNEL = "com.orb.guard/logs"
 
     private var wifiHandler: WifiChannelHandler?
+    private var contentFilterHandler: ContentFilterChannelHandler?
     private let batterySampler = BatteryDrainSampler()
 
     // MARK: - App Lifecycle
@@ -81,6 +82,16 @@ import MachO
         logsChannel.setMethodCallHandler { call, result in
             AppLogStoreReader.handle(call: call, result: result)
         }
+
+        // Content-filter blocklist bridge (com.orb.guard/content_filter): mirrors
+        // the Dart threat-intel domain block list into the shared App Group
+        // container that the OrbGuardFilter NEFilterDataProvider reads. This is a
+        // one-way DATA sync only — it does NOT start filtering and never reports
+        // enforcement as active. Apple only runs an NEFilterDataProvider on
+        // MDM-supervised devices; see ContentFilterChannelHandler for details.
+        let contentFilterHandler = ContentFilterChannelHandler()
+        self.contentFilterHandler = contentFilterHandler
+        contentFilterHandler.register(with: controller.binaryMessenger)
 
         // Start battery sampling so getBatteryDrain can report a measured rate.
         batterySampler.start()

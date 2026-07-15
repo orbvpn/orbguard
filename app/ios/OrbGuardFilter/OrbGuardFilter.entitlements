@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Groups - read the shared blocklist container the app writes to
+	     (group.com.orb.guard.shared / BlocklistCache SQLite DB). -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.orb.guard.shared</string>
+	</array>
+
+	<!-- Network Extension - Content Filter (NEFilterDataProvider).
+	     NOTE: iOS only ACTIVATES a content filter on an MDM-supervised
+	     (enterprise-managed) device. The extension is real and shippable, but
+	     it does not run on an un-managed consumer iPhone. -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>content-filter-provider</string>
+	</array>
+
+	<!-- Keychain Sharing - parity with the host app / VPN extension so shared
+	     credentials remain reachable from the same access group. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.orb.guard</string>
+		<string>$(AppIdentifierPrefix)group.com.orb.guard.shared</string>
+	</array>
+</dict>
+</plist>
