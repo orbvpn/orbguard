@@ -38,6 +38,7 @@ class MainActivity: FlutterActivity() {
     private var systemMetricsHandler: SystemMetricsHandler? = null
     private var wifiChannelHandler: WifiChannelHandler? = null
     private var supplyChainChannelHandler: SupplyChainChannelHandler? = null
+    private var firewallChannelHandler: FirewallChannelHandler? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -61,6 +62,12 @@ class MainActivity: FlutterActivity() {
 
         // Supply-chain inspection channel (com.orbguard/supply_chain)
         supplyChainChannelHandler = SupplyChainChannelHandler(this).also {
+            it.register(flutterEngine.dartExecutor.binaryMessenger)
+        }
+
+        // On-device firewall channel (com.orbvpn.orbguard/firewall)
+        firewallChannelHandler = FirewallChannelHandler(this).also {
+            it.setActivity(this)
             it.register(flutterEngine.dartExecutor.binaryMessenger)
         }
 
@@ -736,6 +743,14 @@ class MainActivity: FlutterActivity() {
     // ============================================================================
     // SMS PROTECTION CHANNEL
     // ============================================================================
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        // Forward the VPN consent-dialog result to the firewall handler.
+        if (requestCode == FirewallChannelHandler.VPN_CONSENT_REQUEST) {
+            firewallChannelHandler?.onVpnConsentResult(resultCode)
+        }
+    }
 
     private fun setupSmsChannel(flutterEngine: FlutterEngine) {
         val smsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SMS_CHANNEL)

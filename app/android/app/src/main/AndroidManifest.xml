@@ -15,6 +15,12 @@
          the channel returns PERMISSION_DENIED / LOCATION_DISABLED otherwise. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
+    <!-- On-device firewall: a local VpnService that filters DNS. BIND_VPN_SERVICE
+         is enforced on the service; the foreground-service perms keep the tunnel
+         alive while active. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <!-- ============================================ -->
     <!-- STORAGE PERMISSIONS (For file system scanning) -->
     <!-- ============================================ -->
@@ -148,6 +154,20 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/messaging_accessibility_config" />
+        </service>
+
+        <!-- On-device network firewall (local DNS-filtering VpnService) -->
+        <service
+            android:name=".OrbFirewallVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="On-device DNS firewall that blocks malicious domains" />
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
         </service>
     </application>
 

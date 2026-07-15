@@ -454,8 +454,28 @@ class NetworkFirewallService {
       } catch (e) {
         debugPrint('Failed to fetch IP indicators: $e');
       }
+
+      // Push the freshly-loaded lists to the native engine so enforcement uses
+      // them (the block decision happens in native, per-packet).
+      await _pushBlockListsToNative();
     } catch (e) {
       debugPrint('Failed to load malicious indicators: $e');
+    }
+  }
+
+  /// Send the current domain block list to the native firewall engine. The
+  /// per-packet block decision is made natively, so the engine needs the list.
+  Future<void> _pushBlockListsToNative() async {
+    if (_engineStatus == FirewallEngineStatus.unavailable) return;
+    try {
+      await _channel.invokeMethod('updateBlockLists', {
+        'domains': _blockedDomains.toList(),
+        'ips': _blockedIps.toList(),
+      });
+    } on MissingPluginException {
+      // Engine not present on this build; nothing to push.
+    } on PlatformException catch (e) {
+      debugPrint('NetworkFirewallService: updateBlockLists failed: ${e.message}');
     }
   }
 
@@ -471,6 +491,10 @@ class NetworkFirewallService {
       throw StateError(_engineUnavailableReason ??
           'Firewall engine is not available on this build.');
     }
+
+    // Make sure the native engine has the current block list before it starts
+    // filtering.
+    await _pushBlockListsToNative();
 
     try {
       await _channel.invokeMethod('enable');
@@ -801,6 +825,8 @@ class NetworkFirewallService {
     _blockedDomains.add(normalized);
     _userBlockedDomains.add(normalized);
     unawaited(_persistState());
+    // Reflect the change in the running engine immediately.
+    unawaited(_pushBlockListsToNative());
   }
 
   /// Unblock domain
@@ -809,6 +835,7 @@ class NetworkFirewallService {
     _blockedDomains.remove(normalized);
     _userBlockedDomains.remove(normalized);
     unawaited(_persistState());
+    unawaited(_pushBlockListsToNative());
   }
 
   /// Block IP
