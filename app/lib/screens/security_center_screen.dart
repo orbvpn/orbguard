@@ -25,6 +25,7 @@ import 'darkweb/darkweb_screen.dart';
 import 'footprint/digital_footprint_screen.dart';
 import 'intelligence/intelligence_core_screen.dart';
 import 'settings/settings_screen.dart';
+import '../presentation/theme/protection_verdict.dart';
 import 'security/threat_hunting_screen.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
@@ -108,30 +109,11 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   int get _blockedToday => _provider.summary?.threats.threatsBlockedToday ?? 0;
 
-  /// Score FILL (ring, tint, glow) — brand status fills.
-  Color _getScoreColor(int score) {
-    if (score < 0) return context.onSurfaceMuted; // not assessed — neutral
-    if (score >= 90) return AppColors.success;
-    if (score >= 70) return AppColors.successLight;
-    if (score >= 50) return AppColors.severityLow;
-    return AppColors.error;
-  }
-
-  /// Contrast-safe INK for score text (lime is fill-only on light).
-  Color _getScoreInk(int score) {
-    if (score < 0) return context.onSurfaceMuted; // not assessed — neutral
-    if (score >= 70) return AppColors.accentInk;
-    if (score >= 50) return AppColors.amberInk;
-    return AppColors.errorInk;
-  }
-
-  String _getStatusText(int score) {
-    if (score < 0) return 'Not assessed yet';
-    if (score >= 90) return 'Excellent Protection';
-    if (score >= 70) return 'Good Protection';
-    if (score >= 50) return 'Needs Attention';
-    return 'At Risk - Action Required';
-  }
+  // Status wording + colors come from the ONE shared verdict source
+  // ([ProtectionVerdict]) so the home and the Dashboard never disagree.
+  Color _getScoreColor(int score) => ProtectionVerdict.fromScore(score).fill;
+  Color _getScoreInk(int score) => ProtectionVerdict.fromScore(score).ink;
+  String _getStatusText(int score) => ProtectionVerdict.fromScore(score).label;
 
   Future<void> _onRefresh() async {
     await _provider.refresh();

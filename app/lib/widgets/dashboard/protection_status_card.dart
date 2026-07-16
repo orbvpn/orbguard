@@ -7,6 +7,7 @@ import '../../models/api/threat_stats.dart';
 import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/theme/protection_verdict.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 
@@ -55,38 +56,29 @@ class ProtectionStatusCard extends StatelessWidget {
   }
 
   Widget _buildProtectionStatus(BuildContext context) {
-    final isProtected = protection?.isProtected ?? status?.isActive ?? false;
-    final score = protection?.protectionScore ?? status?.score ?? 0.0;
-    final grade = protection?.protectionGrade ?? status?.grade ?? 'U';
+    // Not-assessed sentinel (-1) when the backend has no assessment yet, so a
+    // fresh device reads "Not assessed yet" instead of a misleading "At risk".
+    final available = protection?.available ?? status?.isActive ?? false;
+    final score = available
+        ? (protection?.protectionScore ?? status?.score ?? 0.0)
+        : -1.0;
 
-    Color statusColor;
-    String statusIcon;
-    String statusText;
-
-    if (!isProtected) {
-      statusColor = AppColors.errorInk;
-      statusIcon = AppIcons.shield;
-      statusText = 'Not Protected';
-    } else if (score >= 80) {
-      statusColor = AppColors.accentInk;
-      statusIcon = AppIcons.shieldCheck;
-      statusText = 'Fully Protected';
-    } else if (score >= 50) {
-      statusColor = AppColors.amberInk;
-      statusIcon = AppIcons.shield;
-      statusText = 'Partially Protected';
-    } else {
-      statusColor = AppColors.errorInk;
-      statusIcon = AppIcons.dangerTriangle;
-      statusText = 'Low Protection';
-    }
+    // Wording + colors from the ONE shared verdict source (matches the home).
+    final verdict = ProtectionVerdict.fromScore(score);
+    final statusColor = verdict.ink;
+    final statusText = verdict.label;
+    final statusIcon = switch (verdict.level) {
+      ProtectionLevel.excellent || ProtectionLevel.good => AppIcons.shieldCheck,
+      ProtectionLevel.attention => AppIcons.shield,
+      ProtectionLevel.atRisk => AppIcons.dangerTriangle,
+      ProtectionLevel.notAssessed => AppIcons.shield,
+    };
 
     return Column(
       children: [
         // Protection score circle
         _ProtectionScoreCircle(
           score: score,
-          grade: grade,
           color: statusColor,
           icon: statusIcon,
         ),
@@ -163,13 +155,11 @@ class ProtectionStatusCard extends StatelessWidget {
 /// Animated protection score circle
 class _ProtectionScoreCircle extends StatelessWidget {
   final double score;
-  final String grade;
   final Color color;
   final String icon;
 
   const _ProtectionScoreCircle({
     required this.score,
-    required this.grade,
     required this.color,
     required this.icon,
   });
@@ -193,33 +183,26 @@ class _ProtectionScoreCircle extends StatelessWidget {
               valueColor: AlwaysStoppedAnimation(Brand.border),
             ),
           ),
-          // Progress circle
+          // Progress circle (empty when the device is not assessed yet)
           SizedBox(
             width: 140,
             height: 140,
             child: CircularProgressIndicator(
-              value: score / 100,
+              value: score < 0 ? 0 : score / 100,
               strokeWidth: 8,
               backgroundColor: Colors.transparent,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
-          // Inner content
+          // Inner content — the score itself (no more confusing "U" grade)
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DuotoneIcon(icon, size: 32, color: color),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                grade,
-                style: BrandText.heading(size: 28, color: color),
-              ),
-              Text(
-                '${score.round()}%',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                score < 0 ? '—' : '${score.round()}%',
+                style: BrandText.heading(size: 26, color: color),
               ),
             ],
           ),

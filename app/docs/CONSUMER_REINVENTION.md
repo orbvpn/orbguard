@@ -46,7 +46,7 @@ Platform columns: **iOS · And · mac · Win · Lin**. `Test` = unit/widget + e2
 | ID | Task | iOS | And | mac | Win | Lin | Test | Status |
 |----|------|-----|-----|-----|-----|-----|------|--------|
 | 0.1 | Remove fake-fear from Home: rescope global "Critical IOCs" stat + kill permanent red alarm banner; show device-relevant status only | 🔵 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 0.2 | Unify to ONE honest verdict vocabulary (reconcile Security Center score vs Dashboard letter-grade "U"/"Not Protected") | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 0.2 | Unify to ONE honest verdict vocabulary (reconcile Security Center score vs Dashboard letter-grade "U"/"Not Protected") | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 0.3 | Wall off jailbreak / root / ADB instruction screens from the consumer flow (gate to Pro / remove from setup path) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 0.4 | Fix iOS silent-pass: scan stages that swallow UNSUPPORTED must surface "not supported on iPhone", never "0 findings / clean" | ⬜ | 🚫 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 0.5 | Fix fake elevation theater: `checkShellAccess()` returns true for any app → report honestly | 🚫 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
