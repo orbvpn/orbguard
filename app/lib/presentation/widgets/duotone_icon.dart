@@ -368,11 +368,23 @@ class DuotoneIcon extends StatelessWidget {
         Theme.of(context).iconTheme.color ??
         Theme.of(context).colorScheme.onSurface;
 
-    return SvgPicture.asset(
-      'assets/icons/$icon.svg',
+    // SizedBox + Center make the glyph immune to TIGHT incoming constraints:
+    // a bare SvgPicture inside e.g. Container(width: 64, height: 64) gets
+    // forced to 64×64 (its own width/height are overridden), rendering the
+    // icon edge-to-edge inside badges/rings. Center re-loosens the
+    // constraints so the glyph always paints at exactly [size], while the
+    // SizedBox keeps the widget's own layout footprint identical to before.
+    return SizedBox(
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(iconColor, blendMode ?? BlendMode.srcIn),
+      child: Center(
+        child: SvgPicture.asset(
+          'assets/icons/$icon.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(iconColor, blendMode ?? BlendMode.srcIn),
+        ),
+      ),
     );
   }
 }

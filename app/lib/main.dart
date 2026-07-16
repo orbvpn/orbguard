@@ -444,7 +444,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Center(
                 child: DuotoneIcon(
                   AppIcons.shieldCheck,
-                  size: 48,
+                  size: 40,
                   color: AppColors.accentInk,
                 ),
               ),

@@ -1098,10 +1098,12 @@ class BreachCheckResultCard extends StatelessWidget {
                   : AppColors.success.withAlpha(40),
               shape: BoxShape.circle,
             ),
-            child: DuotoneIcon(
-              isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
-              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
-              size: 36,
+            child: Center(
+              child: DuotoneIcon(
+                isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
+                color: isBreached ? AppColors.errorInk : AppColors.accentInk,
+                size: 32,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -1172,10 +1174,12 @@ class PasswordCheckResultCard extends StatelessWidget {
                   : AppColors.success.withAlpha(40),
               shape: BoxShape.circle,
             ),
-            child: DuotoneIcon(
-              isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
-              color: isBreached ? AppColors.errorInk : AppColors.accentInk,
-              size: 36,
+            child: Center(
+              child: DuotoneIcon(
+                isBreached ? AppIcons.dangerTriangle : AppIcons.checkCircle,
+                color: isBreached ? AppColors.errorInk : AppColors.accentInk,
+                size: 32,
+              ),
             ),
           ),
           const SizedBox(height: 16),
