@@ -1064,8 +1064,13 @@ class RootAccess {
             
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val output = reader.readLine()
-            
-            if (output?.contains("uid=") == true) {
+
+            // A plain `sh` spawned by an app runs as the app's OWN unprivileged
+            // uid, so "uid=" is ALWAYS present and proves nothing. Real elevated
+            // shell access (Shizuku / ADB) runs as the shell user (uid 2000) or
+            // root (uid 0) — only those count.
+            if (output != null &&
+                (output.contains("uid=0(") || output.contains("uid=2000("))) {
                 return true
             }
         } catch (e: Exception) {
@@ -1073,23 +1078,12 @@ class RootAccess {
         }
         return false
     }
-    
+
     private fun checkAppProcessAccess(): Boolean {
-        try {
-            val process = Runtime.getRuntime().exec(arrayOf(
-                "sh", "-c",
-                "CLASSPATH=/system/framework/am.jar app_process /system/bin com.android.commands.am.Am"
-            ))
-            
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val output = reader.readLine()
-            
-            if (output != null) {
-                return true
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // A sandboxed app invoking app_process runs UNPRIVILEGED — reachable
+        // `am` output is not elevation. Genuinely elevated devices are already
+        // caught by the root (uid 0) and shell (uid 0/2000) checks above, so
+        // this method must not claim access it does not actually have.
         return false
     }
     
