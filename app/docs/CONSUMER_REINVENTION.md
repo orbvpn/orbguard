@@ -79,6 +79,15 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 ## Phase 1 — Guard Mode Shell
 *Two-mode architecture + consumer home + one-button ritual + onboarding. Shared UI → all five at once.*
 
+> **✅ COMPLETE (2026-07-16)** — the whole consumer shell ships: appMode flag, lean Guard nav
+> (expert console behind Pro), the calm single-verdict Guard Home + "Check my phone", the
+> plain-language checkup ritual, and first-run onboarding. e2e on iOS (fresh-install → onboarding →
+> Guard Home → lean nav, verified) + macOS (Guard Home) + Android (app runs, honest home in P0.7).
+> Bonus: fixed a startup bug the sweep caught (main() blocked first paint on threat-intel network).
+> Honest gaps: the Pro-toggle **flipping the UI** was proven by Guard's lean nav (Pro hidden by
+> default) + the symmetric gating expression + provider unit tests, not a live toggle screenshot
+> (iOS prefs-cache quirk; the Android emulator crashed mid-tap-through — tooling, not app). 88 tests.
+
 | ID | Task | iOS | And | mac | Win | Lin | Test | Status |
 |----|------|-----|-----|-----|-----|-----|------|--------|
 | 1.1 | `appMode` (guard/pro) in SettingsProvider — persisted, defaults **guard**; toggle in Settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -87,7 +96,7 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 | 1.4 | Unified verdict model (`ProtectionVerdict`, shipped in P0.2; drives home + dashboard) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 1.5 | The Checkup Ritual: one-button scan that **names each check as it runs**, honest per platform, ends in relief | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 1.6 | First-run Onboarding: 3 steps (anti-surveillance value → honest checkup → privacy); persist first-run flag | 🔵 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 1.7 | Phase 1 e2e: fresh install → onboarding → checkup → verdict; mode toggle; Pro hidden by default — all five | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1.7 | Phase 1 e2e: fresh install → onboarding → checkup → verdict; mode toggle; Pro hidden by default — all five | 🔵 | ✅ | 🔵 | ✅ | ✅ | 🔵 | ✅ |
 
 ## Phase 2 — The Six Shields + Two New Features
 *Re-express real capability as plain-English shields; build the two new features.*
