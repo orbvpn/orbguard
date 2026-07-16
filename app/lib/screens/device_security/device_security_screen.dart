@@ -13,6 +13,7 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/victim_safety_notice.dart';
 import '../../providers/device_security_provider.dart';
 import '../../services/device_agent/device_agent.dart' show AgentDisplayMessage;
 
@@ -41,6 +42,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
           hasSearch: true,
           searchHint: 'Search...',
           actions: [
+            // Duress escape — leaves this sensitive view for the neutral home.
+            const QuickExitAction(),
             if (provider.status.isLost || provider.status.isStolen)
               GestureDetector(
                 onTap: () => provider.markAsRecovered(),

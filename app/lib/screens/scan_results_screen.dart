@@ -8,6 +8,7 @@ import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/widgets/victim_safety_notice.dart';
 
 class ScanResultsScreen extends StatefulWidget {
   final List<ThreatDetection> threats;
@@ -82,6 +83,13 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
+              // Duress escape — leaves the results view for the neutral home.
+              IconButton(
+                tooltip: 'Quick Exit',
+                icon: DuotoneIcon('exit',
+                    color: Theme.of(context).colorScheme.onSurface, size: 24),
+                onPressed: () => VictimSafety.quickExit(context),
+              ),
               IconButton(
                 icon: DuotoneIcon('share',
                     color: Theme.of(context).colorScheme.onSurface, size: 24),
@@ -640,6 +648,12 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
                 ),
               )
             else if (_hasNativeRemediation(threat)) ...[
+              // Removing stalkerware can alert the abuser — warn first, calmly,
+              // and offer a duress Quick Exit right at the point of action.
+              if (_looksLikeStalkerware(threat)) ...[
+                const VictimSafetyNotice(margin: EdgeInsets.zero),
+                const SizedBox(height: 12),
+              ],
               if (threat.type.toLowerCase() == 'package') ...[
                 _buildGuidanceRow(
                   'Automatic uninstall requires elevated access. If removal '
@@ -703,6 +717,20 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   bool _isDismissOnly(ThreatDetection threat) {
     final type = threat.type.toLowerCase();
     return type == 'network' || type == 'behavioral' || threat.severity == 'LOW';
+  }
+
+  /// Whether a threat reads like covert monitoring / stalkerware — keyed off the
+  /// scanner's own text, so removing it may alert whoever installed it. Drives
+  /// the victim-safety warning shown before removal.
+  bool _looksLikeStalkerware(ThreatDetection threat) {
+    return VictimSafety.mentionsSurveillance(<String?>[
+      threat.name,
+      threat.description,
+      // metadata values are dynamic — stringify safely (never `as String`).
+      threat.metadata['category']?.toString(),
+      threat.metadata['family']?.toString(),
+      threat.metadata['consequence']?.toString(),
+    ]);
   }
 
   Widget _buildGuidanceRow(String text) {
@@ -932,6 +960,14 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               _getRemovalDescription(threat),
               style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
+            if (_looksLikeStalkerware(threat)) ...[
+              const SizedBox(height: 12),
+              Text(
+                'If someone is monitoring you, removing this may alert them. '
+                'If you feel unsafe, consider getting support before you act.',
+                style: TextStyle(color: AppColors.secondaryInk, fontSize: 13),
+              ),
+            ],
           ],
         ),
         actions: [

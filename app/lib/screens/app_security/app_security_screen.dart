@@ -10,8 +10,27 @@ import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/victim_safety_notice.dart';
 import '../../providers/app_security_provider.dart';
 import '../../widgets/app_security/app_security_widgets.dart';
+
+/// Whether a flagged app reads like covert monitoring / stalkerware, using the
+/// analyzer's OWN text (verdict, warnings, malware family, permission concerns).
+/// Gated on a real risk signal so the victim-safety framing never lands on a
+/// clean app the user installed themselves.
+bool _isLikelyMonitoringApp(AnalyzedApp app) {
+  final result = app.result;
+  if (result == null) return false;
+  if (!(app.isHighRisk || result.isKnownMalware)) return false;
+  return VictimSafety.mentionsSurveillance([
+    app.app.appName,
+    result.overallVerdict,
+    result.recommendation,
+    result.threatIntelMatch?.malwareFamily,
+    ...result.warnings,
+    ...result.permissionRisk.concerns,
+  ]);
+}
 
 class AppSecurityScreen extends StatelessWidget {
   const AppSecurityScreen({super.key});
@@ -25,6 +44,8 @@ class AppSecurityScreen extends StatelessWidget {
           hasSearch: true,
           searchHint: 'Search apps...',
           actions: [
+            // Duress escape — leaves the stalkerware view for the neutral home.
+            const QuickExitAction(),
             PopupMenuButton<AppSortOption>(
               icon: DuotoneIcon('sort_vertical',
                   size: 24,
@@ -350,6 +371,11 @@ class _AppsTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 24),
+                // Victim-safe removal warning for monitoring / stalkerware apps.
+                if (_isLikelyMonitoringApp(app)) ...[
+                  const VictimSafetyNotice(margin: EdgeInsets.zero),
+                  const SizedBox(height: 24),
+                ],
                 // Warnings
                 if (app.result!.warnings.isNotEmpty) ...[
                   Text(
@@ -820,6 +846,11 @@ class _RisksTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 24),
+                // Victim-safe removal warning for monitoring / stalkerware apps.
+                if (_isLikelyMonitoringApp(app)) ...[
+                  const VictimSafetyNotice(margin: EdgeInsets.zero),
+                  const SizedBox(height: 24),
+                ],
                 // Warnings
                 if (app.result!.warnings.isNotEmpty) ...[
                   Text(
