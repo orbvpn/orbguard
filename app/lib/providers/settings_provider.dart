@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/app_mode.dart';
 import '../services/notifications/notification_service.dart';
 import '../services/telemetry/telemetry_service.dart';
 
@@ -222,6 +223,11 @@ class SettingsProvider extends ChangeNotifier {
   static const String _kThemeMode = 'app_theme_mode';
   ThemeMode _themeMode = ThemeMode.system;
 
+  // Experience mode — the consumer "Guard" surface (default) vs the opt-in
+  // "Pro" expert console (persisted). Gates navigation only; see [AppMode].
+  static const String _kAppMode = 'app_mode';
+  AppMode _appMode = AppMode.guard;
+
   // Getters
   ProtectionSettings get protection => _protection;
   NotificationSettings get notifications => _notifications;
@@ -231,6 +237,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   ThemeMode get themeMode => _themeMode;
+  AppMode get appMode => _appMode;
+  bool get isProMode => _appMode.isPro;
 
   /// Update the app theme mode and persist it.
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -241,6 +249,20 @@ class SettingsProvider extends ChangeNotifier {
     await _prefs!.setString(_kThemeMode, mode.name);
   }
 
+  /// Switch between the Guard (consumer) and Pro (expert) experience and
+  /// persist it. Navigation-only; no data or screens are removed.
+  Future<void> setAppMode(AppMode mode) async {
+    if (mode == _appMode) return;
+    _appMode = mode;
+    notifyListeners();
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setString(_kAppMode, mode.name);
+  }
+
+  /// Convenience toggle between Guard and Pro.
+  Future<void> toggleAppMode() =>
+      setAppMode(_appMode.isPro ? AppMode.guard : AppMode.pro);
+
   /// Initialize provider
   Future<void> init() async {
     _isLoading = true;
@@ -249,6 +271,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       _prefs = await SharedPreferences.getInstance();
       _themeMode = _parseThemeMode(_prefs!.getString(_kThemeMode));
+      _appMode = AppMode.fromName(_prefs!.getString(_kAppMode));
       await _loadSettings();
       await _syncNotificationService();
     } catch (e) {

@@ -81,7 +81,7 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 
 | ID | Task | iOS | And | mac | Win | Lin | Test | Status |
 |----|------|-----|-----|-----|-----|-----|------|--------|
-| 1.1 | `appMode` (guard/pro) in SettingsProvider — persisted, defaults **guard**; toggle in Settings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1.1 | `appMode` (guard/pro) in SettingsProvider — persisted, defaults **guard**; toggle in Settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 1.2 | Navigation gating: expert drawer sections + "Intel" tab move behind Pro; Guard gets a lean 4-item nav | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 1.3 | Guard Home: single honest verdict + one "Check my phone" button (brand-kit styled) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 1.4 | Unified verdict model: "Protected / Needs attention / Threat found", device-specific, improvable by action | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
