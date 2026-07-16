@@ -168,11 +168,13 @@ void main() async {
     apiKey: '', // API key managed by auth interceptor
   );
 
-  await threatIntel.initialize();
-
-  // Start auto-updates
-  final autoUpdater = ThreatIntelligenceAutoUpdater(threatIntel);
-  autoUpdater.startAutoUpdate();
+  // Load threat intelligence in the BACKGROUND — never block first paint on
+  // the network. A slow or absent connection must not trap the user on the
+  // splash; onboarding and the Guard home don't depend on it. Auto-updates
+  // start once the initial load settles.
+  unawaited(threatIntel.initialize().then((_) {
+    ThreatIntelligenceAutoUpdater(threatIntel).startAutoUpdate();
+  }));
 
   // Initialize advanced detection
   advancedDetection = AdvancedDetectionManager();
