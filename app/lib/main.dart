@@ -12,6 +12,7 @@ import 'screens/permission_setup_screen.dart';
 import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/home/guard_home_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
 import 'screens/qr_scanner/qr_scanner_screen.dart';
@@ -242,7 +243,13 @@ class AntiSpywareApp extends StatelessWidget {
               child: AppLockGate(child: child ?? const SizedBox.shrink()),
             );
           },
-          home: const HomeScreen(),
+          home: settings.isLoading
+              // Prefs still loading — the ambient gradient shows briefly; avoids
+              // flashing onboarding at returning users before the flag loads.
+              ? const SizedBox.shrink()
+              : settings.hasSeenOnboarding
+                  ? const HomeScreen()
+                  : OnboardingScreen(onDone: settings.completeOnboarding),
         ),
       ),
     );

@@ -45,4 +45,18 @@ void main() {
     expect(AppMode.fromName(null), AppMode.guard);
     expect(AppMode.fromName('garbage'), AppMode.guard);
   });
+
+  test('onboarding flag defaults false and persists once completed', () async {
+    final p = SettingsProvider();
+    await p.init();
+    expect(p.hasSeenOnboarding, isFalse);
+
+    await p.completeOnboarding();
+    expect(p.hasSeenOnboarding, isTrue);
+
+    final restarted = SettingsProvider();
+    await restarted.init();
+    expect(restarted.hasSeenOnboarding, isTrue,
+        reason: 'onboarding should not show again after completion');
+  });
 }

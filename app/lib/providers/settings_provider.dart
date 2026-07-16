@@ -228,6 +228,10 @@ class SettingsProvider extends ChangeNotifier {
   static const String _kAppMode = 'app_mode';
   AppMode _appMode = AppMode.guard;
 
+  // Whether the first-run onboarding has been completed (persisted).
+  static const String _kOnboarded = 'onboarding_complete';
+  bool _hasSeenOnboarding = false;
+
   // Getters
   ProtectionSettings get protection => _protection;
   NotificationSettings get notifications => _notifications;
@@ -239,6 +243,7 @@ class SettingsProvider extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   AppMode get appMode => _appMode;
   bool get isProMode => _appMode.isPro;
+  bool get hasSeenOnboarding => _hasSeenOnboarding;
 
   /// Update the app theme mode and persist it.
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -263,6 +268,15 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> toggleAppMode() =>
       setAppMode(_appMode.isPro ? AppMode.guard : AppMode.pro);
 
+  /// Mark the first-run onboarding as complete (persisted).
+  Future<void> completeOnboarding() async {
+    if (_hasSeenOnboarding) return;
+    _hasSeenOnboarding = true;
+    notifyListeners();
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setBool(_kOnboarded, true);
+  }
+
   /// Initialize provider
   Future<void> init() async {
     _isLoading = true;
@@ -272,6 +286,7 @@ class SettingsProvider extends ChangeNotifier {
       _prefs = await SharedPreferences.getInstance();
       _themeMode = _parseThemeMode(_prefs!.getString(_kThemeMode));
       _appMode = AppMode.fromName(_prefs!.getString(_kAppMode));
+      _hasSeenOnboarding = _prefs!.getBool(_kOnboarded) ?? false;
       await _loadSettings();
       await _syncNotificationService();
     } catch (e) {
