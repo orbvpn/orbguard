@@ -146,7 +146,7 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 | 2026-07-16 | Two new features | Hidden VPN/Proxy Watch + Secure Call Check — **Phase 2** |
 
 **Strategy dossier (rationale, competitive teardown, psychology):** https://claude.ai/code/artifact/cf12693f-fef4-4781-bf64-d4fe67b3450c
-**Live status dashboard:** https://claude.ai/code/artifact/bb8e03ed-613b-4f99-9aae-e4814bb1ea20
+**Live status dashboard:** https://claude.ai/code/artifact/d3462645-f12c-46ca-a3c2-e1f366cf26f0
 
 ---
 
