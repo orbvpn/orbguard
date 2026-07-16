@@ -13,6 +13,7 @@ import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/home/guard_home_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
 import 'screens/qr_scanner/qr_scanner_screen.dart';
@@ -559,7 +560,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // body switch is independent of a tab's visible position, and switching
     // modes can never strand the user on a hidden tab.
     final isPro = context.watch<SettingsProvider>().isProMode;
-    final navDests = isPro ? const [0, 1, 2, 3] : const [0, 1, 3];
+    // Guard: Home · Protect(shields) · Scan · Settings. Pro swaps in the expert
+    // Intel tab and drops the consumer Protect hub.
+    final navDests = isPro ? const [0, 1, 2, 3] : const [0, 4, 1, 3];
     final effIndex = navDests.contains(_currentNavIndex) ? _currentNavIndex : 0;
 
     // The Intel tab owns the whole screen: its Browse/Check/History selector is
@@ -737,6 +740,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return _buildIntelContent();
       case 3:
         return _buildSettingsContent();
+      case 4:
+        return const ShieldsScreen();
       default:
         return _buildHomeContent();
     }
@@ -751,6 +756,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return NavItem(label: 'Intel', iconPath: AppIcons.structure);
       case 3:
         return NavItem(label: 'Settings', iconPath: AppIcons.settings);
+      case 4:
+        return NavItem(label: 'Protect', iconPath: AppIcons.shieldCheck);
       case 0:
       default:
         return NavItem(label: 'Home', iconPath: AppIcons.home);
