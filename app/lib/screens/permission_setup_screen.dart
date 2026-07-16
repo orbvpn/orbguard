@@ -2,14 +2,12 @@
 // Interactive permission setup with explanations
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../permissions/permission_manager.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
-import 'elevated_access_setup_screen.dart';
 
 class PermissionSetupScreen extends StatefulWidget {
   const PermissionSetupScreen({super.key});
@@ -20,12 +18,9 @@ class PermissionSetupScreen extends StatefulWidget {
 
 class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     with WidgetsBindingObserver {
-  static const platform = MethodChannel('com.orb.guard/system');
   final PermissionManager _permissionManager = PermissionManager();
   PermissionScanResult? _scanResult;
   bool _isChecking = false;
-  bool _hasRootAccess = false;
-  String _accessMethod = 'Standard';
 
   @override
   void initState() {
@@ -52,27 +47,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     setState(() => _isChecking = true);
 
     final result = await _permissionManager.checkAllPermissions();
-    await _checkSystemAccess();
 
     setState(() {
       _scanResult = result;
       _isChecking = false;
     });
-  }
-
-  Future<void> _checkSystemAccess() async {
-    try {
-      final result = await platform.invokeMethod('checkRootAccess');
-      setState(() {
-        _hasRootAccess = result['hasRoot'] ?? false;
-        _accessMethod = result['method'] ?? 'Standard';
-      });
-    } catch (e) {
-      setState(() {
-        _hasRootAccess = false;
-        _accessMethod = 'Standard';
-      });
-    }
   }
 
   @override
@@ -168,134 +147,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           () => _requestAccessibility(),
         ),
 
-        const SizedBox(height: 24),
-
-        // Enhanced Access
-        _buildGroupHeader('Enhanced Access', AppIcons.codeSquare),
-        Text(
-          'Enables deep system scanning',
-          style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 13),
-        ),
-        const SizedBox(height: 12),
-        _buildEnhancedAccessCard(),
-
         const SizedBox(height: 80), // Space for bottom bar
       ],
-    );
-  }
-
-  Widget _buildEnhancedAccessCard() {
-    final hasEnhancedAccess = _hasRootAccess || _accessMethod == 'Shell' || _accessMethod == 'AppProcess';
-
-    String accessIcon;
-    Color accessColor;
-    String accessLabel;
-    String accessDescription;
-
-    switch (_accessMethod) {
-      case 'Root':
-        accessIcon = AppIcons.crown;
-        accessColor = AppColors.accentInk;
-        accessLabel = 'Root Access';
-        accessDescription = 'Maximum protection - full system access';
-        break;
-      case 'Shell':
-        accessIcon = AppIcons.codeSquare;
-        accessColor = AppColors.secondaryInk;
-        accessLabel = 'Shell Access';
-        accessDescription = 'Enhanced scanning via Shizuku/ADB';
-        break;
-      case 'AppProcess':
-        accessIcon = AppIcons.settings;
-        accessColor = AppColors.amberInk;
-        accessLabel = 'Elevated Access';
-        accessDescription = 'Extended monitoring capabilities';
-        break;
-      default:
-        accessIcon = AppIcons.shield;
-        accessColor = Theme.of(context).colorScheme.onSurfaceVariant;
-        accessLabel = 'Standard Access';
-        accessDescription = 'Tap to enable deeper scanning';
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ElevatedAccessSetupScreen(),
-            ),
-          ).then((_) => _checkPermissions());
-        },
-        borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: accessColor.withAlpha(30),
-                  borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
-                ),
-                child: DuotoneIcon(accessIcon, color: accessColor, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          accessLabel,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: hasEnhancedAccess
-                                ? accessColor
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                        if (hasEnhancedAccess) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: accessColor.withAlpha(30),
-                              borderRadius: BorderRadius.circular(GlassTheme.radiusSmall),
-                            ),
-                            child: Text(
-                              '+${_hasRootAccess ? 15 : 10}%',
-                              style: TextStyle(fontSize: 11, color: accessColor),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      accessDescription, maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              hasEnhancedAccess
-                  ? DuotoneIcon(AppIcons.checkCircle, color: accessColor)
-                  : DuotoneIcon(AppIcons.chevronRight,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
