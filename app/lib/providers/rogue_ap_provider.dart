@@ -237,6 +237,7 @@ class RogueAPProvider extends ChangeNotifier {
       notifyListeners();
 
       List<Map<String, dynamic>> nearbyAPs = [];
+      var wifiScanUnsupported = false;
       try {
         final result = await _wifiChannel.invokeMethod<List<dynamic>>('scanWifiNetworks');
         if (result != null) {
@@ -244,6 +245,17 @@ class RogueAPProvider extends ChangeNotifier {
         }
       } on PlatformException catch (e) {
         debugPrint('Platform WiFi scan failed: $e');
+        if (e.code == 'UNSUPPORTED') wifiScanUnsupported = true;
+      }
+
+      // iOS (and any platform without a Wi-Fi scan API) cannot enumerate nearby
+      // networks — say so honestly instead of reporting "Scan complete, 0 found".
+      if (wifiScanUnsupported) {
+        _scanStatus = 'Not available on this device';
+        _error = "Wi-Fi network scanning isn't available on this device — "
+            "Apple doesn't allow apps to scan nearby Wi-Fi on iPhone.";
+        _scanProgress = 1.0;
+        return;
       }
 
       // Step 2: Send to API for threat analysis

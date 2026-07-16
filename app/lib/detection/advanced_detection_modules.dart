@@ -8,6 +8,17 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+/// Thrown by a detection module when the underlying capability does not exist
+/// on this platform (e.g. iOS cannot enumerate installed apps, certificates,
+/// accessibility services, or keyboards). The device scan surfaces this as
+/// "not supported on this device" instead of a misleading "0 findings / clean".
+class DetectionUnsupportedException implements Exception {
+  final String message;
+  DetectionUnsupportedException(this.message);
+  @override
+  String toString() => 'DetectionUnsupportedException: $message';
+}
+
 // ============================================================================
 // MODULE 1: BEHAVIORAL ANOMALY DETECTION
 // ============================================================================
@@ -253,6 +264,13 @@ class CertificateAnalyzer {
     try {
       final result = await platform.invokeMethod('getInstalledCertificates');
       return List<Map<String, dynamic>>.from(result['certificates'] ?? []);
+    } on PlatformException catch (e) {
+      if (e.code == 'UNSUPPORTED') {
+        throw DetectionUnsupportedException(
+            e.message ?? 'not supported on this device');
+      }
+      debugPrint('Error getting certificates: $e');
+      return [];
     } catch (e) {
       debugPrint('Error getting certificates: $e');
       return [];
@@ -366,6 +384,13 @@ class PermissionAbuseDetector {
     try {
       final result = await platform.invokeMethod('getInstalledApps');
       return List<Map<String, dynamic>>.from(result['apps'] ?? []);
+    } on PlatformException catch (e) {
+      if (e.code == 'UNSUPPORTED') {
+        throw DetectionUnsupportedException(
+            e.message ?? 'not supported on this device');
+      }
+      debugPrint('Error getting installed apps: $e');
+      return [];
     } catch (e) {
       debugPrint('Error getting installed apps: $e');
       return [];
@@ -438,6 +463,13 @@ class AccessibilityAbuseDetector {
         'getEnabledAccessibilityServices',
       );
       return List<Map<String, dynamic>>.from(result['services'] ?? []);
+    } on PlatformException catch (e) {
+      if (e.code == 'UNSUPPORTED') {
+        throw DetectionUnsupportedException(
+            e.message ?? 'not supported on this device');
+      }
+      debugPrint('Error getting accessibility services: $e');
+      return [];
     } catch (e) {
       debugPrint('Error getting accessibility services: $e');
       return [];
@@ -523,6 +555,13 @@ class KeystrokeLoggerDetector {
     try {
       final result = await platform.invokeMethod('getInstalledKeyboards');
       return List<Map<String, dynamic>>.from(result['keyboards'] ?? []);
+    } on PlatformException catch (e) {
+      if (e.code == 'UNSUPPORTED') {
+        throw DetectionUnsupportedException(
+            e.message ?? 'not supported on this device');
+      }
+      debugPrint('Error getting keyboards: $e');
+      return [];
     } catch (e) {
       debugPrint('Error getting keyboards: $e');
       return [];

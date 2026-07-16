@@ -183,6 +183,13 @@ class DeviceScanService {
           final threats = await stage.run();
           allThreats.addAll(threats);
           anyStageSucceeded = true;
+        } on DetectionUnsupportedException catch (e) {
+          // The capability doesn't exist on this platform (e.g. iOS can't
+          // enumerate installed apps / certs / a11y services / keyboards).
+          // Report it honestly rather than as a fake "clean, 0 findings".
+          stageError = 'not supported on this device';
+          debugPrint('DeviceScanService: stage "${stage.name}" not supported '
+              'on this platform: ${e.message}');
         } on MissingPluginException {
           if (stage.isNative) nativeChannelAvailable = false;
           stageError = 'unavailable on this build';
