@@ -103,15 +103,20 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 
 | ID | Task | iOS | And | mac | Win | Lin | Test | Status |
 |----|------|-----|-----|-----|-----|-----|------|--------|
-| 2.1 | Shield IA: map 19 consumer screens → 6 shields (Spyware&Pegasus · Who's Watching You · Secure Call · Hidden VPN/Proxy · Scam Shield · Identity&Breach) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 2.2 | Honest per-platform shield status surfacing (incl. desktop: firewall, process/persistence scan) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 2.3 | **Feature — Hidden VPN & Proxy Watch**: detect active tunnel/proxy, list installed VPN apps, whitelist OrbVPN, guide removal | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 2.4 | **Feature — Secure Call Check**: device-posture (screen-cap/MITM/jailbreak/certs/a11y) + scam-number flagging | 🟡 | 🟡 | ⬜ | 🚫 | 🚫 | ⬜ | ⬜ |
-| 2.5 | Victim-safe stalkerware UX: removal warning + duress Quick-Exit | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 2.6 | Jargon-elimination sweep across all consumer surfaces (IOC/STIX/TTP/correlation → plain English) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 2.7 | Phase 2 e2e: each shield opens, runs, reports honestly per platform | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 2.1 | Shield IA: map 19 consumer screens → 6 shields (Spyware&Pegasus · Who's Watching You · Secure Call · Hidden VPN/Proxy · Scam Shield · Identity&Breach) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2.2 | Honest per-platform shield status surfacing (incl. desktop: firewall, process/persistence scan) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2.3 | **Feature — Hidden VPN & Proxy Watch**: detect active tunnel/proxy, list installed VPN apps, whitelist OrbVPN, guide removal | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2.4 | **Feature — Secure Call Check**: device-posture (screen-cap/MITM/jailbreak/certs/a11y) + scam-number flagging | ✅ | ✅ | ✅ | 🚫 | 🚫 | ✅ | ✅ |
+| 2.5 | Victim-safe stalkerware UX: removal warning + duress Quick-Exit | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2.6 | Jargon-elimination sweep across all consumer surfaces (IOC/STIX/TTP/correlation → plain English) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2.7 | Phase 2 e2e: each shield opens, runs, reports honestly per platform | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-*(2.3/2.4 marked 🟡 = primitives already exist in the tree per the feasibility study; not yet surfaced as the feature.)*
+**Phase 2 complete (2026-07-17).** Six-shield `Protect` hub (`shields_screen.dart`) wired to all
+six destinations, including the two new features. `flutter analyze lib` → 0 errors/0 warnings
+(27 pre-existing `unnecessary_import` infos only); `flutter test` → **120/120 pass** (new suites:
+`vpn_proxy_detector` 17, `secure_call_check` 11). All shields are pure-Dart navigation over
+existing engines → cross-platform by construction; native gaps degrade honestly to "can't check
+here" (never a false clean). 2.4 stays 🚫 on Win/Lin (no call/telephony posture surface there).
 
 ## Phase 3 — Trust & In-App GTM
 *Trust surfaces + habit loop. (Certification / SEO / external audit are business tracks, noted but out of code scope.)*

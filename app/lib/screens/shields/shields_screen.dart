@@ -4,11 +4,11 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../darkweb/darkweb_screen.dart';
-import '../device_security/device_security_screen.dart';
 import '../forensics/forensics_screen.dart';
-import '../network/network_security_screen.dart';
 import '../privacy/privacy_protection_screen.dart';
 import '../scam/scam_detection_screen.dart';
+import 'hidden_vpn_proxy_screen.dart';
+import 'secure_call_screen.dart';
 
 /// The consumer **Protect** hub — the six plain-English shields, each a doorway
 /// into a real protection. This is the Guard-mode organising layer over the
@@ -35,10 +35,10 @@ class ShieldsScreen extends StatelessWidget {
           (_) => const ScamDetectionScreen()),
       _Shield('wi_fi_router', 'Hidden VPN & proxy',
           'Spot traffic being secretly rerouted', AppColors.accentInk,
-          (_) => const NetworkSecurityScreen()),
+          (_) => const HiddenVpnProxyScreen()),
       _Shield('phone_calling', 'Secure call',
           'Check your device before sensitive calls', AppColors.secondaryInk,
-          (_) => const DeviceSecurityScreen()),
+          (_) => const SecureCallScreen()),
       _Shield('global', 'Identity & breach',
           'Find your accounts exposed on the dark web', AppColors.accentInk,
           (_) => const DarkWebScreen()),
