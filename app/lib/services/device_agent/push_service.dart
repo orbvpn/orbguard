@@ -164,43 +164,95 @@ class DevicePushService {
     }
 
     // --- FIREBASE BLOCK ---
-    // Idempotent: telemetry may have already initialized the default app.
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
+    // Push is best-effort: any failure here must never escape (init() is
+    // fire-and-forget from the provider), the agent's HTTP polling remains
+    // the wake mechanism.
+    try {
+      // Idempotent: telemetry may have already initialized the default app.
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+      final messaging = FirebaseMessaging.instance;
+
+      // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+      // Wire handlers first — they are independent of token availability, so
+      // a token that arrives late still registers via onTokenRefresh.
+      messaging.onTokenRefresh.listen(registerToken);
+
+      // Foreground data pushes wake the agent immediately.
+      FirebaseMessaging.onMessage.listen((message) {
+        onPushReceived(message.data);
+      });
+
+      // Tapping a notification that opened the app also triggers a poll.
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        onPushReceived(message.data);
+      });
+
+      // iOS: FCM requires the APNs device token first. On a cold start APNs
+      // delivery takes a moment — and on simulators without push support it
+      // never happens — while getAPNSToken()/getToken() THROW
+      // [firebase_messaging/apns-token-not-set] rather than waiting. Poll
+      // briefly and defer to onTokenRefresh instead of crashing app init.
+      if (PlatformInfo.isIOS) {
+        final apnsToken = await _waitForApnsToken(messaging);
+        if (apnsToken == null) {
+          developer.log(
+            'APNs token not delivered (expected on simulators without push '
+            'support / cold starts) — FCM token registration deferred to '
+            'onTokenRefresh; agent polling covers wake-ups meanwhile.',
+            name: _logName,
+          );
+          return;
+        }
+      }
+
+      // Register the current token, then keep it fresh on rotation.
+      final token = await messaging.getToken();
+      if (token != null) {
+        await registerToken(token);
+      }
+
+      // Background/terminated data messages are handled by the top-level
+      // handler registered in main() (orbGuardFirebaseBackgroundHandler).
+
+      developer.log('Firebase messaging initialized', name: _logName);
+    } on FirebaseException catch (e) {
+      developer.log(
+        'Firebase messaging init failed (${e.code}) — push disabled this '
+        'session, agent polling remains: ${e.message}',
+        name: _logName,
+      );
+    } catch (e) {
+      developer.log(
+        'Firebase messaging init failed — push disabled this session, agent '
+        'polling remains: $e',
+        name: _logName,
+      );
     }
-    final messaging = FirebaseMessaging.instance;
-
-    // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
-
-    // iOS: ensure an APNs token exists before asking for the FCM token,
-    // otherwise getToken() can return null on a cold start.
-    if (PlatformInfo.isIOS) {
-      await messaging.getAPNSToken();
-    }
-
-    // Register the current token, then keep it fresh on rotation.
-    final token = await messaging.getToken();
-    if (token != null) {
-      await registerToken(token);
-    }
-    messaging.onTokenRefresh.listen(registerToken);
-
-    // Foreground data pushes wake the agent immediately.
-    FirebaseMessaging.onMessage.listen((message) {
-      onPushReceived(message.data);
-    });
-
-    // Tapping a notification that opened the app also triggers a poll.
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      onPushReceived(message.data);
-    });
-
-    // Background/terminated data messages are handled by the top-level
-    // handler registered in main() (orbGuardFirebaseBackgroundHandler).
     // --- END FIREBASE BLOCK ---
+  }
 
-    developer.log('Firebase messaging initialized', name: _logName);
+  /// Poll for the APNs device token for a few seconds. Returns null if APNs
+  /// never delivers one (e.g. simulator hosts without push support), treating
+  /// the plugin's `apns-token-not-set` throw the same as "not yet".
+  Future<String?> _waitForApnsToken(
+    FirebaseMessaging messaging, {
+    int attempts = 8,
+    Duration delay = const Duration(milliseconds: 750),
+  }) async {
+    for (var i = 0; i < attempts; i++) {
+      try {
+        final token = await messaging.getAPNSToken();
+        if (token != null) return token;
+      } on FirebaseException catch (e) {
+        if (e.code != 'apns-token-not-set') rethrow;
+      }
+      await Future.delayed(delay);
+    }
+    return null;
   }
 }
 
