@@ -49,8 +49,19 @@ Platform columns: **iOS · And · mac · Win · Lin**. `Test` = unit/widget + e2
 | 0.2 | Unify to ONE honest verdict vocabulary (reconcile Security Center score vs Dashboard letter-grade "U"/"Not Protected") | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 0.3 | Wall off jailbreak / root / ADB instruction screens from the consumer flow (gate to Pro / remove from setup path) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 0.4 | Fix iOS silent-pass: scan stages that swallow UNSUPPORTED must surface "not supported on iPhone", never "0 findings / clean" | ✅ | 🚫 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 0.5 | Fix fake elevation theater: `checkShellAccess()` returns true for any app → report honestly | 🚫 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 0.6 | Strip "fear/urgency" framing (per the self-incriminating code comment) from remaining consumer copy | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 0.5 | Fix fake elevation theater: `checkShellAccess()` returns true for any app → report honestly | 🚫 | ✅ | 🚫 | 🚫 | 🚫 | 🟡 | ✅ |
+| 0.6 | Strip "fear/urgency" framing (per the self-incriminating code comment) from remaining consumer copy | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+*(0.5: Kotlin is valid + isolated; **Android runtime e2e is blocked by BLOCKER-1 below** — the whole Android build currently fails on a third-party plugin, not on our code.)*
+
+## Known blockers
+
+- **BLOCKER-1 — Android build broken by `mobile_scanner` 7.2.1.** `flutter build apk` fails with
+  ~30 "Unresolved reference" Kotlin errors *inside the plugin's own source* (`MobileScannerCallback`,
+  `invertBitmapColors`, `rotateBitmap`, …) under Kotlin 2.1.0 / AGP 8.9.1. Pre-existing, unrelated to
+  the reinvention work; iOS/macOS/Windows/Linux unaffected. **Must be resolved for any Android
+  delivery + e2e** (P0.7 Android leg, and 0.5 runtime verification depend on it). Likely fix: bump/pin
+  `mobile_scanner` to a Kotlin-2.1-compatible version (or bump Kotlin/AGP per Flutter's warnings).
 | 0.7 | Phase 0 e2e sweep: home shows no fake alarm; scans honest on all five | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 
 ## Phase 1 — Guard Mode Shell

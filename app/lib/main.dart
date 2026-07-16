@@ -495,11 +495,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('⚠️ Limited Detection'),
+        title: const Text('Enable deeper scanning'),
         content: Text(
-          'Current detection capability: ${_detectionCapability.round()}%\n\n'
-          'For comprehensive scanning, please grant additional permissions.\n\n'
-          'Would you like to set up permissions now?',
+          'OrbGuard can check your device more thoroughly with a few extra '
+          'permissions. Current coverage: ${_detectionCapability.round()}%.\n\n'
+          'Set them up now?',
         ),
         actions: [
           TextButton(

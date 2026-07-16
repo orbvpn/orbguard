@@ -1,7 +1,8 @@
 /// Security Center Screen
 ///
-/// Main security dashboard with animated score, quick actions, and threat overview.
-/// Inspired by OrbX design with fear/urgency elements to drive engagement.
+/// Main security dashboard with the protection score, quick actions, and a
+/// calm threat overview — status is conveyed honestly by color and plain
+/// wording, with no fear/urgency framing.
 library;
 
 import 'package:flutter/material.dart';
@@ -35,27 +36,13 @@ class SecurityCenterScreen extends StatefulWidget {
   State<SecurityCenterScreen> createState() => _SecurityCenterScreenState();
 }
 
-class _SecurityCenterScreenState extends State<SecurityCenterScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
+class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
   final DashboardProvider _provider = DashboardProvider();
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Pulse animation for score circle
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     // Load the persisted protection settings (shared with the Settings
     // screen) so the Active Protections switches reflect real state.
@@ -80,7 +67,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _provider.removeListener(_onProviderChanged);
     _provider.dispose();
     super.dispose();
@@ -193,10 +179,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
 
   Widget _buildSecurityScoreCard(
       bool isDark, int score, Color scoreColor, Color scoreInk) {
-    // Only pulse for a real, low score — never for the "not assessed"
-    // sentinel, which must read as neutral, not urgent.
-    final shouldPulse = score >= 0 && score < 70;
-
     return GlassCard(
       isDark: isDark,
       margin: EdgeInsets.zero,
@@ -206,16 +188,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
           children: [
             Row(
               children: [
-                // Animated Score Circle
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: shouldPulse ? _pulseAnimation.value : 1.0,
-                      child: child,
-                    );
-                  },
-                  child: Container(
+                // Calm, static score ring — status is conveyed honestly by
+                // color and plain wording; the pulsing "urgency" was removed.
+                Container(
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
@@ -224,9 +199,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                       border: Border.all(color: scoreColor, width: 4),
                       boxShadow: [
                         BoxShadow(
-                          color: scoreColor.withAlpha(shouldPulse ? 100 : 50),
-                          blurRadius: shouldPulse ? 30 : 20,
-                          spreadRadius: shouldPulse ? 5 : 2,
+                          color: scoreColor.withAlpha(50),
+                          blurRadius: 20,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
@@ -259,7 +234,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                             ],
                           ),
                   ),
-                ),
                 const SizedBox(width: 24),
 
                 // Status Details
