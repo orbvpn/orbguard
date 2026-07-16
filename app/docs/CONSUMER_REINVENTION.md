@@ -56,12 +56,19 @@ Platform columns: **iOS · And · mac · Win · Lin**. `Test` = unit/widget + e2
 
 ## Known blockers
 
-- **BLOCKER-1 — Android build broken by `mobile_scanner` 7.2.1.** `flutter build apk` fails with
-  ~30 "Unresolved reference" Kotlin errors *inside the plugin's own source* (`MobileScannerCallback`,
-  `invertBitmapColors`, `rotateBitmap`, …) under Kotlin 2.1.0 / AGP 8.9.1. Pre-existing, unrelated to
-  the reinvention work; iOS/macOS/Windows/Linux unaffected. **Must be resolved for any Android
-  delivery + e2e** (P0.7 Android leg, and 0.5 runtime verification depend on it). Likely fix: bump/pin
-  `mobile_scanner` to a Kotlin-2.1-compatible version (or bump Kotlin/AGP per Flutter's warnings).
+- **BLOCKER-1 — Android build broken by `mobile_scanner` 7.2.1. ✅ RESOLVED (2026-07-16).**
+  `flutter build apk` failed with ~30 "Unresolved reference" Kotlin errors inside the plugin's own
+  source under Kotlin 2.1.0 / AGP 8.9.1. Fixed by modernizing the Android toolchain (user's call):
+  **Kotlin 2.1.0 → 2.2.20, AGP 8.9.1 → 8.11.1, Gradle 8.12 → 8.14** (+ matching kotlin-stdlib; Flutter's
+  migrator added `android.builtInKotlin=false` / `android.newDsl=false`). No plugin bump needed — the
+  APK now builds clean (201 MB debug). Android delivery + 0.5 runtime verify + P0.7 Android leg unblocked.
+
+## Platform reality for e2e (P0.7)
+
+This dev machine is macOS, so local e2e covers **iOS · Android · macOS**. **Windows and Linux cannot be
+built or run from macOS** — their leg of every e2e is verified structurally (the Phase-0 changes are
+shared Dart, identical across platforms) + via CI on Windows/Linux hosts. Marked 🔵 only where actually
+exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run confirms them.
 | 0.7 | Phase 0 e2e sweep: home shows no fake alarm; scans honest on all five | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 
 ## Phase 1 — Guard Mode Shell
