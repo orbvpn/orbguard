@@ -77,6 +77,23 @@ class _ScanningScreenState extends State<ScanningScreen>
   List<Map<String, dynamic>> _threats = [];
   late DateTime _scanStartTime;
 
+  /// Plain-language names for each real scan stage — the checkup should read
+  /// like "scanning for spyware", not "Accessibility abuse".
+  static const Map<String, String> _friendlyStages = {
+    'Network connections': 'Inspecting network connections',
+    'Running processes': 'Checking active apps',
+    'File system': 'Scanning files',
+    'App databases': 'Checking app data',
+    'Memory': 'Inspecting device memory',
+    'Behavioral analysis': 'Watching for suspicious activity',
+    'Certificate analysis': 'Testing for network interception',
+    'Permission abuse': 'Auditing app permissions',
+    'Accessibility abuse': 'Scanning for spyware & stalkerware',
+    'Keylogger detection': 'Checking for keyloggers',
+    'Location stalkers': 'Checking for location tracking',
+  };
+  String _friendlyStage(String raw) => _friendlyStages[raw] ?? raw;
+
   @override
   void initState() {
     super.initState();
@@ -109,7 +126,7 @@ class _ScanningScreenState extends State<ScanningScreen>
       if (update.stageCompleted) {
         _stagesCompleted = update.stageIndex + 1;
         if (update.stageError != null) {
-          _stageWarnings.add('${update.stageName}: ${update.stageError}');
+          _stageWarnings.add(_friendlyStage(update.stageName));
         }
       }
       _overallProgress = update.fraction;
@@ -441,9 +458,11 @@ class _ScanningScreenState extends State<ScanningScreen>
                     size: 20, color: AppColors.accentInk),
                 const SizedBox(width: 8),
                 Text(
-                  _threats.isEmpty
-                      ? 'No threats detected'
-                      : '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found',
+                  _threats.isNotEmpty
+                      ? '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found'
+                      : (_stageWarnings.isEmpty
+                          ? "You're protected — no threats found"
+                          : 'No threats found in the checks we ran'),
                   style: TextStyle(
                     color: _threats.isEmpty
                         ? AppColors.accentInk
@@ -457,9 +476,8 @@ class _ScanningScreenState extends State<ScanningScreen>
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  '${_stageWarnings.length} scan stage'
-                  '${_stageWarnings.length == 1 ? '' : 's'} could not run:\n'
-                  '${_stageWarnings.join('\n')}',
+                  "Some checks aren't available on this device:\n"
+                  '${_stageWarnings.join(', ')}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
@@ -477,7 +495,7 @@ class _ScanningScreenState extends State<ScanningScreen>
       children: [
         if (_stageName.isNotEmpty)
           Text(
-            _stageName,
+            _friendlyStage(_stageName),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -488,7 +506,7 @@ class _ScanningScreenState extends State<ScanningScreen>
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              _stageWarnings.last,
+              "Some checks aren't available on this device",
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.amberInk,
