@@ -14,6 +14,7 @@ import '../../presentation/widgets/glass_container.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/theme_mode_selector.dart';
+import '../../models/app_mode.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
@@ -184,6 +185,42 @@ class SettingsScreen extends StatelessWidget {
                         builder: (_) => const PrivacySettingsScreen(),
                       ),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Experience — Guard (consumer) vs the opt-in Pro expert console.
+              _buildSettingsSection(
+                context,
+                'Experience',
+                'widget_5',
+                AppColors.accentInk,
+                [
+                  SwitchListTile(
+                    secondary: DuotoneIcon(
+                      'structure',
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      size: 24,
+                    ),
+                    title: Text(
+                      'Expert (Pro) mode',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      settings.isProMode
+                          ? 'On — advanced threat-intelligence & enterprise tools are visible'
+                          : 'Off — the simple, consumer Guard experience',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                    value: settings.isProMode,
+                    onChanged: (on) =>
+                        settings.setAppMode(on ? AppMode.pro : AppMode.guard),
                   ),
                 ],
               ),
