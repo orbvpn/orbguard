@@ -1027,7 +1027,7 @@ class _PasswordCheckInputState extends State<PasswordCheckInput> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Your password is never sent to our servers. We use k-anonymity.',
+          'Your password is never sent to our servers.',
           style: TextStyle(
             color: cs.onSurfaceVariant,
             fontSize: 11,

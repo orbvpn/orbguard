@@ -942,7 +942,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _buildDrawerItem(
                     svgIcon: 'chat_dots',
                     title: 'SMS Protection',
-                    subtitle: 'Phishing & smishing detection',
+                    subtitle: 'Phishing & scam text detection',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -1511,17 +1511,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         content: const Text(
           'OrbGuard - Advanced Spyware Defense\n\n'
-          'Detects and removes sophisticated threats including Pegasus using multiple access methods:\n\n'
-          '• Root Access (if available)\n'
-          '• Shell Access (Shizuku method integrated)\n'
-          '• System Services (app_process)\n'
-          '• Standard APIs\n\n'
-          '✓ No external apps required\n'
-          '✓ All scanning happens locally\n'
+          'Finds and removes advanced spyware, including Pegasus, using '
+          'whatever level of device access is available:\n\n'
+          '• Full access if your device is rooted\n'
+          '• Deeper system access where your device supports it\n'
+          '• System-level scanning\n'
+          '• Standard device checks\n\n'
+          '✓ No extra apps required\n'
+          '✓ All scanning happens on your device\n'
           '✓ No data sent to servers\n'
-          '✓ Automatic privilege escalation\n'
-          '✓ Cloud threat intelligence\n'
-          '✓ Special permissions for enhanced detection\n\n'
+          '✓ Automatically uses the deepest access your device allows\n'
+          '✓ Up-to-date threat information from the cloud\n'
+          '✓ Uses extra permissions for stronger detection\n\n'
           'Your privacy and security are our priority.',
         ),
         actions: [

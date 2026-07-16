@@ -517,7 +517,7 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Analyze this message to detect phishing, smishing, and other threats',
+            'Analyze this message to detect phishing and other threats',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -324,7 +324,7 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
           icon: 'shield_keyhole_minimalistic',
           color: AppColors.warning,
           message: 'SMS permission is required to scan your inbox for '
-              'smishing and phishing threats.',
+              'phishing and scam texts.',
           actionLabel: 'Grant Permission',
           onAction: _requestPermission,
         );

@@ -773,7 +773,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Confidence: ${(result.hijackConfidence! * 100).toInt()}%',
+                'We are ${(result.hijackConfidence! * 100).toInt()}% sure of this result',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
               ),
             ),

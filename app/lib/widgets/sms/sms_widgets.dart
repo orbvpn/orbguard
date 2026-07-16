@@ -415,7 +415,7 @@ class SmsStatsCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      'Smishing & phishing detection',
+                      'Phishing & scam text detection',
                       style: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontSize: 12,

@@ -515,7 +515,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               children: [
                 Expanded(
                   child: _buildStatTile(
-                    'Total IOCs',
+                    'Known Threats',
                     _formatNumber(stats?.totalIndicators ?? 0),
                     'fingerprint',
                     AppColors.secondaryInk,

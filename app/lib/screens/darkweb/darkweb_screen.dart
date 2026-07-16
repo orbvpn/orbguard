@@ -162,7 +162,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Check if your password has been exposed in data breaches using k-anonymity (your password never leaves your device).',
+            'Check if your password has appeared in a known data breach. Your password never leaves your device.',
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 14,
@@ -198,15 +198,15 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 const SizedBox(height: 12),
                 _buildInfoRow(
                   '1.',
-                  'Your password is hashed locally (SHA-1)',
+                  'Your password is turned into a one-way code on your device',
                 ),
                 _buildInfoRow(
                   '2.',
-                  'Only the first 5 characters are sent to the server',
+                  'Only the first 5 characters of that code are sent to the server',
                 ),
                 _buildInfoRow(
                   '3.',
-                  'We return matching hashes to check locally',
+                  'We send back possible matches for your device to check',
                 ),
                 _buildInfoRow(
                   '4.',

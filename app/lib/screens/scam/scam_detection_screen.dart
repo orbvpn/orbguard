@@ -414,10 +414,10 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           err.contains('Service Unavailable')) {
         setState(() {
           _mediaCapabilityNotice = _selectedType == ScamContentType.image
-              ? 'Image analysis requires server AI configuration: the '
-                  'vision analyzer is not enabled on this backend.'
-              : 'Voice analysis requires server AI configuration: the '
-                  'speech analyzer is not enabled on this backend.';
+              ? 'Image analysis isn\'t available right now — it isn\'t '
+                  'enabled on our servers.'
+              : 'Voice analysis isn\'t available right now — it isn\'t '
+                  'enabled on our servers.';
         });
       }
     }
@@ -482,7 +482,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
                       style: BrandText.title(size: 18, color: riskColor),
                     ),
                     Text(
-                      '${(result.confidence * 100).toInt()}% confidence', maxLines: 2, overflow: TextOverflow.ellipsis,
+                      '${(result.confidence * 100).toInt()}% sure', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                     ),
                   ],
@@ -507,8 +507,8 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           if (result.offline) ...[
             const SizedBox(height: 12),
             Text(
-              'The backend was unreachable — this verdict comes from the '
-              'limited on-device heuristic, not the server AI.',
+              'We couldn\'t reach our servers, so this result comes from '
+              'limited checks on your device instead of our full analysis.',
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
             ),
           ],
@@ -532,7 +532,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           if (result.indicators.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Indicators Found',
+              'Warning Signs Found',
               style: BrandText.title(size: 14, color: cs.onSurface),
             ),
             const SizedBox(height: 8),

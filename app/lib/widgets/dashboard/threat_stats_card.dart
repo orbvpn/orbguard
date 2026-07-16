@@ -177,7 +177,7 @@ class ThreatStatsCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${threatOverview!.activeCampaignsTargetingDevice} active campaign${threatOverview!.activeCampaignsTargetingDevice > 1 ? 's' : ''} targeting your device',
+                    '${threatOverview!.activeCampaignsTargetingDevice} active threat${threatOverview!.activeCampaignsTargetingDevice > 1 ? 's' : ''} targeting your device',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.errorInk,
