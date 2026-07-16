@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Boots the iPhone 17 Pro Max simulator and blocks until it is fully
+      // booted, so the F5 "iPhone 17 Pro Max" launch config always has its
+      // target device ready. No-op if it is already booted.
+      "label": "Boot iPhone 17 Pro Max",
+      "type": "shell",
+      "command": "open -a Simulator && xcrun simctl bootstatus CAF9D6B5-1540-49FD-AE6A-27D75017A87A -b",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "close": true
+      }
+    }
+  ]
+}

@@ -116,4 +116,5 @@ GoogleService-Info.plist
 .svn/
 .hg/
 *.swp
-*.swodevtools_options.yaml
+*.swo
+devtools_options.yaml

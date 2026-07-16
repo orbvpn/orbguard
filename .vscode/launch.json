@@ -2,6 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // Default F5 target: iPhone 17 Pro Max simulator, debug + hot reload.
+      // preLaunchTask boots the simulator first so the device is always ready.
+      "name": "OrbGuard · iPhone 17 Pro Max (debug · hot reload)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "CAF9D6B5-1540-49FD-AE6A-27D75017A87A",
+      "preLaunchTask": "Boot iPhone 17 Pro Max"
+    },
+    {
+      // Runs on whatever device is selected in VS Code's device picker
+      // (bottom-right status bar) — any booted simulator or connected phone.
       "name": "OrbGuard app (debug · hot reload)",
       "type": "dart",
       "request": "launch",
