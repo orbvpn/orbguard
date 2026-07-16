@@ -83,8 +83,8 @@ exercised; Windows/Linux stay ✅ (shared-code verified) until a CI/host run con
 |----|------|-----|-----|-----|-----|-----|------|--------|
 | 1.1 | `appMode` (guard/pro) in SettingsProvider — persisted, defaults **guard**; toggle in Settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 1.2 | Navigation gating: expert drawer sections + "Intel" tab move behind Pro; Guard gets a lean 4-item nav | 🔵 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 1.3 | Guard Home: single honest verdict + one "Check my phone" button (brand-kit styled) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 1.4 | Unified verdict model: "Protected / Needs attention / Threat found", device-specific, improvable by action | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1.3 | Guard Home: single honest verdict + one "Check my phone" button (brand-kit styled) | 🔵 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 1.4 | Unified verdict model (`ProtectionVerdict`, shipped in P0.2; drives home + dashboard) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 1.5 | The Checkup Ritual: one-button scan that **names each check as it runs**, honest per platform, ends in relief | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 1.6 | First-run Onboarding: 3–4 steps (value → permissions-with-reasons → first checkup); persist first-run flag | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 1.7 | Phase 1 e2e: fresh install → onboarding → checkup → verdict; mode toggle; Pro hidden by default — all five | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

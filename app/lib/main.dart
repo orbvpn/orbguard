@@ -11,6 +11,7 @@ import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
 import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/home/guard_home_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
 import 'screens/qr_scanner/qr_scanner_screen.dart';
@@ -749,7 +750,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Home tab content - Security Center
   Widget _buildHomeContent() {
-    return const SecurityCenterScreen();
+    // Guard (default) gets the calm single-verdict home; Pro keeps the fuller
+    // Security Center dashboard.
+    if (context.watch<SettingsProvider>().isProMode) {
+      return const SecurityCenterScreen();
+    }
+    return GuardHomeScreen(onCheckMyPhone: () => _startScan());
   }
 
   /// Scan tab content
