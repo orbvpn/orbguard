@@ -24,6 +24,7 @@ import 'app_security/app_security_screen.dart';
 import 'darkweb/darkweb_screen.dart';
 import 'footprint/digital_footprint_screen.dart';
 import 'intelligence/intelligence_core_screen.dart';
+import 'settings/settings_screen.dart';
 import 'security/threat_hunting_screen.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
@@ -105,7 +106,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
     return protection.protectionScore.round();
   }
 
-  int get _threatCount => _provider.stats?.criticalAndHighCount ?? 0;
   int get _blockedToday => _provider.summary?.threats.threatsBlockedToday ?? 0;
 
   /// Score FILL (ring, tint, glow) — brand status fills.
@@ -314,12 +314,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                             isDark,
                           ),
                           _buildMiniStat(
-                            'danger_triangle',
-                            '$_threatCount',
-                            'Critical IOCs',
-                            _threatCount > 0
-                                ? AppColors.errorInk
-                                : context.onSurfaceMuted,
+                            'history',
+                            '${_provider.summary?.threats.threatsDetectedWeek ?? 0}',
+                            'Past 7 days',
+                            AppColors.accentInk,
                             isDark,
                           ),
                         ],
@@ -330,16 +328,18 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
               ],
             ),
 
-            // Warning Banner (if threats detected)
-            if (_threatCount > 0 || (score >= 0 && score < 50))
+            // Attention banner — only when THIS DEVICE's protection score is
+            // genuinely low. (It used to also fire on the global feed's IOC
+            // count, turning a permanent alarm on for everyone; removed.)
+            if (score >= 0 && score < 50)
               Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    // The threat count comes from intelligence stats, so the
-                    // Intelligence Core (threat feed) is where to review them.
-                    _navigateTo(const IntelligenceCoreScreen());
+                    // Low device score → take the user to their protection
+                    // settings to improve it, not to the global threat feed.
+                    _navigateTo(const SettingsScreen());
                   },
                   child: Container(
                     padding: const EdgeInsets.all(14),
@@ -355,9 +355,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            _threatCount > 0
-                                ? 'Critical threats in the intelligence feed. Tap to review.'
-                                : 'Your device needs attention. Review settings.',
+                            'Your device needs attention. Tap to review your protection.',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
