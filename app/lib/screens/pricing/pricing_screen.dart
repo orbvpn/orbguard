@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../providers/account_provider.dart';
+import '../account/login_screen.dart';
 
 /// Phase 3.5 — the transparent pricing screen.
 ///
@@ -175,9 +178,31 @@ class _PricingScreenState extends State<PricingScreen> {
     );
   }
 
+  /// Best-effort match of an OrbNet subscription tier string to one of the
+  /// local marketing plans, so a subscriber's plan can be badged "Current".
+  /// Returns null when the tier doesn't clearly name a paid plan — the honest
+  /// default (we never guess a plan the user may not actually be on); the
+  /// "You're subscribed" banner still states the real tier either way.
+  static String? _matchPlan(String? tier) {
+    if (tier == null) return null;
+    final t = tier.toLowerCase();
+    for (final p in _plans) {
+      if (p.isFree) continue;
+      final n = p.name.toLowerCase();
+      if (t == n || t.contains(n)) return p.name;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Reflect the real account/subscription state — the screen must never
+    // imply a fresh purchase to someone who's already subscribed.
+    final account = context.watch<AccountProvider>();
+    final subscribed = account.isLoggedIn && account.subscriptionValid;
+    final currentPlan =
+        subscribed ? _matchPlan(account.subscriptionTier) : null;
 
     return GlassPage(
       title: 'Plans',
@@ -192,7 +217,9 @@ class _PricingScreenState extends State<PricingScreen> {
             'Three honest plans. Upgrade, downgrade, or cancel whenever you want.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          _AccountStateBanner(account: account),
+          const SizedBox(height: 16),
           _CycleToggle(
             cycle: _cycle,
             onChanged: (c) => setState(() => _cycle = c),
@@ -202,6 +229,8 @@ class _PricingScreenState extends State<PricingScreen> {
             _PlanCard(
               plan: plan,
               cycle: _cycle,
+              subscribed: subscribed,
+              isCurrent: currentPlan != null && plan.name == currentPlan,
               onSelect: () => _choosePlan(context, plan),
             ),
             const SizedBox(height: 14),
@@ -209,6 +238,99 @@ class _PricingScreenState extends State<PricingScreen> {
           const SizedBox(height: 4),
           const _PromiseBand(),
         ],
+      ),
+    );
+  }
+}
+
+/// Honest banner above the plans, reflecting the real account state:
+///  • subscribed      → a "You're subscribed" banner naming the real tier;
+///  • signed-in, free → a plain "You're on the Free plan" note;
+///  • logged out      → a "Sign in to see your plan" row linking to sign-in.
+class _AccountStateBanner extends StatelessWidget {
+  final AccountProvider account;
+  const _AccountStateBanner({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (account.isLoggedIn && account.subscriptionValid) {
+      return BrandGlass(
+        padding: const EdgeInsets.all(16),
+        spectrumBorder: true,
+        child: Row(
+          children: [
+            DuotoneIcon(AppIcons.verifiedCheck,
+                size: 22, color: AppColors.accentInk),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text("You're subscribed",
+                            style: BrandText.title(
+                                color: cs.onSurface, size: 15)),
+                      ),
+                      const SizedBox(width: 8),
+                      GlassBadge(
+                        text: account.subscriptionLabel.toUpperCase(),
+                        color: AppColors.accentInk,
+                        isDark: isDark,
+                        fontSize: 10.5,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Your premium features are unlocked.',
+                      style: BrandText.body(
+                          color: cs.onSurfaceVariant, size: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (account.isLoggedIn) {
+      return GlassCard(
+        margin: EdgeInsets.zero,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            DuotoneIcon(AppIcons.shield, size: 20, color: cs.onSurfaceVariant),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "You're on the Free plan. Choose a plan below to subscribe.",
+                style: BrandText.body(color: cs.onSurfaceVariant, size: 13.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Logged out — invite sign-in so the real plan can be shown.
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      padding: EdgeInsets.zero,
+      child: ListTile(
+        leading: DuotoneIcon('login', size: 22, color: AppColors.accentInk),
+        title: Text('Sign in to see your plan',
+            style: BrandText.title(color: cs.onSurface, size: 14.5)),
+        subtitle: Text('Use your OrbVPN account to check your subscription',
+            style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5)),
+        trailing: DuotoneIcon('alt_arrow_right',
+            size: 20, color: cs.onSurfaceVariant),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        ),
       ),
     );
   }
@@ -271,11 +393,42 @@ class _PlanCard extends StatelessWidget {
   final _BillingCycle cycle;
   final VoidCallback onSelect;
 
+  /// The account already has a live subscription — CTAs must not imply a fresh
+  /// purchase.
+  final bool subscribed;
+
+  /// This is the subscriber's current plan — badge it and disable its CTA.
+  final bool isCurrent;
+
   const _PlanCard({
     required this.plan,
     required this.cycle,
     required this.onSelect,
+    this.subscribed = false,
+    this.isCurrent = false,
   });
+
+  /// The plan's action button. When the account is already subscribed the CTA
+  /// never implies a fresh purchase: the current plan reads "Current plan"
+  /// (disabled); any other plan reads that it's included/free (disabled). Only
+  /// a non-subscriber gets an actionable "Choose …" button.
+  Widget _planCta() {
+    if (isCurrent) {
+      return const BrandButton(label: 'Current plan', onPressed: null);
+    }
+    if (subscribed) {
+      return BrandButton.secondary(
+        label: plan.isFree ? 'Free plan' : 'Included with premium',
+        onPressed: null,
+      );
+    }
+    return plan.recommended
+        ? BrandButton(label: 'Choose ${plan.name}', onPressed: onSelect)
+        : BrandButton.secondary(
+            label: plan.isFree ? 'Continue with Free' : 'Choose ${plan.name}',
+            onPressed: onSelect,
+          );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,7 +457,14 @@ class _PlanCard extends StatelessWidget {
               child: Text(plan.name,
                   style: BrandText.h2(color: cs.onSurface, size: 21)),
             ),
-            if (plan.recommended)
+            if (isCurrent)
+              GlassBadge(
+                text: 'CURRENT',
+                color: AppColors.accentInk,
+                isDark: isDark,
+                fontSize: 10.5,
+              )
+            else if (plan.recommended)
               GlassBadge(
                 text: 'RECOMMENDED',
                 color: AppColors.accentInk,
@@ -339,15 +499,7 @@ class _PlanCard extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 20),
-        plan.recommended
-            ? BrandButton(
-                label: 'Choose ${plan.name}',
-                onPressed: onSelect,
-              )
-            : BrandButton.secondary(
-                label: plan.isFree ? 'Continue with Free' : 'Choose ${plan.name}',
-                onPressed: onSelect,
-              ),
+        _planCta(),
       ],
     );
 

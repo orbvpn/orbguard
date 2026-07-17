@@ -86,6 +86,22 @@ class AccountProvider extends ChangeNotifier {
   bool get subscriptionValid =>
       subscription.subscriptionValid || (_user?.hasActiveSubscription ?? false);
 
+  /// The single premium-gating key: a signed-in account WITH a live, entitled
+  /// subscription. Everything premium (ad-free, the Pro/expert console, deeper
+  /// & unlimited scans, remote control/camera) unlocks off this one flag. Free
+  /// tier — logged out, OR logged in without a valid subscription — is false;
+  /// basic on-demand scanning stays available regardless.
+  bool get hasPremium => isLoggedIn && subscriptionValid;
+
+  /// A short, honest label for the current entitlement: the subscription
+  /// tier/plan name when premium (falling back to "Premium" when the tier is
+  /// unnamed), otherwise "Free". Never names a plan the user hasn't paid for.
+  String get subscriptionLabel {
+    if (!hasPremium) return 'Free';
+    final tier = subscriptionTier;
+    return (tier != null && tier.isNotEmpty) ? tier : 'Premium';
+  }
+
   // ---- Actions -------------------------------------------------------------
 
   /// Hydrate the session from secure storage. Never throws; safe to call once

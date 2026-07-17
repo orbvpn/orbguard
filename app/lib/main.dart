@@ -101,6 +101,7 @@ import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
 import 'providers/account_provider.dart';
+import 'models/app_mode.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
@@ -240,7 +241,8 @@ class AntiSpywareApp extends StatelessWidget {
         // start (login is optional; anonymous device registration is untouched).
         ChangeNotifierProvider(create: (_) => AccountProvider()..init()),
       ],
-      child: Consumer<SettingsProvider>(
+      child: _PremiumModeSync(
+        child: Consumer<SettingsProvider>(
         builder: (context, settings, _) => MaterialApp(
           title: 'OrbGuard',
           debugShowCheckedModeBanner: false,
@@ -276,8 +278,34 @@ class AntiSpywareApp extends StatelessWidget {
                       ? PermissionPrimingScreen(onDone: settings.completePriming)
                       : const HomeScreen(),
         ),
+        ),
       ),
     );
+  }
+}
+
+/// Keeps the persisted experience mode honest: Pro/expert is premium-only, so
+/// if the account loses entitlement (sign-out or a lapsed subscription) while
+/// Pro is still on, revert to the always-free Guard. Watches both providers,
+/// reverts on the next frame (guarded on [AccountProvider.isInitialized] so a
+/// premium user is never bounced to Guard during the brief startup window
+/// before the saved session hydrates), and returns [child] untouched.
+class _PremiumModeSync extends StatelessWidget {
+  final Widget child;
+  const _PremiumModeSync({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final account = context.watch<AccountProvider>();
+    if (account.isInitialized && settings.isProMode && !account.hasPremium) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (settings.isProMode && !account.hasPremium) {
+          settings.setAppMode(AppMode.guard);
+        }
+      });
+    }
+    return child;
   }
 }
 

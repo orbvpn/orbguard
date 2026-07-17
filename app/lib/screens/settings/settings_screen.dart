@@ -26,6 +26,7 @@ import '../trust/device_capabilities_screen.dart';
 import '../trust/privacy_explainer_screen.dart';
 import '../account/login_screen.dart';
 import '../../providers/account_provider.dart';
+import '../../widgets/premium/premium_gate.dart';
 import 'notification_discipline_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -267,31 +268,62 @@ class SettingsScreen extends StatelessWidget {
                 'widget_5',
                 AppColors.accentInk,
                 [
-                  SwitchListTile(
-                    secondary: DuotoneIcon(
-                      'structure',
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      size: 24,
-                    ),
-                    title: Text(
-                      'Expert (Pro) mode',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    subtitle: Text(
-                      settings.isProMode
-                          ? 'On — advanced threat-intelligence & enterprise tools are visible'
-                          : 'Off — the simple, consumer Guard experience',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                    value: settings.isProMode,
-                    onChanged: (on) =>
-                        settings.setAppMode(on ? AppMode.pro : AppMode.guard),
+                  // Expert (Pro) mode is premium. Turning it ON requires a live
+                  // subscription — otherwise we DON'T flip; we upsell. Turning
+                  // it OFF (back to the always-free Guard) is never gated.
+                  Consumer<AccountProvider>(
+                    builder: (context, account, _) {
+                      final cs = Theme.of(context).colorScheme;
+                      final locked = !account.hasPremium;
+                      return SwitchListTile(
+                        secondary: DuotoneIcon(
+                          'structure',
+                          color: cs.onSurfaceVariant,
+                          size: 24,
+                        ),
+                        title: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Expert (Pro) mode',
+                                style: TextStyle(
+                                  color: cs.onSurface,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (locked) ...[
+                              const SizedBox(width: 8),
+                              const PremiumBadge(),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text(
+                          settings.isProMode
+                              ? 'On — advanced threat-intelligence & enterprise tools are visible'
+                              : locked
+                                  ? 'Premium — subscribe to unlock the expert console'
+                                  : 'Off — the simple, consumer Guard experience',
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                        value: settings.isProMode,
+                        onChanged: (on) {
+                          // Enabling Pro needs premium; if not entitled, show
+                          // the upsell and leave the switch OFF (honest — Pro
+                          // is not active until it's paid for).
+                          if (on && !account.hasPremium) {
+                            PremiumGate.ensure(context, account,
+                                feature: 'Expert (Pro) mode');
+                            return;
+                          }
+                          settings
+                              .setAppMode(on ? AppMode.pro : AppMode.guard);
+                        },
+                      );
+                    },
                   ),
                 ],
               ),

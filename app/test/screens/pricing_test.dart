@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
+import 'package:orbguard/providers/account_provider.dart';
 import 'package:orbguard/screens/pricing/pricing_screen.dart';
 
 /// Phase 3.5 — the transparent pricing screen. This screen's whole pitch is
 /// its honesty, so the guard here is as much about what ISN'T on screen
 /// (fake urgency copy) as what is (the plain-language renewal promise).
 void main() {
-  Widget host() => const MaterialApp(home: PricingScreen());
+  // PricingScreen reads AccountProvider (to reflect real subscription state);
+  // provide a logged-out (Free) one so these tests see the normal plan CTAs.
+  Widget host() => ChangeNotifierProvider<AccountProvider>(
+        create: (_) => AccountProvider(enableProactiveRefresh: false),
+        child: const MaterialApp(home: PricingScreen()),
+      );
 
   // The screen is a single tall ListView (3 plan cards + promise band) that
   // overflows the default 800×600 test surface, so Sliver virtualization
