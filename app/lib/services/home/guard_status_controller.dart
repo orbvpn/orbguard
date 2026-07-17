@@ -177,6 +177,32 @@ class GuardProbes {
         );
       };
 
+  /// App malware scan: real on Android (scans installed apps against malware
+  /// intelligence). iOS/desktop sandbox other apps → honestly unavailable,
+  /// never a fake "protected". [lastResult] is a short live detail when known
+  /// (e.g. "No malware found" / "1 flagged").
+  static GuardProbe malwareScan({
+    required bool supported,
+    Future<String?> Function()? lastResult,
+  }) =>
+      () async {
+        if (!supported) {
+          return const GuardStatus(
+            id: 'malware_scan',
+            name: 'App malware scan',
+            state: GuardState.unavailable,
+            detail: 'iPhone blocks scanning other apps',
+          );
+        }
+        final detail = (await lastResult?.call()) ?? 'Tap Run check to scan apps';
+        return GuardStatus(
+          id: 'malware_scan',
+          name: 'App malware scan',
+          state: GuardState.active,
+          detail: detail,
+        );
+      };
+
   /// Hidden-VPN watch: reflects the latest real check.
   static GuardProbe hiddenVpn({required Future<bool?> Function() unknownVpnActive}) =>
       () async {

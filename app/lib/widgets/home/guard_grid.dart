@@ -22,6 +22,7 @@ String guardIconFor(String guardId) => switch (guardId) {
       'alerts' => AppIcons.bell, // bell
       'breach' => AppIcons.global, // global
       'hidden_vpn' => AppIcons.eyeClosed, // eye_closed
+      'malware_scan' => 'virus',
       _ => AppIcons.shieldCheck, // shield_check
     };
 

@@ -99,6 +99,7 @@ class _PrivacyCheckScreenState extends State<PrivacyCheckScreen>
     'Accessibility abuse',
     'Keylogger detection',
     'Location stalkers',
+    'App malware scan',
   ];
 
   /// Plain-language names for each real scan stage — same translations as
@@ -117,6 +118,7 @@ class _PrivacyCheckScreenState extends State<PrivacyCheckScreen>
     'Accessibility abuse': 'Scanning for spyware & stalkerware',
     'Keylogger detection': 'Checking for keyloggers',
     'Location stalkers': 'Checking for location tracking',
+    'App malware scan': 'Scanning your apps for malware',
   };
 
   static String _friendlyLabel(String raw) {

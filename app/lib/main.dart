@@ -313,6 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     GuardProbes.smsFilter(
         supported: PlatformInfo.isAndroid,
         granted: () async => await Permission.sms.isGranted),
+    GuardProbes.malwareScan(supported: PlatformInfo.isAndroid),
     GuardProbes.alerts(granted: () async => await Permission.notification.isGranted),
     GuardProbes.breachMonitor(breachedAccounts: () async => null),
     GuardProbes.hiddenVpn(unknownVpnActive: () async => null),

@@ -20,6 +20,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../detection/advanced_detection_modules.dart';
+import 'app_malware_scanner.dart';
 
 /// Thrown when the scan engine cannot run at all on this build.
 class DeviceScanUnavailableException implements Exception {
@@ -143,6 +144,10 @@ class DeviceScanService {
       _ScanStage('Keylogger detection', () => _detection.runModule('keylogger'),
           isNative: false),
       _ScanStage('Location stalkers', () => _detection.runModule('location'),
+          isNative: false),
+      // Real malware scan of installed apps (Android only; throws
+      // DetectionUnsupportedException on iOS/desktop → honest "not supported").
+      _ScanStage('App malware scan', () => AppMalwareScanner().scan(),
           isNative: false),
     ];
 
