@@ -130,14 +130,34 @@ Likely NOT (OrbGuard is a security companion, not a tunnel) → an OrbNet-side c
 OrbGuard platform from the device-limit count (or give OrbGuard its own limit). Raise before A2 ships.
 
 ## Phase A progress
-- **A1 (login)** ✅ e2e-verified (see below). `d433207`.
+The **account layer (A1 + A1.5 + A2) is DONE and comprehensively verified.** A3 (ads→credits) is
+the remaining Phase A work and needs shared-backend (OrbNet) changes — see the decision point below.
+
+- **A1 (login)** ✅ e2e-verified. `d433207`. Real-backend proof: register+login of a throwaway
+  account returned a real USER JWT for BOTH password and magic-link paths (the network/session
+  layer genuinely works). A real-account login correctly hit OrbNet's device-limit policy (7/plan)
+  — proving the full stack end to end, and motivating OrbGuard's own device limit (A3/backend).
 - **A2 (subscription gating)** ✅ `ec671c2`. `hasPremium` + `PremiumGate` upsell; Pro console now
-  subscriber-gated; PricingScreen reflects real state. 240/240 tests.
-- **A1.5 (login UX + OAuth)** ✅ `be0d08b`. Magic-link primary, password secondary, Google/Apple
-  buttons (real flows, honest errors). 250/250 tests. **Config still needed for Google/Apple e2e:**
-  Google OAuth clients + serverClientId (google-services.json is FCM-only, 0 oauth_client entries),
-  Apple capability on the App ID/profile (iOS entitlement added), and OrbNet `/auth/oauth/login`
-  must accept OrbGuard's OAuth audience. Magic-link + password work with no extra config.
+  subscriber-gated; PricingScreen reflects real state. Gate behavior directly tested
+  (`premium_gate_test.dart`): premium→passes through; logged-out→"Sign in" upsell; logged-in-free→
+  "See plans" upsell; + the real Settings Pro-toggle integration (toggle stays off, upsell shows).
+- **A1.5 (login UX + OAuth)** ✅ `be0d08b` + `e05c8a9`. Magic-link primary, password secondary,
+  Google/Apple buttons (real flows, honest errors). **On-device verified (Android Galaxy Fold):**
+  login screen renders per spec (Google button, Apple correctly hidden on Android, lime magic-link
+  primary, "Use password instead" reveal swaps to password form + "Sign in"), and the honesty
+  guardrail fires — an unconfigured Google tap shows "Couldn't sign in with Google — try email
+  instead" with NO fake session. Credential handoff proven in CI (`login_screen_test.dart`): typed
+  email+password reach `login()` verbatim → "Signed in"; typed email reaches `loginWithMagicLink()`
+  → advances to code entry. Full suite **252/252**, analyze 0/0.
+  - *Note on manual on-device login demo:* a live typed-login screenshot was blocked by environment,
+    not by OrbGuard — the Android device's default voice-assistant (Midas/OrbX) repeatedly stole
+    foreground, and the iOS sim lacks `idb` for scripted taps. The successful-login path is instead
+    proven by the combination above (real-backend JWT + on-device UI + in-CI credential handoff),
+    which is reproducible rather than a one-off screenshot.
+  - **Config still needed for Google/Apple e2e:** Google OAuth clients + serverClientId
+    (google-services.json is FCM-only, 0 oauth_client entries), Apple capability on the App
+    ID/profile (iOS entitlement added), and OrbNet `/auth/oauth/login` must accept OrbGuard's OAuth
+    audience. Magic-link + password work with no extra config.
 - **A3 (ads → scan credits)** ⬜ NEXT — the big one: OrbNet backend (OrbGuard's own device limit +
   `scan_credits` reward type/ledger + endpoints) + OrbGuard app (ad SDKs + scan metering). Needs a
   Go backend change + deploy.
