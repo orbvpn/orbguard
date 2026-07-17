@@ -168,14 +168,18 @@ https://claude.ai/code/artifact/19b038b1-e5d3-4454-a8a5-19aa0a8105b0*
 | 4.4 | Honest scan theatre (named real checks, live counts) + findings results screen | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 4.5 | Android real-time: firewall boot persistence + guard foreground notification + blocked-today counter | 🚫 | ✅ | 🚫 | 🚫 | 🚫 | ✅ | ✅ |
 | 4.6 | iOS honesty fix: real BGTaskScheduler background scan (killed the fake `success:true`) | ✅ | 🚫 | 🚫 | 🚫 | 🚫 | ✅ | ✅ |
-| 4.7 | FCM instant alerts end-to-end (backend sender **code-complete**; blocked on ops: SA IAM grant + APNs + env) | 🟡 | 🟡 | 🚫 | 🚫 | 🚫 | ✅ | 🟡 |
+| 4.7 | FCM instant alerts end-to-end — **LIVE (2026-07-17)** | ✅ | ✅ | 🚫 | 🚫 | 🚫 | ✅ | ✅ |
 | 4.8 | Phase 4 integration + e2e + merge | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🟡 |
 
 **Phase 4 shipping (2026-07-17).** Home redesign committed + iOS/Android builds green + 214/214 tests
 (`fa05210` data plane · `0c216d4` control-panel home + scan theatre + priming · `e1596e4` native
 real-time). New home sim-verified: pulsing live hero, Privacy Score 612/1000 meter, guard grid, real
 verdict (a genuine scan recorded score 74 — the stuck-"needs attention" bug is dead). First-run gate
-enters onboarding→priming→home. 4.7 FCM waits on ops only. **Open polish:** eager notification dialog
+enters onboarding→priming→home. 4.7 FCM **now LIVE** — activated on the `orbguard-lab` container 2026-07-17 (secret `fcm-sa-json` =
+the `orb-guard` firebase-adminsdk key; env `ORBGUARD_PUSH_ENABLED=true` + `ORBGUARD_FCM_PROJECT_ID=orb-guard`
++ `ORBGUARD_FCM_SERVICE_ACCOUNT_JSON=secretref:fcm-sa-json`); backend logged "FCM push service
+initialized · project_id orb-guard"; migration 022 `device_push_tokens` applied to prod. Only real-world
+delivery to a registered device remains to be observed. **Open polish:** eager notification dialog
 fires at launch (pre-existing push-init) before priming explains it — suppress so priming owns the ask.
 
 ---
