@@ -372,6 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 8),
         _field(
           context,
+          fieldKey: const ValueKey('magic_email_field'),
           controller: _emailController,
           hint: 'you@example.com',
           icon: 'letter',
@@ -430,6 +431,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 8),
         _field(
           context,
+          fieldKey: const ValueKey('pw_email_field'),
           controller: _emailController,
           hint: 'you@example.com',
           icon: 'letter',
@@ -441,6 +443,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 8),
         _field(
           context,
+          fieldKey: const ValueKey('pw_password_field'),
           controller: _passwordController,
           hint: 'Your password',
           icon: 'lock_password',
@@ -529,6 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required TextEditingController controller,
     required String hint,
     required String icon,
+    Key? fieldKey,
     TextInputType? keyboardType,
     bool obscure = false,
     bool enabled = true,
@@ -537,6 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     final cs = context.colors;
     return TextField(
+      key: fieldKey,
       controller: controller,
       enabled: enabled,
       obscureText: obscure,
