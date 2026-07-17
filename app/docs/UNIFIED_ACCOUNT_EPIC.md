@@ -84,7 +84,37 @@ Never claim lock/wipe works where it doesn't (iOS MDM-only; Android needs the na
 Web control only after real per-user ownership enforcement (close the horizontal-authz hole first).
 Camera capture is foreground-deferred — don't promise instant on a locked/backgrounded phone.
 
-## Open dependency
-**OrbNet backend map (agent ad873ea1, in progress)** gates: the JWT-verify mechanism (B1), the
-ad-credit approach (A3), and how/where to ship OrbNet-side changes. Nothing OrbNet-side starts
-until that lands.
+## OrbNet backend contract (resolved 2026-07-17 — the foundation)
+OrbNet = **chi v5**, migrations `internal/database/migrations/001..074`, deploys via GH Actions →
+Azure Container App **`orbnet-go` (rg ORB)**. No OrbGuard/device concept there yet (clean slate).
+
+- **JWT = HS256 symmetric shared secret.** No JWKS/asymmetric. OrbGuard verifies by: parse →
+  require HS256 → key = `ORBNET_JWT_ACCESS_SECRET` (min 32 ch; live value in OrbNet `.env` +
+  the `orbnet-go` Azure app env — NOT printed by the agent) → assert `iss=="orbnet"` + `exp`
+  future. **No `aud`** (accepts as-is). Access TTL = **1h**; OrbGuard can't refresh (refresh secret
+  is OrbNet-internal) → clients re-present a fresh OrbNet access token; OrbGuard treats it as a
+  short-lived bearer. Mint/verify ref: `pkg/jwt/jwt.go:203,245-270`.
+- ⚠️ **SECURITY TRADEOFF (raise at Phase B):** HS256 shared secret = anyone holding it can *mint*
+  OrbNet tokens. Sharing it with OrbGuard grants OrbGuard token-minting power over the whole
+  account system. Clean fix = OrbNet moves access tokens to RS256/ES256 + a public key / JWKS
+  (none today) so OrbGuard verifies with a PUBLIC key only. Decision for the user at Phase B:
+  ship on HS256 now vs invest in RS256/JWKS first.
+- **User id = `users.id SERIAL` (int).** JWT `user_id`/`sub` = that int. OrbGuard keys devices on it.
+- **Entitlement is IN the token** (`subscription_valid/tier/status/expires_at/...`) — OrbGuard reads
+  it from the verified JWT, no extra call. Also `GET /subscriptions/current`.
+- **Ad→credit path** (`/ad/session`→`/ad/verify`→`AddServiceCredits`→`token_balances.service_only_balance`;
+  `reward_type` ∈ vpn_seconds/seconds/credits already branches). **Scan-credit approach (chosen: a):**
+  add `reward_type='scan_credits'`, use the neutral `user_credits` ledger (migration 072) via
+  `AddScanCredits`/`DeductScanCredits`, expose `GET /scan-credits/balance` + `POST /scan-credits/spend`.
+  Credit ledger lives in OrbNet's DB → OrbGuard grants/spends **server-to-server** using the
+  internal API key (`X-API-Key: ORBNET_SERVER_INTERNAL_API_KEY`, `middleware/auth.go:172-205`) or by
+  forwarding the user JWT.
+- **CORS:** OrbGuard backend must add `https://admin.orbai.world` to its allow-list so the web panel
+  can POST anti-theft commands (OrbNet's CORS is irrelevant to a guard.orbai.world call).
+
+## Phase split clarified
+- **Phase A stays app↔OrbNet only** (login/subscription/ads hit `api.orbai.world` directly; no
+  shared secret needed yet; guard.orbai.world stays on the device api_key). Ship login + real
+  subscription gating + ad→scan-credits.
+- **Phase B** is where guard.orbai.world verifies the OrbNet JWT (the HS256-secret decision lands
+  here), links device→user_id, and enforces ownership.
