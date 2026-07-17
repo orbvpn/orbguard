@@ -110,8 +110,22 @@ import MachO
         // Request notification permissions
         requestNotificationPermissions()
 
+        // Background scan (BGTaskScheduler): the launch handler MUST be
+        // registered before this method returns (Apple requirement). Then
+        // submit a refresh request so one is generally pending — iOS alone
+        // decides if and when it actually runs.
+        BackgroundScanService.shared.register()
+        BackgroundScanService.shared.submitNextRequestLoggingFailure()
+
         GeneratedPluginRegistrant.register(with: self)
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    override func applicationDidEnterBackground(_ application: UIApplication) {
+        // Refresh the pending background-scan request whenever the app leaves
+        // the foreground, so a request generally exists for iOS to honor.
+        BackgroundScanService.shared.submitNextRequestLoggingFailure()
+        super.applicationDidEnterBackground(application)
     }
 
     // MARK: - Method Channel Handler
@@ -138,15 +152,17 @@ import MachO
             // Basic initialization - always succeed
             result(true)
 
-        // iOS sandboxes third-party apps from other processes' sockets, memory,
         // iOS sandboxes apps from other processes' sockets, memory and data, so
         // these stages cannot inspect OTHER apps. Instead each runs the real,
         // device-wide checks iOS DOES permit for the current runtime + device
         // posture (MITM proxy, injected dylibs, debugger, screen capture,
         // sandbox escape). An empty result means "checked, nothing found".
+        // The implementations live in SecurityPostureChecks
+        // (BackgroundScanService.swift) — the SAME code the background scan
+        // runs, so the two paths can never drift apart.
         case "scanNetwork":
             DispatchQueue.global(qos: .userInitiated).async {
-                let threats = self.scanNetworkThreats()
+                let threats = SecurityPostureChecks.proxyThreats()
                 DispatchQueue.main.async {
                     result(["threats": threats])
                 }
@@ -154,7 +170,8 @@ import MachO
 
         case "scanProcesses":
             DispatchQueue.global(qos: .userInitiated).async {
-                let threats = self.scanProcessThreats()
+                let threats = SecurityPostureChecks.injectedLibraryThreats()
+                    + SecurityPostureChecks.screenCaptureThreats()
                 DispatchQueue.main.async {
                     result(["threats": threats])
                 }
@@ -170,7 +187,7 @@ import MachO
 
         case "scanDatabases":
             DispatchQueue.global(qos: .userInitiated).async {
-                let threats = self.scanSandboxThreats()
+                let threats = SecurityPostureChecks.sandboxEscapeThreats()
                 DispatchQueue.main.async {
                     result(["threats": threats])
                 }
@@ -178,7 +195,7 @@ import MachO
 
         case "scanMemory":
             DispatchQueue.global(qos: .userInitiated).async {
-                let threats = self.scanMemoryThreats()
+                let threats = SecurityPostureChecks.debuggerThreats()
                 DispatchQueue.main.async {
                     result(["threats": threats])
                 }
@@ -269,15 +286,45 @@ import MachO
 
         // ============================================================
         // BACKGROUND SCANNING METHODS
+        // These used to return fabricated success for a no-op; they now do
+        // the real BGTaskScheduler work and report the actual outcome.
         // ============================================================
 
         case "scheduleBackgroundScan":
-            result(["success": true])
+            // Really submits a BGAppRefreshTaskRequest; success is true only
+            // when BGTaskScheduler accepted it. iOS decides the actual run
+            // time — earliestBeginDate is a floor, never a schedule.
+            do {
+                let earliest = try BackgroundScanService.shared.submitNextRequest()
+                result([
+                    "success": true,
+                    "taskIdentifier": BackgroundScanService.taskIdentifier,
+                    "earliestBeginDate": ISO8601DateFormatter().string(from: earliest),
+                ])
+            } catch {
+                result([
+                    "success": false,
+                    "error": error.localizedDescription,
+                ])
+            }
+
+        case "getBackgroundScanStatus":
+            // Real state only: `scheduled` from BGTaskScheduler's pending
+            // request list, the rest from the persisted last genuine run.
+            BackgroundScanService.shared.status { payload in
+                result(payload)
+            }
 
         case "scheduleDeepScan":
-            result(["success": true])
+            // No deep background scan exists on iOS (the old handler faked
+            // success). Only the quick posture check runs via BGAppRefreshTask.
+            result(FlutterError(
+                code: "UNSUPPORTED",
+                message: "Background deep scanning is not implemented on iOS. Only the quick posture check (proxy/MITM, jailbreak markers, injected libraries, debugger) runs as a background refresh task.",
+                details: ["platform": "ios"]))
 
         case "cancelBackgroundScans":
+            BackgroundScanService.shared.cancelPendingRequest()
             result(["success": true])
 
         // ============================================================
@@ -450,38 +497,16 @@ import MachO
     // MARK: - Jailbreak Detection
 
     private func checkJailbreak() -> Bool {
-        // Check for common jailbreak indicators
-        let jailbreakPaths = [
-            "/Applications/Cydia.app",
-            "/Applications/Sileo.app",
-            "/Applications/Zebra.app",
-            "/Library/MobileSubstrate/MobileSubstrate.dylib",
-            "/bin/bash",
-            "/usr/sbin/sshd",
-            "/etc/apt",
-            "/private/var/lib/apt/",
-            "/usr/bin/ssh",
-            "/var/cache/apt",
-            "/var/lib/cydia",
-            "/var/log/syslog",
-            "/bin/sh",
-            "/usr/libexec/sftp-server"
-        ]
-
-        for path in jailbreakPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                return true
-            }
+        // File-marker and sandbox-write checks are shared with the background
+        // scan (SecurityPostureChecks in BackgroundScanService.swift); only
+        // the cydia:// URL-scheme probe lives here because UIApplication is a
+        // main-thread/foreground API that must not run in a background task.
+        if !SecurityPostureChecks.jailbreakFileMarkerHits().isEmpty {
+            return true
         }
 
-        // Check if we can write to system paths
-        let testPath = "/private/jailbreak_test.txt"
-        do {
-            try "test".write(toFile: testPath, atomically: true, encoding: .utf8)
-            try FileManager.default.removeItem(atPath: testPath)
+        if SecurityPostureChecks.sandboxWriteProbeSucceeds() {
             return true
-        } catch {
-            // Expected to fail on non-jailbroken devices
         }
 
         // Check for URL schemes
@@ -501,141 +526,10 @@ import MachO
     // and sandbox escape (jailbreak). These are the same signals legitimate iOS
     // security/anti-fraud SDKs use. Each returns real findings; an empty array
     // means the check ran and found nothing (not "unavailable").
-
-    /// Detects a system HTTP proxy that could be intercepting traffic (MITM).
-    private func scanNetworkThreats() -> [[String: Any]] {
-        var threats: [[String: Any]] = []
-        guard let cf = CFNetworkCopySystemProxySettings()?.takeRetainedValue(),
-              let settings = cf as? [String: Any] else {
-            return threats
-        }
-        if let enabled = settings[kCFNetworkProxiesHTTPEnable as String] as? Int,
-           enabled == 1,
-           let host = settings[kCFNetworkProxiesHTTPProxy as String] as? String,
-           !host.isEmpty {
-            threats.append([
-                "id": "net_proxy_\(UUID().uuidString)",
-                "name": "HTTP proxy configured",
-                "type": "network",
-                "severity": "MEDIUM",
-                "path": host,
-                "description": "A proxy (\(host)) is routing this device's web traffic. If you did not set it up, a malicious proxy can intercept and modify traffic (man-in-the-middle).",
-                "requiresRoot": false,
-                "metadata": ["proxy_host": host]
-            ])
-        }
-        return threats
-    }
-
-    /// Detects code-injection/hooking libraries loaded into this process and
-    /// active screen capture/mirroring.
-    private func scanProcessThreats() -> [[String: Any]] {
-        var threats: [[String: Any]] = []
-        let hooks = ["substrate", "substitute", "libhooker", "cycript", "cynject",
-                     "frida", "sslkillswitch", "libjailbreak", "rocketbootstrap",
-                     "tweakinject", "shadow.dylib"]
-        for i in 0..<_dyld_image_count() {
-            guard let cname = _dyld_get_image_name(i) else { continue }
-            let full = String(cString: cname)
-            let lower = full.lowercased()
-            if let hit = hooks.first(where: { lower.contains($0) }) {
-                threats.append([
-                    "id": "proc_inject_\(UUID().uuidString)",
-                    "name": "Injected library detected",
-                    "type": "process",
-                    "severity": "HIGH",
-                    "path": full,
-                    "description": "A code-injection/hooking library (\(hit)) is loaded into this app — a sign of a jailbroken device or a tampered build, which spyware uses to hook into apps.",
-                    "requiresRoot": false,
-                    "metadata": ["library": hit]
-                ])
-            }
-        }
-        var captured = false
-        if Thread.isMainThread {
-            captured = UIScreen.main.isCaptured
-        } else {
-            DispatchQueue.main.sync { captured = UIScreen.main.isCaptured }
-        }
-        if captured {
-            threats.append([
-                "id": "proc_screencapture_\(UUID().uuidString)",
-                "name": "Screen is being captured",
-                "type": "process",
-                "severity": "MEDIUM",
-                "path": "UIScreen.isCaptured",
-                "description": "The screen is currently being recorded or mirrored. If you did not start a recording or AirPlay session, screen-capture spyware may be active.",
-                "requiresRoot": false,
-                "metadata": [:]
-            ])
-        }
-        return threats
-    }
-
-    /// Detects an attached debugger/tracer and DYLD library injection.
-    private func scanMemoryThreats() -> [[String: Any]] {
-        var threats: [[String: Any]] = []
-        if isDebuggerAttached() {
-            threats.append([
-                "id": "mem_debugger_\(UUID().uuidString)",
-                "name": "Debugger attached to app",
-                "type": "memory",
-                "severity": "HIGH",
-                "path": "P_TRACED",
-                "description": "A debugger/tracer is attached to this app. Outside development this indicates runtime tampering or dynamic instrumentation by malware.",
-                "requiresRoot": false,
-                "metadata": [:]
-            ])
-        }
-        if let raw = getenv("DYLD_INSERT_LIBRARIES") {
-            let libs = String(cString: raw)
-            if !libs.isEmpty {
-                threats.append([
-                    "id": "mem_dyld_\(UUID().uuidString)",
-                    "name": "DYLD injection detected",
-                    "type": "memory",
-                    "severity": "HIGH",
-                    "path": libs,
-                    "description": "DYLD_INSERT_LIBRARIES is set (\(libs)) — a library is being force-loaded into apps, a common malware/hooking technique.",
-                    "requiresRoot": false,
-                    "metadata": ["libraries": libs]
-                ])
-            }
-        }
-        return threats
-    }
-
-    /// Attempts to write outside the app sandbox. Success is only possible on a
-    /// jailbroken device (the sandbox is broken), the precondition for most iOS
-    /// spyware such as Pegasus.
-    private func scanSandboxThreats() -> [[String: Any]] {
-        var threats: [[String: Any]] = []
-        let probe = "/private/.orbguard_sbx_\(UUID().uuidString)"
-        if (try? "x".write(toFile: probe, atomically: true, encoding: .utf8)) != nil {
-            try? FileManager.default.removeItem(atPath: probe)
-            threats.append([
-                "id": "sbx_escape_\(UUID().uuidString)",
-                "name": "Sandbox escape possible (jailbreak)",
-                "type": "system",
-                "severity": "CRITICAL",
-                "path": "/private",
-                "description": "This app was able to write outside its sandbox, which is only possible on a jailbroken device. Jailbreaking removes the protections that stop spyware from reading your data.",
-                "requiresRoot": false,
-                "metadata": [:]
-            ])
-        }
-        return threats
-    }
-
-    /// True when a debugger/tracer is attached to this process (P_TRACED).
-    private func isDebuggerAttached() -> Bool {
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
-        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
-        let ret = sysctl(&mib, 4, &info, &size, nil, 0)
-        if ret != 0 { return false }
-        return (info.kp_proc.p_flag & P_TRACED) != 0
-    }
+    //
+    // The implementations live in SecurityPostureChecks
+    // (BackgroundScanService.swift) so the on-demand scan above and the
+    // background scan execute ONE shared implementation.
 
     // MARK: - Basic File System Scan
 

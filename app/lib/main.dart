@@ -19,6 +19,7 @@ import 'screens/scan/findings_screen.dart';
 import 'services/habit/protection_streak_controller.dart';
 import 'services/home/last_scan_verdict_controller.dart';
 import 'services/home/guard_status_controller.dart';
+import 'services/security/firewall_realtime.dart';
 import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
@@ -290,6 +291,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final List<ThreatDetection> _threats = [];
   double _detectionCapability = 0.0;
 
+  // Real proof-of-work for the home feed: surveillance domains the Android
+  // DNS firewall actually blocked today (0 when off / not Android / native
+  // absent — the feed shows its honest empty state at 0, never a fake number).
+  final FirewallRealtime _firewallRt = FirewallRealtime();
+  int _blockedToday = 0;
+
   // Live guard states for the control-panel home. Each probe reads a REAL
   // source (auto-scan setting, firewall state, granted permissions); breach
   // and hidden-VPN start as "check to verify" until a real check populates
@@ -313,7 +320,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _guards.refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _guards.refresh();
+      _refreshActivity();
+    });
     _initializeApp();
   }
 
@@ -336,7 +346,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await specialPermissions.checkPermissions();
     await _calculateDetectionCapability();
     unawaited(_guards.refresh());
+    unawaited(_refreshActivity());
     setState(() {});
+  }
+
+  /// Pull the real "blocked today" count for the home's proof-of-work feed.
+  Future<void> _refreshActivity() async {
+    if (!PlatformInfo.isAndroid) return;
+    final n = await _firewallRt.blockedToday();
+    if (mounted) setState(() => _blockedToday = n);
   }
 
   /// Route a tapped guard tile to the place it's set up / reviewed. Scan-y
@@ -808,6 +826,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       streak: context.watch<ProtectionStreakController>(),
       onGuardTap: _onGuardTap,
       onFactorTap: _onFactorTap,
+      blockedTodayCount: () => _blockedToday,
     );
   }
 

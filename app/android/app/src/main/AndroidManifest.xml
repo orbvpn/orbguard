@@ -17,9 +17,11 @@
 
     <!-- On-device firewall: a local VpnService that filters DNS. BIND_VPN_SERVICE
          is enforced on the service; the foreground-service perms keep the tunnel
-         alive while active. -->
+         alive while active. RECEIVE_BOOT_COMPLETED lets BootReceiver restore the
+         firewall after a reboot when the user left it enabled. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- ============================================ -->
     <!-- STORAGE PERMISSIONS (For file system scanning) -->
@@ -169,6 +171,21 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <!-- Restores the firewall after a reboot or app update when the user
+             left it enabled; posts an honest "tap to re-enable" notification
+             instead when VPN consent must be granted again. exported=false is
+             fine: both actions are protected system broadcasts, which the
+             system delivers regardless (same pattern WorkManager uses). -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Queries for Package Visibility (Android 11+) -->

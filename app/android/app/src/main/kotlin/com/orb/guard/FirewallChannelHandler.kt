@@ -4,9 +4,13 @@
 // MethodChannel  com.orbvpn.orbguard/firewall
 //   initialize        -> report engine availability (always available here)
 //   updateBlockLists  -> push the threat-intel + user domain block list to native
+//                        (also persisted via FirewallState for boot restore)
 //   enable            -> request VPN consent if needed, then start the service
 //   disable           -> stop the service
 //   status            -> whether the firewall is currently running
+//   getBlockedToday   -> Int: DNS queries blocked so far today (local date)
+//   survivesReboot    -> Bool: enabled flag persisted AND VPN consent still
+//                        valid, i.e. BootReceiver can restore without the user
 //
 // EventChannel   com.orbvpn.orbguard/firewall_events
 //   streams connection/block events emitted by the VpnService.
@@ -57,12 +61,17 @@ class FirewallChannelHandler(private val context: Context) {
                     @Suppress("UNCHECKED_CAST")
                     val domains = (call.argument<List<String>>("domains") ?: emptyList())
                     OrbFirewallVpnService.updateBlockedDomains(domains.toSet())
+                    // Persist so a reboot/process-death restore enforces the
+                    // same list instead of an empty one.
+                    FirewallState.saveBlocklist(context, domains)
                     result.success(true)
                 }
 
                 "enable" -> enable(result)
 
                 "disable" -> {
+                    // The user's intent is now "off": never auto-restore it.
+                    FirewallState.setEnabled(context, false)
                     val intent = Intent(context, OrbFirewallVpnService::class.java)
                         .setAction(OrbFirewallVpnService.ACTION_STOP)
                     context.startService(intent)
@@ -72,6 +81,19 @@ class FirewallChannelHandler(private val context: Context) {
                 "status" -> result.success(
                     mapOf("running" to OrbFirewallVpnService.running)
                 )
+
+                "getBlockedToday" -> result.success(
+                    FirewallState.blockedToday(context)
+                )
+
+                "survivesReboot" -> {
+                    val consentValid = try {
+                        VpnService.prepare(context) == null
+                    } catch (e: Exception) {
+                        false
+                    }
+                    result.success(FirewallState.isEnabled(context) && consentValid)
+                }
 
                 else -> result.notImplemented()
             }
@@ -149,6 +171,10 @@ class FirewallChannelHandler(private val context: Context) {
             .setAction(OrbFirewallVpnService.ACTION_START)
         try {
             context.startService(intent)
+            // Persist the user's "on" intent so BootReceiver restores the
+            // firewall after a reboot (covers both the already-consented and
+            // the consent-just-granted enable paths).
+            FirewallState.setEnabled(context, true)
             Log.i(TAG, "firewall service start requested")
         } catch (e: Exception) {
             Log.e(TAG, "failed to start firewall service: ${e.message}")

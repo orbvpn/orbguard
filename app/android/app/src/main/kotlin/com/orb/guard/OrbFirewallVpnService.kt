@@ -17,6 +17,11 @@
 // This is the same DNS-content-filter design used by Blokada/RethinkDNS. Honest
 // limitations (documented for the user): apps that hardcode their own resolver
 // or use DoH/DoT bypass DNS filtering, and IPv6 DNS is passed through.
+//
+// Real-time hardening: the service survives reboots via BootReceiver +
+// FirewallState (persisted enabled flag + block list), counts blocked queries
+// per local day ("blocked today"), and its foreground notification doubles as
+// the app's persistent "OrbGuard is protecting you" status anchor.
 
 package com.orb.guard
 
@@ -28,6 +33,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.FileInputStream
@@ -58,6 +65,14 @@ class OrbFirewallVpnService : VpnService() {
 
         private const val NOTIF_CHANNEL = "orbguard_firewall"
         private const val NOTIF_ID = 4711
+
+        /** Set by BootReceiver so a failed restore posts the re-enable prompt. */
+        const val EXTRA_BOOT_RESTORE = "boot_restore"
+
+        // The persistent status notification refreshes its "N blocked today"
+        // text on this cadence. A plain main-looper Handler tick: no wakelock,
+        // no alarm — when the device sleeps the tick simply runs late.
+        private const val NOTIF_REFRESH_MS = 15 * 60 * 1000L
 
         // Live block lists, set from Dart via FirewallChannelHandler before the
         // service starts and updated while it runs. Volatile: read on the TUN
@@ -94,6 +109,17 @@ class OrbFirewallVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var worker: Thread? = null
     private val active = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Periodic "N blocked today" refresh of the ongoing status notification. */
+    private val notifRefresh: Runnable = object : Runnable {
+        override fun run() {
+            if (!active.get()) return
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIF_ID, buildStatusNotification())
+            mainHandler.postDelayed(this, NOTIF_REFRESH_MS)
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -101,13 +127,26 @@ class OrbFirewallVpnService : VpnService() {
                 stopFirewall()
                 return START_NOT_STICKY
             }
-            else -> startFirewall()
+            else -> {
+                // Enter the foreground immediately: a boot restore starts us
+                // with startForegroundService(), which requires a prompt
+                // startForeground() even if establishing the tunnel fails.
+                startForegroundNotification()
+                startFirewall(intent?.getBooleanExtra(EXTRA_BOOT_RESTORE, false) ?: false)
+            }
         }
         return START_STICKY
     }
 
-    private fun startFirewall() {
+    private fun startFirewall(fromBootRestore: Boolean) {
         if (active.get()) return
+
+        // After a reboot or process-death restart the Dart side has not pushed
+        // the block list yet — reload the last persisted one so the firewall
+        // actually enforces instead of running empty (a placebo).
+        if (blockedDomains.isEmpty()) {
+            updateBlockedDomains(FirewallState.loadBlocklist(this))
+        }
 
         val builder = Builder()
             .setSession("OrbGuard Firewall")
@@ -129,6 +168,12 @@ class OrbFirewallVpnService : VpnService() {
         }
         if (pfd == null) {
             emit(mapOf("type" to "engine_error", "reason" to "VPN establish failed"))
+            if (fromBootRestore) {
+                // Nobody is watching at boot — never fail silently: tell the
+                // user protection is off and how to bring it back.
+                BootReceiver.postReEnableNotification(this)
+            }
+            stopForegroundCompat()
             stopSelf()
             return
         }
@@ -136,7 +181,13 @@ class OrbFirewallVpnService : VpnService() {
         tun = pfd
         active.set(true)
         running = true
+        // Rebuild the notification now that we are running (shows the current
+        // "N blocked today"), clear any stale re-enable prompt, and start the
+        // 15-minute text refresh.
         startForegroundNotification()
+        BootReceiver.cancelReEnableNotification(this)
+        mainHandler.removeCallbacks(notifRefresh)
+        mainHandler.postDelayed(notifRefresh, NOTIF_REFRESH_MS)
 
         worker = Thread({ runLoop(pfd) }, "orb-firewall-dns").also { it.start() }
         emit(mapOf("type" to "engine_state", "enabled" to true))
@@ -146,6 +197,8 @@ class OrbFirewallVpnService : VpnService() {
     private fun stopFirewall() {
         active.set(false)
         running = false
+        mainHandler.removeCallbacks(notifRefresh)
+        FirewallState.flush(this)
         worker?.interrupt()
         worker = null
         try {
@@ -207,6 +260,9 @@ class OrbFirewallVpnService : VpnService() {
         if (isBlocked(domain)) {
             val response = buildSinkholeResponse(packet, length, ihl, udpStart, dns)
             if (response != null) output.write(response)
+            // "Blocked today" proof-of-work counter: in-memory bump, flushed
+            // to prefs every few blocks (see FirewallState) — no per-packet IO.
+            FirewallState.recordBlocked(this)
             emit(dnsEvent(domain, blocked = true, remoteAddress = "0.0.0.0"))
         } else {
             forwardUpstream(packet, length, ihl, udpStart, dns, domain, output)
@@ -413,6 +469,38 @@ class OrbFirewallVpnService : VpnService() {
         )
 
     // ---- Foreground notification ------------------------------------------
+    //
+    // This ONE ongoing low-priority notification is the app's "OrbGuard is
+    // protecting you" anchor. It is deliberately the firewall's own foreground
+    // notification (enriched with the live "N blocked today" count) rather
+    // than a second GuardStatusService: the VpnService IS the protection, so
+    // a separate always-on service would only add a duplicate persistent
+    // notification and a second foreground-service footprint for zero truth.
+
+    /** The persistent status notification, with today's blocked count. */
+    private fun buildStatusNotification(): Notification {
+        val launch = packageManager.getLaunchIntentForPackage(packageName)
+        val pending = if (launch != null) {
+            PendingIntent.getActivity(
+                this, 0, launch,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                    PendingIntent.FLAG_IMMUTABLE else 0,
+            )
+        } else null
+
+        val blocked = FirewallState.blockedToday(this)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            Notification.Builder(this, NOTIF_CHANNEL) else
+            @Suppress("DEPRECATION") Notification.Builder(this)
+        return builder
+            .setContentTitle("OrbGuard is protecting you")
+            .setContentText("Firewall active · $blocked blocked today")
+            .setSmallIcon(applicationInfo.icon)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .apply { if (pending != null) setContentIntent(pending) }
+            .build()
+    }
 
     private fun startForegroundNotification() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -424,26 +512,7 @@ class OrbFirewallVpnService : VpnService() {
             ).apply { description = "OrbGuard on-device firewall is active" }
             nm.createNotificationChannel(channel)
         }
-        val launch = packageManager.getLaunchIntentForPackage(packageName)
-        val pending = if (launch != null) {
-            PendingIntent.getActivity(
-                this, 0, launch,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                    PendingIntent.FLAG_IMMUTABLE else 0,
-            )
-        } else null
-
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            Notification.Builder(this, NOTIF_CHANNEL) else
-            @Suppress("DEPRECATION") Notification.Builder(this)
-        val notification = builder
-            .setContentTitle("Firewall active")
-            .setContentText("OrbGuard is filtering DNS on this device")
-            .setSmallIcon(applicationInfo.icon)
-            .setOngoing(true)
-            .apply { if (pending != null) setContentIntent(pending) }
-            .build()
-        startForeground(NOTIF_ID, notification)
+        startForeground(NOTIF_ID, buildStatusNotification())
     }
 
     private fun stopForegroundCompat() {
