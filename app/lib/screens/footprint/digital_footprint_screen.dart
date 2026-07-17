@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/app_sheet.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
+import '../../presentation/widgets/sheet_panel.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/digital_footprint_provider.dart';
 
@@ -576,32 +577,20 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
   }
 
   void _requestBatchRemoval(DigitalFootprintProvider provider, List<DataBroker> brokers) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: context.isDark
-            ? GlassTheme.gradientTop
-            : GlassTheme.gradientTopLight,
-        title: Text('Remove from All',
-            style: TextStyle(color: context.colors.onSurface)),
-        content: Text(
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: 'Remove from All',
+        body: Text(
           'Request removal from ${brokers.length} data brokers?',
           style: TextStyle(color: context.colors.onSurfaceVariant),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              provider.requestBatchRemoval(brokers);
-              _tabPageKey.currentState?.animateToTab(2); // Go to requests tab
-            },
-            child: const Text('Request Removal'),
-          ),
-        ],
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Request Removal',
+        onPrimary: () {
+          provider.requestBatchRemoval(brokers);
+          _tabPageKey.currentState?.animateToTab(2); // Go to requests tab
+        },
       ),
     );
   }

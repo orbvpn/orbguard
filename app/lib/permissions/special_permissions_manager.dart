@@ -3,10 +3,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/platform_info.dart';
-import '../presentation/widgets/duotone_icon.dart';
-import '../presentation/theme/colors.dart';
 import '../presentation/theme/brand.dart';
+import '../presentation/theme/colors.dart';
+import '../presentation/widgets/app_sheet.dart';
+import '../presentation/widgets/brand_button.dart';
+import '../presentation/widgets/duotone_icon.dart';
+import '../utils/platform_info.dart';
 
 class SpecialPermissionsManager {
   static const platform = MethodChannel('com.orb.guard/system');
@@ -126,75 +128,58 @@ class SpecialPermissionsManager {
         break;
     }
 
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
+    return showAppSheet<bool>(
+      context,
+      isDismissible: false,
+      enableDrag: false,
+      child: _ConfirmSheet(
+        title: title,
+        titleIcon:
             DuotoneIcon(AppIcons.shieldCheck, color: AppColors.accentInk),
-            const SizedBox(width: 12),
-            Expanded(child: Text(title)),
+        secondaryLabel: 'Not Now',
+        primaryLabel: 'Open Settings',
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              description,
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'This enables:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...capabilities.map(
+              (cap) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(cap, style: const TextStyle(fontSize: 13)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  DuotoneIcon(AppIcons.infoCircle, size: 20, color: AppColors.secondaryInk),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'OrbGuard only uses this to detect threats. Your data stays on your device.',
+                      style: TextStyle(fontSize: 12, color: AppColors.secondaryInk),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                description,
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'This enables:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...capabilities.map(
-                (cap) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(cap, style: const TextStyle(fontSize: 13)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    DuotoneIcon(AppIcons.infoCircle, size: 20, color: AppColors.secondaryInk),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'OrbGuard only uses this to detect threats. Your data stays on your device.',
-                        style: TextStyle(fontSize: 12, color: AppColors.secondaryInk),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not Now'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Brand.lime,
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('Open Settings'),
-          ),
-        ],
       ),
     );
   }
@@ -540,5 +525,72 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
       // Small delay between requests
       await Future.delayed(const Duration(milliseconds: 500));
     }
+  }
+}
+
+/// A branded confirm sheet that mirrors [SheetPanel] but completes the
+/// [showAppSheet] future with a bool: `true` from the primary action, `false`
+/// from the secondary. A barrier/drag dismiss yields `null`, which callers
+/// treat as `false` — exactly as the original `showDialog<bool>` did.
+class _ConfirmSheet extends StatelessWidget {
+  final String title;
+  final Widget? titleIcon;
+  final Widget body;
+  final String primaryLabel;
+  final String secondaryLabel;
+
+  const _ConfirmSheet({
+    required this.title,
+    required this.body,
+    required this.primaryLabel,
+    required this.secondaryLabel,
+    this.titleIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (titleIcon != null) ...[titleIcon!, const SizedBox(width: 10)],
+              Expanded(
+                child: Text(title,
+                    style: BrandText.h2(color: cs.onSurface, size: 21)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Flexible(child: SingleChildScrollView(child: body)),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(secondaryLabel),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: BrandButton(
+                  label: primaryLabel,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

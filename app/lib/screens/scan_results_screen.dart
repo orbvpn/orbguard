@@ -7,7 +7,10 @@ import '../main.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/glass_theme.dart';
+import '../presentation/widgets/app_sheet.dart';
+import '../presentation/widgets/brand_button.dart';
 import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/widgets/sheet_panel.dart';
 import '../presentation/widgets/victim_safety_notice.dart';
 
 class ScanResultsScreen extends StatefulWidget {
@@ -940,53 +943,35 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   void _removeThreat(ThreatDetection threat) {
     HapticFeedback.mediumImpact();
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
-        title: const Text('Remove Threat'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              threat.name,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, color: AppColors.errorInk),
-            ),
+    _showDangerSheet(
+      context,
+      title: 'Remove Threat',
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            threat.name,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: AppColors.errorInk),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _getRemovalDescription(threat),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
+          ),
+          if (_looksLikeStalkerware(threat)) ...[
             const SizedBox(height: 12),
             Text(
-              _getRemovalDescription(threat),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
+              'If someone is monitoring you, removing this may alert them. '
+              'If you feel unsafe, consider getting support before you act.',
+              style: TextStyle(color: AppColors.secondaryInk, fontSize: 13),
             ),
-            if (_looksLikeStalkerware(threat)) ...[
-              const SizedBox(height: 12),
-              Text(
-                'If someone is monitoring you, removing this may alert them. '
-                'If you feel unsafe, consider getting support before you act.',
-                style: TextStyle(color: AppColors.secondaryInk, fontSize: 13),
-              ),
-            ],
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _executeRemoval(threat);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Brand.danger,
-                foregroundColor: Brand.onDanger),
-            child: const Text('Remove'),
-          ),
         ],
       ),
+      confirmLabel: 'Remove',
+      onConfirm: () => _executeRemoval(threat),
     );
   }
 
@@ -1008,13 +993,11 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   void _dismissThreat(ThreatDetection threat) {
     HapticFeedback.lightImpact();
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
-        title: const Text('Dismiss Warning'),
-        content: Column(
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: 'Dismiss Warning',
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1031,22 +1014,9 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _executeDismiss(threat);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.info,
-                foregroundColor: Brand.onPink),
-            child: const Text('Dismiss'),
-          ),
-        ],
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Dismiss',
+        onPrimary: () => _executeDismiss(threat),
       ),
     );
   }
@@ -1172,36 +1142,21 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
   }
 
   void _showRemoveAllDialog() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(GlassTheme.radiusMedium)),
-        title: const Text('Remove All Threats'),
-        content: const Text(
-          'This removes every threat OrbGuard can act on: suspicious '
-          'processes, files and apps are removed via the system, and '
-          'informational warnings are dismissed. Threats that need manual '
-          'action are kept in the list.\n\nThis action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              HapticFeedback.heavyImpact();
-              _executeRemoveAll();
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Brand.danger,
-                foregroundColor: Brand.onDanger),
-            child: const Text('Remove All'),
-          ),
-        ],
+    _showDangerSheet(
+      context,
+      title: 'Remove All Threats',
+      body: Text(
+        'This removes every threat OrbGuard can act on: suspicious '
+        'processes, files and apps are removed via the system, and '
+        'informational warnings are dismissed. Threats that need manual '
+        'action are kept in the list.\n\nThis action cannot be undone.',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
       ),
+      confirmLabel: 'Remove All',
+      onConfirm: () {
+        HapticFeedback.heavyImpact();
+        _executeRemoveAll();
+      },
     );
   }
 
@@ -1288,4 +1243,61 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
       if (mounted) Navigator.pop(context);
     }
   }
+}
+
+/// A destructive confirm rendered as an iOS bottom sheet: the same layout as the
+/// shared SheetPanel confirm, but the primary action is a danger-styled
+/// [BrandButton.destructive]. The primary button dismisses the sheet first, then
+/// runs [onConfirm]; Cancel or a barrier-dismiss just closes it.
+void _showDangerSheet(
+  BuildContext context, {
+  required String title,
+  required Widget body,
+  required String confirmLabel,
+  required VoidCallback onConfirm,
+  String cancelLabel = 'Cancel',
+}) {
+  final cs = Theme.of(context).colorScheme;
+  showAppSheet(
+    context,
+    child: Builder(
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: BrandText.h2(color: cs.onSurface, size: 21)),
+            const SizedBox(height: 14),
+            Flexible(child: SingleChildScrollView(child: body)),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: Text(cancelLabel),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: BrandButton.destructive(
+                    label: confirmLabel,
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      onConfirm();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

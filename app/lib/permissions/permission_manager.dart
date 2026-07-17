@@ -4,9 +4,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../utils/platform_info.dart';
-import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
+import '../presentation/widgets/app_sheet.dart';
+import '../presentation/widgets/brand_button.dart';
+import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/widgets/sheet_panel.dart';
+import '../utils/platform_info.dart';
 
 // ============================================================================
 // PERMISSION MANAGER - Handles all app permissions
@@ -249,17 +253,15 @@ class PermissionManager {
 
     // Show rationale dialog
     if (!context.mounted) return status;
-    final shouldRequest = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
+    final shouldRequest = await showAppSheet<bool>(
+      context,
+      child: _ConfirmSheet(
+        title: title,
+        titleIcon:
             DuotoneIcon(AppIcons.shieldCheck, color: AppColors.secondaryInk),
-            const SizedBox(width: 12),
-            Expanded(child: Text(title)),
-          ],
-        ),
-        content: Column(
+        secondaryLabel: 'Not Now',
+        primaryLabel: 'Grant Permission',
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -291,16 +293,6 @@ class PermissionManager {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not Now'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Grant Permission'),
-          ),
-        ],
       ),
     );
 
@@ -369,11 +361,13 @@ class PermissionManager {
 
   /// Request Usage Stats permission (navigates to Settings)
   Future<bool> requestUsageStatsPermission(BuildContext context) async {
-    final shouldOpen = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enable Usage Stats'),
-        content: Column(
+    final shouldOpen = await showAppSheet<bool>(
+      context,
+      child: _ConfirmSheet(
+        title: 'Enable Usage Stats',
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Open Settings',
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('This permission allows OrbGuard to:\n\n'
@@ -403,16 +397,6 @@ class PermissionManager {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Open Settings'),
-          ),
-        ],
       ),
     );
 
@@ -431,11 +415,13 @@ class PermissionManager {
 
   /// Request Accessibility permission (navigates to Settings)
   Future<bool> requestAccessibilityPermission(BuildContext context) async {
-    final shouldOpen = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enable Accessibility Service'),
-        content: Column(
+    final shouldOpen = await showAppSheet<bool>(
+      context,
+      child: _ConfirmSheet(
+        title: 'Enable Accessibility Service',
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Open Settings',
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('This permission allows OrbGuard to:\n\n'
@@ -465,16 +451,6 @@ class PermissionManager {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Open Settings'),
-          ),
-        ],
       ),
     );
 
@@ -501,11 +477,14 @@ class PermissionManager {
     String title,
     String explanation,
   ) async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Column(
+    await showAppSheet(
+      context,
+      child: SheetPanel(
+        title: title,
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Open Settings',
+        onPrimary: openAppSettings,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(explanation),
@@ -516,19 +495,6 @@ class PermissionManager {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
       ),
     );
   }
@@ -595,4 +561,71 @@ class PermissionScanResult {
 
   bool get hasSpecialPermissions =>
       granted.contains('Usage Stats') || granted.contains('Accessibility');
+}
+
+/// A branded confirm sheet that mirrors [SheetPanel] but completes the
+/// [showAppSheet] future with a bool: `true` from the primary action, `false`
+/// from the secondary. A barrier/drag dismiss yields `null`, which callers
+/// treat as `false` — exactly as the original `showDialog<bool>` did.
+class _ConfirmSheet extends StatelessWidget {
+  final String title;
+  final Widget? titleIcon;
+  final Widget body;
+  final String primaryLabel;
+  final String secondaryLabel;
+
+  const _ConfirmSheet({
+    required this.title,
+    required this.body,
+    required this.primaryLabel,
+    required this.secondaryLabel,
+    this.titleIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (titleIcon != null) ...[titleIcon!, const SizedBox(width: 10)],
+              Expanded(
+                child: Text(title,
+                    style: BrandText.h2(color: cs.onSurface, size: 21)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Flexible(child: SingleChildScrollView(child: body)),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(secondaryLabel),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: BrandButton(
+                  label: primaryLabel,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

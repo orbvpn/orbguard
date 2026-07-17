@@ -7,9 +7,9 @@ import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/app_sheet.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -476,35 +476,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ),
               TextButton.icon(
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: context.colors.surface,
-                      title: Text(
-                        'Clear History',
-                        style: TextStyle(color: context.colors.onSurface),
-                      ),
-                      content: Text(
-                        'Are you sure you want to clear all scan history?',
-                        style: TextStyle(color: context.colors.onSurfaceVariant),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            provider.clearHistory();
-                            Navigator.pop(context);
-                          },
-                          child: Text(
-                            'Clear',
-                            style: TextStyle(color: AppColors.errorInk),
-                          ),
-                        ),
-                      ],
+                  _showDangerSheet(
+                    context,
+                    title: 'Clear History',
+                    body: Text(
+                      'Are you sure you want to clear all scan history?',
+                      style: TextStyle(color: context.colors.onSurfaceVariant),
                     ),
+                    confirmLabel: 'Clear',
+                    onConfirm: () => provider.clearHistory(),
                   );
                 },
                 icon: const DuotoneIcon('trash_bin_minimalistic', size: 18),
@@ -613,4 +593,61 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       ),
     );
   }
+}
+
+/// A destructive confirm rendered as an iOS bottom sheet: the same layout as the
+/// shared SheetPanel confirm, but the primary action is a danger-styled
+/// [BrandButton.destructive]. The primary button dismisses the sheet first, then
+/// runs [onConfirm]; Cancel or a barrier-dismiss just closes it.
+void _showDangerSheet(
+  BuildContext context, {
+  required String title,
+  required Widget body,
+  required String confirmLabel,
+  required VoidCallback onConfirm,
+  String cancelLabel = 'Cancel',
+}) {
+  final cs = Theme.of(context).colorScheme;
+  showAppSheet(
+    context,
+    child: Builder(
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: BrandText.h2(color: cs.onSurface, size: 21)),
+            const SizedBox(height: 14),
+            Flexible(child: SingleChildScrollView(child: body)),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: Text(cancelLabel),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: BrandButton.destructive(
+                    label: confirmLabel,
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      onConfirm();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
