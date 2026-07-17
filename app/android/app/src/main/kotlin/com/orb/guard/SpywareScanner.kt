@@ -5,9 +5,12 @@ package com.orb.guard
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import java.security.MessageDigest
 import kotlinx.coroutines.*
 
 /**
@@ -84,23 +87,20 @@ class SpywareScanner(
 
             // OrbVPN is our companion VPN — an active tunnel is expected and
             // must NEVER be flagged. Android exposes no public API for the VPN
-            // owner, so we treat an active VPN as OrbVPN when OrbVPN is
-            // installed. A non-OrbVPN VPN (OrbVPN absent) is still surfaced so
-            // the user can review/disconnect it.
-            val orbVpnInstalled = try {
-                context.packageManager.getPackageInfo("com.orbvpn.android", 0)
-                true
-            } catch (e: Exception) {
-                false
-            }
+            // owner, so we treat an active VPN as OrbVPN when the GENUINE OrbVPN
+            // is installed — verified by its SIGNING CERTIFICATE, not just its
+            // package name, so a sideloaded app spoofing `com.orbvpn.android`
+            // cannot slip a hostile VPN past this check. A non-OrbVPN VPN is
+            // still surfaced so the user can review/disconnect it.
+            val orbVpnTrusted = isGenuineOrbVpnInstalled()
 
             for (network in networks) {
                 val capabilities = connectivityManager.getNetworkCapabilities(network)
 
                 if (capabilities != null) {
                     // Check for VPN (could be a malicious proxy) — but never
-                    // flag our own OrbVPN companion.
-                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && !orbVpnInstalled) {
+                    // flag our own genuine OrbVPN companion.
+                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && !orbVpnTrusted) {
                         threats.add(mapOf(
                             "id" to "network_vpn_${System.currentTimeMillis()}",
                             "name" to "Active VPN Connection Detected",
@@ -609,5 +609,48 @@ class SpywareScanner(
         if (!hasElevatedAccess) return false
         val result = rootAccess.pmCommand("uninstall $packageName")
         return result?.contains("Success") == true
+    }
+
+    /**
+     * True only when the GENUINE OrbVPN companion is installed — its signing
+     * certificate must match a pinned SHA-256. Package name alone is not
+     * trusted (a sideloaded app can claim `com.orbvpn.android`), so a spoofed
+     * OrbVPN cannot suppress the active-VPN finding. Fails closed (returns
+     * false → the VPN is flagged) on any error.
+     */
+    private fun isGenuineOrbVpnInstalled(): Boolean {
+        return try {
+            val digests = orbVpnSignatureSha256() ?: return false
+            digests.any { it.equals(ORBVPN_SIGNING_SHA256, ignoreCase = true) }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun orbVpnSignatureSha256(): List<String>? {
+        val pm = context.packageManager
+        val sigs: Array<Signature> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val info = pm.getPackageInfo(
+                "com.orbvpn.android", PackageManager.GET_SIGNING_CERTIFICATES
+            )
+            val signing = info.signingInfo ?: return null
+            if (signing.hasMultipleSigners()) signing.apkContentsSigners
+            else signing.signingCertificateHistory
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo("com.orbvpn.android", PackageManager.GET_SIGNATURES).signatures
+                ?: return null
+        }
+        val md = MessageDigest.getInstance("SHA-256")
+        return sigs.map { sig ->
+            md.digest(sig.toByteArray()).joinToString("") { "%02X".format(it) }
+        }
+    }
+
+    companion object {
+        // Pinned SHA-256 of OrbVPN's app-signing certificate. Signing keys are
+        // stable for an app's lifetime, so this is a durable trust anchor.
+        private const val ORBVPN_SIGNING_SHA256 =
+            "9D817DC7EDA62A34CB60812EC5231301B525CCF1D2C619B0B1CE4A76AA17F37C"
     }
 }
