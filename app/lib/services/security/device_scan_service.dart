@@ -131,8 +131,6 @@ class DeviceScanService {
       _ScanStage('App databases', () => native('scanDatabases'),
           isNative: true),
       _ScanStage('Memory', () => native('scanMemory'), isNative: true),
-      _ScanStage('Behavioral analysis', () => _detection.runModule('behavioral'),
-          isNative: false),
       _ScanStage('Certificate analysis',
           () => _detection.runModule('certificate'),
           isNative: false),

@@ -81,13 +81,26 @@ class SpywareScanner(
             // Standard network check (no special permissions needed)
             val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val networks = connectivityManager.allNetworks
-            
+
+            // OrbVPN is our companion VPN — an active tunnel is expected and
+            // must NEVER be flagged. Android exposes no public API for the VPN
+            // owner, so we treat an active VPN as OrbVPN when OrbVPN is
+            // installed. A non-OrbVPN VPN (OrbVPN absent) is still surfaced so
+            // the user can review/disconnect it.
+            val orbVpnInstalled = try {
+                context.packageManager.getPackageInfo("com.orbvpn.android", 0)
+                true
+            } catch (e: Exception) {
+                false
+            }
+
             for (network in networks) {
                 val capabilities = connectivityManager.getNetworkCapabilities(network)
-                
+
                 if (capabilities != null) {
-                    // Check for VPN (could be malicious proxy)
-                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                    // Check for VPN (could be a malicious proxy) — but never
+                    // flag our own OrbVPN companion.
+                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && !orbVpnInstalled) {
                         threats.add(mapOf(
                             "id" to "network_vpn_${System.currentTimeMillis()}",
                             "name" to "Active VPN Connection Detected",

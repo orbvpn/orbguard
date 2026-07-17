@@ -114,6 +114,21 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
 
+                // Remediation: open the system VPN settings so the user can
+                // disconnect/remove a VPN (we cannot silently kill another
+                // app's tunnel — Android forbids it).
+                "openVpnSettings" -> {
+                    result.success(openVpnSettings())
+                }
+
+                // Remediation: open a specific app's App Info screen so the
+                // user can uninstall (or, for a system app like Bixby,
+                // disable) it. Works on any device — no root needed.
+                "openAppDetails" -> {
+                    val pkg = call.argument<String>("package")
+                    result.success(openAppDetails(pkg))
+                }
+
                 // Storage Permission (Android 11+)
                 "checkStoragePermission" -> {
                     val hasPermission = checkStoragePermission()
@@ -281,6 +296,38 @@ class MainActivity: FlutterActivity() {
         }
     }
     
+    /** Opens the system VPN settings screen so the user can disconnect a VPN. */
+    private fun openVpnSettings(): Boolean {
+        return try {
+            val intent = Intent(Settings.ACTION_VPN_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            } catch (e2: Exception) {
+                false
+            }
+        }
+    }
+
+    /** Opens a package's App Info screen (uninstall / disable) — no root needed. */
+    private fun openAppDetails(pkg: String?): Boolean {
+        if (pkg.isNullOrBlank()) return false
+        return try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:$pkg"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun requestUsageStatsPermission() {
         try {
             val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)

@@ -203,6 +203,26 @@ class GuardProbes {
         );
       };
 
+  /// Secure call: a device-posture check you run before a sensitive call
+  /// (screen-recording, interception, tampering). Available on mobile; not on
+  /// desktop. Ready-to-run rather than continuously monitoring.
+  static GuardProbe secureCall({required bool supported}) => () async {
+        if (!supported) {
+          return const GuardStatus(
+            id: 'secure_call',
+            name: 'Secure call',
+            state: GuardState.unavailable,
+            detail: 'Not available on this device',
+          );
+        }
+        return const GuardStatus(
+          id: 'secure_call',
+          name: 'Secure call',
+          state: GuardState.active,
+          detail: 'Check your device before calls',
+        );
+      };
+
   /// Hidden-VPN watch: reflects the latest real check.
   static GuardProbe hiddenVpn({required Future<bool?> Function() unknownVpnActive}) =>
       () async {

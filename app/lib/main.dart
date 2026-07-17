@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
 import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -20,6 +19,7 @@ import 'services/habit/protection_streak_controller.dart';
 import 'services/home/last_scan_verdict_controller.dart';
 import 'services/home/guard_status_controller.dart';
 import 'services/security/firewall_realtime.dart';
+import 'services/security/remediation.dart';
 import 'presentation/widgets/app_sheet.dart';
 import 'presentation/widgets/sheet_panel.dart';
 import 'screens/shields/shields_screen.dart';
@@ -36,6 +36,8 @@ import 'screens/enterprise/executive_protection_screen.dart';
 import 'screens/security/threat_hunting_screen.dart';
 import 'screens/supply_chain/supply_chain_screen.dart';
 import 'screens/network/network_firewall_screen.dart';
+import 'screens/shields/hidden_vpn_proxy_screen.dart';
+import 'screens/shields/secure_call_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
 import 'screens/rogue_ap/rogue_ap_screen.dart';
 import 'screens/enterprise/enterprise_policy_screen.dart';
@@ -317,6 +319,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     GuardProbes.alerts(granted: () async => await Permission.notification.isGranted),
     GuardProbes.breachMonitor(breachedAccounts: () async => null),
     GuardProbes.hiddenVpn(unknownVpnActive: () async => null),
+    GuardProbes.secureCall(
+        supported: PlatformInfo.isAndroid || PlatformInfo.isIOS),
   ]);
 
   @override
@@ -372,15 +376,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) setState(() => _blockedToday = n);
   }
 
-  /// Route a tapped guard tile to the place it's set up / reviewed. Scan-y
-  /// guards run a check; alerts requests the permission; the rest open the
-  /// Protect hub where every shield can be configured.
+  /// Route a tapped guard tile straight to where it's actually set up or run —
+  /// not the generic Protect hub. Scan-based guards run a check; alerts asks
+  /// for the permission; each feature guard opens its own screen (as a sheet).
   void _onGuardTap(String id) {
     switch (id) {
       case 'alerts':
         _requestAlerts();
       case 'spyware_watch':
+      case 'malware_scan':
         _startScan();
+      case 'firewall':
+        showAppSheet(context,
+            heightFactor: 0.94, child: const NetworkFirewallScreen());
+      case 'sms_filter':
+        showAppSheet(context,
+            heightFactor: 0.94, child: const SmsProtectionScreen());
+      case 'breach':
+        showAppSheet(context,
+            heightFactor: 0.94, child: const DarkWebScreen());
+      case 'hidden_vpn':
+        showAppSheet(context,
+            heightFactor: 0.94, child: const HiddenVpnProxyScreen());
+      case 'secure_call':
+        showAppSheet(context,
+            heightFactor: 0.94, child: const SecureCallScreen());
       default:
         setState(() => _currentNavIndex = 4); // Protect hub
     }
@@ -480,10 +500,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  // Track scan metadata for results display
-  int _lastScanItemsScanned = 0;
-  Duration _lastScanDuration = Duration.zero;
-
   Future<void> _startScan({bool? deepScan}) async {
     // Check if we have enough permissions
     if (_detectionCapability < 50) {
@@ -534,20 +550,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _threats
           ..clear()
           ..addAll(scanResult.threats.map(ThreatDetection.fromJson));
-        _lastScanItemsScanned = scanResult.itemsScanned;
-        _lastScanDuration = scanResult.scanDuration;
       });
       debugPrint('[OrbGuard] Scan complete: ${_threats.length} threats');
       if (mounted) {
         // Results present as an iOS sheet (slides up over the home), not a
         // full-screen push.
+        final threats = scanResult.threats;
         showAppSheet(
           context,
           heightFactor: 0.94,
           child: FindingsScreen(
-            threats: scanResult.threats,
+            threats: threats,
             checksRun: scanResult.itemsScanned,
-            onFixAll: _threats.isNotEmpty ? _showScanResults : null,
+            onOpenThreat: _remediate,
+            onFixAll: threats.isNotEmpty
+                ? () => _remediate(_mostSevere(threats))
+                : null,
           ),
         );
       }
@@ -555,16 +573,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
 
-  void _showScanResults() {
-    showAppSheet(
-      context,
-      heightFactor: 0.94,
-      child: ScanResultsScreen(
-        threats: _threats,
-        itemsScanned: _lastScanItemsScanned,
-        scanDuration: _lastScanDuration,
-      ),
-    );
+  final Remediation _remediation = Remediation();
+
+  static const _severityRank = {
+    'CRITICAL': 0,
+    'HIGH': 1,
+    'MEDIUM': 2,
+    'LOW': 3,
+    'INFO': 4,
+  };
+
+  /// The most-severe threat, so "Fix these" starts with what matters most.
+  Map<String, dynamic> _mostSevere(List<Map<String, dynamic>> threats) {
+    final sorted = [...threats]..sort((a, b) {
+        final ra = _severityRank['${a['severity']}'.toUpperCase()] ?? 5;
+        final rb = _severityRank['${b['severity']}'.toUpperCase()] ?? 5;
+        return ra - rb;
+      });
+    return sorted.first;
+  }
+
+  /// Take the user to the real, one-tap fix for a finding: the app's App Info
+  /// (uninstall/disable) or the system VPN settings (disconnect). When there's
+  /// no device-native fix, point them at the right place.
+  Future<void> _remediate(Map<String, dynamic> threat) async {
+    final opened = await _remediation.fix(threat);
+    if (opened || !mounted) return;
+    final guidance = Remediation.kindFor(threat) == RemediationKind.guidanceOnly
+        ? 'Open the Protect tab to review and resolve this.'
+        : "Couldn't open the system screen — resolve it manually in Settings.";
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(guidance)));
   }
 
   void _showPermissionWarning() {
