@@ -98,13 +98,14 @@ class ControlPanelHomeScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
 
-            // ── 1 · Hero: verdict orb + present-tense headline + live line ──
+            // ── 1 · Hero: the verdict orb IS the scan button ──────────────
             Center(
               child: PulseOrb(
                 icon: _heroIcon(v.level),
                 fill: v.fill,
                 ink: v.ink,
                 live: live,
+                onTap: onRunCheck,
               ),
             ),
             const SizedBox(height: 14),
@@ -121,9 +122,9 @@ class ControlPanelHomeScreen extends StatelessWidget {
             PrivacyScoreCard(score: score, onFactorTap: onFactorTap),
             const SizedBox(height: 16),
 
-            // ── 3 · The one lime action ──────────────────────────────────
+            // ── 3 · The one lime action (the orb triggers the same scan) ──
             BrandButton(
-              label: 'Run privacy check',
+              label: 'Run scan',
               expand: true,
               onPressed: onRunCheck,
             ),

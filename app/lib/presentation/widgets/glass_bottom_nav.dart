@@ -62,7 +62,6 @@ class GlassBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
@@ -71,22 +70,10 @@ class GlassBottomNavBar extends StatelessWidget {
         right: 16,
         bottom: bottomPadding + 12,
       ),
-      child: Container(
+      // Floating nav — NO background bar; the items sit directly over the page.
+      child: SizedBox(
         height: 60,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          color: GlassTheme.glassColor(isDark),
-          border: Border.all(
-            color: GlassTheme.glassBorderColor(isDark),
-            width: GlassTheme.borderWidth,
-          ),
-          boxShadow: [GlassTheme.elevatedShadow(isDark)],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: GlassTheme.blurFilter,
-            child: Padding(
+        child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
                 children: List.generate(items.length, (index) {
@@ -145,8 +132,6 @@ class GlassBottomNavBar extends StatelessWidget {
                 }),
               ),
             ),
-          ),
-        ),
       ),
     );
   }

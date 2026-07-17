@@ -31,6 +31,10 @@ class PulseOrb extends StatefulWidget {
   /// Diameter of the core ring; the pulse rings expand ~1.55× beyond it.
   final double size;
 
+  /// Tapping the orb runs a scan. When set, the orb reads as a button (press
+  /// feedback + a soft glow) — the hero IS the primary scan control.
+  final VoidCallback? onTap;
+
   const PulseOrb({
     super.key,
     required this.icon,
@@ -38,6 +42,7 @@ class PulseOrb extends StatefulWidget {
     required this.ink,
     required this.live,
     this.size = 116,
+    this.onTap,
   });
 
   @override
@@ -52,6 +57,7 @@ class _PulseOrbState extends State<PulseOrb>
   );
 
   bool _reduceMotion = false;
+  bool _pressed = false;
 
   @override
   void didChangeDependencies() {
@@ -107,25 +113,54 @@ class _PulseOrbState extends State<PulseOrb>
                 ],
               ),
             ),
-          // Core ring + glyph (same treatment in live and static states).
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: widget.fill.withAlpha(28),
-              border: Border.all(color: widget.fill.withAlpha(90), width: 2),
-            ),
-            child: Center(
-              child: DuotoneIcon(
-                widget.icon,
-                size: size * 0.42,
-                color: widget.ink,
-              ),
-            ),
-          ),
+          // Core ring + glyph — a tappable scan button when [onTap] is set.
+          _buildCore(size),
         ],
       ),
+    );
+  }
+
+  Widget _buildCore(double size) {
+    final core = AnimatedScale(
+      scale: _pressed ? 0.94 : 1.0,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOut,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.fill.withAlpha(28),
+          border: Border.all(color: widget.fill.withAlpha(90), width: 2),
+          // Soft glow so the orb reads as a raised, tappable control.
+          boxShadow: widget.onTap == null
+              ? null
+              : [
+                  BoxShadow(
+                    color: widget.fill.withAlpha(_pressed ? 40 : 70),
+                    blurRadius: _pressed ? 14 : 26,
+                    spreadRadius: 1,
+                  ),
+                ],
+        ),
+        child: Center(
+          child: DuotoneIcon(
+            widget.icon,
+            size: size * 0.42,
+            color: widget.ink,
+          ),
+        ),
+      ),
+    );
+
+    if (widget.onTap == null) return core;
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: core,
     );
   }
 

@@ -758,26 +758,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           const SizedBox(width: 12),
-          // Title container (pill-shaped)
+          // Title area — floats over the page with NO background bar.
           Expanded(
-            child: Container(
+            child: SizedBox(
               height: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(25),
-                color: GlassTheme.glassColor(isDark),
-                border: Border.all(
-                  color: GlassTheme.glassBorderColor(isDark),
-                  width: GlassTheme.borderWidth,
-                ),
-                boxShadow: [GlassTheme.shadow(isDark)],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(25),
-                child: BackdropFilter(
-                  filter: GlassTheme.blurFilter,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
+              child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
                       children: [
                         // Title text
                         Expanded(
@@ -819,8 +806,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-            ),
-          ),
         ],
       ),
     );
