@@ -14,7 +14,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/orbnet/auth_repository.dart';
 import '../services/orbnet/network_error.dart' as net_err;
 import '../services/orbnet/orbnet_api_client.dart';
+import '../services/orbnet/social_auth_service.dart';
 import '../services/orbnet/token_service.dart';
+import '../services/orbnet/models/auth_response.dart';
 import '../services/orbnet/models/subscription_status.dart';
 import '../services/orbnet/models/user.dart';
 
@@ -182,6 +184,42 @@ class AccountProvider extends ChangeNotifier {
       _busy = false;
       notifyListeners();
       return true;
+    } catch (e) {
+      _error = _friendlyError(e);
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sign in with Google. Returns true on success. A user cancellation returns
+  /// false WITHOUT setting an error (silent). Any real failure — including a
+  /// missing native config or a backend audience rejection — sets a clear
+  /// [lastError]; it never fakes a session.
+  Future<bool> loginWithGoogle() => _socialLogin(_repo.signInWithGoogle);
+
+  /// Sign in with Apple. Same contract as [loginWithGoogle].
+  Future<bool> loginWithApple() => _socialLogin(_repo.signInWithApple);
+
+  /// Shared driver for the social sign-in paths — mirrors [login]'s shape
+  /// (busy → repo → set user/session → notify), plus silent cancellation.
+  Future<bool> _socialLogin(Future<AuthResponse> Function() signIn) async {
+    if (_busy) return false;
+    _setBusy(true);
+    _error = null;
+    _requiresTwoFactor = false;
+    try {
+      final res = await signIn();
+      _user = res.user;
+      _startRefresh();
+      _busy = false;
+      notifyListeners();
+      return true;
+    } on SocialAuthCancelledException {
+      // The user backed out of the native sheet — not an error.
+      _busy = false;
+      notifyListeners();
+      return false;
     } catch (e) {
       _error = _friendlyError(e);
       _busy = false;

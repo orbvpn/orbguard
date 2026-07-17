@@ -2,12 +2,19 @@
 //
 // Brand-kit sign-in screen for the shared OrbVPN/OrbNet account. Login is
 // OPTIONAL this phase — it unlocks subscription / credits / remote control,
-// while anonymous scanning keeps working. Supports email+password (with an
-// optional TOTP step) and a magic-link "email me a code" path. OAuth / passkey
-// are deferred to a later phase and are not shown here.
+// while anonymous scanning keeps working.
+//
+// Sign-in order (top → bottom): Continue with Google / Apple → an "or" divider
+// → email + a PRIMARY magic-link "Email me a sign-in code" button (the default
+// path) → a subtle "Use password instead" reveal for email+password (with an
+// optional TOTP step) → "Skip for now".
+//
+// HONESTY: the Google/Apple buttons drive the REAL native flow. On failure
+// (user cancels aside) a clear error is shown — never a fake success.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
@@ -34,7 +41,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
 
-  _LoginMode _mode = _LoginMode.password;
+  // Magic-link is the DEFAULT/PRIMARY path; password hides behind a reveal.
+  _LoginMode _mode = _LoginMode.magic;
   bool _magicSent = false;
   bool _obscurePassword = true;
 
@@ -58,9 +66,41 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Apple's guidelines: only offer "Sign in with Apple" on Apple platforms.
+  /// The service also enforces [SignInWithApple.isAvailable] at attempt time.
+  bool _showApple(BuildContext context) {
+    final platform = Theme.of(context).platform;
+    return platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS;
+  }
+
   void _dismiss([bool signedIn = false]) {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop(signedIn);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final account = context.read<AccountProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    FocusScope.of(context).unfocus();
+    final ok = await account.loginWithGoogle();
+    if (!mounted) return;
+    if (ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
+      _dismiss(true);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    final account = context.read<AccountProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    FocusScope.of(context).unfocus();
+    final ok = await account.loginWithApple();
+    if (!mounted) return;
+    if (ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
+      _dismiss(true);
     }
   }
 
@@ -130,9 +170,18 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               GlassCard(
                 padding: const EdgeInsets.all(20),
-                child: _mode == _LoginMode.password
-                    ? _passwordForm(context, account)
-                    : _magicForm(context, account),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _socialButtons(context, account),
+                    const SizedBox(height: 18),
+                    _orDivider(context),
+                    const SizedBox(height: 18),
+                    _mode == _LoginMode.password
+                        ? _passwordForm(context, account)
+                        : _magicForm(context, account),
+                  ],
+                ),
               ),
               if (account.lastError != null) ...[
                 const SizedBox(height: 16),
@@ -194,10 +243,179 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Use the same email and password as OrbVPN / OrbNet. '
-          'Signing in unlocks your subscription, credits and remote control.',
+          'Use your OrbVPN / OrbNet account. Signing in unlocks your '
+          'subscription, credits and remote control.',
           textAlign: TextAlign.center,
           style: BrandText.body(color: context.colors.onSurfaceVariant, size: 14),
+        ),
+      ],
+    );
+  }
+
+  /// Google + (on Apple platforms) Apple — glass buttons, never lime.
+  Widget _socialButtons(BuildContext context, AccountProvider account) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _socialButton(
+          context,
+          key: const ValueKey('google_signin_button'),
+          mark: SvgPicture.asset(
+            'assets/branding/google_g.svg', // vendor identity
+            width: 20,
+            height: 20,
+          ),
+          label: 'Continue with Google',
+          onPressed: account.isBusy ? null : _signInWithGoogle,
+        ),
+        if (_showApple(context)) ...[
+          const SizedBox(height: 12),
+          _socialButton(
+            context,
+            key: const ValueKey('apple_signin_button'),
+            mark: Icon(
+              Icons.apple, // vendor identity
+              size: 24,
+              color: context.colors.onSurface,
+            ),
+            label: 'Continue with Apple',
+            onPressed: account.isBusy ? null : _signInWithApple,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _socialButton(
+    BuildContext context, {
+    required Key key,
+    required Widget mark,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    final disabled = onPressed == null;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1,
+        child: GestureDetector(
+          key: key,
+          onTap: onPressed,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Brand.rMd),
+            child: BackdropFilter(
+              filter: Brand.blurSm,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 52),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Brand.glassFill,
+                  borderRadius: BorderRadius.circular(Brand.rMd),
+                  border: Border.all(color: Brand.glassBorder, width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(width: 24, height: 24, child: Center(child: mark)),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: BrandText.title(
+                          color: context.colors.onSurface,
+                          size: 15.5,
+                          weight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _orDivider(BuildContext context) {
+    final line = Expanded(
+      child: Divider(
+        color: context.colors.onSurfaceVariant.withValues(alpha: 0.25),
+        height: 1,
+      ),
+    );
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'or',
+            style: BrandText.label(
+                color: context.colors.onSurfaceVariant, size: 12),
+          ),
+        ),
+        line,
+      ],
+    );
+  }
+
+  Widget _magicForm(BuildContext context, AccountProvider account) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _fieldLabel(context, 'Email'),
+        const SizedBox(height: 8),
+        _field(
+          context,
+          controller: _emailController,
+          hint: 'you@example.com',
+          icon: 'letter',
+          keyboardType: TextInputType.emailAddress,
+          enabled: !account.isBusy && !_magicSent,
+        ),
+        if (_magicSent) ...[
+          const SizedBox(height: 16),
+          Text(
+            'We emailed a sign-in code to ${_emailController.text.trim()}. '
+            'Enter it below.',
+            style: BrandText.body(
+                color: context.colors.onSurfaceVariant, size: 13),
+          ),
+          const SizedBox(height: 12),
+          _fieldLabel(context, 'Sign-in code'),
+          const SizedBox(height: 8),
+          _field(
+            context,
+            controller: _codeController,
+            hint: 'Paste the code from your email',
+            icon: 'key',
+            enabled: !account.isBusy,
+          ),
+        ],
+        const SizedBox(height: 20),
+        // The single lime action for this screen — the default sign-in path.
+        BrandButton(
+          label: _magicSent ? 'Verify & sign in' : 'Email me a sign-in code',
+          isLoading: account.isBusy,
+          onPressed: account.isBusy
+              ? null
+              : (_magicSent ? _verifyMagicCode : _requestMagicCode),
+        ),
+        const SizedBox(height: 10),
+        // Subtle, non-lime reveal for the secondary password path.
+        TextButton(
+          onPressed:
+              account.isBusy ? null : () => _switchMode(_LoginMode.password),
+          child: Text(
+            'Use password instead',
+            style: BrandText.title(
+                color: context.colors.onSurfaceVariant, size: 14),
+          ),
         ),
       ],
     );
@@ -253,68 +471,22 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
         const SizedBox(height: 20),
-        // The single lime action for this screen.
+        // In password mode this is the single lime action.
         BrandButton(
           label: needs2fa ? 'Verify & sign in' : 'Sign in',
           isLoading: account.isBusy,
           onPressed: account.isBusy ? null : _signInWithPassword,
         ),
         const SizedBox(height: 10),
-        BrandButton.secondary(
-          label: 'Email me a code instead',
+        // Back to the default magic-link path.
+        TextButton(
           onPressed:
               account.isBusy ? null : () => _switchMode(_LoginMode.magic),
-        ),
-      ],
-    );
-  }
-
-  Widget _magicForm(BuildContext context, AccountProvider account) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _fieldLabel(context, 'Email'),
-        const SizedBox(height: 8),
-        _field(
-          context,
-          controller: _emailController,
-          hint: 'you@example.com',
-          icon: 'letter',
-          keyboardType: TextInputType.emailAddress,
-          enabled: !account.isBusy && !_magicSent,
-        ),
-        if (_magicSent) ...[
-          const SizedBox(height: 16),
-          Text(
-            'We emailed a sign-in code to ${_emailController.text.trim()}. '
-            'Enter it below.',
-            style: BrandText.body(
-                color: context.colors.onSurfaceVariant, size: 13),
+          child: Text(
+            'Email me a code instead',
+            style: BrandText.title(
+                color: context.colors.onSurfaceVariant, size: 14),
           ),
-          const SizedBox(height: 12),
-          _fieldLabel(context, 'Sign-in code'),
-          const SizedBox(height: 8),
-          _field(
-            context,
-            controller: _codeController,
-            hint: 'Paste the code from your email',
-            icon: 'key',
-            enabled: !account.isBusy,
-          ),
-        ],
-        const SizedBox(height: 20),
-        BrandButton(
-          label: _magicSent ? 'Verify & sign in' : 'Email me a code',
-          isLoading: account.isBusy,
-          onPressed: account.isBusy
-              ? null
-              : (_magicSent ? _verifyMagicCode : _requestMagicCode),
-        ),
-        const SizedBox(height: 10),
-        BrandButton.secondary(
-          label: 'Use password instead',
-          onPressed:
-              account.isBusy ? null : () => _switchMode(_LoginMode.password),
         ),
       ],
     );

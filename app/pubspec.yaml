@@ -25,6 +25,11 @@ dependencies:
   # Secure token storage for the shared OrbVPN/OrbNet account (auth foundation).
   # Same keys as OrbVPN so an on-device session can be shared later.
   flutter_secure_storage: ^10.3.1
+  # Social sign-in for the shared OrbVPN/OrbNet account. Native SDK flows that
+  # yield an OpenID idToken, exchanged for OrbNet JWTs via /auth/oauth/login.
+  # Versions matched to OrbVPN (orbx.flutter) so behaviour is identical.
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.1.0
      
   # Database
   sqflite: ^2.3.0

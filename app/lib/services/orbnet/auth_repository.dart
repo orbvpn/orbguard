@@ -24,6 +24,7 @@ import 'models/auth_response.dart';
 import 'models/user.dart';
 import 'network_error.dart' as net_err;
 import 'orbnet_api_client.dart';
+import 'social_auth_service.dart';
 
 /// Thrown when the account has 2FA enabled and a TOTP code is required.
 class TwoFactorRequiredException implements Exception {
@@ -55,6 +56,7 @@ enum TokenRefreshOutcome {
 class AuthRepository {
   final OrbNetApiClient _restClient = OrbNetApiClient.instance;
   final AuthApi _authApi = AuthApi();
+  final SocialAuthService _socialAuthService;
   final FlutterSecureStorage _secureStorage;
 
   // In-memory token cache (updated synchronously on refresh, before the slower
@@ -68,8 +70,11 @@ class AuthRepository {
 
   TokenRefreshOutcome _lastRefreshOutcome = TokenRefreshOutcome.success;
 
-  AuthRepository({required FlutterSecureStorage secureStorage})
-      : _secureStorage = secureStorage {
+  AuthRepository({
+    required FlutterSecureStorage secureStorage,
+    SocialAuthService? socialAuthService,
+  })  : _secureStorage = secureStorage,
+        _socialAuthService = socialAuthService ?? SocialAuthService() {
     // Wire the REST client's 401 interceptor to this repository.
     _restClient.setTokenRefreshCallback(refreshToken);
     _restClient.setCachedTokenGetter(getCachedToken);
@@ -171,6 +176,36 @@ class AuthRepository {
     final result = await _authApi.verifyMagicLink(code);
     final response = await _persistAuthResult(result);
     _log('Magic login successful: ${response.user.email}');
+    return response;
+  }
+
+  // ---- Social OAuth (Google / Apple) --------------------------------------
+
+  /// Sign in with Google via the native SDK, then persist the OrbNet session.
+  /// Throws [SocialAuthCancelledException] when the user dismisses the sheet,
+  /// or an [ApiException] on a genuine failure.
+  Future<AuthResponse> signInWithGoogle() =>
+      _completeSocialLogin(_socialAuthService.signInWithGoogle());
+
+  /// Sign in with Apple via the native SDK, then persist the OrbNet session.
+  /// Throws [SocialAuthCancelledException] when the user dismisses the sheet,
+  /// or an [ApiException] on a genuine failure.
+  Future<AuthResponse> signInWithApple() =>
+      _completeSocialLogin(_socialAuthService.signInWithApple());
+
+  /// Persist a successful social sign-in through the SAME path as email/magic
+  /// login. The service already validated the envelope carries an access token.
+  Future<AuthResponse> _completeSocialLogin(
+      Future<SocialAuthResult> pending) async {
+    final result = await pending;
+    if (result.cancelled) {
+      throw SocialAuthCancelledException(result.provider);
+    }
+    if (!result.success || result.data == null) {
+      throw ApiException(result.error ?? 'Social sign-in failed.');
+    }
+    final response = await _persistAuthResult(result.data!);
+    _log('Social login successful: ${response.user.email}');
     return response;
   }
 

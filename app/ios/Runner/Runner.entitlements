@@ -2,6 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Sign in with Apple - social sign-in for the shared OrbVPN/OrbNet
+	     account. This entitlement is the on-device half; you MUST also enable
+	     the "Sign in with Apple" capability on the App ID (Apple Developer
+	     portal) and in the target's Signing & Capabilities so the provisioning
+	     profile carries it, or getAppleIDCredential() fails at runtime. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
 	<!-- Apple Push Notifications (FCM anti-theft wake-ups). Requires the Push
 	     Notifications capability on the App ID + an APNs auth key uploaded to
 	     Firebase (Apple Developer account). Set to `production` for release /
