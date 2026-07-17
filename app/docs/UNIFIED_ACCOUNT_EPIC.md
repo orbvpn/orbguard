@@ -112,6 +112,23 @@ Azure Container App **`orbnet-go` (rg ORB)**. No OrbGuard/device concept there y
 - **CORS:** OrbGuard backend must add `https://admin.orbai.world` to its allow-list so the web panel
   can POST anti-theft commands (OrbNet's CORS is irrelevant to a guard.orbai.world call).
 
+## Phase A1 status — DONE + e2e-verified (2026-07-17)
+Committed `d433207`. OrbNet auth stack ported (`lib/services/orbnet/*`), `AccountProvider`,
+`LoginScreen` ("Sign in with your OrbVPN account"), Settings "Account" section, `flutter_secure_storage`.
+analyze 0/0; 236/236 tests (3 new). **e2e proven:** (1) live `api.orbai.world` register+login loop
+returns real USER JWT; (2) a REAL-account sign-in on the device (`nima@golsharifi.com`) authenticated
+against prod OrbNet and returned a genuine RFC-7807 policy response — the full request→auth→parse→
+display stack works. Login screen + Settings Account section render correctly (verified on device,
+light+dark). (Build infra note: needed `flutter clean` + clearing a corrupt `~/.gradle/caches/8.14`
+transform — disk-full collateral, not code.)
+
+⚠️ **DEVICE-LIMIT FINDING (epic decision needed).** OrbNet login counts the caller as a *device*
+against the plan's device limit (the real account hit **"logged in on 8 devices but your plan allows
+only 7"**). So OrbGuard sharing the account **consumes a VPN device slot** — friction, and the user's
+account is already over. Decision: should an OrbGuard sign-in count against the VPN device limit?
+Likely NOT (OrbGuard is a security companion, not a tunnel) → an OrbNet-side change to exclude the
+OrbGuard platform from the device-limit count (or give OrbGuard its own limit). Raise before A2 ships.
+
 ## Phase split clarified
 - **Phase A stays app↔OrbNet only** (login/subscription/ads hit `api.orbai.world` directly; no
   shared secret needed yet; guard.orbai.world stays on the device api_key). Ship login + real
