@@ -129,6 +129,19 @@ account is already over. Decision: should an OrbGuard sign-in count against the 
 Likely NOT (OrbGuard is a security companion, not a tunnel) → an OrbNet-side change to exclude the
 OrbGuard platform from the device-limit count (or give OrbGuard its own limit). Raise before A2 ships.
 
+## Phase A progress
+- **A1 (login)** ✅ e2e-verified (see below). `d433207`.
+- **A2 (subscription gating)** ✅ `ec671c2`. `hasPremium` + `PremiumGate` upsell; Pro console now
+  subscriber-gated; PricingScreen reflects real state. 240/240 tests.
+- **A1.5 (login UX + OAuth)** ✅ `be0d08b`. Magic-link primary, password secondary, Google/Apple
+  buttons (real flows, honest errors). 250/250 tests. **Config still needed for Google/Apple e2e:**
+  Google OAuth clients + serverClientId (google-services.json is FCM-only, 0 oauth_client entries),
+  Apple capability on the App ID/profile (iOS entitlement added), and OrbNet `/auth/oauth/login`
+  must accept OrbGuard's OAuth audience. Magic-link + password work with no extra config.
+- **A3 (ads → scan credits)** ⬜ NEXT — the big one: OrbNet backend (OrbGuard's own device limit +
+  `scan_credits` reward type/ledger + endpoints) + OrbGuard app (ad SDKs + scan metering). Needs a
+  Go backend change + deploy.
+
 ## Premium model — DECIDED (user, 2026-07-17)
 - **Device limit:** OrbGuard gets its OWN separate device limit, independent of the VPN's 7 →
   OrbNet-side change (a distinct limit/counter for OrbGuard installs; exclude from VPN device count).
