@@ -100,6 +100,7 @@ import 'providers/digital_footprint_provider.dart';
 import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
+import 'providers/account_provider.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
@@ -235,6 +236,9 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ForensicsProvider()),
         ChangeNotifierProvider(create: (_) => PrivacyProvider()),
         ChangeNotifierProvider(create: (_) => ScamDetectionProvider()),
+        // Shared OrbVPN/OrbNet account state. Hydrates from secure storage on
+        // start (login is optional; anonymous device registration is untouched).
+        ChangeNotifierProvider(create: (_) => AccountProvider()..init()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) => MaterialApp(

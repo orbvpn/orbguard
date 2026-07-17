@@ -24,6 +24,8 @@ import '../../services/security/desktop_scan_config.dart';
 import '../pricing/pricing_screen.dart';
 import '../trust/device_capabilities_screen.dart';
 import '../trust/privacy_explainer_screen.dart';
+import '../account/login_screen.dart';
+import '../../providers/account_provider.dart';
 import 'notification_discipline_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -42,6 +44,11 @@ class SettingsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
+              // Account — shared OrbVPN/OrbNet sign-in (optional; unlocks
+              // subscription/credits/remote control). Anonymous scanning works
+              // without it.
+              _buildAccountSection(context),
+              const SizedBox(height: 24),
               // Appearance
               _buildSettingsSection(
                 context,
@@ -428,6 +435,79 @@ class SettingsScreen extends StatelessWidget {
           ? DuotoneIcon('alt_arrow_right', color: cs.onSurfaceVariant, size: 20)
           : null,
       onTap: onTap,
+    );
+  }
+
+  /// Account section — reflects login state from [AccountProvider]. Logged
+  /// out: a single "Sign in / Account" row opening the login screen. Logged in:
+  /// the account email + a "Sign out" row.
+  Widget _buildAccountSection(BuildContext context) {
+    return Consumer<AccountProvider>(
+      builder: (context, account, _) {
+        final loggedIn = account.isLoggedIn;
+        final tier = account.subscriptionTier;
+        return _buildSettingsSection(
+          context,
+          'Account',
+          'shield_keyhole',
+          AppColors.accentInk,
+          [
+            if (!loggedIn)
+              _buildSettingsTile(
+                context,
+                'Sign in / Account',
+                'Use your OrbVPN account to unlock subscription & remote control',
+                'login',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                ),
+              )
+            else ...[
+              _buildSettingsTile(
+                context,
+                account.email ?? 'Signed in',
+                tier != null && tier.isNotEmpty
+                    ? 'Signed in with your OrbVPN account · $tier'
+                    : 'Signed in with your OrbVPN account',
+                'shield_keyhole',
+              ),
+              _buildSettingsTile(
+                context,
+                'Sign out',
+                'Sign out of your OrbVPN account on this device',
+                'logout',
+                isDestructive: true,
+                onTap: () => _showSignOutSheet(context, account),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSignOutSheet(BuildContext context, AccountProvider account) {
+    final messenger = ScaffoldMessenger.of(context);
+    _showDangerSheet(
+      context,
+      title: 'Sign out',
+      body: Text(
+        'You will be signed out of your OrbVPN account on this device. '
+        'Anonymous scanning keeps working.',
+        style: TextStyle(
+          fontSize: 14.5,
+          height: 1.45,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+      confirmLabel: 'Sign out',
+      onConfirm: () async {
+        await account.logout();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Signed out')),
+        );
+      },
     );
   }
 

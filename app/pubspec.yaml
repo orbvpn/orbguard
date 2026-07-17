@@ -22,6 +22,9 @@ dependencies:
   connectivity_plus: ^7.0.0
   web_socket_channel: ^2.4.0
   crypto: ^3.0.3
+  # Secure token storage for the shared OrbVPN/OrbNet account (auth foundation).
+  # Same keys as OrbVPN so an on-device session can be shared later.
+  flutter_secure_storage: ^10.3.1
      
   # Database
   sqflite: ^2.3.0
