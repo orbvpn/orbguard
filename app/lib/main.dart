@@ -11,10 +11,14 @@ import 'screens/scan_results_screen.dart';
 import 'screens/permission_setup_screen.dart';
 import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/home/guard_home_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/onboarding/permission_priming_screen.dart';
+import 'screens/home/control_panel_home_screen.dart';
+import 'screens/scan/privacy_check_screen.dart';
+import 'screens/scan/findings_screen.dart';
 import 'services/habit/protection_streak_controller.dart';
 import 'services/home/last_scan_verdict_controller.dart';
+import 'services/home/guard_status_controller.dart';
 import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
@@ -56,7 +60,6 @@ import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
 
 // Glass Theme & Colors
-import 'presentation/theme/brand.dart';
 import 'presentation/theme/glass_theme.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/theme/colors.dart';
@@ -256,9 +259,13 @@ class AntiSpywareApp extends StatelessWidget {
               // Prefs still loading — the ambient gradient shows briefly; avoids
               // flashing onboarding at returning users before the flag loads.
               ? const SizedBox.shrink()
-              : settings.hasSeenOnboarding
-                  ? const HomeScreen()
-                  : OnboardingScreen(onDone: settings.completeOnboarding),
+              : !settings.hasSeenOnboarding
+                  ? OnboardingScreen(onDone: settings.completeOnboarding)
+                  : !settings.permissionsPrimed
+                      // First-run permission priming: value-first, staged,
+                      // skippable — the app finally asks for what it needs.
+                      ? PermissionPrimingScreen(onDone: settings.completePriming)
+                      : const HomeScreen(),
         ),
       ),
     );
@@ -283,16 +290,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final List<ThreatDetection> _threats = [];
   double _detectionCapability = 0.0;
 
+  // Live guard states for the control-panel home. Each probe reads a REAL
+  // source (auto-scan setting, firewall state, granted permissions); breach
+  // and hidden-VPN start as "check to verify" until a real check populates
+  // them. Refreshed after first frame and on every resume.
+  late final GuardStatusController _guards = GuardStatusController(probes: [
+    GuardProbes.spywareWatch(
+        autoScanOn: () async =>
+            context.read<SettingsProvider>().scan.autoScanEnabled),
+    GuardProbes.firewall(
+        supported: PlatformInfo.isAndroid,
+        enabled: () async => context.read<NetworkFirewallProvider>().isEnabled),
+    GuardProbes.smsFilter(
+        supported: PlatformInfo.isAndroid,
+        granted: () async => await Permission.sms.isGranted),
+    GuardProbes.alerts(granted: () async => await Permission.notification.isGranted),
+    GuardProbes.breachMonitor(breachedAccounts: () async => null),
+    GuardProbes.hiddenVpn(unknownVpnActive: () async => null),
+  ]);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _guards.refresh());
     _initializeApp();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _guards.dispose();
     super.dispose();
   }
 
@@ -307,7 +335,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _refreshPermissions() async {
     await specialPermissions.checkPermissions();
     await _calculateDetectionCapability();
+    unawaited(_guards.refresh());
     setState(() {});
+  }
+
+  /// Route a tapped guard tile to the place it's set up / reviewed. Scan-y
+  /// guards run a check; alerts requests the permission; the rest open the
+  /// Protect hub where every shield can be configured.
+  void _onGuardTap(String id) {
+    switch (id) {
+      case 'alerts':
+        _requestAlerts();
+      case 'spyware_watch':
+        _startScan();
+      default:
+        setState(() => _currentNavIndex = 4); // Protect hub
+    }
+  }
+
+  /// Route a "thing to fix" from the privacy-score card to its remedy.
+  void _onFactorTap(String id) {
+    switch (id) {
+      case 'run_check':
+      case 'resolve_threats':
+      case 'review_apps':
+        _startScan();
+      case 'enable_alerts':
+        _requestAlerts();
+      default:
+        setState(() => _currentNavIndex = 4); // Protect hub
+    }
+  }
+
+  Future<void> _requestAlerts() async {
+    await Permission.notification.request();
+    await _guards.refresh();
+    if (mounted) setState(() {});
   }
 
   Future<void> _initializeApp() async {
@@ -403,7 +466,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final scanResult = await Navigator.push<ScanResult>(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => ScanningScreen(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            PrivacyCheckScreen(
           onScanWithProgress: (onProgress) =>
               DeviceScanService.instance.performScan(
             deepScan: effectiveDeepScan,
@@ -430,84 +494,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
     }
 
-    if (scanResult != null && scanResult.threats.isNotEmpty) {
-      debugPrint(
-          '[OrbGuard] Received ${scanResult.threats.length} threats from scan');
+    // The honest findings screen handles BOTH outcomes: a list of threats to
+    // fix, or a calm all-clear that states how many checks genuinely ran.
+    if (scanResult != null) {
       setState(() {
-        _threats.clear();
-        for (var t in scanResult.threats) {
-          final converted = ThreatDetection.fromJson(t);
-          debugPrint(
-              '[OrbGuard] Converted: ${converted.name} (${converted.severity})');
-          _threats.add(converted);
-        }
+        _threats
+          ..clear()
+          ..addAll(scanResult.threats.map(ThreatDetection.fromJson));
         _lastScanItemsScanned = scanResult.itemsScanned;
         _lastScanDuration = scanResult.scanDuration;
       });
-      debugPrint('[OrbGuard] Showing results with ${_threats.length} threats');
-      _showScanResults();
-    } else if (scanResult != null) {
-      // Scan completed with no threats
-      debugPrint('[OrbGuard] Scan completed with no threats');
-      setState(() {
-        _lastScanItemsScanned = scanResult.itemsScanned;
-        _lastScanDuration = scanResult.scanDuration;
-      });
-      _showNoThreatsDialog();
+      debugPrint('[OrbGuard] Scan complete: ${_threats.length} threats');
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FindingsScreen(
+              threats: scanResult.threats,
+              checksRun: scanResult.itemsScanned,
+              onFixAll: _threats.isNotEmpty ? _showScanResults : null,
+            ),
+          ),
+        );
+      }
     }
   }
 
-  void _showNoThreatsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accentPill,
-              ),
-              child: Center(
-                child: DuotoneIcon(
-                  AppIcons.shieldCheck,
-                  size: 40,
-                  color: AppColors.accentInk,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'All Clear!',
-              style: BrandText.h2(size: 24, color: AppColors.accentInk),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No threats were detected on your device. Your device appears to be secure.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              // Themed lime primary (kit states come from AppTheme).
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Great!'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showScanResults() {
     Navigator.push(
@@ -789,7 +801,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (context.watch<SettingsProvider>().isProMode) {
       return const SecurityCenterScreen();
     }
-    return GuardHomeScreen(onCheckMyPhone: () => _startScan());
+    return ControlPanelHomeScreen(
+      onRunCheck: () => _startScan(),
+      verdict: context.watch<LastScanVerdictController>(),
+      guardsController: _guards,
+      streak: context.watch<ProtectionStreakController>(),
+      onGuardTap: _onGuardTap,
+      onFactorTap: _onFactorTap,
+    );
   }
 
   /// Scan tab content

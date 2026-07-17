@@ -232,6 +232,12 @@ class SettingsProvider extends ChangeNotifier {
   static const String _kOnboarded = 'onboarding_complete';
   bool _hasSeenOnboarding = false;
 
+  // Whether the first-run permission priming has been shown (persisted). The
+  // priming screen writes this key itself; surfaced here so the gate reads it
+  // synchronously alongside onboarding rather than doing an async prefs read.
+  static const String _kPrimed = 'permissions_primed';
+  bool _permissionsPrimed = false;
+
   // Getters
   ProtectionSettings get protection => _protection;
   NotificationSettings get notifications => _notifications;
@@ -244,6 +250,7 @@ class SettingsProvider extends ChangeNotifier {
   AppMode get appMode => _appMode;
   bool get isProMode => _appMode.isPro;
   bool get hasSeenOnboarding => _hasSeenOnboarding;
+  bool get permissionsPrimed => _permissionsPrimed;
 
   /// Update the app theme mode and persist it.
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -277,6 +284,17 @@ class SettingsProvider extends ChangeNotifier {
     await _prefs!.setBool(_kOnboarded, true);
   }
 
+  /// Mark the first-run permission priming as done (persisted). The priming
+  /// screen also writes the pref itself; this keeps the in-memory flag + the
+  /// gate in sync so it never shows twice.
+  Future<void> completePriming() async {
+    if (_permissionsPrimed) return;
+    _permissionsPrimed = true;
+    notifyListeners();
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setBool(_kPrimed, true);
+  }
+
   /// Initialize provider
   Future<void> init() async {
     _isLoading = true;
@@ -287,6 +305,7 @@ class SettingsProvider extends ChangeNotifier {
       _themeMode = _parseThemeMode(_prefs!.getString(_kThemeMode));
       _appMode = AppMode.fromName(_prefs!.getString(_kAppMode));
       _hasSeenOnboarding = _prefs!.getBool(_kOnboarded) ?? false;
+      _permissionsPrimed = _prefs!.getBool(_kPrimed) ?? false;
       await _loadSettings();
       await _syncNotificationService();
     } catch (e) {
