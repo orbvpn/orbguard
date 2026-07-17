@@ -144,6 +144,28 @@ class NotificationPolicy {
     return true;
   }
 
+  /// Live send-path gate. Identical to [shouldNotify] with ONE exception: a
+  /// `critical` alert is ALWAYS delivered. A frequency cap, cooldown, or the
+  /// [criticalOnly] setting must never suppress a critical security alert —
+  /// in a security app, silently dropping "spyware found" because we already
+  /// pinged today would be dangerous. Non-critical alerts still pass the full
+  /// discipline ([shouldNotify]: severity/[criticalOnly], actionable, cooldown,
+  /// daily cap). As with [shouldNotify], the caller MUST [recordSent] right
+  /// after actually showing the notification.
+  bool deliversNow({
+    required AlertSeverity severity,
+    required String category,
+    required bool actionable,
+    required DateTime now,
+  }) =>
+      severity == AlertSeverity.critical ||
+      shouldNotify(
+        severity: severity,
+        category: category,
+        actionable: actionable,
+        now: now,
+      );
+
   /// Records that a notification was actually shown for [category] at
   /// [now] — updates both the per-category cooldown clock and the global
   /// cap log, in memory and in SharedPreferences (so a restarted app still

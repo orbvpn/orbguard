@@ -13,6 +13,7 @@ import 'notification_channels.dart';
 import 'notification_actions.dart';
 import '../realtime/websocket_service.dart';
 import '../../models/api/threat_indicator.dart';
+import 'notification_policy.dart';
 
 /// Notification service singleton
 class NotificationService {
@@ -24,6 +25,11 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+
+  /// Notification-discipline policy (per-category 24h cooldown + global daily
+  /// cap, criticals always delivered). Gates the unsolicited security-alert
+  /// channels below, on top of the per-severity/-category settings.
+  final NotificationPolicy _policy = NotificationPolicy();
 
   bool _initialized = false;
   int _notificationId = 0;
@@ -101,6 +107,7 @@ class NotificationService {
 
     // Load settings
     await _loadSettings();
+    await _policy.load();
 
     // Initialize platform-specific settings
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -128,6 +135,43 @@ class NotificationService {
     }
 
     _initialized = true;
+  }
+
+  /// Maps the app's [SeverityLevel] onto the discipline policy's
+  /// [AlertSeverity]. `unknown` is treated as `info` (never alert-eligible).
+  AlertSeverity _toAlertSeverity(SeverityLevel s) {
+    switch (s) {
+      case SeverityLevel.critical:
+        return AlertSeverity.critical;
+      case SeverityLevel.high:
+        return AlertSeverity.high;
+      case SeverityLevel.medium:
+        return AlertSeverity.medium;
+      case SeverityLevel.low:
+        return AlertSeverity.low;
+      case SeverityLevel.info:
+      case SeverityLevel.unknown:
+        return AlertSeverity.info;
+    }
+  }
+
+  /// Frequency-discipline gate for an unsolicited security alert, applied ON
+  /// TOP of the per-severity/-category settings each `show*` method already
+  /// checks. Reloads the policy so changes made in the Notification-discipline
+  /// settings take effect live, applies the per-category cooldown + global
+  /// daily cap (a `critical` always delivers), and — when it allows the alert
+  /// — records the send for cooldown/cap accounting. Returns true to proceed.
+  Future<bool> _allowAlert(SeverityLevel severity, String category) async {
+    await _policy.load();
+    final now = DateTime.now();
+    final allowed = _policy.deliversNow(
+      severity: _toAlertSeverity(severity),
+      category: category,
+      actionable: true,
+      now: now,
+    );
+    if (allowed) await _policy.recordSent(category, now);
+    return allowed;
   }
 
   /// Request notification permissions
@@ -176,6 +220,7 @@ class NotificationService {
     if (!_initialized) await init();
     if (_suppressed() || !_threatAlerts) return;
     if (!_enabledSeverities.contains(event.severity)) return;
+    if (!await _allowAlert(event.severity, 'threat')) return;
 
     final channel = _getChannelForSeverity(event.severity);
     final id = _getNextNotificationId();
@@ -249,6 +294,7 @@ class NotificationService {
   }) async {
     if (!_initialized) await init();
     if (_suppressed() || !_breachAlerts) return;
+    if (!await _allowAlert(severity, 'breach')) return;
 
     final channel = NotificationChannels.breach;
     final id = _getNextNotificationId();
@@ -369,6 +415,7 @@ class NotificationService {
     if (!_initialized) await init();
     if (_suppressed()) return;
     if (!_enabledSeverities.contains(severity)) return;
+    if (!await _allowAlert(severity, 'sms')) return;
 
     final channel = _getChannelForSeverity(severity);
     final id = _getNextNotificationId();

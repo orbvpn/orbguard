@@ -126,7 +126,7 @@ here" (never a false clean). 2.4 stays 🚫 on Win/Lin (no call/telephony postur
 | 3.1 | Trust surfaces: on-device / "we can't see your data" messaging + privacy explainer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 3.2 | Honest per-platform capability disclosure screen ("what's possible on your device") | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 3.3 | Habit loop: "days protected" streak + weekly checkup ritual | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 3.4 | Notification discipline: rare/severe/actionable only + one scheduled summary (cap frequency) | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 | ✅ | 🟡 |
+| 3.4 | Notification discipline: rare/severe/actionable only + one scheduled summary (cap frequency) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 3.5 | Transparent pricing screen (no dark patterns; "the price you see is the price that renews") | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 **Phase 3 delivered (2026-07-17)** — five parallel worktree agents built self-contained surfaces;
@@ -137,12 +137,16 @@ gated "days protected" `StreakCard` (shows only after the first checkup); Settin
 transparency** section (privacy explainer · device capabilities · plans) + a notification-discipline
 entry. `recordCheckup` fires on every completed scan (`main.dart`).
 
-> **3.4 follow-up (open):** the `NotificationPolicy` engine + settings + user controls ship and are
-> tested (16), but the live send path (`NotificationService`'s 6 typed methods) is **not yet gated**
-> behind `shouldNotify`. Doing so changes which notifications fire (per-type severity/actionable
-> mapping — e.g. whether scan-complete is suppressed), a deliberate behavior change left as a scoped
-> follow-up rather than rushed. Until then the discipline settings are configurable but not enforced
-> on send. (Per-platform ✅ only under Test; live-enforcement pending on all platforms.)
+> **3.4 now enforced on the live path (2026-07-17).** `NotificationService`'s three unsolicited
+> security-alert channels — threat, breach, SMS — pass through `NotificationPolicy.deliversNow`
+> (added on top of the existing per-severity/-category settings). The policy reloads per alert so
+> discipline-settings changes take effect live; per-category 24h cooldown + a global daily cap apply,
+> and **a `critical` alert always delivers** (a cap/cooldown must never suppress a critical security
+> alert). Deliberate behavior change, documented: with `criticalOnly` defaulting **on**, only
+> *critical* alerts push by default — turning "Critical alerts only" off additionally admits *high*.
+> Solicited/informational notices (scan-complete, URL-blocked, generic) are intentionally NOT gated
+> by this discipline (they keep their own toggles). Verified: `deliversNow` unit tests (critical
+> bypasses cap + cooldown; non-criticals obey the full gate); full suite 163/163.
 
 ---
 
