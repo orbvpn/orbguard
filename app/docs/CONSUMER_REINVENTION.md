@@ -162,14 +162,21 @@ https://claude.ai/code/artifact/19b038b1-e5d3-4454-a8a5-19aa0a8105b0*
 
 | ID | Task | iOS | And | mac | Win | Lin | Test | Status |
 |----|------|-----|-----|-----|-----|-----|------|--------|
-| 4.1 | Honest data plane: `LastScanVerdictController` (fixes stuck verdict) + `PrivacyScoreEngine` (real-signal 0–1000) + `GuardStatusController` (live guard states) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 4.2 | Control-panel Home: pulsing live hero + score card + guard grid w/ Set-up tiles + proof-of-work feed | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 4.3 | First-run permission priming (staged, value-first) + immediate first check w/ real findings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 4.4 | Honest scan theatre (named real checks, live counts) + findings results screen | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 4.5 | Android real-time: firewall boot persistence + persistent guard foreground service + blocked-today counter | 🚫 | ⬜ | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
-| 4.6 | iOS honesty fix: real BGTaskScheduler background scan (kill the fake `success:true`) | ⬜ | 🚫 | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
-| 4.7 | FCM instant alerts end-to-end (backend sender live; needs user-provided SA cred + APNs) | ⬜ | ⬜ | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
-| 4.8 | Phase 4 integration + e2e + merge | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4.1 | Honest data plane: `LastScanVerdictController` (fixes stuck verdict) + `PrivacyScoreEngine` (real-signal 0–1000) + `GuardStatusController` (live guard states) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 4.2 | Control-panel Home: pulsing live hero + score card + guard grid w/ Set-up tiles + proof-of-work feed | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 4.3 | First-run permission priming (staged, value-first) + immediate first check w/ real findings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 4.4 | Honest scan theatre (named real checks, live counts) + findings results screen | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 4.5 | Android real-time: firewall boot persistence + guard foreground notification + blocked-today counter | 🚫 | ✅ | 🚫 | 🚫 | 🚫 | ✅ | ✅ |
+| 4.6 | iOS honesty fix: real BGTaskScheduler background scan (killed the fake `success:true`) | ✅ | 🚫 | 🚫 | 🚫 | 🚫 | ✅ | ✅ |
+| 4.7 | FCM instant alerts end-to-end (backend sender **code-complete**; blocked on ops: SA IAM grant + APNs + env) | 🟡 | 🟡 | 🚫 | 🚫 | 🚫 | ✅ | 🟡 |
+| 4.8 | Phase 4 integration + e2e + merge | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🟡 |
+
+**Phase 4 shipping (2026-07-17).** Home redesign committed + iOS/Android builds green + 214/214 tests
+(`fa05210` data plane · `0c216d4` control-panel home + scan theatre + priming · `e1596e4` native
+real-time). New home sim-verified: pulsing live hero, Privacy Score 612/1000 meter, guard grid, real
+verdict (a genuine scan recorded score 74 — the stuck-"needs attention" bug is dead). First-run gate
+enters onboarding→priming→home. 4.7 FCM waits on ops only. **Open polish:** eager notification dialog
+fires at launch (pre-existing push-init) before priming explains it — suppress so priming owns the ask.
 
 ---
 
