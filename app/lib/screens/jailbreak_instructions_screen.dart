@@ -5,6 +5,8 @@ import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
+import '../presentation/widgets/app_sheet.dart';
+import '../presentation/widgets/sheet_panel.dart';
 
 class JailbreakInstructionsScreen extends StatefulWidget {
   const JailbreakInstructionsScreen({super.key});
@@ -49,17 +51,19 @@ class _JailbreakInstructionsScreenState
       if (mounted) setState(() => _isTesting = false);
     }
     if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: title,
+        body: Text(
+          message,
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.45,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ],
+        ),
+        primaryLabel: 'OK',
       ),
     );
   }
