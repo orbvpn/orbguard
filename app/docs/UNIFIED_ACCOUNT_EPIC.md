@@ -142,6 +142,40 @@ OrbGuard platform from the device-limit count (or give OrbGuard its own limit). 
   `scan_credits` reward type/ledger + endpoints) + OrbGuard app (ad SDKs + scan metering). Needs a
   Go backend change + deploy.
 
+### A3 technical plan (from investigation, agent a356a83d, 2026-07-18)
+**Key simplifier:** OrbGuard's ported OrbNet auth stack (`lib/services/orbnet/`, base `api.orbai.world`)
+already yields a user JWT, so **the app calls OrbNet `/ad/session` + `/ad/verify` DIRECTLY** — no new
+S2S backend route needed. OrbNet's HMAC-per-session + idempotent `GrantReward` already guard double-credit.
+
+**OrbX ad stack to mirror** (`/Developments/orbx.flutter`): plugins `unity_ads_plugin ^0.4.0` (global),
+`adivery ^4.9.0` (Iran), `yandex_mobileads ^7.18.0` (Russia). Flow = `AdProvider.watchAdForVPNTime()`
+(`ad_provider.dart:1625`) → `startAdSession`→`POST /ad/session` (`ad_api.dart:13`) → show → reward cb →
+`_verifyAndCreditReward()` (`:2224`) → `smartVerify`→`POST /ad/verify` (`ad_api.dart:32`) → refresh balance.
+
+**OrbNet side** (`/Developments/orbnet`, next migration = **104**):
+- `grantSessionReward` (`internal/handler/adverification.go:230-262`) currently: `reward_type` ∈
+  `vpn_seconds`(legacy)/`credits`(→`AddServiceCredits`→`token_balances.service_only_balance`)/`bonus`.
+- ADD `reward_type='scan_credits'` + a **separate** balance (new `token_balances.scan_credit_balance`
+  col or a `scan_credits` table — keep OUT of `service_only_balance` so VPN minutes don't mingle) +
+  `AddScanCredits` mirroring `AddServiceCredits` (`token/service.go:1395`), ledger `type='SCAN_CREDIT'`.
+- Reward amount via `ad_provider_config.reward_credits` (`GetCreditsPerAd`, `vpnauth/service.go:921`),
+  gated so OrbGuard sessions grant scan_credits not VPN minutes.
+- Spend endpoint `POST /scan/consume` (JWT) → `DeductScanCredits` (pattern `DeductServiceCredits`
+  `token/service.go:1443`). `ORBNET_SERVER_INTERNAL_API_KEY` middleware exists (`auth.go:171`) but no
+  credit-grant internal route today — not needed for the direct-JWT approach.
+- ⚠️ OrbNet is the LIVE shared VPN backend — changes to `grantSessionReward`/token service touch OrbX.
+  Gate strictly on `reward_type`/app; check in with user before deploying to prod (GH Actions → Azure rg ORB).
+
+**OrbGuard app side** (no ad/credit code exists yet; scan chokepoints found):
+- Add ad SDK(s) to pubspec; port slim ad client (reuse `orbnet_api_client.dart`) + trimmed `AdProvider`
+  (drop VPN-pause) + `ScanCreditProvider{balance, canScan, refresh()}`.
+- "Watch ad → earn scan credits" button by the dashboard scan CTA (`dashboard_screen.dart:161`).
+- **Gate the scan** at `scanning_screen.dart:136 _startScan` / `_navigateToScan` before
+  `app_malware_scanner.dart:86 scan()`; zero credits → watch-ad sheet. Decide auto-scan
+  (`auto_scan_scheduler.dart`) exempt vs metered.
+- **Device limit:** the A1 e2e hit OrbNet's device-limit policy (7/plan). OrbGuard needs its OWN limit —
+  likely an OrbNet-side device-kind/app tag so OrbGuard registrations don't consume VPN device slots.
+
 ## Premium model — DECIDED (user, 2026-07-17)
 - **Device limit:** OrbGuard gets its OWN separate device limit, independent of the VPN's 7 →
   OrbNet-side change (a distinct limit/counter for OrbGuard installs; exclude from VPN device count).
