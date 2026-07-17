@@ -33,6 +33,7 @@ import '../../utils/platform_info.dart';
 // --- FIREBASE BLOCK: imports ---
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // --- END FIREBASE BLOCK: imports ---
 
 import '../api/orbguard_api_client.dart';
@@ -174,8 +175,19 @@ class DevicePushService {
       }
       final messaging = FirebaseMessaging.instance;
 
-      // Request notification permission (iOS prompts; Android 13+ POST_NOTIFICATIONS).
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      // Notification permission is owned by the value-first first-run priming
+      // (which explains WHY before the OS dialog). Only trigger the prompt here
+      // once priming has run — so a fresh install never gets a bare dialog at
+      // launch. The handlers below are wired unconditionally, so a token that
+      // arrives once permission is granted (via priming or the home's alerts
+      // tile) still registers; on later launches we ensure permission for
+      // reliable delivery.
+      final primed =
+          (await SharedPreferences.getInstance()).getBool('permissions_primed') ??
+              false;
+      if (primed) {
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
+      }
 
       // Wire handlers first — they are independent of token availability, so
       // a token that arrives late still registers via onTokenRefresh.

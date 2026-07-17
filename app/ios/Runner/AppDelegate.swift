@@ -575,6 +575,14 @@ import MachO
     // MARK: - Notifications
 
     private func requestNotificationPermissions() {
+        // The value-first first-run priming owns the notification ask — it
+        // explains WHY before the OS dialog. Don't prompt at launch until
+        // priming has run (Flutter persists `permissions_primed` via
+        // shared_preferences, stored under the `flutter.` key). Once granted
+        // anywhere, a later call here is a harmless no-op.
+        if !UserDefaults.standard.bool(forKey: "flutter.permissions_primed") {
+            return
+        }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
                 print("[OrbGuard] Notification permissions granted")
