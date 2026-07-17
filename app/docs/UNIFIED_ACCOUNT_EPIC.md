@@ -129,6 +129,16 @@ account is already over. Decision: should an OrbGuard sign-in count against the 
 Likely NOT (OrbGuard is a security companion, not a tunnel) → an OrbNet-side change to exclude the
 OrbGuard platform from the device-limit count (or give OrbGuard its own limit). Raise before A2 ships.
 
+## Premium model — DECIDED (user, 2026-07-17)
+- **Device limit:** OrbGuard gets its OWN separate device limit, independent of the VPN's 7 →
+  OrbNet-side change (a distinct limit/counter for OrbGuard installs; exclude from VPN device count).
+- **Subscription unlocks EVERYTHING** (free tier = basic scanning + watch-ads-for-scan-credits;
+  subscriber = full product): (1) ad-free + more/unlimited scan credits; (2) the Pro/expert console
+  (today a free toggle → becomes premium); (3) unlimited + deeper scans (dark-web/forensics/full
+  app-malware); (4) the Phase B/C remote control + thief-camera are subscriber-only.
+- Gating key = `AccountProvider.hasPremium` (isLoggedIn && subscriptionValid). Logged-out or
+  no-valid-subscription = free tier. Build a reusable `PremiumGate` for A2 + reused in B/C.
+
 ## Phase split clarified
 - **Phase A stays app↔OrbNet only** (login/subscription/ads hit `api.orbai.world` directly; no
   shared secret needed yet; guard.orbai.world stays on the device api_key). Ship login + real
