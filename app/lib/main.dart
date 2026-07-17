@@ -20,6 +20,8 @@ import 'services/habit/protection_streak_controller.dart';
 import 'services/home/last_scan_verdict_controller.dart';
 import 'services/home/guard_status_controller.dart';
 import 'services/security/firewall_realtime.dart';
+import 'presentation/widgets/app_sheet.dart';
+import 'presentation/widgets/sheet_panel.dart';
 import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
@@ -536,14 +538,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
       debugPrint('[OrbGuard] Scan complete: ${_threats.length} threats');
       if (mounted) {
-        Navigator.push(
+        // Results present as an iOS sheet (slides up over the home), not a
+        // full-screen push.
+        showAppSheet(
           context,
-          MaterialPageRoute(
-            builder: (_) => FindingsScreen(
-              threats: scanResult.threats,
-              checksRun: scanResult.itemsScanned,
-              onFixAll: _threats.isNotEmpty ? _showScanResults : null,
-            ),
+          heightFactor: 0.94,
+          child: FindingsScreen(
+            threats: scanResult.threats,
+            checksRun: scanResult.itemsScanned,
+            onFixAll: _threats.isNotEmpty ? _showScanResults : null,
           ),
         );
       }
@@ -552,41 +555,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
 
   void _showScanResults() {
-    Navigator.push(
+    showAppSheet(
       context,
-      MaterialPageRoute(
-        builder: (context) => ScanResultsScreen(
-          threats: _threats,
-          itemsScanned: _lastScanItemsScanned,
-          scanDuration: _lastScanDuration,
-        ),
+      heightFactor: 0.94,
+      child: ScanResultsScreen(
+        threats: _threats,
+        itemsScanned: _lastScanItemsScanned,
+        scanDuration: _lastScanDuration,
       ),
     );
   }
 
   void _showPermissionWarning() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enable deeper scanning'),
-        content: Text(
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: 'Enable deeper scanning',
+        body: Text(
           'OrbGuard can check your device more thoroughly with a few extra '
           'permissions. Current coverage: ${_detectionCapability.round()}%.\n\n'
           'Set them up now?',
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.45,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Not Now'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _navigateToPermissionSetup();
-            },
-            child: const Text('Setup Permissions'),
-          ),
-        ],
+        secondaryLabel: 'Not now',
+        primaryLabel: 'Set up permissions',
+        onPrimary: _navigateToPermissionSetup,
       ),
     );
   }
@@ -1566,18 +1563,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            SvgPicture.asset('assets/branding/orbguard_icon.svg',
-                width: 26, height: 26),
-            const SizedBox(width: 10),
-            const Text('About OrbGuard'),
-          ],
-        ),
-        content: const Text(
+    showAppSheet(
+      context,
+      heightFactor: 0.7,
+      child: SheetPanel(
+        title: 'About OrbGuard',
+        titleIcon: SvgPicture.asset('assets/branding/orbguard_icon.svg',
+            width: 26, height: 26),
+        body: Text(
           'OrbGuard - Advanced Spyware Defense\n\n'
           'Finds and removes advanced spyware, including Pegasus, using '
           'whatever level of device access is available:\n\n'
@@ -1592,13 +1585,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           '✓ Up-to-date threat information from the cloud\n'
           '✓ Uses extra permissions for stronger detection\n\n'
           'Your privacy and security are our priority.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ],
+        ),
+        primaryLabel: 'Close',
       ),
     );
   }
