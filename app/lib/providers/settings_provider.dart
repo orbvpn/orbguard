@@ -238,6 +238,11 @@ class SettingsProvider extends ChangeNotifier {
   static const String _kPrimed = 'permissions_primed';
   bool _permissionsPrimed = false;
 
+  // Whether the automatic first checkup (run once, right after priming, to
+  // deliver the "your first check found N things" moment) has fired.
+  static const String _kFirstCheck = 'first_check_done';
+  bool _firstCheckDone = false;
+
   // Getters
   ProtectionSettings get protection => _protection;
   NotificationSettings get notifications => _notifications;
@@ -251,6 +256,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get isProMode => _appMode.isPro;
   bool get hasSeenOnboarding => _hasSeenOnboarding;
   bool get permissionsPrimed => _permissionsPrimed;
+  bool get firstCheckDone => _firstCheckDone;
 
   /// Update the app theme mode and persist it.
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -295,6 +301,16 @@ class SettingsProvider extends ChangeNotifier {
     await _prefs!.setBool(_kPrimed, true);
   }
 
+  /// Mark the automatic first checkup as fired (persisted) so it runs exactly
+  /// once. No notifyListeners — this is a one-shot latch the home reads, not
+  /// UI state, and flipping it must not rebuild mid-scan-launch.
+  Future<void> markFirstCheckDone() async {
+    if (_firstCheckDone) return;
+    _firstCheckDone = true;
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setBool(_kFirstCheck, true);
+  }
+
   /// Initialize provider
   Future<void> init() async {
     _isLoading = true;
@@ -306,6 +322,7 @@ class SettingsProvider extends ChangeNotifier {
       _appMode = AppMode.fromName(_prefs!.getString(_kAppMode));
       _hasSeenOnboarding = _prefs!.getBool(_kOnboarded) ?? false;
       _permissionsPrimed = _prefs!.getBool(_kPrimed) ?? false;
+      _firstCheckDone = _prefs!.getBool(_kFirstCheck) ?? false;
       await _loadSettings();
       await _syncNotificationService();
     } catch (e) {

@@ -323,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _guards.refresh();
       _refreshActivity();
+      _maybeRunFirstCheck();
     });
     _initializeApp();
   }
@@ -348,6 +349,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     unawaited(_guards.refresh());
     unawaited(_refreshActivity());
     setState(() {});
+  }
+
+  /// Run the automatic first checkup once, right after first-run priming, so
+  /// the user gets the "your first check found N things" moment instead of a
+  /// static home. Guarded by a one-shot pref; Guard mode only.
+  void _maybeRunFirstCheck() {
+    if (!mounted) return;
+    final s = context.read<SettingsProvider>();
+    if (s.isProMode || !s.permissionsPrimed || s.firstCheckDone) return;
+    s.markFirstCheckDone();
+    _startScan();
   }
 
   /// Pull the real "blocked today" count for the home's proof-of-work feed.

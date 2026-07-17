@@ -59,4 +59,24 @@ void main() {
     expect(restarted.hasSeenOnboarding, isTrue,
         reason: 'onboarding should not show again after completion');
   });
+
+  test('priming + first-check latches default false and persist once set',
+      () async {
+    final p = SettingsProvider();
+    await p.init();
+    expect(p.permissionsPrimed, isFalse);
+    expect(p.firstCheckDone, isFalse);
+
+    await p.completePriming();
+    await p.markFirstCheckDone();
+    expect(p.permissionsPrimed, isTrue);
+    expect(p.firstCheckDone, isTrue);
+
+    final restarted = SettingsProvider();
+    await restarted.init();
+    expect(restarted.permissionsPrimed, isTrue,
+        reason: 'priming must not show again');
+    expect(restarted.firstCheckDone, isTrue,
+        reason: 'the auto first-check must fire exactly once, ever');
+  });
 }
