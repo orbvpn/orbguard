@@ -784,11 +784,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           child: DuotoneIcon(
                             AppIcons.shieldCheck,
                             size: 22,
+                            // Use the theme-aware INK getters, not the raw fills
+                            // (lime/pink fills are invisible on the light bed).
                             color: _detectionCapability >= 80
-                                ? GlassTheme.successColor
+                                ? AppColors.accentInk
                                 : _detectionCapability >= 50
-                                    ? GlassTheme.warningColor
-                                    : GlassTheme.errorColor,
+                                    ? AppColors.amberInk
+                                    : AppColors.errorInk,
                           ),
                         ),
                         const SizedBox(width: 16),

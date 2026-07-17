@@ -15,6 +15,10 @@ class SheetPanel extends StatelessWidget {
   final String? secondaryLabel;
   final VoidCallback? onSecondary;
 
+  /// When true the primary action is a destructive (red) button — for
+  /// Remove/Delete/Reset confirms.
+  final bool danger;
+
   const SheetPanel({
     super.key,
     required this.title,
@@ -24,6 +28,7 @@ class SheetPanel extends StatelessWidget {
     this.onPrimary,
     this.secondaryLabel,
     this.onSecondary,
+    this.danger = false,
   });
 
   @override
@@ -66,13 +71,28 @@ class SheetPanel extends StatelessWidget {
                 const SizedBox(width: 12),
               ],
               Expanded(
-                child: BrandButton(
-                  label: primaryLabel,
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    onPrimary?.call();
-                  },
-                ),
+                child: danger
+                    ? ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onPrimary?.call();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Brand.danger,
+                          foregroundColor: Brand.onDanger,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(primaryLabel),
+                      )
+                    : BrandButton(
+                        label: primaryLabel,
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onPrimary?.call();
+                        },
+                      ),
               ),
             ],
           ),

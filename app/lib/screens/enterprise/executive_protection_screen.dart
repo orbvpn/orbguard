@@ -5,12 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/app_sheet.dart';
+import '../../presentation/widgets/sheet_panel.dart';
 import '../../providers/executive_protection_provider.dart';
 import '../../services/security/executive_protection_service.dart';
 
@@ -1070,29 +1071,18 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
         Color(ExecutiveProtectionProvider.getRiskLevelColor(result.riskLevel));
     final cs = context.colors;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cs.surface,
-        title: Row(
-          children: [
-            DuotoneIcon(
-              result.isImpersonation ? 'danger_triangle' : 'check_circle',
-              color: result.isImpersonation ? riskColor : AppColors.accentInk,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                result.isImpersonation
-                    ? 'Impersonation Detected!'
-                    : 'Message Appears Safe',
-                style: TextStyle(color: cs.onSurface),
-              ),
-            ),
-          ],
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: result.isImpersonation
+            ? 'Impersonation Detected!'
+            : 'Message Appears Safe',
+        titleIcon: DuotoneIcon(
+          result.isImpersonation ? 'danger_triangle' : 'check_circle',
+          color: result.isImpersonation ? riskColor : AppColors.accentInk,
+          size: 24,
         ),
-        content: Column(
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1115,19 +1105,11 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
             ],
             Text(
               result.recommendation,
-              style: TextStyle(
-                color: cs.onSurface,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: cs.onSurface, fontSize: 14, height: 1.45),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+        primaryLabel: 'Close',
       ),
     );
   }
@@ -1138,34 +1120,18 @@ class _ExecutiveProtectionScreenState extends State<ExecutiveProtectionScreen> {
     ExecutiveProtectionProvider provider,
   ) {
     final cs = context.colors;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cs.surface,
-        title: Text(
-          'Remove VIP?',
-          style: TextStyle(color: cs.onSurface),
-        ),
-        content: Text(
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: 'Remove VIP?',
+        body: Text(
           'Stop monitoring ${exec.name} for impersonation attempts?',
-          style: TextStyle(color: cs.onSurface),
+          style: TextStyle(color: cs.onSurface, fontSize: 14.5, height: 1.45),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.removeExecutive(exec.id);
-              Navigator.pop(context);
-            },
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: GlassTheme.errorColor),
-            ),
-          ),
-        ],
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Remove',
+        danger: true,
+        onPrimary: () => provider.removeExecutive(exec.id),
       ),
     );
   }
