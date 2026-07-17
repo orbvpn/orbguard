@@ -150,6 +150,29 @@ entry. `recordCheckup` fires on every completed scan (`main.dart`).
 
 ---
 
+## Phase 4 — The Living Home (control panel + real real-time)
+*User verdict on the P1 home: "looks like the app is not doing anything… worst possible design."
+Root causes confirmed by 4 investigations (2026-07-17): (1) verdict reads a backend features-configured
+score the local scan never touches → permanently "needs attention"; (2) first-run requests ZERO
+permissions (a built PermissionSetupScreen exists, unwired); (3) real real-time exists (firewall,
+SMS/web filters, feed) but is never surfaced — and iOS "background scan" is dead code returning a
+fake `success:true`; (4) leaders (Norton/McAfee/Bitdefender) all ship a living control panel: status
+hero + named-guard grid + proof-of-work numbers + a score to raise. Design target (user-approved):
+https://claude.ai/code/artifact/19b038b1-e5d3-4454-a8a5-19aa0a8105b0*
+
+| ID | Task | iOS | And | mac | Win | Lin | Test | Status |
+|----|------|-----|-----|-----|-----|-----|------|--------|
+| 4.1 | Honest data plane: `LastScanVerdictController` (fixes stuck verdict) + `PrivacyScoreEngine` (real-signal 0–1000) + `GuardStatusController` (live guard states) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4.2 | Control-panel Home: pulsing live hero + score card + guard grid w/ Set-up tiles + proof-of-work feed | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4.3 | First-run permission priming (staged, value-first) + immediate first check w/ real findings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4.4 | Honest scan theatre (named real checks, live counts) + findings results screen | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4.5 | Android real-time: firewall boot persistence + persistent guard foreground service + blocked-today counter | 🚫 | ⬜ | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
+| 4.6 | iOS honesty fix: real BGTaskScheduler background scan (kill the fake `success:true`) | ⬜ | 🚫 | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
+| 4.7 | FCM instant alerts end-to-end (backend sender live; needs user-provided SA cred + APNs) | ⬜ | ⬜ | 🚫 | 🚫 | 🚫 | ⬜ | ⬜ |
+| 4.8 | Phase 4 integration + e2e + merge | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+
+---
+
 ## The honesty guardrails (never ship a claim on this list)
 
 - **Never** "we listen to / read inside your WhatsApp, Signal, Telegram, or WeChat calls." No app can (sandbox + E2E).
@@ -168,6 +191,9 @@ entry. `recordCheckup` fires on every completed scan (`main.dart`).
 | 2026-07-16 | Delivery scope | Full product, 100% ready + e2e at every step, with this status matrix |
 | 2026-07-16 | Platform rollout | **All five in parallel** (shared Flutter UI) |
 | 2026-07-16 | Two new features | Hidden VPN/Proxy Watch + Secure Call Check — **Phase 2** |
+| 2026-07-17 | Home redesign ambition | **Control panel + Privacy Exposure Score** (full living panel, real-signal 0–1000) |
+| 2026-07-17 | Real-time depth | **All-in** — surface real state + firewall persistence + iOS BGTask fix + FCM + Android guard service |
+| 2026-07-17 | Phase 4 shipping | **One complete push** (home + first-run + real-time land together) |
 
 **Strategy dossier (rationale, competitive teardown, psychology):** https://claude.ai/code/artifact/cf12693f-fef4-4781-bf64-d4fe67b3450c
 **Live status dashboard:** https://claude.ai/code/artifact/d3462645-f12c-46ca-a3c2-e1f366cf26f0

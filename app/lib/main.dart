@@ -14,6 +14,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/home/guard_home_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'services/habit/protection_streak_controller.dart';
+import 'services/home/last_scan_verdict_controller.dart';
 import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
 import 'screens/url_protection/url_protection_screen.dart';
@@ -204,6 +205,8 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
         ChangeNotifierProvider(
             create: (_) => ProtectionStreakController()..load()),
+        ChangeNotifierProvider(
+            create: (_) => LastScanVerdictController()..load()),
         ChangeNotifierProvider(create: (_) => MitreProvider()),
         ChangeNotifierProvider(create: (_) => IdentityProtectionProvider()),
         ChangeNotifierProvider(create: (_) => ExecutiveProtectionProvider()),
@@ -415,9 +418,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
 
-    // A completed checkup — clean or not — extends the "days protected" streak.
+    // A completed checkup — clean or not — extends the "days protected" streak
+    // AND records the honest verdict the home reads (score from real findings
+    // + real coverage), so scanning genuinely moves the home status.
     if (scanResult != null && mounted) {
       context.read<ProtectionStreakController>().recordCheckup(DateTime.now());
+      context.read<LastScanVerdictController>().recordScan(
+            threats: scanResult.threats,
+            coveragePercent: _detectionCapability.round(),
+            now: DateTime.now(),
+          );
     }
 
     if (scanResult != null && scanResult.threats.isNotEmpty) {
