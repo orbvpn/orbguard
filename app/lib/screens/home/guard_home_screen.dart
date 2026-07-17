@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/protection_verdict.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../presentation/widgets/on_device_trust_badge.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../services/habit/protection_streak_controller.dart';
+import '../../widgets/habit/streak_card.dart';
 
 /// The consumer **Guard Home** — the calm centre of the app.
 ///
@@ -59,6 +63,7 @@ class _GuardHomeScreenState extends State<GuardHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final streak = context.watch<ProtectionStreakController>();
     final verdict = ProtectionVerdict.fromScore(_score);
     final headlineColor =
         verdict.level == ProtectionLevel.notAssessed ? cs.onSurface : verdict.ink;
@@ -103,7 +108,10 @@ class _GuardHomeScreenState extends State<GuardHomeScreen> {
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
           ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
+          const Center(child: OnDeviceTrustBadge()),
+
+          const SizedBox(height: 26),
 
           // ── The one primary action ────────────────────────────────────
           BrandButton(
@@ -113,6 +121,12 @@ class _GuardHomeScreenState extends State<GuardHomeScreen> {
           ),
 
           const SizedBox(height: 30),
+
+          // ── Days-protected streak (appears once a checkup has run) ─────
+          if (streak.currentStreak > 0 || streak.bestStreak > 0) ...[
+            StreakCard(controller: streak),
+            const SizedBox(height: 30),
+          ],
 
           // ── What we watch for (plain language, honest) ────────────────
           GlassCard(

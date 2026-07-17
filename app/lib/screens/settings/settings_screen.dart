@@ -19,6 +19,10 @@ import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
 import '../../services/security/desktop_scan_config.dart';
+import '../pricing/pricing_screen.dart';
+import '../trust/device_capabilities_screen.dart';
+import '../trust/privacy_explainer_screen.dart';
+import 'notification_discipline_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -106,6 +110,18 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  _buildSettingsTile(
+                    context,
+                    'Notification discipline',
+                    'How we decide to alert you — rare, serious, actionable',
+                    'bell',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationDisciplineScreen(),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -183,6 +199,52 @@ class SettingsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const PrivacySettingsScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Trust & transparency — the Phase 3 consumer trust surfaces.
+              _buildSettingsSection(
+                context,
+                'Trust & transparency',
+                'shield_keyhole',
+                AppColors.accentInk,
+                [
+                  _buildSettingsTile(
+                    context,
+                    'How your privacy works',
+                    'Everything runs on your phone — what we can and cannot see',
+                    'incognito',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacyExplainerScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildSettingsTile(
+                    context,
+                    'What OrbGuard can do here',
+                    'Honest capabilities for your device',
+                    'smartphone',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DeviceCapabilitiesScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildSettingsTile(
+                    context,
+                    'Plans & pricing',
+                    'The price you see is the price that renews',
+                    'wallet',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PricingScreen(),
                       ),
                     ),
                   ),
