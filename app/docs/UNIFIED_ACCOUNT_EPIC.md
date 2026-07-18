@@ -191,8 +191,10 @@ the remaining Phase A work and needs shared-backend (OrbNet) changes — see the
     device slot (own limit, enforced by guard.orbai.world), so capped users (free=1) can log in.
     Strictly gated (`IsOrbGuardClient`, `oneof=orbguard`) → OrbVPN path byte-for-byte unchanged; app
     sends `client:'orbguard'` on password/magic/OAuth. Passkey/QR/security paths untouched, no
-    migration. build+vet+tests green (+TestIsOrbGuardClient). ⚠️ post-deploy e2e pending (orbguard
-    logins bypass limit; normal logins still enforce).
+    migration. build+vet+tests green (+TestIsOrbGuardClient). **✅ POST-DEPLOY E2E VERIFIED ON PROD:**
+    3 `client=orbguard` logins with different device_ids all HTTP200 (489c no-device token), while a
+    NORMAL client got HTTP200 on device 1 then HTTP403 DEVICE_LIMIT_EXCEEDED on devices 2–3 (free
+    tier=1). OrbGuard bypasses the VPN limit; OrbVPN enforcement intact.
 
 ### A3 technical plan (from investigation, agent a356a83d, 2026-07-18)
 **Key simplifier:** OrbGuard's ported OrbNet auth stack (`lib/services/orbnet/`, base `api.orbai.world`)
