@@ -141,6 +141,16 @@ closed). Verifier + guard + gate unit-tested. **NEXT: B2 (web panel controls) + 
 - C3 Latency + background: FCM now live → near-instant on Android; capture is foreground-only
   (background isolate can't open the camera) — deferred to next foreground; document honestly.
 
+#### C build (2026-07-18) — 🚧 web UI in progress (agent a7f6623b)
+Backend loop **verified on prod** (B2 test account): `take_selfie` command → **402** for a free account
+(premium-gated exactly like lock/ring); `GET /device/{id}/selfies` → **200** `{count, device_id,
+selfies:[]}` for the owner. `ThiefSelfie.image_url` is a **`data:image/jpeg;base64,…`** URI (renders
+directly in `<img>`). So C is pure web UI in orbnet.admin, extending the Phase B anti-theft page:
+`anti-theft.ts` gets `takePhoto()` (`POST /command {type:take_selfie}`) + `getSelfies()`; the page
+gets a per-device "Take photo" button (honest "queued, captured on next check-in" toast) + a photo
+gallery (grid of data-URI images with trigger_type + captured_at + optional map link, a Dialog
+lightbox, refresh, honest empty state). No backend/app changes — the device+backend side already works.
+
 ## Honesty guardrails (carry over)
 Never claim lock/wipe works where it doesn't (iOS MDM-only; Android needs the native handler).
 Web control only after real per-user ownership enforcement (close the horizontal-authz hole first).
