@@ -106,6 +106,14 @@ device); (5) an ownership guard helper on every `/device/{device_id}/*` handler 
 device's `orbnet_user_id` ≠ caller); (6) `GET /device` my-devices scoped to the caller. App side: send
 the OrbNet JWT (Authorization: Bearer) on device register/update/commands once logged in.
 
+#### B1 — DONE + DEPLOYED + e2e-VERIFIED on prod (2026-07-18)
+OrbGuard `a4f1e8c` on main (also `ec0b17c` on production-hardening), migration 023 applied to prod DB,
+`ORBNET_JWT_ACCESS_SECRET` copied from `orbnet-go`→`orbguard-lab` container (rg ORB). **Prod e2e (real
+JWTs + device key) — all green:** unclaimed→404; claim→200 (idempotent), other acct→409; owner read/
+mark→200; free owner lock/locate→**402** (premium gate); non-owner get/lock→**404** (isolation);
+device-self settings/commands→200 (**app path preserved**); device key→another device→**403** (hole
+closed). Verifier + guard + gate unit-tested. **NEXT: B2 (web panel controls) + B3 (native lock/wipe).**
+
 ### Phase C — Remote camera ("photograph the thief" from web)  [mostly web UI; loop already exists]
 - The full loop already works: web `POST /device/{id}/command {type:take_selfie}` → device polls →
   captures (front camera, real) → `POST /device/{id}/selfie` → web `GET /device/{id}/selfies`.
