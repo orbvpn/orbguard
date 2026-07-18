@@ -141,10 +141,11 @@ closed). Verifier + guard + gate unit-tested. **NEXT: B2 (web panel controls) + 
 - C3 Latency + background: FCM now live → near-instant on Android; capture is foreground-only
   (background isolate can't open the camera) — deferred to next foreground; document honestly.
 
-#### C build (2026-07-18) — ✅ web UI DONE + DEPLOYING (orbnet.admin `6c94d11`)
+#### C build (2026-07-18) — ✅ DONE + DEPLOYED + verified (orbnet.admin `6c94d11`→prod)
 "Take photo" button + Dialog photo gallery on the anti-theft page (`api/anti-theft.ts` `takePhoto`/
 `getSelfies`; image_url data URIs render directly; trigger/captured_at/map link; honest queued toast).
-tsc/eslint/build clean. → deployed orbnet-admin (browser verification like B2 follows).
+tsc/eslint/build clean; deployed to orbnet-admin; live page renders with **0 console errors** (per-device
+Photos/Take-photo buttons show once an account has a linked device). **PHASE C COMPLETE — EPIC CODE DONE.**
 
 #### C build (2026-07-18) — was web UI in progress (agent a7f6623b)
 Backend loop **verified on prod** (B2 test account): `take_selfie` command → **402** for a free account
