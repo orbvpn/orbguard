@@ -70,6 +70,42 @@ sign_in_with_apple, google_sign_in, passkeys, local_auth, app_links (auth). **No
   (the Dart bridge `device_admin.dart` exists; no native side). iOS lock/wipe = MDM-only (leave
   honest-unavailable).
 
+#### B backend investigation (2026-07-18, mapped in `orbguard/backend`)
+Backend is MORE ready than the memory note implied. Confirmed facts (file:line):
+- **Router:** whole `/api/v1` group is behind `apimiddleware.APIKeyAuth(cfg.JWT.Secret)`
+  (`internal/api/router.go:84`). Device anti-theft endpoints under `/device/{device_id}/…`
+  (`router.go:471-504`): register/get/update, locate/lock/wipe/ring/command,
+  commands/pending+ack, mark-lost/stolen/recovered, location(+history), sim(+history/trusted).
+- **Auth today:** `APIKeyAuth` (`internal/api/middleware/auth.go:118`) accepts the S2S shared secret
+  OR an opaque **Redis-stored session token** (`auth:token:<t>`) whose `TokenClaims` MAY carry
+  `UserID`/`DeviceID` → already put in context (`ContextKeyUserID/DeviceID`, :185-190). **No JWT is
+  parsed anywhere** — no `golang-jwt` in go.mod. OrbGuard's own `Login` returns **501** ("no user
+  store… directing client to device registration", `handlers/auth.go`). ⇒ OrbNet JWT will be the
+  PRIMARY user identity.
+- **Ownership hole CONFIRMED:** no `/device` handler reads `ContextKeyUserID` or checks the device's
+  owner — any authed caller can command any `device_id`. `RegisterDevice` (`handlers/device_security.go:31`)
+  decodes the body and stores it with **no** identity from context.
+- **Schema (good news):** `device_security_devices` already has `user_id UUID` (nullable) +
+  `idx_devsec_devices_user`; `device_commands` also has `user_id UUID` (`migrations/011`, `022`).
+  ⚠️ **Type mismatch:** OrbGuard's owner is a **UUID**, but OrbNet's JWT `user_id` is an **INTEGER**
+  (saw 22203/22204 in A3 e2e). Plan: add `orbnet_user_id BIGINT` (+ index) to devices (and commands),
+  enforce ownership on THAT. Next migration = **023**.
+- **Command relay:** `IssueCommand` (`device_security.go:147`) writes to `device_commands`; FCM push
+  registry live (`migrations/022`), device also polls `commands/pending` + acks. locate/ring/selfie/
+  mark-stolen real; lock/wipe = native stubs (Phase B3).
+- **Deploy:** root `.github/workflows/deploy.yml` → Azure Container App `orbguard-lab` rg `ORB` on
+  `backend/**` push to main.
+
+**Refined B1 plan:** (1) add `golang-jwt/jwt/v5`; (2) new middleware `OrbNetJWTAuth` — verify HS256
+with a new `ORBNET_JWT_ACCESS_SECRET` config, check `iss=="orbnet"` + exp, put int `user_id` in a new
+`ContextKeyOrbNetUserID`; mount on `/device` (and a subscriber-gate reading the JWT's subscription_*
+claims per the premium decision); (3) migration 023 adds `orbnet_user_id BIGINT` to
+`device_security_devices` + `device_commands` (+ indexes); (4) `RegisterDevice`/`UpdateDevice` stamp
+`orbnet_user_id` from the verified token (the ownership BOOTSTRAP = the logged-in app claims its
+device); (5) an ownership guard helper on every `/device/{device_id}/*` handler (404/403 if the
+device's `orbnet_user_id` ≠ caller); (6) `GET /device` my-devices scoped to the caller. App side: send
+the OrbNet JWT (Authorization: Bearer) on device register/update/commands once logged in.
+
 ### Phase C — Remote camera ("photograph the thief" from web)  [mostly web UI; loop already exists]
 - The full loop already works: web `POST /device/{id}/command {type:take_selfie}` → device polls →
   captures (front camera, real) → `POST /device/{id}/selfie` → web `GET /device/{id}/selfies`.
