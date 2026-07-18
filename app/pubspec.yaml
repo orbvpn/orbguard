@@ -69,6 +69,16 @@ dependencies:
   firebase_crashlytics: ^5.2.6
   firebase_analytics: ^12.4.5
 
+  # Rewarded ads → scan credits (Phase A3). EXACT pins shared with OrbVPN
+  # (orbx.flutter) so SDK behaviour is identical across the account universe.
+  # Unity = global; Adivery = Iran (Android-only); Yandex = Russia/CIS. Network
+  # IDs are supplied at build time via --dart-define (see RewardedAdService); a
+  # network with no configured ID is skipped, and with NONE configured the
+  # watch-ad flow honestly reports "unavailable" — it never fakes a reward.
+  unity_ads_plugin: ^0.4.0
+  adivery: ^4.9.0
+  yandex_mobileads: ^7.18.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

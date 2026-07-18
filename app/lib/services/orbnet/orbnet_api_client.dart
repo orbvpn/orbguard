@@ -296,6 +296,8 @@ class OrbNetApiClient {
           return AuthenticationException(message);
         } else if (statusCode == 403) {
           return AuthorizationException(message);
+        } else if (statusCode == 402) {
+          return PaymentRequiredException(message);
         } else if (statusCode == 404) {
           return NotFoundException(message);
         } else if (statusCode == 422) {
@@ -366,6 +368,13 @@ class AuthenticationException extends ApiException {
 /// Authorization exception (403).
 class AuthorizationException extends ApiException {
   AuthorizationException(super.message);
+}
+
+/// Payment/quota required (402). The server positively refused an operation the
+/// account can't currently afford — used by scan-credit consumption to signal an
+/// empty balance ("out of credits, watch an ad").
+class PaymentRequiredException extends ApiException {
+  PaymentRequiredException(super.message);
 }
 
 /// Not found exception (404).
