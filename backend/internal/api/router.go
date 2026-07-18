@@ -58,6 +58,13 @@ func (r *Router) Setup() http.Handler {
 		router.Use(apimiddleware.RateLimiter(r.cache, r.config.RateLimit))
 	}
 
+	// Wire OrbNet JWT verification (shared account identity for device
+	// ownership). Inert unless ORBNET_JWT_ACCESS_SECRET is configured.
+	apimiddleware.ConfigureOrbNetJWT(r.config.JWT.OrbNetAccessSecret)
+	if r.config.JWT.OrbNetAccessSecret != "" {
+		r.logger.Info().Msg("OrbNet JWT verification enabled (device-ownership auth)")
+	}
+
 	// Public routes
 	router.Group(func(pub chi.Router) {
 		// Health check
@@ -469,56 +476,71 @@ func (r *Router) Setup() http.Handler {
 
 		// Device Security endpoints (Anti-theft, SIM monitoring, OS vulnerabilities)
 		api.Route("/device", func(dev chi.Router) {
-			// Reference data (must come before parameterized routes)
+			// --- Unguarded: reference data, registration, account-level ---
+			// (no {device_id}, or the ownership bootstrap itself)
 			dev.Get("/vulnerabilities/known", r.handlers.DeviceSecurity.GetKnownVulnerabilities)
 			dev.Get("/security-info", r.handlers.DeviceSecurity.GetLatestSecurityInfo)
 			dev.Get("/service/stats", r.handlers.DeviceSecurity.GetStats)
-
-			// Device registration and management
 			dev.Post("/register", r.handlers.DeviceSecurity.RegisterDevice)
-			dev.Get("/{device_id}", r.handlers.DeviceSecurity.GetDevice)
-			dev.Put("/{device_id}", r.handlers.DeviceSecurity.UpdateDevice)
-
-			// Anti-theft remote commands
-			dev.Post("/{device_id}/locate", r.handlers.DeviceSecurity.Locate)
-			dev.Post("/{device_id}/lock", r.handlers.DeviceSecurity.Lock)
-			dev.Post("/{device_id}/wipe", r.handlers.DeviceSecurity.Wipe)
-			dev.Post("/{device_id}/ring", r.handlers.DeviceSecurity.Ring)
-			dev.Post("/{device_id}/command", r.handlers.DeviceSecurity.IssueCommand)
-			dev.Get("/{device_id}/commands/pending", r.handlers.DeviceSecurity.GetPendingCommands)
-			dev.Post("/{device_id}/commands/{command_id}/ack", r.handlers.DeviceSecurity.AcknowledgeCommand)
-
-			// Device status management
-			dev.Post("/{device_id}/mark-lost", r.handlers.DeviceSecurity.MarkLost)
-			dev.Post("/{device_id}/mark-stolen", r.handlers.DeviceSecurity.MarkStolen)
-			dev.Post("/{device_id}/mark-recovered", r.handlers.DeviceSecurity.MarkRecovered)
-
-			// Location tracking
-			dev.Post("/{device_id}/location", r.handlers.DeviceSecurity.UpdateLocation)
-			dev.Get("/{device_id}/location/history", r.handlers.DeviceSecurity.GetLocationHistory)
-
-			// SIM monitoring
-			dev.Post("/{device_id}/sim", r.handlers.DeviceSecurity.ReportSIM)
-			dev.Get("/{device_id}/sim", r.handlers.DeviceSecurity.GetCurrentSIMs)
-			dev.Get("/{device_id}/sim/history", r.handlers.DeviceSecurity.GetSIMHistory)
-			dev.Post("/{device_id}/sim/trusted", r.handlers.DeviceSecurity.AddTrustedSIM)
-
-			// Thief selfie capture
-			dev.Post("/{device_id}/selfie", r.handlers.DeviceSecurity.RecordThiefSelfie)
-			dev.Get("/{device_id}/selfies", r.handlers.DeviceSecurity.GetThiefSelfies)
-
-			// Anti-theft settings
-			dev.Get("/{device_id}/settings", r.handlers.DeviceSecurity.GetSettings)
-			dev.Put("/{device_id}/settings", r.handlers.DeviceSecurity.UpdateSettings)
-
-			// FCM push token registration (real-time command delivery)
-			dev.Post("/{device_id}/push-token", r.handlers.DeviceSecurity.RegisterPushToken)
-
-			// OS vulnerability auditing
 			dev.Post("/vulnerabilities/audit", r.handlers.DeviceSecurity.AuditOSVulnerabilities)
 
-			// Overall device security status
-			dev.Get("/{device_id}/security-status", r.handlers.DeviceSecurity.GetSecurityStatus)
+			// An OrbNet account's own devices + the claim bootstrap. The claim
+			// route is intentionally NOT ownership-guarded (the device is
+			// unclaimed at that point); its handler requires an OrbNet JWT and
+			// only claims an unclaimed device.
+			dev.Get("/mine", r.handlers.DeviceSecurity.GetMyDevices)
+			dev.Post("/{device_id}/claim", r.handlers.DeviceSecurity.ClaimDevice)
+
+			// --- Ownership-enforced: acting on a specific, claimed device ---
+			// Reads + device self-reporting. The device (its own key) and the
+			// owning OrbNet account pass; anyone else is rejected.
+			dev.Group(func(own chi.Router) {
+				own.Use(apimiddleware.DeviceOwnership(r.handlers.DeviceSecurity.LookupOrbNetOwner))
+
+				own.Get("/{device_id}", r.handlers.DeviceSecurity.GetDevice)
+				own.Put("/{device_id}", r.handlers.DeviceSecurity.UpdateDevice)
+
+				// Command queue (device polls + acks its own)
+				own.Get("/{device_id}/commands/pending", r.handlers.DeviceSecurity.GetPendingCommands)
+				own.Post("/{device_id}/commands/{command_id}/ack", r.handlers.DeviceSecurity.AcknowledgeCommand)
+
+				// Status marks (own the device → free)
+				own.Post("/{device_id}/mark-lost", r.handlers.DeviceSecurity.MarkLost)
+				own.Post("/{device_id}/mark-stolen", r.handlers.DeviceSecurity.MarkStolen)
+				own.Post("/{device_id}/mark-recovered", r.handlers.DeviceSecurity.MarkRecovered)
+
+				// Location tracking (device reports; owner reads history)
+				own.Post("/{device_id}/location", r.handlers.DeviceSecurity.UpdateLocation)
+				own.Get("/{device_id}/location/history", r.handlers.DeviceSecurity.GetLocationHistory)
+
+				// SIM monitoring
+				own.Post("/{device_id}/sim", r.handlers.DeviceSecurity.ReportSIM)
+				own.Get("/{device_id}/sim", r.handlers.DeviceSecurity.GetCurrentSIMs)
+				own.Get("/{device_id}/sim/history", r.handlers.DeviceSecurity.GetSIMHistory)
+				own.Post("/{device_id}/sim/trusted", r.handlers.DeviceSecurity.AddTrustedSIM)
+
+				// Thief selfie (device uploads; owner views)
+				own.Post("/{device_id}/selfie", r.handlers.DeviceSecurity.RecordThiefSelfie)
+				own.Get("/{device_id}/selfies", r.handlers.DeviceSecurity.GetThiefSelfies)
+
+				// Anti-theft settings + push token + status
+				own.Get("/{device_id}/settings", r.handlers.DeviceSecurity.GetSettings)
+				own.Put("/{device_id}/settings", r.handlers.DeviceSecurity.UpdateSettings)
+				own.Post("/{device_id}/push-token", r.handlers.DeviceSecurity.RegisterPushToken)
+				own.Get("/{device_id}/security-status", r.handlers.DeviceSecurity.GetSecurityStatus)
+
+				// --- Remote CONTROL commands: ownership + premium ---
+				// Actively commanding the device from the web is a premium
+				// feature (the device itself + S2S are never gated).
+				own.Group(func(ctrl chi.Router) {
+					ctrl.Use(apimiddleware.RequireOrbNetSubscription)
+					ctrl.Post("/{device_id}/locate", r.handlers.DeviceSecurity.Locate)
+					ctrl.Post("/{device_id}/lock", r.handlers.DeviceSecurity.Lock)
+					ctrl.Post("/{device_id}/wipe", r.handlers.DeviceSecurity.Wipe)
+					ctrl.Post("/{device_id}/ring", r.handlers.DeviceSecurity.Ring)
+					ctrl.Post("/{device_id}/command", r.handlers.DeviceSecurity.IssueCommand)
+				})
+			})
 		})
 
 		// QR Code Security endpoints (Quishing protection)

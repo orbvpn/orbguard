@@ -210,6 +210,11 @@ type JWTConfig struct {
 	Secret     string        `mapstructure:"secret"`
 	Expiration time.Duration `mapstructure:"expiration"`
 	Issuer     string        `mapstructure:"issuer"`
+	// OrbNetAccessSecret is the SHARED HS256 secret OrbNet signs its access
+	// tokens with (env ORBNET_JWT_ACCESS_SECRET — same value on both services).
+	// When set, OrbGuard verifies OrbNet JWTs so the web panel + app can act as
+	// an authenticated OrbNet user (device ownership). Empty ⇒ that path is off.
+	OrbNetAccessSecret string `mapstructure:"orbnet_access_secret"`
 }
 
 type CORSConfig struct {
@@ -465,6 +470,9 @@ func Load(configPath string) (*Config, error) {
 	v.BindEnv("sources.urlscan.api_key", "ORBGUARD_URLSCAN_API_KEY")
 	v.BindEnv("sources.hybrid_analysis.api_key", "ORBGUARD_HYBRID_ANALYSIS_API_KEY")
 	v.BindEnv("sources.shodan.api_key", "ORBGUARD_SHODAN_API_KEY")
+	// Shared OrbNet JWT secret (same env var name + value as OrbNet) so OrbGuard
+	// can verify OrbNet-issued access tokens for the device-ownership path.
+	v.BindEnv("jwt.orbnet_access_secret", "ORBNET_JWT_ACCESS_SECRET")
 
 	// Read config file
 	if err := v.ReadInConfig(); err != nil {

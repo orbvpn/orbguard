@@ -49,6 +49,9 @@ const (
 type SecureDeviceInfo struct {
 	ID              uuid.UUID    `json:"id" db:"id"`
 	UserID          uuid.UUID    `json:"user_id" db:"user_id"`
+	// OrbNetUserID is the OrbNet account (integer) that owns this device, or nil
+	// when unclaimed. Ownership for remote anti-theft control is enforced on it.
+	OrbNetUserID    *int64       `json:"orbnet_user_id,omitempty" db:"orbnet_user_id"`
 	DeviceID        string       `json:"device_id" db:"device_id"`
 	Name            string       `json:"name" db:"name"`
 	Model           string       `json:"model" db:"model"`
