@@ -191,10 +191,15 @@ enabled on `com.orb.guard` and **GROUPED with OrbVPN's primary App ID `33T4RDL64
 correct choice: grouping makes the Apple `sub` SHARED across OrbVPN + OrbGuard, so an Apple login on
 OrbGuard resolves to the SAME OrbNet account (standalone/primary would have created separate accounts,
 breaking unification). Last mechanical step = rebuild iOS with the updated provisioning profile
-(Xcode automatic signing pulls it next build). Then Apple login is live end-to-end. ⚠️ SECURITY NOTE (pre-existing OrbNet gap, not OrbGuard-specific): the missing Apple
-`aud` check means any Apple-signed idToken for any app is accepted — optional hardening = add an
-`aud` allowlist (com.orb.vpn + com.orb.guard + the web Services ID) to `validateAppleToken`; needs the
-full OrbVPN audience list to avoid breaking OrbVPN's Apple login.
+(Xcode automatic signing pulls it next build). Then Apple login is live end-to-end. **Apple `aud`-check hardening ✅ BUILT + DEPLOYED (opt-in, OFF by default)** — orbnet `81d9b36` on main.
+`validateAppleToken` now checks `aud` against `AppleOAuthConfig.ValidClientIDs` (env
+`ORBNET_OAUTH_APPLE_VALID_CLIENT_IDS`, comma-sep), but ONLY when that allowlist is non-empty — so the
+deploy changed nothing (legacy no-check behaviour until configured). Tests + build green. **TO ENABLE
+enforcement:** set the env to the COMPLETE list of Apple audiences that log into OrbNet — known:
+`com.orb.vpn` (OrbVPN/OrbX native), `com.orb.guard` (OrbGuard native), `com.orbvpn.auth` (web Service
+ID); ⚠️ the OrbVPN Sign-in-with-Apple group has **9 App IDs** — any omitted app that authenticates via
+Apple would get 403, so the full list must be confirmed before flipping it on. (Bounded pre-existing
+risk: Apple `sub` is per-team, so a cross-team token maps to a different account, not takeover.)
 
 **Not a blocker:** magic-link + password login work with ZERO config; OAuth is optional polish.
 
