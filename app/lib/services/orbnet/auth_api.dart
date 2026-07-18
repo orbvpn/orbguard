@@ -7,6 +7,11 @@
 
 import 'orbnet_api_client.dart';
 
+/// Sent as `client` on every OrbGuard login so OrbNet issues a session without
+/// consuming a VPN device slot (OrbGuard has its own device limit). Must match
+/// the backend's accepted value (auth.ClientOrbGuard).
+const String kOrbGuardClient = 'orbguard';
+
 class AuthApi {
   final OrbNetApiClient _client = OrbNetApiClient.instance;
 
@@ -22,6 +27,9 @@ class AuthApi {
         'email': email,
         'password': password,
         if (totpCode != null && totpCode.isNotEmpty) 'totp_code': totpCode,
+        // Identify as OrbGuard so OrbNet issues a no-VPN-device session (own
+        // device limit) instead of consuming a VPN device slot.
+        'client': kOrbGuardClient,
       },
       skipAuth: true,
     );
@@ -105,7 +113,7 @@ class AuthApi {
   Future<Map<String, dynamic>> verifyMagicLink(String token) async {
     return await _client.post<Map<String, dynamic>>(
       '/auth/magic-link/verify',
-      data: {'token': token},
+      data: {'token': token, 'client': kOrbGuardClient},
       skipAuth: true,
     );
   }
@@ -117,7 +125,7 @@ class AuthApi {
   }) async {
     return await _client.post<Map<String, dynamic>>(
       '/auth/oauth/login',
-      data: {'provider': provider, 'token': token},
+      data: {'provider': provider, 'token': token, 'client': kOrbGuardClient},
       skipAuth: true,
     );
   }
