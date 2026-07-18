@@ -63,12 +63,20 @@ sign_in_with_apple, google_sign_in, passkeys, local_auth, app_links (auth). **No
   already exist but are inert), bind `device_security_devices.user_id` to the authed user on
   register, enforce ownership on EVERY `/device/{id}/*` handler (today: horizontal-authz hole —
   any token can command any device), add `GET /device` "my devices" scoped to the user.
-- B2 Web UI (orbnet.admin): the USER role + `/dashboard/devices` "My Devices" page already exist;
-  add anti-theft controls (lock/alarm/mark-stolen/locate) + a second api-client targeting
-  `guard.orbai.world` sending the OrbNet JWT. shadcn/ui; `src/api/anti-theft.ts` + page extension.
-- B3 Android lock/wipe: write the `com.orb.guard/device_admin` native handler + DeviceAdminReceiver
-  (the Dart bridge `device_admin.dart` exists; no native side). iOS lock/wipe = MDM-only (leave
-  honest-unavailable).
+- B2 Web UI (orbnet.admin): ✅ BUILT + DEPLOYING (orbnet.admin `61df695`→main→Azure orbnet-admin).
+  New `/dashboard/anti-theft` page (device cards + locate/ring/lock/wipe/mark-stolen; wipe type-to-
+  confirm; honest "queued" toasts; 402→premium, 404→not-linked). `guard-api-client.ts` reuses the
+  OrbNet JWT with `autoRefresh:false` (guard has no /auth/refresh → avoids logout-on-401);
+  `api/anti-theft.ts` typed 402/404 mapping. Guard CORS for `orbvpn.xyz` LIVE (`63a0181`, preflight
+  verified). tsc/eslint/build clean. Live browser verification pending deploy.
+- B3 Android lock/wipe: ✅ DONE (`3df4ba4`). Native `com.orb.guard/device_admin` handler
+  (isAdminActive/lockNow/wipeData/requestAdmin) + OrbDeviceAdminReceiver + res/xml (force-lock +
+  wipe-data) + manifest BIND_DEVICE_ADMIN + ACTION_ADD_DEVICE_ADMIN enable flow. Honest: inactive
+  admin → lock/wipe return false (backend acks FAILED), never faked. Device Security→Anti-Theft tab
+  gained an "Enable device administrator" card (Android). APK builds; 267/267 tests. iOS lock/wipe =
+  MDM-only (honest-unavailable). Store release is a separate user-controlled step.
+- B1-app: ✅ DONE (`ca9a07d`). App claims its device for the signed-in OrbNet account (POST
+  /device/{id}/claim with the OrbNet JWT) after login + at agent start — best-effort, idempotent.
 
 #### B backend investigation (2026-07-18, mapped in `orbguard/backend`)
 Backend is MORE ready than the memory note implied. Confirmed facts (file:line):
