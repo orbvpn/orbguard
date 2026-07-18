@@ -97,5 +97,19 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Google Sign-In: the iOS OAuth client's reversed client ID must be a URL
+	     scheme so Google can return to the app (client 428639254932-69dmmhiju98…,
+	     bundle com.orb.guard, project orbvpn-f8292). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.428639254932-69dmmhiju98tm6kbq7rdi9fd0pgq1gv8</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

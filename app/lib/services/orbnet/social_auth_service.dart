@@ -14,6 +14,8 @@
 // the user cancels, or the backend rejects the token's audience, the caller
 // gets a truthful failure / cancellation — never a fabricated session.
 
+import 'dart:io' show Platform;
+
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -70,8 +72,25 @@ class SocialAuthService {
     String? googleServerClientId,
     String? googleClientId,
   })  : _authApi = authApi ?? AuthApi(),
-        _googleServerClientId = googleServerClientId ?? _envServerClientId,
-        _googleClientId = googleClientId ?? _envClientId;
+        _googleServerClientId = googleServerClientId ??
+            (_envServerClientId.isNotEmpty
+                ? _envServerClientId
+                : _defaultServerClientId),
+        _googleClientId = googleClientId ??
+            (_envClientId.isNotEmpty ? _envClientId : _defaultClientId);
+
+  // Defaults (shared OrbVPN Google project orbvpn-f8292), overridable via
+  // --dart-define. serverClientId = the OrbVPN OAuth **Web** client that OrbNet
+  // already accepts as the idToken audience (verified present in the backend's
+  // ORBNET_OAUTH_GOOGLE_VALID_CLIENT_IDS; the same one OrbX passes). clientId =
+  // OrbGuard's OWN iOS OAuth client (bundle com.orb.guard) for the iOS flow —
+  // iOS only; on Android google_sign_in reads its client from
+  // google-services.json, so this stays empty there.
+  static const String _defaultServerClientId =
+      '428639254932-93ijb65qnhvkacjjd2b5e17olm10fbck.apps.googleusercontent.com';
+  static String get _defaultClientId => Platform.isIOS
+      ? '428639254932-69dmmhiju98tm6kbq7rdi9fd0pgq1gv8.apps.googleusercontent.com'
+      : '';
 
   final AuthApi _authApi;
 

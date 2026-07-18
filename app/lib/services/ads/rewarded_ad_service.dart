@@ -64,15 +64,39 @@ abstract class RewardedAdService {
 
 /// Production implementation backed by the Unity / Adivery / Yandex SDKs.
 class DefaultRewardedAdService implements RewardedAdService {
-  // ── Build-time network configuration (compile-time constants) ──────────────
-  static const String _unityGameId = String.fromEnvironment('UNITY_GAME_ID');
-  static const String _unityPlacement =
+  // ── Build-time network configuration ──────────────────────────────────────
+  // IDs are shared with OrbVPN (same ad accounts) and used as the defaults so a
+  // plain build has working rewarded ads; each is overridable at build time via
+  // --dart-define (e.g. UNITY_GAME_ID=...) once OrbGuard has its own dedicated
+  // entries. Unity + Yandex are platform-specific (Android vs iOS).
+  static const String _unityGameIdOverride =
+      String.fromEnvironment('UNITY_GAME_ID');
+  static const String _unityPlacementOverride =
       String.fromEnvironment('UNITY_REWARDED_PLACEMENT');
-  static const String _adiveryAppId = String.fromEnvironment('ADIVERY_APP_ID');
-  static const String _adiveryPlacement =
+  static const String _adiveryAppIdOverride =
+      String.fromEnvironment('ADIVERY_APP_ID');
+  static const String _adiveryPlacementOverride =
       String.fromEnvironment('ADIVERY_PLACEMENT');
-  static const String _yandexUnitId =
+  static const String _yandexUnitIdOverride =
       String.fromEnvironment('YANDEX_REWARDED_UNIT_ID');
+
+  // Effective IDs: the --dart-define override if present, else the shared
+  // OrbVPN production default for this platform.
+  String get _unityGameId => _unityGameIdOverride.isNotEmpty
+      ? _unityGameIdOverride
+      : (_isAndroid ? '6025377' : '6025376');
+  String get _unityPlacement => _unityPlacementOverride.isNotEmpty
+      ? _unityPlacementOverride
+      : (_isAndroid ? 'Rewarded_Android' : 'Rewarded_iOS');
+  String get _adiveryAppId => _adiveryAppIdOverride.isNotEmpty
+      ? _adiveryAppIdOverride
+      : 'c3e6649e-1d19-4642-8478-ef1e6bf85d8d';
+  String get _adiveryPlacement => _adiveryPlacementOverride.isNotEmpty
+      ? _adiveryPlacementOverride
+      : '819b9205-6c65-4662-a78c-acdb7ac3f65e';
+  String get _yandexUnitId => _yandexUnitIdOverride.isNotEmpty
+      ? _yandexUnitIdOverride
+      : (_isAndroid ? 'R-M-18438192-1' : 'R-M-18436157-1');
 
   AdRegion _region;
 
