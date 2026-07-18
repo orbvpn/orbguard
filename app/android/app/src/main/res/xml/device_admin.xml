@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Device-administrator policy set for OrbGuard's remote anti-theft commands.
+     force-lock backs DevicePolicyManager.lockNow() (remote LOCK); wipe-data
+     backs DevicePolicyManager.wipeData() (remote factory reset / WIPE). -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+        <wipe-data />
+    </uses-policies>
+</device-admin>

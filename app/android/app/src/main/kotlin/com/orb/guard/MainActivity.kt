@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.app.AppOpsManager
+import android.app.admin.DevicePolicyManager
 import android.os.Build
 import android.os.Environment
 import android.net.Uri
@@ -31,6 +32,13 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.orb.guard/system"
     private val SMS_CHANNEL = "com.orb.guard/sms"
     private val BROWSER_CHANNEL = "com.orb.guard/browser"
+    private val DEVICE_ADMIN_CHANNEL = "com.orb.guard/device_admin"
+    // Distinct from FirewallChannelHandler.VPN_CONSENT_REQUEST (0x0F1A) and the
+    // storage/SMS permission codes (100/200) so onActivityResult can tell the
+    // device-admin grant apart.
+    private val DEVICE_ADMIN_ENABLE_REQUEST = 0x0DA1
+    // Held while the ACTION_ADD_DEVICE_ADMIN system screen is showing.
+    private var pendingAdminResult: MethodChannel.Result? = null
     private var rootAccess: RootAccess? = null
     private var spywareScanner: SpywareScanner? = null
     private var smsAnalyzer: SMSAnalyzer? = null
@@ -54,6 +62,9 @@ class MainActivity: FlutterActivity() {
 
         // Setup Browser Method Channel
         setupBrowserChannel(flutterEngine)
+
+        // Device-administrator channel (remote anti-theft lock / wipe)
+        setupDeviceAdminChannel(flutterEngine)
 
         // Wi-Fi inspection channel (com.orb.guard/wifi)
         wifiChannelHandler = WifiChannelHandler(this).also {
@@ -796,6 +807,124 @@ class MainActivity: FlutterActivity() {
         // Forward the VPN consent-dialog result to the firewall handler.
         if (requestCode == FirewallChannelHandler.VPN_CONSENT_REQUEST) {
             firewallChannelHandler?.onVpnConsentResult(resultCode)
+        } else if (requestCode == DEVICE_ADMIN_ENABLE_REQUEST) {
+            // Report the real grant state back to Dart. Some OEMs return
+            // RESULT_CANCELED even after a successful enable, so trust
+            // isAdminActive() over resultCode.
+            val pending = pendingAdminResult
+            pendingAdminResult = null
+            val granted = try {
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                dpm.isAdminActive(ComponentName(this, OrbDeviceAdminReceiver::class.java))
+            } catch (e: Exception) {
+                false
+            }
+            pending?.success(granted)
+        }
+    }
+
+    // ============================================================================
+    // DEVICE ADMINISTRATOR CHANNEL (remote anti-theft lock / wipe)
+    // ============================================================================
+    //
+    // Serves com.orb.guard/device_admin for the Dart DeviceAdminBridge:
+    //   isAdminActive -> Boolean: is OrbGuard an active device administrator
+    //   lockNow       -> Boolean: lock the screen now (false if admin inactive)
+    //   wipeData      -> Boolean: factory reset (false if admin inactive); also
+    //                    wipes external storage when wipe_sd_card == true
+    //   requestAdmin  -> Boolean: launch the intrusive ACTION_ADD_DEVICE_ADMIN
+    //                    system screen and report whether the user granted it
+    //
+    // HONEST FAILURE: lock/wipe never fake success — without an active admin
+    // they return false, which the bridge surfaces as a real failure so the
+    // backend acks the command FAILED. WIPE is irreversible; it only ever runs
+    // through a genuine remote 'wipe' command with admin already granted.
+
+    private fun setupDeviceAdminChannel(flutterEngine: FlutterEngine) {
+        val channel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            DEVICE_ADMIN_CHANNEL
+        )
+        channel.setMethodCallHandler { call, result ->
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val component = ComponentName(this, OrbDeviceAdminReceiver::class.java)
+            when (call.method) {
+                "isAdminActive" -> {
+                    result.success(
+                        try {
+                            dpm.isAdminActive(component)
+                        } catch (e: Exception) {
+                            false
+                        }
+                    )
+                }
+
+                "lockNow" -> {
+                    if (!dpm.isAdminActive(component)) {
+                        // Honest failure — the bridge maps false to "enable
+                        // OrbGuard as a device administrator".
+                        result.success(false)
+                    } else {
+                        try {
+                            dpm.lockNow()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("LOCK_FAILED", e.message, null)
+                        }
+                    }
+                }
+
+                "wipeData" -> {
+                    if (!dpm.isAdminActive(component)) {
+                        result.success(false)
+                    } else {
+                        try {
+                            val wipeSdCard = call.argument<Boolean>("wipe_sd_card") ?: false
+                            val flags = if (wipeSdCard)
+                                DevicePolicyManager.WIPE_EXTERNAL_STORAGE else 0
+                            dpm.wipeData(flags)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("WIPE_FAILED", e.message, null)
+                        }
+                    }
+                }
+
+                "requestAdmin" -> requestDeviceAdmin(result)
+
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /**
+     * Launches the system ACTION_ADD_DEVICE_ADMIN screen so the user can grant
+     * OrbGuard device-administrator privileges (the prerequisite for remote
+     * lock/wipe). The grant outcome is delivered back through onActivityResult.
+     * If admin is already active, succeeds immediately.
+     */
+    private fun requestDeviceAdmin(result: MethodChannel.Result) {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val component = ComponentName(this, OrbDeviceAdminReceiver::class.java)
+        if (dpm.isAdminActive(component)) {
+            result.success(true)
+            return
+        }
+        pendingAdminResult = result
+        try {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "OrbGuard needs device-administrator access so you can " +
+                        "remotely lock or factory-reset this device from the web " +
+                        "if it is lost or stolen."
+                )
+            }
+            startActivityForResult(intent, DEVICE_ADMIN_ENABLE_REQUEST)
+        } catch (e: Exception) {
+            pendingAdminResult = null
+            result.error("ADMIN_REQUEST_FAILED", e.message, null)
         }
     }
 

@@ -186,6 +186,25 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Device administrator for remote anti-theft LOCK / WIPE. Enabling it
+             is an intrusive one-time user action (the ACTION_ADD_DEVICE_ADMIN
+             system screen); until the user grants it DeviceAdminBridge
+             .isAdminActive() is false and remote lock/wipe honestly fail.
+             BIND_DEVICE_ADMIN is enforced by the OS so only the system can
+             trigger the admin callbacks. Policies declared in
+             res/xml/device_admin.xml (force-lock + wipe-data). -->
+        <receiver
+            android:name=".OrbDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Queries for Package Visibility (Android 11+) -->
