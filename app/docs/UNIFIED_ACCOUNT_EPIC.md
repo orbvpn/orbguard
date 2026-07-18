@@ -162,23 +162,24 @@ Both features are CODE-COMPLETE and fail honestly until these external registrat
 shared *backends* are reusable; the per-app *identity registrations* are not (OrbGuard = `com.orb.guard`
 Android / `com.orb.guard` iOS; OrbVPN = `com.orbvpn.android` / `com.orb.vpn`).
 
-**Ads (A3)** — OrbVPN production IDs (from `orbx.flutter` `ad_provider.dart`, `_useTestAds=false`):
-Unity Android game `6025377` / iOS `6025376`, placements `Rewarded_Android`/`Rewarded_iOS`; Adivery
-app `c3e6649e-1d19-4642-8478-ef1e6bf85d8d` rewarded `819b9205-6c65-4662-a78c-acdb7ac3f65e`; Yandex
-Android `R-M-18438192-1` iOS `R-M-18436157-1`. Reusable via `--dart-define` to make the loop functional
-NOW (works for testing), but they're bound to OrbVPN's store listing → mixes revenue + risks
-no-fill/policy under `com.orb.guard`. Clean fix: add OrbGuard as a new app under the SAME ad accounts
-→ own IDs. App reads these from `--dart-define` (UNITY_GAME_ID etc.); wiring = plug in IDs.
+**Ads (A3)** — ✅ WIRED + FUNCTIONAL (`a8aa44c`). OrbVPN production IDs are now the platform-aware
+DEFAULTS in `rewarded_ad_service.dart` (Unity Android `6025377`/iOS `6025376` + `Rewarded_Android`/`iOS`;
+Adivery `c3e6649e-…`/`819b9205-…`; Yandex `R-M-18438192-1`/`R-M-18436157-1`), still `--dart-define`-
+overridable. APK builds with the plugins. The watch-ad→scan-credit loop is live out of the box.
+⚠️ These IDs are bound to OrbVPN's store listing → mixes revenue + slight no-fill/policy risk under
+`com.orb.guard`; clean follow-up = add OrbGuard entries under the SAME ad accounts → own IDs (plug into
+--dart-define). Fine for launch/testing as-is.
 
-**Google OAuth** — backend ALREADY accepts a LIST: `ORBNET_OAUTH_GOOGLE_VALID_CLIENT_IDS`
-(`config.go:808`, `oauth/service.go:785 isValidGoogleClientID`). OrbVPN project = `orbvpn-f8292`, web
-client `428639254932-...`. OrbGuard CANNOT reuse OrbVPN's Android/iOS client IDs (Google binds them to
-package+SHA-1 / bundle). NEEDED: in project `orbvpn-f8292` add an Android OAuth client (pkg
-`com.orb.guard` + OrbGuard signing SHA-1) + an iOS client (bundle `com.orb.guard`) → OrbGuard
-`google-services.json` + iOS reversed-client-id URL scheme; then add OrbGuard's client id to the
-backend VALID_CLIENT_IDS. (Reusing the shared web serverClientId `428639254932-...` as the token
-audience is accepted by the backend, but a native Android/iOS client for `com.orb.guard` is still
-required for Google to issue the idToken at all.)
+**Google OAuth** — ✅ iOS + serverClientId WIRED (`a8aa44c`), NO backend change needed. Backend accepts
+a LIST (`ORBNET_OAUTH_GOOGLE_VALID_CLIENT_IDS`); OrbX's real serverClientId `428639254932-93ijb65q…`
+(a **web** client) is IN that list, so OrbGuard uses it as its default serverClientId → the idToken
+audience is already accepted. Default iOS clientId = OrbGuard's OWN iOS client `428639254932-69dmmhiju98…`
+(bundle `com.orb.guard`, user-created); its reversed-client-id URL scheme added to `ios/Runner/Info.plist`.
+project = `orbvpn-f8292`. **ONE STEP LEFT (Android):** create an Android OAuth client (pkg `com.orb.guard`
++ SHA-1 `12:5A:18:03:8A:6C:F0:D1:38:3D:15:9B:AB:44:FE:97:3C:AD:96:F3`) in that project → drop OrbGuard's
+`google-services.json` into `android/app/`. With the shared serverClientId, its audience is already
+accepted → no further backend work. (The user-provided `07plgm1s8…` "installed" client is unused — an
+installed-type client isn't valid as a serverClientId; the web `93ijb65q…` is used instead.)
 
 **Apple OAuth** — native idToken `aud` = the app bundle (`com.orb.guard`). Backend Apple config is a
 SINGLE `ORBNET_OAUTH_APPLE_CLIENT_ID` (currently OrbVPN's `com.orb.vpn`) — needs a small backend change
