@@ -191,7 +191,16 @@ enabled on `com.orb.guard` and **GROUPED with OrbVPN's primary App ID `33T4RDL64
 correct choice: grouping makes the Apple `sub` SHARED across OrbVPN + OrbGuard, so an Apple login on
 OrbGuard resolves to the SAME OrbNet account (standalone/primary would have created separate accounts,
 breaking unification). Last mechanical step = rebuild iOS with the updated provisioning profile
-(Xcode automatic signing pulls it next build). Then Apple login is live end-to-end. **Apple `aud`-check hardening ✅ BUILT + DEPLOYED (opt-in, OFF by default)** — orbnet `81d9b36` on main.
+(Xcode automatic signing pulls it next build). Then Apple login is live end-to-end. **Apple `aud`-check hardening ✅ BUILT + DEPLOYED + ENABLED (2026-07-18).** Enforcement is now LIVE:
+`ORBNET_OAUTH_APPLE_VALID_CLIENT_IDS=com.orb.vpn,com.orbvpn.go,com.orb.guard,com.orbvpn.auth` set on
+`orbnet-go`. The allowlist was derived by scanning every OrbVPN-family app repo for the Apple bundle
+IDs that do Sign-in-with-Apple → OrbNet: OrbVPN/OrbX (`com.orb.vpn`, iOS/macOS/tvOS), OrbGo
+(`com.orbvpn.go`), OrbGuard (`com.orb.guard`), + the web Service ID (`com.orbvpn.auth`); **hylon
+excluded** (no applesignin entitlement). Reversible instantly (unset the env). Could not mint a live
+Apple token to e2e the accept-path, but logic is unit-tested + the list is empirically derived; API
+healthy post-revision (register→201, email/Google paths unaffected).
+--- (prior) ---
+**Apple `aud`-check hardening (opt-in, OFF by default)** — orbnet `81d9b36` on main.
 `validateAppleToken` now checks `aud` against `AppleOAuthConfig.ValidClientIDs` (env
 `ORBNET_OAUTH_APPLE_VALID_CLIENT_IDS`, comma-sep), but ONLY when that allowlist is non-empty — so the
 deploy changed nothing (legacy no-check behaviour until configured). Tests + build green. **TO ENABLE
