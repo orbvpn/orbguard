@@ -68,7 +68,17 @@ sign_in_with_apple, google_sign_in, passkeys, local_auth, app_links (auth). **No
   confirm; honest "queued" toasts; 402→premium, 404→not-linked). `guard-api-client.ts` reuses the
   OrbNet JWT with `autoRefresh:false` (guard has no /auth/refresh → avoids logout-on-401);
   `api/anti-theft.ts` typed 402/404 mapping. Guard CORS for `orbvpn.xyz` LIVE (`63a0181`, preflight
-  verified). tsc/eslint/build clean. Live browser verification pending deploy.
+  verified). tsc/eslint/build clean. **✅ LIVE-VERIFIED (Playwright, real session on orbvpn.xyz):**
+  the `/dashboard/anti-theft` page renders (nav entry + honest "commands are queued" alert + stat
+  cards + "sign in on the OrbGuard app to link your phone" empty state); the cross-origin
+  `GET /device/mine` to guard **succeeded** (clean 0-devices state, not CORS/error) with ZERO console
+  errors — CORS + JWT + ownership all working end-to-end. Deployed to orbnet-admin.
+
+**PHASE B COMPLETE (2026-07-18)** — every component built, deployed, verified: B1 backend (prod e2e,
+16 assertions), B1-app claim, B2 web panel (live browser), B3 native lock/wipe (APK builds). The only
+unproven-live step is a physical device reacting to a web command — needs the new app build on a
+phone + logged into OrbNet + device-admin granted (a user-run real-device demo); every piece up to
+that is individually verified.
 - B3 Android lock/wipe: ✅ DONE (`3df4ba4`). Native `com.orb.guard/device_admin` handler
   (isAdminActive/lockNow/wipeData/requestAdmin) + OrbDeviceAdminReceiver + res/xml (force-lock +
   wipe-data) + manifest BIND_DEVICE_ADMIN + ACTION_ADD_DEVICE_ADMIN enable flow. Honest: inactive
