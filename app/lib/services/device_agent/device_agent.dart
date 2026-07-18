@@ -37,6 +37,7 @@ import '../notifications/notification_service.dart';
 import '../security/auto_scan_scheduler.dart';
 import 'agent_api.dart';
 import 'device_admin.dart';
+import 'device_claim_service.dart';
 import 'location_reporter.dart';
 import 'ringer.dart';
 import 'selfie_capture.dart';
@@ -227,6 +228,10 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     notifyListeners();
+
+    // If the user is already signed into their OrbNet account, link this device
+    // to it so they can control it from the web (best-effort, idempotent).
+    unawaited(DeviceClaimService.instance.claimIfReady());
 
     // Initial cycle — do not block the caller's init path.
     unawaited(pollNow());

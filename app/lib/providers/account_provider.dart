@@ -8,9 +8,12 @@
 // does NOT touch OrbGuard's own anonymous device registration
 // (`OrbGuardApiClient` against guard.orbai.world) — the two coexist.
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../services/device_agent/device_claim_service.dart';
 import '../services/orbnet/auth_repository.dart';
 import '../services/orbnet/network_error.dart' as net_err;
 import '../services/orbnet/orbnet_api_client.dart';
@@ -136,6 +139,7 @@ class AccountProvider extends ChangeNotifier {
       final res = await _repo.login(email, password, totpCode: totpCode);
       _user = res.user;
       _startRefresh();
+      _bootstrapDeviceOwnership();
       _busy = false;
       notifyListeners();
       return true;
@@ -181,6 +185,7 @@ class AccountProvider extends ChangeNotifier {
       final res = await _repo.verifyMagicLogin(email, code);
       _user = res.user;
       _startRefresh();
+      _bootstrapDeviceOwnership();
       _busy = false;
       notifyListeners();
       return true;
@@ -212,6 +217,7 @@ class AccountProvider extends ChangeNotifier {
       final res = await signIn();
       _user = res.user;
       _startRefresh();
+      _bootstrapDeviceOwnership();
       _busy = false;
       notifyListeners();
       return true;
@@ -226,6 +232,14 @@ class AccountProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Link this device to the just-signed-in OrbNet account so the user can
+  /// control it from the web (best-effort, non-blocking, idempotent). No-op if
+  /// the device isn't registered yet — the agent re-attempts on next start.
+  void _bootstrapDeviceOwnership() {
+    // Fire-and-forget: ownership claim must never delay or fail the login.
+    unawaited(DeviceClaimService.instance.claimIfReady());
   }
 
   /// Sign out. Best-effort backend revoke, then always clears local state.
