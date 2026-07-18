@@ -62,6 +62,9 @@ cors:
     - http://localhost:8080
     - https://admin.orbai.world
     - https://api.orbai.world
+    # OrbVPN admin/user web panel (orbnet.admin) — the anti-theft control UI
+    # sends the OrbNet JWT to guard.orbai.world, so its origin must be allowed.
+    - https://orbvpn.xyz
   allowed_methods:
     - GET
     - POST
