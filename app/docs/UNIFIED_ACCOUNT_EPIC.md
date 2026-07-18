@@ -171,10 +171,20 @@ the remaining Phase A work and needs shared-backend (OrbNet) changes — see the
     "Insufficient scan credits"**. (2) Isolation — after a scan_credits ad, scan_credits=1 but VPN
     `service_only_balance=0`. (3) OrbX unchanged — a NORMAL ad (no reward_type) → `reward_type:
     vpn_seconds`, VPN `service_only_balance=+3`, scan_credits=0. Gating confirmed bulletproof.
-  - **App side 🚧** building (Unity + Adivery + Yandex waterfall, per user). Foundation (OrbNet ad +
-    scan-credit client, `ScanCreditProvider`, config-gated honest ad SDK layer, watch-ad sheet, tests)
-    in a worktree agent. **Main agent still owns:** wiring the scan gate + the free-vs-premium UX
-    decision (premium=unlimited scans/no ads; free=credits — free daily allowance TBD with user).
+  - **App side ✅ BUILT + WIRED** (`95e46d3` foundation, `c1d9e96` gate). OrbNet ad + scan-credit
+    client (`ad_api`/`scan_credit_api`, 402→`InsufficientScanCreditsException`), `ScanCreditProvider`
+    (earn/spend, honest — credit only after a real ad + `/ad/verify`), config-gated Unity→Adivery→
+    Yandex waterfall (`rewarded_ad_service`, `--dart-define` IDs, `AdsNotConfigured` never faked),
+    `watch_ad_sheet`. **Gate model (user chose "every scan costs a credit"):** `scan_gate.ensureScanCredit`
+    — premium=unlimited/no ads; free=1 credit/scan (out→watch-ad sheet; signed-out→sign-in; error→
+    blocked+surfaced). Wired into `main.dart _startScan(userInitiated)` (first-run check + auto-scan
+    exempt) + `dashboard_screen`. Suite **267/267**.
+  - **⛔ NEEDS USER: ad config** — Unity/Adivery/Yandex IDs via `--dart-define` (`UNITY_GAME_ID`,
+    `UNITY_REWARDED_PLACEMENT`, `ADIVERY_APP_ID`, `ADIVERY_PLACEMENT`, `YANDEX_REWARDED_UNIT_ID`) +
+    native (iOS `SKAdNetworkItems`/`NSUserTrackingUsageDescription` + `pod install`; Android
+    Yandex/Adivery maven + minSdk + AD_ID perm). Until supplied, ads are honestly UNAVAILABLE, so a
+    free user who is out of credits genuinely can't scan (premium + the free onboarding check work).
+  - Device e2e of the UI blocked by (a) ad config above and (b) the device-limit login blocker (#64).
   - **Device limit** (decision #4) deferred to a separate careful change — it touches the critical
     `LoginByUserIDWithDevice` auth path; orthogonal to the ad→credit loop.
 
