@@ -89,6 +89,36 @@ func (s *DeviceSecurityService) requireRepo() error {
 	return nil
 }
 
+// GetOrbNetOwner returns the OrbNet account id owning the device (nil = unclaimed,
+// found=false = unknown device). Used by the device-ownership middleware.
+func (s *DeviceSecurityService) GetOrbNetOwner(ctx context.Context, deviceID string) (ownerID *int64, found bool, err error) {
+	if err := s.requireRepo(); err != nil {
+		return nil, false, err
+	}
+	return s.repo.GetOrbNetOwner(ctx, deviceID)
+}
+
+// ClaimDevice binds the device to an OrbNet account when it is unclaimed (or
+// already the same account). See repository.ClaimDevice for the return flags.
+func (s *DeviceSecurityService) ClaimDevice(ctx context.Context, deviceID string, orbnetUserID int64) (claimed, conflict, found bool, err error) {
+	if err := s.requireRepo(); err != nil {
+		return false, false, false, err
+	}
+	claimed, conflict, found, err = s.repo.ClaimDevice(ctx, deviceID, orbnetUserID)
+	if claimed {
+		s.invalidateDeviceCache(ctx, deviceID)
+	}
+	return claimed, conflict, found, err
+}
+
+// ListDevicesByOrbNetUser returns all devices owned by an OrbNet account.
+func (s *DeviceSecurityService) ListDevicesByOrbNetUser(ctx context.Context, orbnetUserID int64) ([]*models.SecureDeviceInfo, error) {
+	if err := s.requireRepo(); err != nil {
+		return nil, err
+	}
+	return s.repo.ListDevicesByOrbNetUser(ctx, orbnetUserID)
+}
+
 func (s *DeviceSecurityService) deviceCacheKey(deviceID string) string {
 	return "device:security:" + deviceID
 }

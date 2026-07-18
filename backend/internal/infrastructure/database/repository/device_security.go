@@ -43,7 +43,7 @@ type DeviceSecurityStats struct {
 const deviceColumns = `id, user_id, device_id, name, model, manufacturer, platform,
 	os_version, security_patch, api_level, status, is_rooted, is_encrypted,
 	has_screen_lock, biometric_type, push_token, last_location, last_seen,
-	registered_at, updated_at`
+	registered_at, updated_at, orbnet_user_id`
 
 // UpsertDevice inserts or updates a tracked device keyed by device_id.
 func (r *DeviceSecurityRepository) UpsertDevice(ctx context.Context, d *models.SecureDeviceInfo) error {
@@ -103,6 +103,76 @@ func (r *DeviceSecurityRepository) GetDevice(ctx context.Context, deviceID strin
 	return d, err
 }
 
+// GetOrbNetOwner returns the OrbNet account id that owns the device. found is
+// false when the device does not exist; ownerID is nil when it exists but is
+// unclaimed. This is the cheap lookup the ownership middleware uses per request.
+func (r *DeviceSecurityRepository) GetOrbNetOwner(ctx context.Context, deviceID string) (ownerID *int64, found bool, err error) {
+	var owner pgtype.Int8
+	err = r.pool.QueryRow(ctx,
+		`SELECT orbnet_user_id FROM device_security_devices WHERE device_id = $1`,
+		deviceID).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if owner.Valid {
+		v := owner.Int64
+		return &v, true, nil
+	}
+	return nil, true, nil
+}
+
+// ClaimDevice records orbnetUserID as the device owner, but only when the device
+// is currently unclaimed (NULL) or already owned by the same user (idempotent).
+// Returns: claimed=true on success; conflict=true when another account already
+// owns it; found=false when the device does not exist.
+func (r *DeviceSecurityRepository) ClaimDevice(ctx context.Context, deviceID string, orbnetUserID int64) (claimed, conflict, found bool, err error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE device_security_devices
+		SET orbnet_user_id = $2, updated_at = NOW()
+		WHERE device_id = $1
+		  AND (orbnet_user_id IS NULL OR orbnet_user_id = $2)`,
+		deviceID, orbnetUserID)
+	if err != nil {
+		return false, false, false, err
+	}
+	if tag.RowsAffected() > 0 {
+		return true, false, true, nil
+	}
+	// No row updated: either the device is missing or owned by someone else.
+	_, found, gErr := r.GetOrbNetOwner(ctx, deviceID)
+	if gErr != nil {
+		return false, false, false, gErr
+	}
+	if !found {
+		return false, false, false, nil
+	}
+	return false, true, true, nil
+}
+
+// ListDevicesByOrbNetUser returns every device owned by the given OrbNet account.
+func (r *DeviceSecurityRepository) ListDevicesByOrbNetUser(ctx context.Context, orbnetUserID int64) ([]*models.SecureDeviceInfo, error) {
+	query := `SELECT ` + deviceColumns + ` FROM device_security_devices
+		WHERE orbnet_user_id = $1 ORDER BY registered_at DESC`
+	rows, err := r.pool.Query(ctx, query, orbnetUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var devices []*models.SecureDeviceInfo
+	for rows.Next() {
+		d, err := scanDevice(rows)
+		if err != nil {
+			return nil, err
+		}
+		devices = append(devices, d)
+	}
+	return devices, rows.Err()
+}
+
 // UpdateDeviceStatus sets the device status (active/locked/wiped/lost/stolen/...).
 func (r *DeviceSecurityRepository) UpdateDeviceStatus(ctx context.Context, deviceID string, status models.DeviceStatus) error {
 	tag, err := r.pool.Exec(ctx,
@@ -119,17 +189,18 @@ func (r *DeviceSecurityRepository) UpdateDeviceStatus(ctx context.Context, devic
 
 func scanDevice(row pgx.Row) (*models.SecureDeviceInfo, error) {
 	var (
-		d        models.SecureDeviceInfo
-		userID   pgtype.UUID
-		status   string
-		locJSON  []byte
-		lastSeen pgtype.Timestamptz
+		d          models.SecureDeviceInfo
+		userID     pgtype.UUID
+		status     string
+		locJSON    []byte
+		lastSeen   pgtype.Timestamptz
+		orbnetUser pgtype.Int8
 	)
 	err := row.Scan(
 		&d.ID, &userID, &d.DeviceID, &d.Name, &d.Model, &d.Manufacturer, &d.Platform,
 		&d.OSVersion, &d.SecurityPatch, &d.APILevel, &status, &d.IsRooted, &d.IsEncrypted,
 		&d.HasScreenLock, &d.BiometricType, &d.PushToken, &locJSON, &lastSeen,
-		&d.RegisteredAt, &d.UpdatedAt,
+		&d.RegisteredAt, &d.UpdatedAt, &orbnetUser,
 	)
 	if err != nil {
 		return nil, err
@@ -137,6 +208,9 @@ func scanDevice(row pgx.Row) (*models.SecureDeviceInfo, error) {
 	d.Status = models.DeviceStatus(status)
 	if userID.Valid {
 		d.UserID = uuid.UUID(userID.Bytes)
+	}
+	if orbnetUser.Valid {
+		d.OrbNetUserID = &orbnetUser.Int64
 	}
 	if lastSeen.Valid {
 		d.LastSeen = lastSeen.Time

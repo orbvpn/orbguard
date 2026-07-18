@@ -27,6 +27,13 @@ const (
 	// ContextKeyIsService is the context key for service-to-service requests
 	// authenticated with the configured shared secret.
 	ContextKeyIsService ContextKey = "is_service"
+	// ContextKeyOrbNetUserID holds the int64 OrbNet account user_id when the
+	// request is authenticated with a valid OrbNet JWT (web panel or a
+	// logged-in app acting as the account user). Absent for device-key/S2S auth.
+	ContextKeyOrbNetUserID ContextKey = "orbnet_user_id"
+	// ContextKeySubscriptionValid holds the bool subscription_valid claim from
+	// an OrbNet JWT — used to gate premium remote-control actions.
+	ContextKeySubscriptionValid ContextKey = "subscription_valid"
 )
 
 // adminTokenEnvVar is the environment variable holding the admin credential.
@@ -148,6 +155,17 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 			if secret != "" && subtle.ConstantTimeCompare([]byte(token), []byte(secret)) == 1 {
 				ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
 				ctx = context.WithValue(ctx, ContextKeyIsService, true)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			// OrbNet account JWT (web panel / logged-in app acting as the user).
+			// Structurally distinct from a device key, so this never shadows the
+			// store lookup below; inert unless the shared secret is configured.
+			if claims, ok := verifyOrbNetJWT(token); ok {
+				ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
+				ctx = context.WithValue(ctx, ContextKeyOrbNetUserID, claims.UserID)
+				ctx = context.WithValue(ctx, ContextKeySubscriptionValid, claims.SubscriptionValid)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
