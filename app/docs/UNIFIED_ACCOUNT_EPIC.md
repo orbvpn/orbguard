@@ -165,7 +165,12 @@ the remaining Phase A work and needs shared-backend (OrbNet) changes — see the
     opt-in on `POST /ad/session`, a scan-credit branch in `grantSessionReward` (OrbX/VPN paths
     untouched), `token.Add/Deduct/GetScanCredits`, and `GET /scan-credits/balance` + `POST
     /scan/consume` (402 when empty). Rate `ORBNET_SCAN_CREDITS_PER_AD` (default 1). Build+vet+tests
-    green. ⚠️ post-deploy e2e verification pending (real-JWT curl of the 4 endpoints).
+    green. **✅ POST-DEPLOY E2E VERIFIED ON PROD** (real fresh-account JWTs, api.orbai.world):
+    (1) full loop — balance 0 → `/ad/session {reward_type:scan_credits}` → `/ad/verify` grants
+    `scan_credits_earned:1` → balance 1 → `/scan/consume` → balance 0 → `/scan/consume` → **402
+    "Insufficient scan credits"**. (2) Isolation — after a scan_credits ad, scan_credits=1 but VPN
+    `service_only_balance=0`. (3) OrbX unchanged — a NORMAL ad (no reward_type) → `reward_type:
+    vpn_seconds`, VPN `service_only_balance=+3`, scan_credits=0. Gating confirmed bulletproof.
   - **App side 🚧** building (Unity + Adivery + Yandex waterfall, per user). Foundation (OrbNet ad +
     scan-credit client, `ScanCreditProvider`, config-gated honest ad SDK layer, watch-ad sheet, tests)
     in a worktree agent. **Main agent still owns:** wiring the scan gate + the free-vs-premium UX
