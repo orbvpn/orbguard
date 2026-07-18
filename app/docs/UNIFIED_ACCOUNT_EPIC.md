@@ -186,9 +186,12 @@ installed-type client isn't valid as a serverClientId; the web `93ijb65q…` is 
 on iOS/macOS. **Backend needs NO change:** `validateAppleToken` (`oauth/service.go:475`) verifies
 Apple's JWKS signature + expiry but does **NOT check `aud`** (unlike Google) — so OrbGuard's native
 token (`aud=com.orb.guard`) is already accepted. (`ORBNET_OAUTH_APPLE_CLIENT_ID=com.orbvpn.auth` is the
-web Services ID, unused for native verify.) **ONE STEP LEFT:** enable "Sign in with Apple" on the
-`com.orb.guard` App ID in Apple Developer + regen the provisioning profile — until then the Apple button
-fails honestly. ⚠️ SECURITY NOTE (pre-existing OrbNet gap, not OrbGuard-specific): the missing Apple
+web Services ID, unused for native verify.) **App ID capability ✅ DONE (user, 2026-07-18):** "Sign in with Apple"
+enabled on `com.orb.guard` and **GROUPED with OrbVPN's primary App ID `33T4RDL646.com.orb.vpn`** — the
+correct choice: grouping makes the Apple `sub` SHARED across OrbVPN + OrbGuard, so an Apple login on
+OrbGuard resolves to the SAME OrbNet account (standalone/primary would have created separate accounts,
+breaking unification). Last mechanical step = rebuild iOS with the updated provisioning profile
+(Xcode automatic signing pulls it next build). Then Apple login is live end-to-end. ⚠️ SECURITY NOTE (pre-existing OrbNet gap, not OrbGuard-specific): the missing Apple
 `aud` check means any Apple-signed idToken for any app is accepted — optional hardening = add an
 `aud` allowlist (com.orb.vpn + com.orb.guard + the web Services ID) to `validateAppleToken`; needs the
 full OrbVPN audience list to avoid breaking OrbVPN's Apple login.
