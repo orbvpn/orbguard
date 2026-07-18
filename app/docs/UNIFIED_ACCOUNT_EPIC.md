@@ -181,10 +181,17 @@ project = `orbvpn-f8292`. **ONE STEP LEFT (Android):** create an Android OAuth c
 accepted → no further backend work. (The user-provided `07plgm1s8…` "installed" client is unused — an
 installed-type client isn't valid as a serverClientId; the web `93ijb65q…` is used instead.)
 
-**Apple OAuth** — native idToken `aud` = the app bundle (`com.orb.guard`). Backend Apple config is a
-SINGLE `ORBNET_OAUTH_APPLE_CLIENT_ID` (currently OrbVPN's `com.orb.vpn`) — needs a small backend change
-to also accept `com.orb.guard`. App: enable "Sign in with Apple" on the `com.orb.guard` App ID +
-regen profile (entitlement already in code from A1.5).
+**Apple OAuth** — ✅ app + backend READY; **one App-Store step left (user).** App side 100% done
+(A1.5): `applesignin` entitlement, `getAppleIDCredential → identityToken → oauthLogin('apple')`, button
+on iOS/macOS. **Backend needs NO change:** `validateAppleToken` (`oauth/service.go:475`) verifies
+Apple's JWKS signature + expiry but does **NOT check `aud`** (unlike Google) — so OrbGuard's native
+token (`aud=com.orb.guard`) is already accepted. (`ORBNET_OAUTH_APPLE_CLIENT_ID=com.orbvpn.auth` is the
+web Services ID, unused for native verify.) **ONE STEP LEFT:** enable "Sign in with Apple" on the
+`com.orb.guard` App ID in Apple Developer + regen the provisioning profile — until then the Apple button
+fails honestly. ⚠️ SECURITY NOTE (pre-existing OrbNet gap, not OrbGuard-specific): the missing Apple
+`aud` check means any Apple-signed idToken for any app is accepted — optional hardening = add an
+`aud` allowlist (com.orb.vpn + com.orb.guard + the web Services ID) to `validateAppleToken`; needs the
+full OrbVPN audience list to avoid breaking OrbVPN's Apple login.
 
 **Not a blocker:** magic-link + password login work with ZERO config; OAuth is optional polish.
 
