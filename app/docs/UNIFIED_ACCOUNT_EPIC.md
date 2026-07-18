@@ -158,9 +158,20 @@ the remaining Phase A work and needs shared-backend (OrbNet) changes — see the
     (google-services.json is FCM-only, 0 oauth_client entries), Apple capability on the App
     ID/profile (iOS entitlement added), and OrbNet `/auth/oauth/login` must accept OrbGuard's OAuth
     audience. Magic-link + password work with no extra config.
-- **A3 (ads → scan credits)** ⬜ NEXT — the big one: OrbNet backend (OrbGuard's own device limit +
-  `scan_credits` reward type/ledger + endpoints) + OrbGuard app (ad SDKs + scan metering). Needs a
-  Go backend change + deploy.
+- **A3 (ads → scan credits)** 🚧 IN PROGRESS.
+  - **Backend ✅ BUILT + DEPLOYED** (2026-07-18). OrbNet commit `abb8517` on `main` (rebased onto
+    origin, gated, no OrbX overlap) → Azure deploy triggered. Adds `token_balances.scan_credit_balance`
+    (migration 104, embedded/idempotent, auto-applies on startup), `reward_type='scan_credits'`
+    opt-in on `POST /ad/session`, a scan-credit branch in `grantSessionReward` (OrbX/VPN paths
+    untouched), `token.Add/Deduct/GetScanCredits`, and `GET /scan-credits/balance` + `POST
+    /scan/consume` (402 when empty). Rate `ORBNET_SCAN_CREDITS_PER_AD` (default 1). Build+vet+tests
+    green. ⚠️ post-deploy e2e verification pending (real-JWT curl of the 4 endpoints).
+  - **App side 🚧** building (Unity + Adivery + Yandex waterfall, per user). Foundation (OrbNet ad +
+    scan-credit client, `ScanCreditProvider`, config-gated honest ad SDK layer, watch-ad sheet, tests)
+    in a worktree agent. **Main agent still owns:** wiring the scan gate + the free-vs-premium UX
+    decision (premium=unlimited scans/no ads; free=credits — free daily allowance TBD with user).
+  - **Device limit** (decision #4) deferred to a separate careful change — it touches the critical
+    `LoginByUserIDWithDevice` auth path; orthogonal to the ad→credit loop.
 
 ### A3 technical plan (from investigation, agent a356a83d, 2026-07-18)
 **Key simplifier:** OrbGuard's ported OrbNet auth stack (`lib/services/orbnet/`, base `api.orbai.world`)
