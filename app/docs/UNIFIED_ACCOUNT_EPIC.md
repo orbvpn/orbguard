@@ -185,8 +185,14 @@ the remaining Phase A work and needs shared-backend (OrbNet) changes — see the
     Yandex/Adivery maven + minSdk + AD_ID perm). Until supplied, ads are honestly UNAVAILABLE, so a
     free user who is out of credits genuinely can't scan (premium + the free onboarding check work).
   - Device e2e of the UI blocked by (a) ad config above and (b) the device-limit login blocker (#64).
-  - **Device limit** (decision #4) deferred to a separate careful change — it touches the critical
-    `LoginByUserIDWithDevice` auth path; orthogonal to the ad→credit loop.
+  - **Device limit** (decision #4) — ✅ BUILT + DEPLOYED (2026-07-18). OrbNet `b1235cd` on main +
+    app `1c18710`. Opt-in `client="orbguard"` on login → routes through the EXISTING no-device path
+    (`issueWebSession`/`LoginByUserIDWeb`, same as web checkout): OrbGuard logins don't consume a VPN
+    device slot (own limit, enforced by guard.orbai.world), so capped users (free=1) can log in.
+    Strictly gated (`IsOrbGuardClient`, `oneof=orbguard`) → OrbVPN path byte-for-byte unchanged; app
+    sends `client:'orbguard'` on password/magic/OAuth. Passkey/QR/security paths untouched, no
+    migration. build+vet+tests green (+TestIsOrbGuardClient). ⚠️ post-deploy e2e pending (orbguard
+    logins bypass limit; normal logins still enforce).
 
 ### A3 technical plan (from investigation, agent a356a83d, 2026-07-18)
 **Key simplifier:** OrbGuard's ported OrbNet auth stack (`lib/services/orbnet/`, base `api.orbai.world`)
