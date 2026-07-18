@@ -20,6 +20,7 @@ import '../services/security/device_scan_service.dart';
 import 'analytics/analytics_dashboard_screen.dart';
 import 'scanning_screen.dart';
 import 'settings/settings_screen.dart';
+import '../widgets/scan_credits/scan_gate.dart';
 
 /// Main dashboard screen
 class DashboardScreen extends StatefulWidget {
@@ -74,6 +75,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _navigateToScan() async {
+    // Same scan-credit gate as the home scan: premium unlimited, free users
+    // spend a credit (or watch an ad to earn one).
+    if (!await ensureScanCredit(context) || !mounted) return;
     final result = await Navigator.push<ScanResult>(
       context,
       PageRouteBuilder(

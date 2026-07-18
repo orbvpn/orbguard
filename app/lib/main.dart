@@ -101,6 +101,11 @@ import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
 import 'providers/account_provider.dart';
+import 'providers/scan_credit_provider.dart';
+import 'services/ads/rewarded_ad_service.dart';
+import 'services/orbnet/ad_api.dart';
+import 'services/orbnet/scan_credit_api.dart';
+import 'widgets/scan_credits/scan_gate.dart';
 import 'models/app_mode.dart';
 
 // API Client
@@ -240,6 +245,21 @@ class AntiSpywareApp extends StatelessWidget {
         // Shared OrbVPN/OrbNet account state. Hydrates from secure storage on
         // start (login is optional; anonymous device registration is untouched).
         ChangeNotifierProvider(create: (_) => AccountProvider()..init()),
+        // Scan credits: earn by watching a rewarded ad, spend one per scan.
+        // Uses the shared authenticated OrbNet client; reads the account for the
+        // "sign in to earn/use credits" rule (registered AFTER AccountProvider
+        // so it's resolvable here).
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final account = ctx.read<AccountProvider>();
+            return ScanCreditProvider(
+              adApi: AdApi(),
+              scanCreditApi: ScanCreditApi(),
+              adService: DefaultRewardedAdService(),
+              isLoggedIn: () => account.isLoggedIn,
+            );
+          },
+        ),
       ],
       child: _PremiumModeSync(
         child: Consumer<SettingsProvider>(
@@ -398,7 +418,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final s = context.read<SettingsProvider>();
     if (s.isProMode || !s.permissionsPrimed || s.firstCheckDone) return;
     s.markFirstCheckDone();
-    _startScan();
+    // The onboarding "your first check found N things" moment is free — not
+    // user-initiated, and never an ad prompt on first run.
+    _startScan(userInitiated: false);
   }
 
   /// Pull the real "blocked today" count for the home's proof-of-work feed.
@@ -532,12 +554,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _startScan({bool? deepScan}) async {
+  Future<void> _startScan({bool? deepScan, bool userInitiated = true}) async {
     // Check if we have enough permissions
     if (_detectionCapability < 50) {
       _showPermissionWarning();
       return;
     }
+
+    // Scan-credit gate: subscribers scan freely; free users spend one credit
+    // (earning more via a rewarded ad). Only user-initiated scans are metered —
+    // the one-shot first-run check and background auto-scans are exempt.
+    if (userInitiated && !await ensureScanCredit(context)) return;
+    if (!mounted) return;
 
     // Honor the Deep Scan setting unless a caller explicitly overrides it.
     final effectiveDeepScan =
