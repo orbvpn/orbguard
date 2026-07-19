@@ -185,6 +185,12 @@ class AuthApi {
     );
   }
 
+  /// List the signed-in account's registered passkeys (bearer required).
+  /// Returns the envelope `{data:{passkeys:[...]}}`.
+  Future<Map<String, dynamic>> listPasskeys() async {
+    return await _client.get<Map<String, dynamic>>('/security/passkeys');
+  }
+
   /// Finish passkey REGISTRATION with the platform attestation (bearer required).
   Future<Map<String, dynamic>> finishPasskeyRegistration({
     required String sessionId,

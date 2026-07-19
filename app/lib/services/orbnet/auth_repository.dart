@@ -218,6 +218,19 @@ class AuthRepository {
   /// Whether this device can run passkey ceremonies (gates the passkey UI).
   Future<bool> isPasskeyAvailable() => _passkeyService.isAvailable();
 
+  /// The number of passkeys registered on the signed-in account. 0 when none
+  /// (or on any error — treated as "none" so the UI offers setup). Best-effort.
+  Future<int> passkeyCount() async {
+    try {
+      final resp = await _authApi.listPasskeys();
+      final data = resp['data'] as Map<String, dynamic>? ?? resp;
+      final list = data['passkeys'];
+      return list is List ? list.length : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   String get _platformName => Platform.isIOS
       ? 'ios'
       : Platform.isAndroid

@@ -27,6 +27,7 @@ import '../trust/privacy_explainer_screen.dart';
 import '../account/login_screen.dart';
 import '../../providers/account_provider.dart';
 import '../../widgets/premium/premium_gate.dart';
+import '../legal/legal_screen.dart';
 import 'notification_discipline_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -371,21 +372,31 @@ class SettingsScreen extends StatelessWidget {
                     '1.0.0 (Build 1)',
                     'info_circle',
                   ),
-                  // No in-app Terms/Privacy content or canonical URL is wired
-                  // yet, so these are shown as plain info rows rather than
-                  // tappable links that go nowhere (a null onTap also removes
-                  // the misleading navigation chevron).
                   _buildSettingsTile(
                     context,
                     'Terms of Service',
                     'View terms and conditions',
                     'file_text',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const LegalScreen(doc: LegalDoc.terms),
+                      ),
+                    ),
                   ),
                   _buildSettingsTile(
                     context,
                     'Privacy Policy',
                     'View privacy policy',
                     'clipboard_text',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const LegalScreen(doc: LegalDoc.privacy),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -504,20 +515,10 @@ class SettingsScreen extends StatelessWidget {
                     : 'Signed in with your OrbVPN account',
                 'shield_keyhole',
               ),
-              // Passkey setup — only when the device can run passkey ceremonies.
-              FutureBuilder<bool>(
-                future: account.isPasskeyAvailable(),
-                builder: (context, snap) {
-                  if (snap.data != true) return const SizedBox.shrink();
-                  return _buildSettingsTile(
-                    context,
-                    'Set up a passkey',
-                    'Sign in with Face / fingerprint next time — no code needed',
-                    'shield_keyhole',
-                    onTap: () => _registerPasskey(context, account),
-                  );
-                },
-              ),
+              // Passkey — reflects whether one is already registered, and only
+              // shown when the device can run passkey ceremonies. Self-contained:
+              // fetches state, registers, and refreshes itself.
+              _PasskeyTile(account: account, buildTile: _buildSettingsTile),
               _buildSettingsTile(
                 context,
                 'Sign out',
@@ -531,18 +532,6 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
-  }
-
-  Future<void> _registerPasskey(
-      BuildContext context, AccountProvider account) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final ok = await account.registerPasskey();
-    if (!context.mounted) return;
-    messenger.showSnackBar(SnackBar(
-      content: Text(ok
-          ? 'Passkey set up — you can now sign in with Face / fingerprint'
-          : (account.lastError ?? 'Could not set up the passkey')),
-    ));
   }
 
   void _showSignOutSheet(BuildContext context, AccountProvider account) {
@@ -588,6 +577,91 @@ class SettingsScreen extends StatelessWidget {
           const SnackBar(content: Text('Settings reset to defaults')),
         );
       },
+    );
+  }
+}
+
+/// Account passkey row. Reflects whether a passkey is already registered
+/// (so it no longer just says "Set up a passkey" forever), registers a new one
+/// on tap with clear feedback, and refreshes itself. Hidden when the device
+/// can't do passkeys.
+class _PasskeyTile extends StatefulWidget {
+  const _PasskeyTile({required this.account, required this.buildTile});
+
+  final AccountProvider account;
+  final Widget Function(
+    BuildContext context,
+    String title,
+    String subtitle,
+    String icon, {
+    VoidCallback? onTap,
+    bool isDestructive,
+  }) buildTile;
+
+  @override
+  State<_PasskeyTile> createState() => _PasskeyTileState();
+}
+
+class _PasskeyTileState extends State<_PasskeyTile> {
+  bool _available = false;
+  int _count = 0;
+  bool _loading = true;
+  bool _working = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final available = await widget.account.isPasskeyAvailable();
+    final count = available ? await widget.account.passkeyCount() : 0;
+    if (!mounted) return;
+    setState(() {
+      _available = available;
+      _count = count;
+      _loading = false;
+    });
+  }
+
+  Future<void> _register() async {
+    if (_working) return;
+    setState(() => _working = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await widget.account.registerPasskey();
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Passkey set up — you can now sign in with Face / fingerprint'
+          : (widget.account.lastError ?? 'Could not set up the passkey')),
+    ));
+    setState(() => _working = false);
+    if (ok) await _refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Hidden until we know the device supports passkeys (avoids a flash).
+    if (_loading || !_available) return const SizedBox.shrink();
+
+    final has = _count > 0;
+    final title = _working
+        ? 'Setting up passkey…'
+        : (has ? 'Passkey enabled' : 'Set up a passkey');
+    final subtitle = _working
+        ? 'Confirm with Face / fingerprint'
+        : (has
+            ? '$_count passkey${_count == 1 ? '' : 's'} · tap to add another'
+            : 'Sign in with Face / fingerprint next time — no code needed');
+
+    return widget.buildTile(
+      context,
+      title,
+      subtitle,
+      'shield_keyhole',
+      onTap: _working ? null : _register,
+      isDestructive: false,
     );
   }
 }

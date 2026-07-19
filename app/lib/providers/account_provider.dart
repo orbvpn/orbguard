@@ -209,6 +209,9 @@ class AccountProvider extends ChangeNotifier {
   /// Whether this device supports passkey sign-in (gates the passkey button).
   Future<bool> isPasskeyAvailable() => _repo.isPasskeyAvailable();
 
+  /// Number of passkeys registered on the signed-in account (0 if none/unknown).
+  Future<int> passkeyCount() => _repo.passkeyCount();
+
   /// Sign in with a platform passkey. Same contract as [loginWithGoogle]:
   /// true on success, silent false on cancel, clear [lastError] on real failure.
   Future<bool> loginWithPasskey(String email) =>

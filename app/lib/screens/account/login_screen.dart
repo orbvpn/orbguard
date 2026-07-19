@@ -12,6 +12,7 @@
 // HONESTY: the Google/Apple buttons drive the REAL native flow. On failure
 // (user cancels aside) a clear error is shown — never a fake success.
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -23,6 +24,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/brand_button.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../legal/legal_screen.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../providers/account_provider.dart';
@@ -111,6 +113,44 @@ class _LoginScreenState extends State<LoginScreen> {
       messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
       _dismiss(true);
     }
+  }
+
+  void _openLegal(LegalDoc doc) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LegalScreen(doc: doc)),
+    );
+  }
+
+  Widget _legalAcceptance(BuildContext context) {
+    final muted = BrandText.body(color: context.colors.onSurfaceVariant, size: 12);
+    final link = BrandText.body(color: AppColors.accentInk, size: 12);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Text.rich(
+        TextSpan(
+          text: 'By continuing you agree to the OrbGuard ',
+          style: muted,
+          children: [
+            TextSpan(
+              text: 'Terms of Service',
+              style: link,
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => _openLegal(LegalDoc.terms),
+            ),
+            TextSpan(text: ' and ', style: muted),
+            TextSpan(
+              text: 'Privacy Policy',
+              style: link,
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => _openLegal(LegalDoc.privacy),
+            ),
+            TextSpan(text: '.', style: muted),
+          ],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 
   Future<void> _signInWithPasskey() async {
@@ -210,7 +250,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 _errorBanner(context, account.lastError!),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              // Terms/Privacy acceptance — signing in constitutes agreement.
+              _legalAcceptance(context),
+              const SizedBox(height: 12),
               // Secondary, non-lime action — dismiss without signing in.
               Center(
                 child: TextButton(
