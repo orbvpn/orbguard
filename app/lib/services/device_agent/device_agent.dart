@@ -53,6 +53,12 @@ const String _kPolicyKey = 'device_agent.policy';
 const String _kBackgroundTaskUniqueName = 'orbguard.device_agent.poll';
 const String _kBackgroundTaskName = 'deviceAgentPoll';
 
+/// Upper bound for a single remote command's on-device execution. Long enough
+/// for a real camera capture + upload; short enough that a hung executor can't
+/// wedge the poll loop. (Ring returns immediately after starting playback — its
+/// own timer stops it — so it is not affected by this bound.)
+const Duration _kCommandTimeout = Duration(seconds: 45);
+
 /// The agent-relevant subset of the backend models.AntiTheftSettings.
 class AgentPolicy {
   final bool remoteLocateEnabled;
@@ -295,7 +301,28 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
       commands = const [];
     }
     for (final cmd in commands) {
-      await _executeCommand(api, cmd, foreground: foreground);
+      // Bound each command so a single hung executor (e.g. a headless camera
+      // capture that never returns) can't stall the whole cycle — which would
+      // leave _polling stuck true and silently stop ALL later commands until an
+      // app restart. On timeout we ack it as failed so it doesn't retry-and-hang
+      // every cycle, then continue with the next command.
+      try {
+        await _executeCommand(api, cmd, foreground: foreground)
+            .timeout(_kCommandTimeout);
+      } on TimeoutException {
+        final commandId = cmd['id']?.toString() ?? '';
+        developer.log('command $commandId timed out after '
+            '${_kCommandTimeout.inSeconds}s — acking failed', name: 'DeviceAgent');
+        if (commandId.isNotEmpty) {
+          try {
+            await api
+                .ackCommand(commandId, error: 'timed out on device')
+                .timeout(const Duration(seconds: 10));
+          } catch (_) {/* best-effort */}
+        }
+      } catch (e) {
+        developer.log('command execution error: $e', name: 'DeviceAgent');
+      }
     }
 
     // 2. Periodic location report (independent of locate commands).
