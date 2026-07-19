@@ -848,18 +848,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           const SizedBox(width: 12),
-          // Title area — floats over the page with NO background bar.
+          // Title pill — matches the unified GlassPage header used across the
+          // app (glass fill + border + blur), so the main tabs are consistent
+          // with every sub-screen instead of a bare floating title.
           Expanded(
-            child: SizedBox(
+            child: Container(
               height: 50,
-              child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: GlassTheme.glassColor(isDark),
+                border: Border.all(
+                  color: GlassTheme.glassBorderColor(isDark),
+                  width: GlassTheme.borderWidth,
+                ),
+                boxShadow: [GlassTheme.shadow(isDark)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: BackdropFilter(
+                  filter: GlassTheme.blurFilter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
                       children: [
                         // Title text
                         Expanded(
                           child: Text(
                             'OrbGuard',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -898,6 +915,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+            ),
+          ),
         ],
       ),
     );
