@@ -107,7 +107,17 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.428639254932-69dmmhiju98tm6kbq7rdi9fd0pgq1gv8</string>
+				<string>com.googleusercontent.apps.568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.orb.guard.magiclink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>orbguard</string>
 			</array>
 		</dict>
 	</array>

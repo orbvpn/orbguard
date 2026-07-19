@@ -101,6 +101,7 @@ import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
 import 'providers/account_provider.dart';
+import 'services/orbnet/magic_link_deep_link.dart';
 import 'providers/scan_credit_provider.dart';
 import 'services/ads/rewarded_ad_service.dart';
 import 'services/orbnet/ad_api.dart';
@@ -375,6 +376,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         supported: PlatformInfo.isAndroid || PlatformInfo.isIOS),
   ]);
 
+  // Signs the user in when they tap the orbguard://login?code=… magic link.
+  late final MagicLinkDeepLinkHandler _magicLink =
+      MagicLinkDeepLinkHandler(_signInWithMagicCode);
+
   @override
   void initState() {
     super.initState();
@@ -383,14 +388,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _guards.refresh();
       _refreshActivity();
       _maybeRunFirstCheck();
+      unawaited(_magicLink.start());
     });
     _initializeApp();
+  }
+
+  // Exchange a magic-link code (from the deep link) for a session. The backend
+  // token is self-contained, so no email is needed (the field is unused there).
+  Future<void> _signInWithMagicCode(String code) async {
+    if (!mounted) return;
+    final account = context.read<AccountProvider>();
+    if (account.isLoggedIn) return; // already signed in — ignore stale links
+    // Capture across the async gap so we don't touch context after await.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final ok = await account.verifyMagicCode('', code);
+    if (!mounted) return;
+    if (ok) {
+      // The deep link fires under HomeScreen; the login screen is pushed on top.
+      // Pop back to home so the user lands signed-in instead of being stranded
+      // on the sign-in screen.
+      navigator.popUntil((route) => route.isFirst);
+    }
+    messenger.showSnackBar(SnackBar(
+      content:
+          Text(ok ? 'Signed in' : 'That sign-in link is invalid or expired'),
+    ));
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _guards.dispose();
+    _magicLink.dispose();
     super.dispose();
   }
 

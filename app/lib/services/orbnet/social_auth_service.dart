@@ -16,6 +16,8 @@
 
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -79,17 +81,21 @@ class SocialAuthService {
         _googleClientId = googleClientId ??
             (_envClientId.isNotEmpty ? _envClientId : _defaultClientId);
 
-  // Defaults (shared OrbVPN Google project orbvpn-f8292), overridable via
-  // --dart-define. serverClientId = the OrbVPN OAuth **Web** client that OrbNet
-  // already accepts as the idToken audience (verified present in the backend's
-  // ORBNET_OAUTH_GOOGLE_VALID_CLIENT_IDS; the same one OrbX passes). clientId =
-  // OrbGuard's OWN iOS OAuth client (bundle com.orb.guard) for the iOS flow —
-  // iOS only; on Android google_sign_in reads its client from
-  // google-services.json, so this stays empty there.
+  // Defaults live in OrbGuard's OWN Firebase project **orb-guard** (number
+  // 568666805173) — the SAME project the app is built with (google-services.json
+  // / GoogleService-Info.plist). google_sign_in/Credential Manager validates the
+  // app against its own project's OAuth clients, so serverClientId + the Android
+  // client + the app's Firebase project must all be orb-guard; a cross-project
+  // client here is what produced "[28444] Developer console is not set up
+  // correctly". serverClientId = the orb-guard **Web** client (client_type 3),
+  // added to the backend's ORBNET_OAUTH_GOOGLE_VALID_CLIENT_IDS so it accepts the
+  // idToken audience. clientId = the orb-guard **iOS** client (bundle
+  // com.orb.guard). On Android google_sign_in resolves its Android client by
+  // package + SHA-1 within the project. Overridable via --dart-define.
   static const String _defaultServerClientId =
-      '428639254932-93ijb65qnhvkacjjd2b5e17olm10fbck.apps.googleusercontent.com';
+      '568666805173-9ufp2it7gl2dntqehqohi6s4qnmh4hb1.apps.googleusercontent.com';
   static String get _defaultClientId => Platform.isIOS
-      ? '428639254932-69dmmhiju98tm6kbq7rdi9fd0pgq1gv8.apps.googleusercontent.com'
+      ? '568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p.apps.googleusercontent.com'
       : '';
 
   final AuthApi _authApi;
@@ -156,9 +162,14 @@ class SocialAuthService {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         return SocialAuthResult.canceled(SocialAuthProvider.google);
       }
+      // Log the code/description (no PII) so a misconfig like the Google Cloud
+      // OAuth "[28444] Developer console is not set up correctly" is diagnosable
+      // from logs instead of being silently swallowed.
+      debugPrint('[OrbGuard] Google sign-in failed: ${e.code} — ${e.description}');
       return SocialAuthResult.failure(
           SocialAuthProvider.google, _googleFailCopy);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[OrbGuard] Google sign-in error: ${e.runtimeType}');
       return SocialAuthResult.failure(
           SocialAuthProvider.google, _googleFailCopy);
     }
@@ -229,8 +240,9 @@ class SocialAuthService {
       // Hand back the raw envelope; the repository persists it via the same
       // path as email/magic login.
       return SocialAuthResult.success(providerEnum, result);
-    } catch (_) {
+    } catch (e) {
       // Network failure, or the backend rejected the provider token's audience.
+      debugPrint('[OrbGuard] OAuth token exchange failed: ${e.runtimeType}');
       return SocialAuthResult.failure(providerEnum, failCopy);
     }
   }

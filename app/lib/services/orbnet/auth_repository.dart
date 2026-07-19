@@ -19,7 +19,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'dart:io' show Platform;
+
 import 'auth_api.dart';
+import 'passkey_webauthn_service.dart';
 import 'models/auth_response.dart';
 import 'models/user.dart';
 import 'network_error.dart' as net_err;
@@ -57,6 +60,7 @@ class AuthRepository {
   final OrbNetApiClient _restClient = OrbNetApiClient.instance;
   final AuthApi _authApi = AuthApi();
   final SocialAuthService _socialAuthService;
+  final PasskeyWebAuthnService _passkeyService = PasskeyWebAuthnService();
   final FlutterSecureStorage _secureStorage;
 
   // In-memory token cache (updated synchronously on refresh, before the slower
@@ -207,6 +211,73 @@ class AuthRepository {
     final response = await _persistAuthResult(result.data!);
     _log('Social login successful: ${response.user.email}');
     return response;
+  }
+
+  // ---- Passkey (WebAuthn) --------------------------------------------------
+
+  /// Whether this device can run passkey ceremonies (gates the passkey UI).
+  Future<bool> isPasskeyAvailable() => _passkeyService.isAvailable();
+
+  String get _platformName => Platform.isIOS
+      ? 'ios'
+      : Platform.isAndroid
+          ? 'android'
+          : Platform.isMacOS
+              ? 'macos'
+              : Platform.isWindows
+                  ? 'windows'
+                  : 'linux';
+
+  /// Sign in with a platform passkey (Face / fingerprint / device PIN), then
+  /// persist the OrbNet session through the SAME path as email/magic login.
+  /// [email] may be empty for a discoverable/passwordless prompt.
+  Future<AuthResponse> signInWithPasskey(String email) async {
+    // Clear stale tokens for a clean sign-in.
+    _cachedAccessToken = null;
+    _cachedRefreshToken = null;
+
+    final begin = await _authApi.beginPasskeyAuth(email: email);
+    final beginData = begin['data'] as Map<String, dynamic>? ?? begin;
+    final options = (beginData['options'] ?? beginData['publicKey'])
+        as Map<String, dynamic>?;
+    final sessionId = beginData['session_id'] as String?;
+    if (options == null || sessionId == null) {
+      throw ApiException('Passkey sign-in is unavailable right now.');
+    }
+
+    final assertion = await _passkeyService.authenticate(options);
+
+    final result = await _authApi.finishPasskeyAuth(
+      sessionId: sessionId,
+      response: assertion,
+      platform: _platformName,
+      deviceName: 'OrbGuard',
+    );
+    final response = await _persistAuthResult(result);
+    _log('Passkey login successful: ${response.user.email}');
+    return response;
+  }
+
+  /// Register a new passkey for the signed-in account (bearer required).
+  /// [name] labels the credential. Returns true on success.
+  Future<bool> registerPasskey(String name) async {
+    final begin = await _authApi.beginPasskeyRegistration();
+    final beginData = begin['data'] as Map<String, dynamic>? ?? begin;
+    final options = (beginData['options'] ?? beginData['publicKey'])
+        as Map<String, dynamic>?;
+    final sessionId = beginData['session_id'] as String?;
+    if (options == null || sessionId == null) {
+      throw ApiException('Could not start passkey setup.');
+    }
+
+    final attestation = await _passkeyService.register(options);
+    await _authApi.finishPasskeyRegistration(
+      sessionId: sessionId,
+      name: name.trim().isEmpty ? 'OrbGuard passkey' : name.trim(),
+      response: attestation,
+    );
+    _log('Passkey registered');
+    return true;
   }
 
   /// Shared handling for a login/verify response: parse the Go envelope

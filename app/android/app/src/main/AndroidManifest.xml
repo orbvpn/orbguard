@@ -99,6 +99,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Magic-link deep link: the OrbGuard-branded sign-in email links to
+                 orbguard://login?code=... (backend chooses this scheme when the
+                 request carries client=orbguard). Opens OrbGuard, not OrbVPN. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="orbguard" android:host="login" />
+            </intent-filter>
         </activity>
 
         <!-- Flutter Embedding -->

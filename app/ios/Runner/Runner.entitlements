@@ -12,6 +12,17 @@
 		<string>Default</string>
 	</array>
 
+	<!-- Associated Domains - passkey (WebAuthn) sign-in is bound to RP ID
+	     orbai.world; iOS requires this webcredentials association (plus the
+	     matching AASA file served at https://orbai.world/.well-known/) before the
+	     platform will present the passkey sheet. You MUST also enable the
+	     "Associated Domains" capability on the App ID (Apple Developer portal) so
+	     the provisioning profile carries it. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:orbai.world</string>
+	</array>
+
 	<!-- Apple Push Notifications (FCM anti-theft wake-ups). Requires the Push
 	     Notifications capability on the App ID + an APNs auth key uploaded to
 	     Firebase (Apple Developer account). Set to `production` for release /

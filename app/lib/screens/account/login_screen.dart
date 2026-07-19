@@ -44,17 +44,26 @@ class _LoginScreenState extends State<LoginScreen> {
   // Magic-link is the DEFAULT/PRIMARY path; password hides behind a reveal.
   _LoginMode _mode = _LoginMode.magic;
   bool _magicSent = false;
+  // After the link is sent we lead with "tap the link" (the email's
+  // orbguard://login link signs in automatically). The manual code entry is a
+  // fallback revealed on demand — mirrors the OrbVPN "click the link" flow.
+  bool _showCodeEntry = false;
   bool _obscurePassword = true;
+  // Passkey button shows only when the device can run passkey ceremonies.
+  bool _passkeyAvailable = false;
 
   @override
   void initState() {
     super.initState();
     // Pre-fill the last email that signed in on this device.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final last = await context.read<AccountProvider>().lastLoggedInEmail();
+      final account = context.read<AccountProvider>();
+      final last = await account.lastLoggedInEmail();
       if (last != null && last.isNotEmpty && mounted && _emailController.text.isEmpty) {
         _emailController.text = last;
       }
+      final canPasskey = await account.isPasskeyAvailable();
+      if (mounted && canPasskey) setState(() => _passkeyAvailable = true);
     });
   }
 
@@ -97,6 +106,19 @@ class _LoginScreenState extends State<LoginScreen> {
     final messenger = ScaffoldMessenger.of(context);
     FocusScope.of(context).unfocus();
     final ok = await account.loginWithApple();
+    if (!mounted) return;
+    if (ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
+      _dismiss(true);
+    }
+  }
+
+  Future<void> _signInWithPasskey() async {
+    final account = context.read<AccountProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    FocusScope.of(context).unfocus();
+    // Pass the entered email to target the account; empty is fine (discoverable).
+    final ok = await account.loginWithPasskey(_emailController.text.trim());
     if (!mounted) return;
     if (ok) {
       messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
@@ -152,6 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _mode = mode;
       _magicSent = false;
+      _showCodeEntry = false;
       _codeController.clear();
     });
     context.read<AccountProvider>().clearError();
@@ -282,6 +305,20 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: account.isBusy ? null : _signInWithApple,
           ),
         ],
+        if (_passkeyAvailable) ...[
+          const SizedBox(height: 12),
+          _socialButton(
+            context,
+            key: const ValueKey('passkey_signin_button'),
+            mark: Icon(
+              Icons.fingerprint,
+              size: 24,
+              color: context.colors.onSurface,
+            ),
+            label: 'Sign in with a passkey',
+            onPressed: account.isBusy ? null : _signInWithPasskey,
+          ),
+        ],
       ],
     );
   }
@@ -382,30 +419,54 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_magicSent) ...[
           const SizedBox(height: 16),
           Text(
-            'We emailed a sign-in code to ${_emailController.text.trim()}. '
-            'Enter it below.',
+            'Check your email — we sent a sign-in link to '
+            '${_emailController.text.trim()}.\n'
+            'Open it on this device and tap the link to sign in.',
             style: BrandText.body(
                 color: context.colors.onSurfaceVariant, size: 13),
           ),
-          const SizedBox(height: 12),
-          _fieldLabel(context, 'Sign-in code'),
-          const SizedBox(height: 8),
-          _field(
-            context,
-            controller: _codeController,
-            hint: 'Paste the code from your email',
-            icon: 'key',
-            enabled: !account.isBusy,
-          ),
+          if (_showCodeEntry) ...[
+            const SizedBox(height: 16),
+            _fieldLabel(context, 'Sign-in code'),
+            const SizedBox(height: 8),
+            _field(
+              context,
+              controller: _codeController,
+              hint: 'Paste the code from your email',
+              icon: 'key',
+              enabled: !account.isBusy,
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: account.isBusy
+                    ? null
+                    : () => setState(() => _showCodeEntry = true),
+                child: Text(
+                  "Can't open the link? Enter the code instead",
+                  style: BrandText.title(
+                      color: context.colors.onSurfaceVariant, size: 13),
+                ),
+              ),
+            ),
+          ],
         ],
         const SizedBox(height: 20),
         // The single lime action for this screen — the default sign-in path.
+        // After sending: "Verify & sign in" once the code fallback is revealed,
+        // otherwise "Resend link".
         BrandButton(
-          label: _magicSent ? 'Verify & sign in' : 'Email me a sign-in code',
+          label: !_magicSent
+              ? 'Email me a sign-in link'
+              : (_showCodeEntry ? 'Verify & sign in' : 'Resend link'),
           isLoading: account.isBusy,
           onPressed: account.isBusy
               ? null
-              : (_magicSent ? _verifyMagicCode : _requestMagicCode),
+              : (!_magicSent
+                  ? _requestMagicCode
+                  : (_showCodeEntry ? _verifyMagicCode : _requestMagicCode)),
         ),
         const SizedBox(height: 10),
         // Subtle, non-lime reveal for the secondary password path.

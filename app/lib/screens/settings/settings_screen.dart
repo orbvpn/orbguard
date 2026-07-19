@@ -504,6 +504,20 @@ class SettingsScreen extends StatelessWidget {
                     : 'Signed in with your OrbVPN account',
                 'shield_keyhole',
               ),
+              // Passkey setup — only when the device can run passkey ceremonies.
+              FutureBuilder<bool>(
+                future: account.isPasskeyAvailable(),
+                builder: (context, snap) {
+                  if (snap.data != true) return const SizedBox.shrink();
+                  return _buildSettingsTile(
+                    context,
+                    'Set up a passkey',
+                    'Sign in with Face / fingerprint next time — no code needed',
+                    'shield_keyhole',
+                    onTap: () => _registerPasskey(context, account),
+                  );
+                },
+              ),
               _buildSettingsTile(
                 context,
                 'Sign out',
@@ -517,6 +531,18 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _registerPasskey(
+      BuildContext context, AccountProvider account) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await account.registerPasskey();
+    if (!context.mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Passkey set up — you can now sign in with Face / fingerprint'
+          : (account.lastError ?? 'Could not set up the passkey')),
+    ));
   }
 
   void _showSignOutSheet(BuildContext context, AccountProvider account) {

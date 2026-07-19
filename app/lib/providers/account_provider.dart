@@ -206,6 +206,33 @@ class AccountProvider extends ChangeNotifier {
   /// Sign in with Apple. Same contract as [loginWithGoogle].
   Future<bool> loginWithApple() => _socialLogin(_repo.signInWithApple);
 
+  /// Whether this device supports passkey sign-in (gates the passkey button).
+  Future<bool> isPasskeyAvailable() => _repo.isPasskeyAvailable();
+
+  /// Sign in with a platform passkey. Same contract as [loginWithGoogle]:
+  /// true on success, silent false on cancel, clear [lastError] on real failure.
+  Future<bool> loginWithPasskey(String email) =>
+      _socialLogin(() => _repo.signInWithPasskey(email));
+
+  /// Register a passkey for the signed-in account (biometric setup). Returns
+  /// true on success; sets [lastError] and returns false on failure/cancel.
+  Future<bool> registerPasskey({String name = 'OrbGuard passkey'}) async {
+    if (_busy || !isLoggedIn) return false;
+    _setBusy(true);
+    _error = null;
+    try {
+      final ok = await _repo.registerPasskey(name);
+      _busy = false;
+      notifyListeners();
+      return ok;
+    } catch (e) {
+      _error = _friendlyError(e);
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Shared driver for the social sign-in paths — mirrors [login]'s shape
   /// (busy → repo → set user/session → notify), plus silent cancellation.
   Future<bool> _socialLogin(Future<AuthResponse> Function() signIn) async {

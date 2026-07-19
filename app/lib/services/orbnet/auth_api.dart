@@ -102,6 +102,9 @@ class AuthApi {
       data: {
         'email': email,
         'source': 'mobile',
+        // Identify OrbGuard so the backend sends the OrbGuard-branded email and
+        // an orbguard://login deep link (instead of the OrbVPN defaults).
+        'client': kOrbGuardClient,
         'allow_registration': allowRegistration,
         'terms_accepted': termsAccepted,
       },
@@ -127,6 +130,70 @@ class AuthApi {
       '/auth/oauth/login',
       data: {'provider': provider, 'token': token, 'client': kOrbGuardClient},
       skipAuth: true,
+    );
+  }
+
+  // ---- Passkey (WebAuthn) ---------------------------------------------------
+
+  /// Begin a passkey authentication ceremony. Public (no bearer). Optional
+  /// [email] targets one account; omit for a discoverable/passwordless prompt.
+  /// Returns `{options, session_id}` (WebAuthn request options + session id).
+  Future<Map<String, dynamic>> beginPasskeyAuth({String? email}) async {
+    final q = (email != null && email.trim().isNotEmpty)
+        ? '?email=${Uri.encodeQueryComponent(email.trim())}'
+        : '';
+    return await _client.post<Map<String, dynamic>>(
+      '/auth/passkey/authenticate/begin$q',
+      data: const {},
+      skipAuth: true,
+    );
+  }
+
+  /// Finish passkey authentication with the platform assertion. Public (no
+  /// bearer). Returns the same auth envelope as magic-link/oauth login.
+  Future<Map<String, dynamic>> finishPasskeyAuth({
+    required String sessionId,
+    required Map<String, dynamic> response,
+    String? deviceId,
+    String? platform,
+    String? deviceName,
+    String? fcmToken,
+  }) async {
+    return await _client.post<Map<String, dynamic>>(
+      '/auth/passkey/authenticate/finish',
+      data: {
+        'session_id': sessionId,
+        'response': response,
+        // OrbGuard's own device limit — no-VPN-device session, so passkey login
+        // never consumes a VPN device slot (same as magic-link/oauth).
+        'client': kOrbGuardClient,
+        if (deviceId != null) 'device_id': deviceId,
+        if (platform != null) 'platform': platform,
+        if (deviceName != null) 'device_name': deviceName,
+        if (fcmToken != null) 'fcm_token': fcmToken,
+      },
+      skipAuth: true,
+    );
+  }
+
+  /// Begin passkey REGISTRATION (bearer required — user must be signed in).
+  /// Returns `{options, session_id}` (WebAuthn creation options + session id).
+  Future<Map<String, dynamic>> beginPasskeyRegistration() async {
+    return await _client.post<Map<String, dynamic>>(
+      '/security/passkeys/register/begin',
+      data: const {},
+    );
+  }
+
+  /// Finish passkey REGISTRATION with the platform attestation (bearer required).
+  Future<Map<String, dynamic>> finishPasskeyRegistration({
+    required String sessionId,
+    required String name,
+    required Map<String, dynamic> response,
+  }) async {
+    return await _client.post<Map<String, dynamic>>(
+      '/security/passkeys/register/finish',
+      data: {'session_id': sessionId, 'name': name, 'response': response},
     );
   }
 
