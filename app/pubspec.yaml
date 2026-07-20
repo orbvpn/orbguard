@@ -64,6 +64,9 @@ dependencies:
   app_links: ^6.3.2
   # Passkey (WebAuthn) sign-in — platform biometric auth, same as OrbVPN.
   passkeys: ^2.21.0
+  # In-app purchases (subscriptions). Adds the Play Billing library, which is
+  # what unlocks subscription management in Play Console + enables purchases.
+  in_app_purchase: ^3.2.0
   # Biometric app-lock — failed unlock attempts trigger a thief selfie.
   # On iOS this is the platform-supported "best extent" for the selfie
   # feature (the OS lock screen exposes no failed-attempt hooks to apps).

@@ -41,7 +41,7 @@ android {
         targetSdk = 36
         // Bump on every Play upload (1 = draft, 2 = targetSdk36, 3 = dropped the
         // unused READ_CALL_LOG permission).
-        versionCode = 4
+        versionCode = 5
         versionName = "1.0"
         multiDexEnabled = true
     }
