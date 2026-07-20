@@ -37,8 +37,11 @@ android {
     defaultConfig {
         applicationId = "com.orb.guard"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
-        versionCode = 1
+        // Google Play requires a recent target API to release; match compileSdk.
+        targetSdk = 36
+        // versionCode 1 was already uploaded as a draft; bump so Play accepts the
+        // new (target-SDK-36) bundle.
+        versionCode = 2
         versionName = "1.0"
         multiDexEnabled = true
     }
