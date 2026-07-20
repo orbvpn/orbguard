@@ -37,11 +37,16 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- ============================================ -->
-    <!-- SMS/CALL SCANNING (Pegasus exploits via SMS) -->
+    <!-- SMS SCANNING — anti-SMS-phishing / smishing detection (SMSAnalyzer):
+         reads and screens incoming + inbox messages for scam and exploit
+         (e.g. Pegasus-style) links. Declared to Google Play under the
+         "Anti-SMS Phishing" permitted use.
+         NOTE: READ_CALL_LOG is deliberately NOT declared — nothing in the app
+         reads the call log. (The permission NAME appears in our scanner's
+         dangerous-permission lists only to flag OTHER apps that request it.) -->
     <!-- ============================================ -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
     <!-- ============================================ -->
     <!-- PACKAGE USAGE (Monitor app behavior) -->
