@@ -45,17 +45,15 @@ class PermissionManager {
       description: 'Enables deep threat analysis',
       icon: AppIcons.search,
       permissions: [
+        // Prominent disclosure (Google Play policy): SMS text is sent to
+        // OrbGuard's servers for scam/phishing analysis — say so BEFORE asking.
         PermissionInfo(
           permission: Permission.sms,
           name: 'SMS Access',
-          reason: 'Detect SMS-based exploits (Pegasus uses SMS)',
-          impact: 'Critical for zero-click exploit detection',
-        ),
-        PermissionInfo(
-          permission: Permission.phone,
-          name: 'Call Logs',
-          reason: 'Identify suspicious call patterns',
-          impact: 'Detects communication monitoring malware',
+          reason: 'Screens texts for scams, phishing and SMS-based exploits. '
+              'Message text is sent securely to OrbGuard servers for this '
+              'analysis only — never sold or used for ads.',
+          impact: 'Critical for scam-text and zero-click exploit detection',
         ),
         PermissionInfo(
           permission: Permission.location,
