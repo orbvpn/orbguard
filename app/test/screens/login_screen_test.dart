@@ -109,7 +109,7 @@ void main() {
 
     // Header + the primary (default) magic-link CTA.
     expect(find.text('Sign in with your OrbVPN account'), findsOneWidget);
-    expect(find.text('Email me a sign-in code'), findsOneWidget);
+    expect(find.text('Email me a sign-in link'), findsOneWidget);
 
     // Social sign-in is offered prominently, with the "or" divider.
     expect(find.text('Continue with Google'), findsOneWidget);
@@ -160,7 +160,7 @@ void main() {
     expect(find.text('PASSWORD'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Email me a code instead'), findsOneWidget);
-    expect(find.text('Email me a sign-in code'), findsNothing);
+    expect(find.text('Email me a sign-in link'), findsNothing);
 
     // Social sign-in stays available in both modes.
     expect(find.text('Continue with Google'), findsOneWidget);
@@ -198,8 +198,8 @@ void main() {
   });
 
   testWidgets(
-      'magic-link path: typed email reaches loginWithMagicLink(); advances to '
-      'code entry', (tester) async {
+      'magic-link path: typed email reaches loginWithMagicLink(); confirms link '
+      'sent (code entry is a fallback)', (tester) async {
     final account = _FakeAccount();
     await _pumpLogin(tester, account);
 
@@ -207,15 +207,21 @@ void main() {
         find.byKey(const ValueKey('magic_email_field')), 'nima@example.com');
     await tester.pump();
 
-    // The default lime action requests a code.
-    await tester.tap(find.text('Email me a sign-in code'));
+    // The default lime action requests a magic sign-in LINK (OrbVPN-style:
+    // "tap the link", not "type a 6-digit code").
+    await tester.tap(find.text('Email me a sign-in link'));
     await tester.pumpAndSettle();
 
     expect(account.magicCalls, 1);
     expect(account.magicEmail, 'nima@example.com');
-    // On success the screen advances to the code-entry step.
-    expect(find.text('Verify & sign in'), findsOneWidget);
-    expect(find.textContaining('We emailed a sign-in code'), findsOneWidget);
+    // On success the screen confirms the link was sent and offers a resend; the
+    // code path is a secondary fallback behind an explicit reveal.
+    expect(find.textContaining('we sent a sign-in link to'), findsOneWidget);
+    expect(find.text('Resend link'), findsOneWidget);
+    expect(
+        find.text("Can't open the link? Enter the code instead"), findsOneWidget);
+    // Not auto-advanced to the code-entry step.
+    expect(find.text('Verify & sign in'), findsNothing);
 
     account.dispose();
   });

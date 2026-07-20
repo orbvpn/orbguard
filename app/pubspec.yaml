@@ -67,6 +67,11 @@ dependencies:
   # In-app purchases (subscriptions). Adds the Play Billing library, which is
   # what unlocks subscription management in Play Console + enables purchases.
   in_app_purchase: ^3.2.0
+  # Platform implementations, declared explicitly because IapService references
+  # their concrete types (GooglePlayPurchaseDetails for the Android purchase
+  # token; StoreKit types) — avoids the depend_on_referenced_packages lint.
+  in_app_purchase_android: ^0.5.1
+  in_app_purchase_storekit: ^0.4.10
   # Biometric app-lock — failed unlock attempts trigger a thief selfie.
   # On iOS this is the platform-supported "best extent" for the selfie
   # feature (the OS lock screen exposes no failed-attempt hooks to apps).

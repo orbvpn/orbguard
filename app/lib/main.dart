@@ -107,6 +107,7 @@ import 'providers/scan_credit_provider.dart';
 import 'services/ads/rewarded_ad_service.dart';
 import 'services/orbnet/ad_api.dart';
 import 'services/orbnet/scan_credit_api.dart';
+import 'services/iap/iap_service.dart';
 import 'widgets/scan_credits/scan_gate.dart';
 import 'models/app_mode.dart';
 
@@ -260,6 +261,24 @@ class AntiSpywareApp extends StatelessWidget {
               adService: DefaultRewardedAdService(),
               isLoggedIn: () => account.isLoggedIn,
             );
+          },
+        ),
+        // In-app purchases (subscriptions). The singleton IapService connects to
+        // the store, loads the real localized prices, and — on a verified
+        // purchase — refreshes the account session so the shared entitlement
+        // unlocks. Registered AFTER AccountProvider so it can wire the session
+        // refresh + login probe. initialize() also replays any purchase left
+        // unfinished on a previous run (money-safe retry).
+        ChangeNotifierProvider<IapService>(
+          create: (ctx) {
+            final account = ctx.read<AccountProvider>();
+            final iap = IapService.instance
+              ..configure(
+                onEntitlementRefresh: account.refreshEntitlement,
+                isLoggedIn: () => account.isLoggedIn,
+              );
+            unawaited(iap.initialize());
+            return iap;
           },
         ),
       ],

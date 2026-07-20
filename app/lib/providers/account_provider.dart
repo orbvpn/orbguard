@@ -286,6 +286,30 @@ class AccountProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Force-refresh the session so a just-completed purchase's new subscription
+  /// claims (`subscription_valid` / tier / expiry) are reflected immediately.
+  ///
+  /// After an IAP is verified, the OrbNet backend writes the shared account
+  /// subscription, but THIS device still holds the pre-purchase access token
+  /// whose claims say "not subscribed". A token refresh mints a new token that
+  /// carries the updated claims, so [hasPremium] / [subscriptionValid] flip to
+  /// true without a re-login. Called by the IAP flow right after a confirmed
+  /// grant. No-op when logged out; never throws. Returns true when the session
+  /// was refreshed.
+  Future<bool> refreshEntitlement() async {
+    if (!isLoggedIn) return false;
+    var refreshed = false;
+    try {
+      refreshed = await _repo.refreshToken();
+    } catch (e) {
+      _log('refreshEntitlement failed: $e');
+    }
+    // Notify regardless: even if the network refresh failed, listeners should
+    // re-read whatever the freshest cached claims are.
+    notifyListeners();
+    return refreshed;
+  }
+
   /// The last email that signed in on this device (to pre-fill the form).
   Future<String?> lastLoggedInEmail() => _repo.getLastLoggedInEmail();
 
