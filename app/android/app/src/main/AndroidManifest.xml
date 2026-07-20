@@ -26,10 +26,13 @@
     <!-- ============================================ -->
     <!-- STORAGE PERMISSIONS (For file system scanning) -->
     <!-- ============================================ -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- Scoped storage only. The APK/file scanner works on files the USER picks
+         (SAF via file_picker), so no all-files access is needed.
+         MANAGE_EXTERNAL_STORAGE is deliberately NOT declared: it powered nothing
+         (the legacy scanFileSystem is root-gated and uses a root shell, not this
+         permission) and Play restricts it to true file-manager/AV use. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <!-- ============================================ -->
     <!-- DEVICE INFO (For spyware detection) -->

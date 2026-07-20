@@ -554,8 +554,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
   String _getPermissionBenefit(Permission permission) {
     final benefits = {
+      // Honest: storage access only helps on older Android (≤12). The APK check
+      // works on files you pick and needs no storage permission at all.
       Permission.storage:
-          'Enables detection of malware files, hidden spyware, and suspicious app modifications',
+          'Lets OrbGuard open files you choose to check (older Android only)',
       Permission.phone: 'Detects system compromises and security bypasses',
       Permission.sms:
           'Critical for detecting SMS-based zero-click exploits like those used by Pegasus',

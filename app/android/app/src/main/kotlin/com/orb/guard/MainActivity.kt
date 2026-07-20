@@ -41,6 +41,7 @@ class MainActivity: FlutterActivity() {
     private var pendingAdminResult: MethodChannel.Result? = null
     private var rootAccess: RootAccess? = null
     private var spywareScanner: SpywareScanner? = null
+    private var apkFileScanner: ApkFileScanner? = null
     private var smsAnalyzer: SMSAnalyzer? = null
     private var browserMonitor: BrowserMonitor? = null
     private var systemMetricsHandler: SystemMetricsHandler? = null
@@ -53,6 +54,7 @@ class MainActivity: FlutterActivity() {
 
         rootAccess = RootAccess()
         spywareScanner = SpywareScanner(this, rootAccess!!)
+        apkFileScanner = ApkFileScanner(this)
         smsAnalyzer = SMSAnalyzer.getInstance(this)
         browserMonitor = BrowserMonitor.getInstance(this)
         systemMetricsHandler = SystemMetricsHandler(this, rootAccess)
@@ -188,6 +190,18 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 
+                // Scoped APK/file scan: analyses only the files the user picked.
+                // No all-files permission needed.
+                "scanApkFiles" -> {
+                    val paths = call.argument<List<String>>("paths") ?: emptyList()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val results = apkFileScanner?.scanApks(paths) ?: emptyList()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("results" to results))
+                        }
+                    }
+                }
+
                 "scanFileSystem" -> {
                     CoroutineScope(Dispatchers.IO).launch {
                         val threats = spywareScanner!!.scanFileSystem()

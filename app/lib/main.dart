@@ -13,6 +13,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/permission_priming_screen.dart';
 import 'screens/home/control_panel_home_screen.dart';
+import 'screens/scan/apk_scan_screen.dart';
 import 'screens/scan/privacy_check_screen.dart';
 import 'screens/scan/findings_screen.dart';
 import 'services/habit/protection_streak_controller.dart';
@@ -1014,6 +1015,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             style: TextStyle(
               fontSize: 14,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 28),
+          // Scoped file check — sideloaded APKs are the real Android malware
+          // vector, and this needs no storage permission (user picks the file).
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ApkScanScreen()),
+            ),
+            child: Text(
+              'Check an app file (.apk)',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.accentInk,
+              ),
             ),
           ),
         ],
