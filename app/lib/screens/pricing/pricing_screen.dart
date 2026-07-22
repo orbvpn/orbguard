@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -225,8 +226,7 @@ class _PricingScreenState extends State<PricingScreen> {
               style: BrandText.h2(color: cs.onSurface, size: 26)),
           const SizedBox(height: 4),
           Text(
-            'Upgrade, downgrade, or cancel whenever you want. One subscription '
-            'covers OrbGuard and OrbVPN.',
+            'Cancel anytime. One subscription covers OrbGuard and OrbVPN.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
           ),
           const SizedBox(height: 16),
@@ -310,7 +310,11 @@ class _AccountStateBanner extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text('Your premium features are unlocked on OrbGuard & OrbVPN.',
+                  Text(
+                      'Your premium features are unlocked on OrbGuard & OrbVPN. '
+                      'To change or cancel your plan, use your '
+                      '${Platform.isAndroid ? 'Google Play' : 'App Store'} '
+                      'subscription settings.',
                       style: BrandText.body(
                           color: cs.onSurfaceVariant, size: 13)),
                 ],

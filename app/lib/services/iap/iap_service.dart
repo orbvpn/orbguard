@@ -101,7 +101,14 @@ class IapService extends ChangeNotifier {
   bool _loadingProducts = false;
   String? _purchasingProductId;
   bool _restoring = false;
+  bool _restoreDelivered = false;
   final Map<String, ProductDetails> _productsById = {};
+
+  /// Purchases whose backend verification failed TRANSIENTLY (left unfinished
+  /// with the store). Kept so this session can retry them — on paywall open and
+  /// before a re-buy of the same product (a fresh buyNonConsumable for a product
+  /// with an unfinished transaction throws duplicate-transaction on iOS).
+  final Map<String, PurchaseDetails> _unverified = {};
 
   // ---- Wiring --------------------------------------------------------------
 
@@ -148,6 +155,32 @@ class IapService extends ChangeNotifier {
     if (_initialized) return;
     _initialized = true;
 
+    await _connect();
+    if (!_available) return;
+
+    await loadProducts();
+
+    // Android crash recovery: the Play plugin only re-delivers past purchases
+    // through a restore (its purchase stream carries new purchase updates, not
+    // a startup replay). An unacknowledged purchase (app killed after paying,
+    // before verify) would otherwise sit until Google auto-refunds it (~3 days)
+    // unless the user manually taps Restore. A silent restore surfaces it into
+    // the normal verify path; the backend is idempotent for already-granted
+    // subs. iOS/macOS genuinely replay via the stream, so this is Android-only.
+    if (Platform.isAndroid && (_isLoggedIn?.call() ?? false)) {
+      try {
+        await _iap.restorePurchases();
+      } catch (e) {
+        _log('startup Android purchase replay failed: $e');
+      }
+    }
+  }
+
+  /// Probe store availability and (once available) subscribe to the purchase
+  /// stream. Separate from [initialize] so a failed first probe (offline at
+  /// launch) can be retried later — [loadProducts] re-runs it, which is what
+  /// makes the paywall's "Try again" actually able to recover.
+  Future<void> _connect() async {
     try {
       _available = await _iap.isAvailable();
     } catch (e) {
@@ -161,17 +194,20 @@ class IapService extends ChangeNotifier {
     }
 
     // Listen BEFORE querying so replayed past purchases are not missed.
-    _sub = _iap.purchaseStream.listen(
+    _sub ??= _iap.purchaseStream.listen(
       _onPurchaseUpdates,
       onError: (Object e) => _log('purchaseStream error: $e'),
     );
-
-    await loadProducts();
   }
 
-  /// (Re)load the store's ProductDetails for all subscription ids.
+  /// (Re)load the store's ProductDetails for all subscription ids. Also
+  /// re-probes a previously-unavailable store (retry path) and retries any
+  /// purchase whose verification failed transiently earlier this session.
   Future<void> loadProducts() async {
-    if (!_available) return;
+    if (!_available) {
+      await _connect();
+      if (!_available) return;
+    }
     _loadingProducts = true;
     notifyListeners();
     try {
@@ -190,6 +226,37 @@ class IapService extends ChangeNotifier {
     } finally {
       _loadingProducts = false;
       notifyListeners();
+    }
+
+    // Opening the paywall is a natural retry point for purchases whose verify
+    // failed transiently (network blip): finish delivering what was paid for.
+    await retryUnverified();
+  }
+
+  /// Re-verify purchases whose backend verification failed TRANSIENTLY earlier
+  /// in this session (they are still unfinished with the store). Called when
+  /// the paywall opens and before re-buying the same product; safe to call any
+  /// time — no-op when there is nothing to retry or while another purchase is
+  /// being processed.
+  Future<void> retryUnverified() async {
+    if (_unverified.isEmpty || isBusy) return;
+    for (final id in List<String>.from(_unverified.keys)) {
+      await retryUnverifiedProduct(id);
+    }
+  }
+
+  /// Re-verify one product's unfinished purchase (no busy guard — [buy] calls
+  /// this while holding the purchasing latch for that same product).
+  Future<void> retryUnverifiedProduct(String productId) async {
+    final purchase = _unverified[productId];
+    if (purchase == null) return;
+    final finish = await _verifyAndGrant(purchase);
+    if (finish && purchase.pendingCompletePurchase) {
+      try {
+        await _iap.completePurchase(purchase);
+      } catch (e) {
+        _log('completePurchase (retry) failed for ${purchase.productID}: $e');
+      }
     }
   }
 
@@ -216,6 +283,21 @@ class IapService extends ChangeNotifier {
       _emit(IapOutcome.failed, productId,
           message: 'This plan is not available right now.');
       return false;
+    }
+
+    // Already paid but not yet activated (a transient verify failure left the
+    // transaction unfinished)? Retry the ACTIVATION, not the purchase — a fresh
+    // buyNonConsumable would throw duplicate-transaction on iOS and could
+    // double-charge on Android.
+    if (_unverified.containsKey(productId)) {
+      _purchasingProductId = productId;
+      notifyListeners();
+      try {
+        await retryUnverifiedProduct(productId);
+      } finally {
+        _clearPurchasing(productId);
+      }
+      return true;
     }
 
     _purchasingProductId = productId;
@@ -246,9 +328,18 @@ class IapService extends ChangeNotifier {
   Future<void> restore() async {
     if (!_available || isBusy) return;
     _restoring = true;
+    _restoreDelivered = false;
     notifyListeners();
     try {
       await _iap.restorePurchases();
+      // Restored events arrive on the purchase stream shortly AFTER the call
+      // returns. Wait briefly; if nothing came, say so — silence would leave
+      // the user staring at a button that appears to do nothing.
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (!_restoreDelivered) {
+        _emit(IapOutcome.failed, '',
+            message: 'No previous purchases found for this store account.');
+      }
     } catch (e) {
       _log('restore failed: $e');
       _emit(IapOutcome.failed, '', message: _friendly(e));
@@ -279,6 +370,9 @@ class IapService extends ChangeNotifier {
 
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
+          if (purchase.status == PurchaseStatus.restored) {
+            _restoreDelivered = true;
+          }
           finish = await _verifyAndGrant(purchase);
           break;
 
@@ -314,6 +408,9 @@ class IapService extends ChangeNotifier {
     // transaction pending — it will replay and verify once the user signs in.
     if (_isLoggedIn != null && !_isLoggedIn!()) {
       _log('purchased while signed out; leaving pending for retry');
+      // Keep it for in-session retry: once the user signs in and the paywall
+      // reopens (retryUnverified), activation completes without a relaunch.
+      _unverified[purchase.productID] = purchase;
       _clearPurchasing(purchase.productID);
       _emit(IapOutcome.failed, purchase.productID,
           message: 'Sign in to finish activating your subscription.');
@@ -321,7 +418,9 @@ class IapService extends ChangeNotifier {
     }
 
     try {
-      final platform = Platform.isIOS ? 'ios' : 'android';
+      // Android is the only Play platform; everything else (iOS, macOS) is
+      // StoreKit and must be verified as 'ios' against Apple.
+      final platform = Platform.isAndroid ? 'android' : 'ios';
       final receiptData = _receiptFor(purchase);
 
       final result = await _payments.verifyReceipt(
@@ -334,6 +433,7 @@ class IapService extends ChangeNotifier {
         // The server positively rejected the receipt. This is terminal for THIS
         // receipt (retrying won't help), so finish it to clear the queue, but
         // surface the failure.
+        _unverified.remove(purchase.productID);
         _clearPurchasing(purchase.productID);
         _emit(IapOutcome.failed, purchase.productID,
             message: result.message ?? 'We could not verify this purchase.');
@@ -347,6 +447,7 @@ class IapService extends ChangeNotifier {
         _log('entitlement refresh after grant failed: $e');
       }
 
+      _unverified.remove(purchase.productID);
       _clearPurchasing(purchase.productID);
       _emit(IapOutcome.success, purchase.productID);
       return true;
@@ -360,9 +461,13 @@ class IapService extends ChangeNotifier {
       // so the store re-delivers and we retry — never charge-without-grant.
       if (_isTerminalVerifyError(e)) {
         _log('verify terminally rejected (finishing to clear queue): $e');
+        _unverified.remove(purchase.productID);
         _emit(IapOutcome.failed, purchase.productID, message: _friendly(e));
         return true;
       }
+      // Remember it so THIS session can retry (paywall open / tapping the plan
+      // again) — the launch-time stream replay only covers the next run.
+      _unverified[purchase.productID] = purchase;
       _log('verify errored transiently (leaving pending for retry): $e');
       _emit(IapOutcome.failed, purchase.productID,
           message:
