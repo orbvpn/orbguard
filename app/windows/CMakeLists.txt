@@ -2,6 +2,11 @@
 cmake_minimum_required(VERSION 3.14)
 project(orbguard LANGUAGES CXX)
 
+# MSVC 2026 (VS 18) hard-errors on the deprecated <experimental/coroutine>
+# headers still used by local_auth_windows / permission_handler_windows.
+# Suppress until the plugins migrate to C++20 <coroutine>.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "orbguard")
