@@ -1,6 +1,7 @@
 // Settings Screen
 // Main settings and configuration screen
 
+import 'dart:async';
 import 'dart:io';
 import '../../utils/platform_info.dart';
 
@@ -536,11 +537,10 @@ class SettingsScreen extends StatelessWidget {
                 _buildSettingsTile(
                   context,
                   'Manage subscription',
-                  Platform.isAndroid
-                      ? 'Change, upgrade, or cancel in Google Play'
-                      : 'Change, upgrade, or cancel in the App Store',
+                  'Change, upgrade, or cancel where it was purchased',
                   'settings',
-                  onTap: () => _openStoreSubscriptionManagement(context),
+                  onTap: () =>
+                      _openStoreSubscriptionManagement(context, account),
                 ),
               _buildSettingsTile(
                 context,
@@ -575,16 +575,45 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// Open the platform's own subscription-management page (App Store / Google
-  /// Play). Store-billed subscriptions can only be changed or cancelled there.
-  Future<void> _openStoreSubscriptionManagement(BuildContext context) async {
+  /// Open the subscription-management page for the store the subscription was
+  /// actually BILLED on (the shared account sub may have been bought on the
+  /// other platform or on the web), falling back to this device's store when
+  /// the gateway is unknown.
+  Future<void> _openStoreSubscriptionManagement(
+      BuildContext context, AccountProvider account) async {
     final messenger = ScaffoldMessenger.of(context);
-    final url = Platform.isAndroid
+    final gateway =
+        account.subscription.paymentGateway?.toUpperCase() ?? '';
+
+    String? url;
+    if (gateway.contains('APPLE')) {
+      url = 'https://apps.apple.com/account/subscriptions';
+    } else if (gateway.contains('GOOGLE')) {
+      url = 'https://play.google.com/store/account/subscriptions';
+    } else if (gateway.isNotEmpty &&
+        !gateway.contains('APPLE') &&
+        !gateway.contains('GOOGLE')) {
+      // Web/other gateway (Stripe, crypto, Amazon…): neither store page can
+      // manage it.
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'This subscription is billed outside the app stores — manage it '
+            'where you purchased it (e.g. the OrbVPN website).'),
+      ));
+      return;
+    }
+    url ??= Platform.isAndroid
         ? 'https://play.google.com/store/account/subscriptions'
         : 'https://apps.apple.com/account/subscriptions';
+
+    var ok = false;
     try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      ok = await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication);
     } catch (_) {
+      ok = false;
+    }
+    if (!ok) {
       messenger.showSnackBar(
         SnackBar(content: Text('Could not open $url')),
       );
@@ -593,29 +622,32 @@ class SettingsScreen extends StatelessWidget {
 
   /// Restore previously-bought subscriptions and surface the outcome here (the
   /// IAP results stream's regular listener is the pricing screen, which isn't
-  /// open now).
+  /// open now). One-shot: the listener shows the FIRST meaningful outcome and
+  /// cancels itself, so it can't double-report alongside a pricing-screen
+  /// listener living lower in the nav stack.
   Future<void> _restorePurchases(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final iap = context.read<IapService>();
     messenger.showSnackBar(
       const SnackBar(content: Text('Checking for previous purchases…')),
     );
-    final sub = iap.results.listen((r) {
-      if (r.message != null || r.isSuccess) {
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-            content: Text(r.isSuccess
-                ? 'Subscription restored — premium unlocked.'
-                : r.message!),
-          ));
-      }
+    late final StreamSubscription<IapResult> sub;
+    sub = iap.results.listen((r) {
+      if (r.message == null && !r.isSuccess) return;
+      sub.cancel();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(r.isSuccess
+              ? 'Subscription restored — premium unlocked.'
+              : r.message!),
+        ));
     });
     try {
       await iap.restore();
     } finally {
-      // The restore verify/feedback lands within restore()'s own window (it
-      // waits for delivery); a short grace covers the last verify round-trip.
+      // Safety net: cancel after the restore window even if no event arrived
+      // (restore() itself now always emits, so this is belt-and-braces).
       Future<void>.delayed(const Duration(seconds: 8), sub.cancel);
     }
   }

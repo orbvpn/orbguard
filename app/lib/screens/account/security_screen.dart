@@ -32,6 +32,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
   bool _passkeySupported = false;
   bool _working = false;
 
+  /// Monotonic refresh sequence: only the LATEST in-flight refresh may write
+  /// state, so a slow stale response can't resurrect a just-deleted passkey.
+  int _refreshSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -39,16 +43,21 @@ class _SecurityScreenState extends State<SecurityScreen> {
   }
 
   Future<void> _refresh() async {
+    final seq = ++_refreshSeq;
     final account = context.read<AccountProvider>();
     final supported = await account.isPasskeyAvailable();
     List<PasskeyInfo>? keys;
     String? error;
     try {
       keys = await account.listPasskeys();
+      // Newest first — the top row is the one most recently created, which for
+      // platform authenticators is the only one guaranteed to still work.
+      keys.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
     } catch (e) {
-      error = 'Could not load your passkeys. Pull to retry.';
+      error = 'Could not load your passkeys.';
     }
-    if (!mounted) return;
+    if (!mounted || seq != _refreshSeq) return;
     setState(() {
       _passkeySupported = supported;
       _passkeys = keys ?? _passkeys ?? const [];
@@ -92,39 +101,51 @@ class _SecurityScreenState extends State<SecurityScreen> {
     );
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _working = true);
+    String message;
     try {
       await account.renamePasskey(key.id, name);
-      _snack('Passkey renamed.');
+      message = 'Passkey renamed.';
     } catch (e) {
-      _snack('Could not rename the passkey.');
+      message = 'Could not rename the passkey.';
     }
     if (!mounted) return;
+    _snack(message);
     setState(() => _working = false);
     await _refresh();
   }
 
   Future<void> _delete(PasskeyInfo key) async {
     final account = context.read<AccountProvider>();
-    final isLast = (_passkeys?.length ?? 0) <= 1;
+    final keys = _passkeys ?? const <PasskeyInfo>[];
+    final isLast = keys.length <= 1;
+    // The list is sorted newest-first; with duplicates, the newest is the only
+    // one the platform authenticator can still use.
+    final isNewestOfMany = keys.length > 1 && keys.first.id == key.id;
     final confirmed = await _confirmSheet(
       title: 'Delete passkey',
       body: 'This removes "${key.name}" from your account — it can no longer '
           'be used to sign in.'
           '${isLast ? '\n\nThis is your LAST passkey; after deleting it you can '
               'still sign in by email link or password.' : ''}'
+          '${isNewestOfMany ? '\n\nThis is your MOST RECENT passkey. If the '
+              'others are older duplicates from this same device, this is the '
+              'one that still works — consider deleting the older ones '
+              'instead.' : ''}'
           '\n\nYou may also want to remove it from your device\'s password '
           'manager (iCloud Keychain / Google Password Manager).',
       confirmLabel: 'Delete passkey',
     );
     if (confirmed != true || !mounted) return;
     setState(() => _working = true);
+    String message;
     try {
       await account.deletePasskey(key.id);
-      _snack('Passkey deleted.');
+      message = 'Passkey deleted.';
     } catch (e) {
-      _snack('Could not delete the passkey.');
+      message = 'Could not delete the passkey.';
     }
     if (!mounted) return;
+    _snack(message);
     setState(() => _working = false);
     await _refresh();
   }
@@ -331,9 +352,19 @@ class _SecurityScreenState extends State<SecurityScreen> {
               GlassCard(
                 margin: EdgeInsets.zero,
                 padding: const EdgeInsets.all(16),
-                child: Text(_loadError!,
-                    style:
-                        BrandText.body(color: AppColors.errorInk, size: 13.5)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_loadError!,
+                        style: BrandText.body(
+                            color: AppColors.errorInk, size: 13.5)),
+                    const SizedBox(height: 12),
+                    // Explicit retry — pull-to-refresh is unreachable with a
+                    // mouse on desktop.
+                    BrandButton.secondary(
+                        label: 'Try again', onPressed: _refresh),
+                  ],
+                ),
               )
             else if (keys == null)
               const GlassCard(
@@ -379,6 +410,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             color: cs.onSurface.withAlpha(16)),
                       _PasskeyRow(
                         info: keys[i],
+                        // Platform authenticators keep ONE passkey per account
+                        // and overwrite on re-registration, so when duplicates
+                        // exist only the newest-created row still signs in —
+                        // badge it so cleanup keeps the right one.
+                        isNewest: i == 0 && keys.length > 1,
                         enabled: !_working,
                         onRename: () => _rename(keys[i]),
                         onDelete: () => _delete(keys[i]),
@@ -435,6 +471,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
 class _PasskeyRow extends StatelessWidget {
   final PasskeyInfo info;
   final bool enabled;
+
+  /// Badge the newest-created passkey when duplicates exist — with platform
+  /// authenticators it is the only one guaranteed to still sign in.
+  final bool isNewest;
+
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -443,6 +484,7 @@ class _PasskeyRow extends StatelessWidget {
     required this.enabled,
     required this.onRename,
     required this.onDelete,
+    this.isNewest = false,
   });
 
   String _dates() {
@@ -461,8 +503,29 @@ class _PasskeyRow extends StatelessWidget {
     return ListTile(
       leading:
           DuotoneIcon('key_minimalistic', size: 24, color: AppColors.accentInk),
-      title: Text(info.name,
-          style: BrandText.title(color: cs.onSurface, size: 14.5)),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(info.name,
+                style: BrandText.title(color: cs.onSurface, size: 14.5),
+                overflow: TextOverflow.ellipsis),
+          ),
+          if (isNewest) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.accentPill,
+                borderRadius: BorderRadius.circular(Brand.rPill),
+              ),
+              child: Text('MOST RECENT',
+                  style: BrandText.label(
+                      color: AppColors.accentInk, size: 9.5)),
+            ),
+          ],
+        ],
+      ),
       subtitle: Text(
         '${_dates()}${info.backedUp ? ' · synced' : ''}',
         style: BrandText.body(color: cs.onSurfaceVariant, size: 12),

@@ -325,8 +325,24 @@ class IapService extends ChangeNotifier {
 
   /// Restore previously-bought subscriptions (App Store requires a visible
   /// "Restore" action). Restored purchases flow through the same verify path.
+  /// Always emits an outcome — silence would leave the user staring at a
+  /// button that appears to do nothing.
   Future<void> restore() async {
-    if (!_available || isBusy) return;
+    if (!_available) {
+      // Re-probe first: the store may have been unreachable only at launch.
+      await _connect();
+    }
+    if (!_available) {
+      _emit(IapOutcome.failed, '',
+          message: 'The store is unavailable right now — try again later.');
+      return;
+    }
+    if (isBusy) {
+      _emit(IapOutcome.failed, '',
+          message: 'Another purchase is still in progress — try again in a '
+              'moment.');
+      return;
+    }
     _restoring = true;
     _restoreDelivered = false;
     notifyListeners();

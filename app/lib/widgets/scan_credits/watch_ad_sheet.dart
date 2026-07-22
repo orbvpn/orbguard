@@ -59,9 +59,10 @@ class _WatchAdSheetState extends State<WatchAdSheet> {
   }
 
   /// Close the sheet and open the plans screen (subscribing removes the need
-  /// for scan credits entirely).
+  /// for scan credits entirely). Pops with [_earned] so an already-earned
+  /// credit is still honoured by the caller (the sheet's return contract).
   void _openPlans(BuildContext context) {
-    Navigator.of(context).pop(false);
+    Navigator.of(context).pop(_earned);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PricingScreen()),
     );

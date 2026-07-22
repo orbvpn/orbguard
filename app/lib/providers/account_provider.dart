@@ -151,7 +151,7 @@ class AccountProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _error = _friendlyError(e);
+      _error = _friendlyError(e, credentialsFlow: true);
       _busy = false;
       notifyListeners();
       return false;
@@ -252,7 +252,14 @@ class AccountProvider extends ChangeNotifier {
   /// then clear local state. Returns true on success; sets [lastError] on
   /// failure. The caller is responsible for the confirmation UX.
   Future<bool> deleteAccount() async {
-    if (_busy || !isLoggedIn) return false;
+    if (_busy) return false;
+    if (!isLoggedIn) {
+      // The session may have died between opening the screen and confirming —
+      // set a real error so the UI never replays a stale unrelated one.
+      _error = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
     _setBusy(true);
     _error = null;
     try {
@@ -376,12 +383,25 @@ class AccountProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _friendlyError(Object e) {
+  String _friendlyError(Object e, {bool credentialsFlow = false}) {
     if (net_err.isNetworkError(e)) {
       return 'Network error. Check your connection and try again.';
     }
     if (e is AuthenticationException) {
-      return 'Incorrect email or password.';
+      // "Incorrect email or password" only makes sense where a password was
+      // typed. Everywhere else a 401 means the SESSION died (expired/revoked
+      // refresh) — saying "incorrect password" on e.g. delete-account would be
+      // nonsense.
+      return credentialsFlow
+          ? 'Incorrect email or password.'
+          : 'Your session has expired. Please sign in again.';
+    }
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('exclude') ||
+        msg.contains('already registered') ||
+        msg.contains('matched an entry')) {
+      // The authenticator refused a duplicate (excludeCredentials matched).
+      return 'A passkey for this account already exists on this device.';
     }
     if (e is ApiException) {
       return e.message;
