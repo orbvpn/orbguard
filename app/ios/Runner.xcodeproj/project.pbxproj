@@ -20,14 +20,12 @@
 		684BEB91AFFD89A4FF989022 /* CallKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E002F581CC9E5B7E0BEE0D3 /* CallKit.framework */; };
 		71A1B45A5A1FE8D84E63ED87 /* ContentFilterChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFBA167E78864F40B4ECD31 /* ContentFilterChannelHandler.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
-		B6C0FF3E2E10000200BA51CE /* BackgroundScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */; };
 		74976FEB5809439B3FF09F8B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
 		8342B3D9CEB646C8B818FE34 /* CallDirectoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0321A4AC9C7FDFE0A7E64D77 /* CallDirectoryStore.swift */; };
 		84192A1450F0772184B19D34 /* MessageFilterExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F44F6C931229B7E1EF29FBC /* MessageFilterExtension.swift */; };
 		8577329723E0B286E6C57E0E /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 32128A2629702286BE209930 /* GoogleService-Info.plist */; };
 		8943115A2E93BE1BE33F45F5 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B3DC6E2CAE5D39977797474 /* NetworkExtension.framework */; };
 		8E144D6522DACA43090E32A0 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46209C653DA657543BD72541 /* SharedDataManager.swift */; };
-		9018F597A318C803719EB5EF /* OrbGuardSmsFilter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 3E30EDFC50C537E54664DC85 /* OrbGuardSmsFilter.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		908ECB93D503F8532C138D90 /* CallDirectoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BEF0CC47748DE71029465A /* CallDirectoryHandler.swift */; };
 		937BC4BB24850073D57100C8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
@@ -35,11 +33,10 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A258CADB34D7F27027FF28BF /* ThreatIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */; };
 		AC775FD8B0D78307F2ECC23C /* CallDirectoryChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C680E5875D6CA75E6CCD05 /* CallDirectoryChannelHandler.swift */; };
+		B6C0FF3E2E10000200BA51CE /* BackgroundScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */; };
 		B8C18A1E677B2E5E6568F4B3 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
 		C9D1916001F7DF0141EE4105 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
-		D00D870F3DC9DE499C3C5192 /* OrbGuardCallDirectory.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 1A46735C9A89D65999896277 /* OrbGuardCallDirectory.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D6097BC63DD5D784B8C629E7 /* ThreatIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */; };
-		ED08A3A7E3497E377E563BD3 /* OrbGuardFilter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B267E273F5A090151DE75F36 /* OrbGuardFilter.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,9 +77,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				ED08A3A7E3497E377E563BD3 /* OrbGuardFilter.appex in Embed App Extensions */,
-				9018F597A318C803719EB5EF /* OrbGuardSmsFilter.appex in Embed App Extensions */,
-				D00D870F3DC9DE499C3C5192 /* OrbGuardCallDirectory.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -125,7 +119,6 @@
 		5B3DC6E2CAE5D39977797474 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/NetworkExtension.framework; sourceTree = DEVELOPER_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackgroundScanService.swift; sourceTree = "<group>"; };
 		76323BD1F7CF21FC9BF2D9A2 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		7F44F6C931229B7E1EF29FBC /* MessageFilterExtension.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MessageFilterExtension.swift; sourceTree = "<group>"; };
@@ -142,6 +135,7 @@
 		A9BEF0CC47748DE71029465A /* CallDirectoryHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CallDirectoryHandler.swift; sourceTree = "<group>"; };
 		B267E273F5A090151DE75F36 /* OrbGuardFilter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardFilter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5F326C45DDC8796893D44DD /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackgroundScanService.swift; sourceTree = "<group>"; };
 		D695DCFADB9715C6E72D94EB /* FilterDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilterDataProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -428,15 +422,11 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				36591E7A0F20C9E53290A779 /* Embed App Extensions */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
-				D60C5B312E353B3E28FB6A5A /* [CP] Embed Pods Frameworks */,
 				EE2AFFFB3405EFA25B75C99F /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				BCEB0E7BEF5FA5002F23091E /* PBXTargetDependency */,
-				6C8CE3D31BB7CF4BE732662C /* PBXTargetDependency */,
-				8B1A0D0EB63B8E4F24BDC7A4 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -580,23 +570,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		D60C5B312E353B3E28FB6A5A /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		EE2AFFFB3405EFA25B75C99F /* [CP] Copy Pods Resources */ = {

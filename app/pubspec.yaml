@@ -1,6 +1,6 @@
 name: orbguard
 description: Anti-spyware defense system
-version: 1.0.0
+version: 1.0.0+7
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
