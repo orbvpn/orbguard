@@ -16,6 +16,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/app_sheet.dart';
 import '../../presentation/widgets/brand_button.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../screens/pricing/pricing_screen.dart';
 
 /// Present the earn-a-scan sheet for [provider]. Returns true when a credit was
 /// earned before the sheet closed.
@@ -57,6 +58,15 @@ class _WatchAdSheetState extends State<WatchAdSheet> {
     setState(() => _earned = ok);
   }
 
+  /// Close the sheet and open the plans screen (subscribing removes the need
+  /// for scan credits entirely).
+  void _openPlans(BuildContext context) {
+    Navigator.of(context).pop(false);
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PricingScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -93,6 +103,14 @@ class _WatchAdSheetState extends State<WatchAdSheet> {
                     : 'Ads unavailable',
                 isLoading: watching,
                 onPressed: (available && !watching) ? _watch : null,
+              ),
+              const SizedBox(height: 10),
+              // Secondary path: skip ads entirely with a subscription (unlimited
+              // scans + every premium feature). Glass/neutral so the lime ad
+              // action stays the single primary.
+              BrandButton.secondary(
+                label: 'Go unlimited with a plan',
+                onPressed: watching ? null : () => _openPlans(context),
               ),
             ],
           ),

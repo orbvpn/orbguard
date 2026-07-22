@@ -266,6 +266,27 @@ class OrbNetApiClient {
     }
   }
 
+  Future<T> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    bool skipAuth = false,
+  }) async {
+    await ensureInitialized();
+    try {
+      final response = await _dio.delete<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _mergeOptions(options, skipAuth),
+      );
+      return _castBody<T>(response.data);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
   Options? _mergeOptions(Options? options, bool skipAuth) {
     if (!skipAuth) return options;
     return (options ?? Options()).copyWith(extra: {'skipAuth': true});

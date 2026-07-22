@@ -70,12 +70,19 @@ Future<void> _pumpSheet(WidgetTester tester, ScanCreditProvider p) async {
   await tester.pumpAndSettle();
 }
 
+/// The BrandButton whose label is [label] (the sheet now has TWO buttons: the
+/// primary earn action and the secondary "Go unlimited with a plan").
+BrandButton _buttonLabeled(WidgetTester tester, String label) =>
+    tester.widget<BrandButton>(
+      find.ancestor(of: find.text(label), matching: find.byType(BrandButton)),
+    );
+
 void main() {
   testWidgets('configured → enabled primary earn action', (tester) async {
     await _pumpSheet(tester, _provider(configured: true));
 
     expect(find.text('Watch ad to earn a scan'), findsOneWidget);
-    final btn = tester.widget<BrandButton>(find.byType(BrandButton));
+    final btn = _buttonLabeled(tester, 'Watch ad to earn a scan');
     expect(btn.onPressed, isNotNull,
         reason: 'earn button must be tappable when a network is configured');
   });
@@ -86,8 +93,19 @@ void main() {
 
     expect(find.textContaining("aren't available"), findsOneWidget);
     expect(find.text('Watch ad to earn a scan'), findsNothing);
-    final btn = tester.widget<BrandButton>(find.byType(BrandButton));
+    final btn = _buttonLabeled(tester, 'Ads unavailable');
     expect(btn.onPressed, isNull,
         reason: 'must never offer a reward it cannot deliver');
+  });
+
+  testWidgets('always offers the subscription path (even when ads are down)',
+      (tester) async {
+    // Ads unavailable is exactly when the plan path matters most.
+    await _pumpSheet(tester, _provider(configured: false));
+
+    expect(find.text('Go unlimited with a plan'), findsOneWidget);
+    final btn = _buttonLabeled(tester, 'Go unlimited with a plan');
+    expect(btn.onPressed, isNotNull,
+        reason: 'the paywall path must stay available regardless of ad state');
   });
 }

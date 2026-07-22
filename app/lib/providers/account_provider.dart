@@ -20,6 +20,7 @@ import '../services/orbnet/orbnet_api_client.dart';
 import '../services/orbnet/social_auth_service.dart';
 import '../services/orbnet/token_service.dart';
 import '../services/orbnet/models/auth_response.dart';
+import '../services/orbnet/models/passkey_info.dart';
 import '../services/orbnet/models/subscription_status.dart';
 import '../services/orbnet/models/user.dart';
 
@@ -228,6 +229,40 @@ class AccountProvider extends ChangeNotifier {
       _busy = false;
       notifyListeners();
       return ok;
+    } catch (e) {
+      _error = _friendlyError(e);
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// The signed-in account's registered passkeys. Throws on failure (the
+  /// management screen distinguishes "none" from "couldn't load").
+  Future<List<PasskeyInfo>> listPasskeys() => _repo.listPasskeys();
+
+  /// Rename a passkey. Throws on failure.
+  Future<void> renamePasskey(int passkeyId, String name) =>
+      _repo.renamePasskey(passkeyId, name);
+
+  /// Delete a passkey. Throws on failure.
+  Future<void> deletePasskey(int passkeyId) => _repo.deletePasskey(passkeyId);
+
+  /// Permanently delete the account and ALL its data on OrbNet (irreversible),
+  /// then clear local state. Returns true on success; sets [lastError] on
+  /// failure. The caller is responsible for the confirmation UX.
+  Future<bool> deleteAccount() async {
+    if (_busy || !isLoggedIn) return false;
+    _setBusy(true);
+    _error = null;
+    try {
+      _tokenService.stopProactiveRefresh();
+      await _repo.deleteAccount();
+      _user = null;
+      _requiresTwoFactor = false;
+      _busy = false;
+      notifyListeners();
+      return true;
     } catch (e) {
       _error = _friendlyError(e);
       _busy = false;

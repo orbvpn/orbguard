@@ -203,6 +203,28 @@ class AuthApi {
     );
   }
 
+  /// Rename a passkey (bearer required; server enforces ownership).
+  Future<Map<String, dynamic>> renamePasskey(int passkeyId, String name) async {
+    return await _client.put<Map<String, dynamic>>(
+      '/security/passkeys/$passkeyId',
+      data: {'name': name},
+    );
+  }
+
+  /// Delete a passkey (bearer required; server enforces ownership).
+  Future<Map<String, dynamic>> deletePasskey(int passkeyId) async {
+    return await _client.delete<Map<String, dynamic>>(
+      '/security/passkeys/$passkeyId',
+    );
+  }
+
+  /// Permanently delete the signed-in account and ALL its data (bearer
+  /// required). The backend hard-deletes across every user-keyed table; this is
+  /// irreversible. Returns `{success, message}`.
+  Future<Map<String, dynamic>> deleteAccount() async {
+    return await _client.delete<Map<String, dynamic>>('/users/me/account');
+  }
+
   /// Revoke the current session on the backend (best-effort).
   Future<Map<String, dynamic>> logout({String? refreshToken}) async {
     return await _client.post<Map<String, dynamic>>(

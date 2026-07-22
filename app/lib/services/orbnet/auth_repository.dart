@@ -24,6 +24,7 @@ import 'dart:io' show Platform;
 import 'auth_api.dart';
 import 'passkey_webauthn_service.dart';
 import 'models/auth_response.dart';
+import 'models/passkey_info.dart';
 import 'models/user.dart';
 import 'network_error.dart' as net_err;
 import 'orbnet_api_client.dart';
@@ -222,13 +223,38 @@ class AuthRepository {
   /// (or on any error — treated as "none" so the UI offers setup). Best-effort.
   Future<int> passkeyCount() async {
     try {
-      final resp = await _authApi.listPasskeys();
-      final data = resp['data'] as Map<String, dynamic>? ?? resp;
-      final list = data['passkeys'];
-      return list is List ? list.length : 0;
+      return (await listPasskeys()).length;
     } catch (_) {
       return 0;
     }
+  }
+
+  /// The signed-in account's registered passkeys (bearer required). Throws on
+  /// failure — the management screen needs to distinguish "none" from "error".
+  Future<List<PasskeyInfo>> listPasskeys() async {
+    final resp = await _authApi.listPasskeys();
+    final data = resp['data'] as Map<String, dynamic>? ?? resp;
+    final list = data['passkeys'];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(PasskeyInfo.fromJson)
+        .toList();
+  }
+
+  /// Rename a passkey. Server enforces ownership.
+  Future<void> renamePasskey(int passkeyId, String name) =>
+      _authApi.renamePasskey(passkeyId, name.trim());
+
+  /// Delete a passkey. Server enforces ownership.
+  Future<void> deletePasskey(int passkeyId) =>
+      _authApi.deletePasskey(passkeyId);
+
+  /// Permanently delete the signed-in account (server hard-deletes all data),
+  /// then clear the local session. Irreversible.
+  Future<void> deleteAccount() async {
+    await _authApi.deleteAccount();
+    await clearLocalSession();
   }
 
   String get _platformName => Platform.isIOS

@@ -21,11 +21,14 @@ import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
 import '../../services/security/desktop_scan_config.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../pricing/pricing_screen.dart';
 import '../trust/device_capabilities_screen.dart';
 import '../trust/privacy_explainer_screen.dart';
 import '../account/login_screen.dart';
+import '../account/security_screen.dart';
 import '../../providers/account_provider.dart';
+import '../../services/iap/iap_service.dart';
 import '../../widgets/premium/premium_gate.dart';
 import '../legal/legal_screen.dart';
 import 'notification_discipline_screen.dart';
@@ -515,10 +518,48 @@ class SettingsScreen extends StatelessWidget {
                     : 'Signed in with your OrbVPN account',
                 'shield_keyhole',
               ),
-              // Passkey — reflects whether one is already registered, and only
-              // shown when the device can run passkey ceremonies. Self-contained:
-              // fetches state, registers, and refreshes itself.
-              _PasskeyTile(account: account, buildTile: _buildSettingsTile),
+              // Subscription: current plan + the purchase path. One subscription
+              // covers OrbGuard and OrbVPN.
+              _buildSettingsTile(
+                context,
+                'Subscription',
+                account.hasPremium
+                    ? '${account.subscriptionLabel} — covers OrbGuard & OrbVPN'
+                    : 'Free plan — view plans & subscribe',
+                'wallet',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PricingScreen()),
+                ),
+              ),
+              if (account.hasPremium)
+                _buildSettingsTile(
+                  context,
+                  'Manage subscription',
+                  Platform.isAndroid
+                      ? 'Change, upgrade, or cancel in Google Play'
+                      : 'Change, upgrade, or cancel in the App Store',
+                  'settings',
+                  onTap: () => _openStoreSubscriptionManagement(context),
+                ),
+              _buildSettingsTile(
+                context,
+                'Restore purchases',
+                'Recover a subscription bought on this store account',
+                'refresh',
+                onTap: () => _restorePurchases(context),
+              ),
+              // Passkeys + account deletion live in Account security.
+              _buildSettingsTile(
+                context,
+                'Account security',
+                'Passkeys, sign-in options & account deletion',
+                'shield_keyhole',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SecurityScreen()),
+                ),
+              ),
               _buildSettingsTile(
                 context,
                 'Sign out',
@@ -532,6 +573,51 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Open the platform's own subscription-management page (App Store / Google
+  /// Play). Store-billed subscriptions can only be changed or cancelled there.
+  Future<void> _openStoreSubscriptionManagement(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = Platform.isAndroid
+        ? 'https://play.google.com/store/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions';
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
+    }
+  }
+
+  /// Restore previously-bought subscriptions and surface the outcome here (the
+  /// IAP results stream's regular listener is the pricing screen, which isn't
+  /// open now).
+  Future<void> _restorePurchases(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final iap = context.read<IapService>();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Checking for previous purchases…')),
+    );
+    final sub = iap.results.listen((r) {
+      if (r.message != null || r.isSuccess) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(r.isSuccess
+                ? 'Subscription restored — premium unlocked.'
+                : r.message!),
+          ));
+      }
+    });
+    try {
+      await iap.restore();
+    } finally {
+      // The restore verify/feedback lands within restore()'s own window (it
+      // waits for delivery); a short grace covers the last verify round-trip.
+      Future<void>.delayed(const Duration(seconds: 8), sub.cancel);
+    }
   }
 
   void _showSignOutSheet(BuildContext context, AccountProvider account) {
@@ -577,91 +663,6 @@ class SettingsScreen extends StatelessWidget {
           const SnackBar(content: Text('Settings reset to defaults')),
         );
       },
-    );
-  }
-}
-
-/// Account passkey row. Reflects whether a passkey is already registered
-/// (so it no longer just says "Set up a passkey" forever), registers a new one
-/// on tap with clear feedback, and refreshes itself. Hidden when the device
-/// can't do passkeys.
-class _PasskeyTile extends StatefulWidget {
-  const _PasskeyTile({required this.account, required this.buildTile});
-
-  final AccountProvider account;
-  final Widget Function(
-    BuildContext context,
-    String title,
-    String subtitle,
-    String icon, {
-    VoidCallback? onTap,
-    bool isDestructive,
-  }) buildTile;
-
-  @override
-  State<_PasskeyTile> createState() => _PasskeyTileState();
-}
-
-class _PasskeyTileState extends State<_PasskeyTile> {
-  bool _available = false;
-  int _count = 0;
-  bool _loading = true;
-  bool _working = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    final available = await widget.account.isPasskeyAvailable();
-    final count = available ? await widget.account.passkeyCount() : 0;
-    if (!mounted) return;
-    setState(() {
-      _available = available;
-      _count = count;
-      _loading = false;
-    });
-  }
-
-  Future<void> _register() async {
-    if (_working) return;
-    setState(() => _working = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final ok = await widget.account.registerPasskey();
-    if (!mounted) return;
-    messenger.showSnackBar(SnackBar(
-      content: Text(ok
-          ? 'Passkey set up — you can now sign in with Face / fingerprint'
-          : (widget.account.lastError ?? 'Could not set up the passkey')),
-    ));
-    setState(() => _working = false);
-    if (ok) await _refresh();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Hidden until we know the device supports passkeys (avoids a flash).
-    if (_loading || !_available) return const SizedBox.shrink();
-
-    final has = _count > 0;
-    final title = _working
-        ? 'Setting up passkey…'
-        : (has ? 'Passkey enabled' : 'Set up a passkey');
-    final subtitle = _working
-        ? 'Confirm with Face / fingerprint'
-        : (has
-            ? '$_count passkey${_count == 1 ? '' : 's'} · tap to add another'
-            : 'Sign in with Face / fingerprint next time — no code needed');
-
-    return widget.buildTile(
-      context,
-      title,
-      subtitle,
-      'shield_keyhole',
-      onTap: _working ? null : _register,
-      isDestructive: false,
     );
   }
 }
