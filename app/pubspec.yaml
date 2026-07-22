@@ -100,6 +100,24 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
+  # Windows MSIX packaging for the Microsoft Store (built by the
+  # windows-msix.yml workflow on a Windows runner).
+  msix: ^3.16.8
+
+# Microsoft Store (MSIX) packaging. identity_name / publisher / publisher_display_name
+# MUST match the values Partner Center shows after reserving the app name
+# (Product management -> Product identity). Until then these placeholders make
+# `dart run msix:create --store` fail loudly rather than produce a mismatched
+# package the Store would reject.
+msix_config:
+  display_name: OrbGuard
+  publisher_display_name: REPLACE_WITH_PartnerCenter_PublisherDisplayName
+  identity_name: REPLACE.WITH.PartnerCenter.IdentityName
+  publisher: CN=REPLACE-WITH-PARTNER-CENTER-GUID
+  msix_version: 1.0.6.0
+  logo_path: assets/branding/icon_master.png
+  capabilities: internetClient, location, webcam, microphone
+  store: true
 
 # App launcher icons across every platform, generated from the OrbGuard brand
 # logo (assets/branding/). Regenerate with: dart run flutter_launcher_icons
