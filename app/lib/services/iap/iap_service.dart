@@ -269,6 +269,11 @@ class IapService extends ChangeNotifier {
 
       switch (purchase.status) {
         case PurchaseStatus.pending:
+          // The purchase is now the store's to settle (e.g. Ask-to-Buy / SCA).
+          // Release the busy latch so a never-resolving pending doesn't block the
+          // paywall for the rest of the session — the stream still delivers the
+          // eventual purchased/canceled update, which we verify + finish then.
+          _clearPurchasing(purchase.productID);
           _emit(IapOutcome.pending, purchase.productID);
           break;
 
@@ -346,15 +351,36 @@ class IapService extends ChangeNotifier {
       _emit(IapOutcome.success, purchase.productID);
       return true;
     } catch (e) {
-      // Transport/server error mid-verify: DO NOT finish. Leave pending so the
-      // store re-delivers on next launch and we retry — never charge-without-grant.
-      _log('verify errored (leaving pending for retry): $e');
       _clearPurchasing(purchase.productID);
+      // Distinguish a TERMINAL client rejection (a 4xx: product mismatch, already
+      // claimed by another account, validation) from a TRANSIENT failure (no server
+      // verdict — network/timeout — or a 5xx / auth-expired). Retrying a terminal
+      // rejection is futile and would re-verify + re-error on every launch forever,
+      // so finish it to clear the store queue. A transient failure is left UNFINISHED
+      // so the store re-delivers and we retry — never charge-without-grant.
+      if (_isTerminalVerifyError(e)) {
+        _log('verify terminally rejected (finishing to clear queue): $e');
+        _emit(IapOutcome.failed, purchase.productID, message: _friendly(e));
+        return true;
+      }
+      _log('verify errored transiently (leaving pending for retry): $e');
       _emit(IapOutcome.failed, purchase.productID,
           message:
               'Purchase received — activating it failed, we\'ll retry automatically.');
       return false;
     }
+  }
+
+  /// Whether a verify exception is a terminal client rejection (safe to finish the
+  /// transaction) vs a transient failure (leave pending and retry). Only a positive
+  /// 4xx server verdict is terminal; no-response (network/timeout), 5xx, and 401
+  /// (needs re-auth) are all retry-able.
+  bool _isTerminalVerifyError(Object e) {
+    if (e is NetworkException) return false; // no server verdict — retry
+    if (e is ServerException) return false; // 5xx — retry
+    if (e is AuthenticationException) return false; // 401 — retry after re-auth
+    if (e is ApiException) return true; // other 4xx — positive rejection, terminal
+    return false; // unknown — be conservative, keep the money safe and retry
   }
 
   /// The receipt/token to send to the backend.

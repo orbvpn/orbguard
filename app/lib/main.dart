@@ -270,6 +270,12 @@ class AntiSpywareApp extends StatelessWidget {
         // refresh + login probe. initialize() also replays any purchase left
         // unfinished on a previous run (money-safe retry).
         ChangeNotifierProvider<IapService>(
+          // Eager (not lazy): initialize() must run at startup — it subscribes to
+          // the store purchase stream, which REPLAYS any purchase left unfinished on
+          // a previous run (e.g. app killed after paying, before verify). A lazy
+          // provider would only run this when the paywall first opens, so a
+          // crash-interrupted purchase would sit unverified until then.
+          lazy: false,
           create: (ctx) {
             final account = ctx.read<AccountProvider>();
             final iap = IapService.instance
