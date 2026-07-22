@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
+import '../presentation/theme/app_snack.dart';
 import '../presentation/widgets/app_sheet.dart';
 import '../presentation/widgets/brand_button.dart';
 import '../presentation/widgets/duotone_icon.dart';
@@ -508,11 +509,10 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
     await _checkPermissions();
 
     if (granted && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Permission granted successfully'),
-          backgroundColor: AppColors.success,
-        ),
+      showResultSnackBar(
+        context,
+        'Permission granted successfully',
+        background: AppColors.success,
       );
     }
   }

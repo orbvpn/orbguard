@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../permissions/permission_manager.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
+import '../presentation/theme/app_snack.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
@@ -435,11 +436,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     final total = results.length;
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Granted $granted of $total essential permissions'),
-          backgroundColor: granted == total ? AppColors.success : AppColors.warning,
-        ),
+      showResultSnackBar(
+        context,
+        'Granted $granted of $total essential permissions',
+        background: granted == total ? AppColors.success : AppColors.warning,
       );
 
       await _checkPermissions();
@@ -453,11 +453,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     final total = results.length;
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Granted $granted of $total advanced permissions'),
-          backgroundColor: granted == total ? AppColors.success : AppColors.warning,
-        ),
+      showResultSnackBar(
+        context,
+        'Granted $granted of $total advanced permissions',
+        background: granted == total ? AppColors.success : AppColors.warning,
       );
 
       await _checkPermissions();
@@ -474,13 +473,10 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            status.isGranted ? '$name granted!' : '$name denied',
-          ),
-          backgroundColor: status.isGranted ? AppColors.success : AppColors.error,
-        ),
+      showResultSnackBar(
+        context,
+        status.isGranted ? '$name granted!' : '$name denied',
+        background: status.isGranted ? AppColors.success : AppColors.error,
       );
 
       await _checkPermissions();

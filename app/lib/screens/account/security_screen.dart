@@ -18,6 +18,8 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/account_provider.dart';
 import '../../services/orbnet/models/passkey_info.dart';
+import '../../services/orbnet/orbnet_api_client.dart'
+    show AuthenticationException, NetworkException, ServerException;
 
 class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
@@ -54,6 +56,14 @@ class _SecurityScreenState extends State<SecurityScreen> {
       // platform authenticators is the only one guaranteed to still work.
       keys.sort((a, b) => (b.createdAt ?? DateTime(0))
           .compareTo(a.createdAt ?? DateTime(0)));
+    } on AuthenticationException {
+      // Session expired / token invalid — tell the user to sign in again
+      // rather than a generic "could not load".
+      error = 'Your session expired. Please sign in again to manage passkeys.';
+    } on NetworkException {
+      error = "Couldn't reach OrbNet. Check your connection and try again.";
+    } on ServerException {
+      error = 'OrbNet couldn’t load your passkeys right now. Please try again.';
     } catch (e) {
       error = 'Could not load your passkeys.';
     }
