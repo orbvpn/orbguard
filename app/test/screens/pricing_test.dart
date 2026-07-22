@@ -136,7 +136,7 @@ void main() {
 
     // Guard: $49.90/yr ÷ 12 = $4.1583… → honestly rounded to $4.16/mo.
     expect(find.text('\$4.16'), findsOneWidget);
-    expect(find.text('Billed \$49.90 once a year.'), findsOneWidget);
+    expect(find.text('Renews yearly at \$49.90.'), findsOneWidget);
     // 49.90 == 10 × 4.99, so "2 months free" is literally true (shown on every
     // tier since each yearly is exactly 10× its monthly here).
     expect(

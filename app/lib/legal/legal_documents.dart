@@ -175,6 +175,8 @@ $app specifically collects and why.
   under contract. We use this ONLY to detect and warn you about threats — never
   to sell, advertise or profile you. You can turn the filter off or revoke SMS
   permission at any time in your device settings.
+• Links and QR codes you scan or check are sent to $company servers to evaluate
+  their reputation and warn you about phishing or malicious destinations.
 • Location data: when you enable Locate or periodic reporting, we process the device's
   location to show it to you (the account owner) and support anti-theft.
 • Camera images ("thief capture"): when you (or you via the web panel) trigger a photo,

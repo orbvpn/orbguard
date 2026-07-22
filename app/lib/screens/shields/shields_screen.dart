@@ -31,7 +31,7 @@ class ShieldsScreen extends StatelessWidget {
           'Hidden trackers, stalkerware & risky permissions',
           AppColors.errorInk, (_) => const PrivacyProtectionScreen()),
       _Shield('danger_triangle', 'Scam shield',
-          'Texts, links, QR codes & scam calls', AppColors.amberInk,
+          'Texts, links & QR codes', AppColors.amberInk,
           (_) => const ScamDetectionScreen()),
       _Shield('wi_fi_router', 'Hidden VPN & proxy',
           'Spot traffic being secretly rerouted', AppColors.accentInk,

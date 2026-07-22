@@ -11,6 +11,7 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/account_provider.dart';
 import '../../services/iap/iap_service.dart';
 import '../account/login_screen.dart';
+import '../legal/legal_screen.dart';
 
 /// The transparent pricing screen — now wired to real in-app purchases.
 ///
@@ -57,9 +58,6 @@ class _GuardTier {
   /// NEW protections this tier adds over [inheritsFrom].
   final List<String> features;
 
-  /// Protections this tier honestly does NOT include — stated plainly.
-  final List<String> excluded;
-
   final bool recommended;
 
   const _GuardTier({
@@ -70,7 +68,6 @@ class _GuardTier {
     required this.yearlyId,
     this.inheritsFrom,
     required this.features,
-    this.excluded = const [],
     this.recommended = false,
   });
 
@@ -86,21 +83,23 @@ class _PricingScreenState extends State<PricingScreen> {
   // `inheritsFrom`. Device counts are stated relatively (never a specific
   // number we can't guarantee for a given region/plan); the exact device limit
   // for the account is shown in Settings after purchase.
+  // Every claim below is store-review-audited: it must name something the app
+  // actually ships TODAY (Apple 2.3.1 / Play misleading-claims). Do not add a
+  // feature bullet before the feature is wired end-to-end. ("Scam calls" and
+  // "priority support" were removed for exactly that reason; "always-on" was
+  // softened because iOS background scanning is launch/resume-based.)
   static const List<_GuardTier> _tiers = [
     _GuardTier(
       name: 'Guard',
       icon: AppIcons.shieldCheck,
-      tagline: 'Always-on protection for one person.',
+      tagline: 'Everyday protection for one person.',
       monthlyId: OrbGuardProductIds.basicMonthly,
       yearlyId: OrbGuardProductIds.basicYearly,
       features: [
-        'Automatic, always-on spyware & stalkerware monitoring',
+        'Automatic spyware & stalkerware monitoring',
         'Scam link, QR code & permission checks',
         'Hidden VPN & proxy detection',
         'Secure device checkups',
-      ],
-      excluded: [
-        'Dark-web identity monitoring',
       ],
     ),
     _GuardTier(
@@ -111,12 +110,9 @@ class _PricingScreenState extends State<PricingScreen> {
       yearlyId: OrbGuardProductIds.premiumYearly,
       inheritsFrom: 'Guard',
       features: [
-        'Full scam shield — texts, links, QR codes & scam calls',
+        'Full scam shield — texts, links & QR codes',
         'Secure call check before sensitive calls',
         'Cover more of your devices',
-      ],
-      excluded: [
-        'Dark-web identity monitoring',
       ],
       recommended: true,
     ),
@@ -130,7 +126,6 @@ class _PricingScreenState extends State<PricingScreen> {
       features: [
         'Dark-web & identity breach monitoring',
         'Cover your whole family',
-        'Priority alerts & support',
       ],
     ),
   ];
@@ -264,8 +259,44 @@ class _PricingScreenState extends State<PricingScreen> {
           ],
           const SizedBox(height: 16),
           const _PromiseBand(),
+          const SizedBox(height: 12),
+          // Apple 3.1.2: Terms of Use + Privacy Policy must be reachable from
+          // the subscription screen itself.
+          const _LegalLinksRow(),
         ],
       ),
+    );
+  }
+}
+
+/// "Terms of Service · Privacy Policy" links — required on the paywall by
+/// App Store subscription rules (3.1.2).
+class _LegalLinksRow extends StatelessWidget {
+  const _LegalLinksRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget link(String label, LegalDoc doc) => TextButton(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => LegalScreen(doc: doc)),
+          ),
+          child: Text(label,
+              style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5)),
+        );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        link('Terms of Service', LegalDoc.terms),
+        Text('·', style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5)),
+        link('Privacy Policy', LegalDoc.privacy),
+      ],
     );
   }
 }
@@ -587,13 +618,6 @@ class _TierCard extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         for (final feature in tier.features) _FeatureRow(text: feature),
-        if (tier.excluded.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text(
-            'Not included: ${tier.excluded.join(', ')}.',
-            style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
-          ),
-        ],
         const SizedBox(height: 20),
         _cta(),
       ],
@@ -735,7 +759,7 @@ class _PriceRow extends StatelessWidget {
           )
         else ...[
           Text(
-            'Billed ${product.price} once a year.',
+            'Renews yearly at ${product.price}.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
           ),
           if (freeMonths != null)
