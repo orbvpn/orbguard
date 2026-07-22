@@ -48,7 +48,19 @@ Yearly" shows). So *any* purchase on the account already unlocks both apps. What
 missing is only the **purchase path** for OrbGuard. Three parts — two are mine,
 one is yours.
 
-### 2a. 🧑‍💻 App Store Connect (OrbGuard app — `com.orb.guard`)
+### VERIFIED STORE STATE (checked via the ASC + Play APIs on 2026-07-19)
+- **App Store Connect: ✅ `com.orb.guard` "OrbGuard" ALREADY EXISTS.** You can
+  create iOS subscriptions immediately — no build upload needed first on Apple.
+- **Google Play: ❌ `com.orb.guard` does NOT exist yet** (Play API: "Package not
+  found"). The app record must be created manually (no API can create it), then the
+  first AAB uploaded. **I've built a signed release AAB for you** — see 2b.
+- **Signing:** OrbGuard now has a real **upload keystore** at
+  `~/.secrets/orbguard-upload.jks` (SHA-256 `91:70:AF:8C:22:82:CF:28:94:CC:0A:7C:84:
+  D3:D4:44:F0:3E:5E:D9:DC:9A:F8:A7:D1:4E:D5:AE:2C:CE:20:52`). Gradle signs release
+  builds with it (via gitignored `android/key.properties`). **KEEP THIS KEYSTORE
+  SAFE** — with Play App Signing the upload key is resettable, but don't lose it.
+
+### 2a. 🧑‍💻 App Store Connect (OrbGuard app — `com.orb.guard`) — app EXISTS, just add products
 1. Create **auto-renewable subscription products** in the OrbGuard app record.
 2. **Reuse OrbVPN's exact product IDs** — the same strings OrbVPN uses:
    - `orb_basic_monthly`, `orb_premium_monthly`, `orb_family_monthly`
@@ -64,15 +76,25 @@ one is yours.
 5. If you use the App Store Server API (recommended over the legacy shared
    secret), give me the **Issuer ID, Key ID, and .p8 key** scoped to OrbGuard.
 
-### 2b. 🧑‍💻 Google Play Console (OrbGuard app — `com.orb.guard`)
-1. Create the **same subscription products** (reuse the same product IDs as above).
-2. Grant your existing Play service account
+### 2b. 🧑‍💻 Google Play Console (OrbGuard app — `com.orb.guard`) — CREATE the app first
+Exact sequence (the app doesn't exist yet; I can't create it via API):
+1. Play Console → **Create app** → name "OrbGuard", default language, App/Game =
+   App, Free/Paid, accept declarations. This creates the record.
+2. Set the **package name to `com.orb.guard`** by uploading the first build: go to
+   a track (Internal testing is easiest) → **Create release** → upload
+   **`OrbGuard-1.0-release.aab`** (I built + signed it; sent to you / at repo root).
+   On first upload, **enroll in Play App Signing** (recommended — Google manages the
+   app signing key; your upload key stays resettable).
+3. After enrolling, copy the **App signing key certificate SHA-1 + SHA-256** from
+   Play Console → **Setup → App signing** and send them to me — I add them to the
+   Google OAuth Android client (so Google Sign-In works in the **released** build)
+   and to the passkey `assetlinks.json` (so passkeys work in release).
+4. Grant your Play service account
    `play-publisher@xexchange-486112.iam.gserviceaccount.com` **access to the
-   OrbGuard app** (Play Console → Users & permissions → add the OrbGuard app to
-   that service account's permissions, with "View financial data" / subscription
-   read). This lets the backend validate OrbGuard's Play receipts.
-3. First-ever OrbGuard AAB must already be uploaded (it is / will be via
-   `play-publish`).
+   OrbGuard app** (Users & permissions → add the OrbGuard app to its permissions,
+   with financial/subscription read) — lets the backend validate Play receipts and
+   lets me push future builds with `play-publish`.
+5. Then create the **same subscription products** (reuse the same product IDs as 2a).
 
 ### 2c. ✅ Backend + app (my work)
 - ✅ Make OrbNet's receipt validation **app-aware**: today it hard-rejects any

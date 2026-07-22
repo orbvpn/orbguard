@@ -30,6 +30,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Export compliance: OrbGuard only uses standard encryption (HTTPS/TLS) via
+	     the OS, which is exempt. Declaring this skips the per-upload encryption
+	     prompt. If you ever add non-standard/proprietary crypto, remove this. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>orbvpn</string>
