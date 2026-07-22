@@ -1,0 +1,28 @@
+name: orbguard
+base: core22
+version: '1.0.0'
+summary: Know if you're being watched — anti-spyware & scam protection
+description: |
+  OrbGuard checks your device for spyware and stalkerware, analyses scam
+  links and QR codes, and adds anti-theft protection. One subscription is
+  shared with OrbVPN and OrbBrowser (sign in with your Orb account).
+license: Proprietary
+grade: stable
+confinement: strict
+
+apps:
+  orbguard:
+    command: orbguard
+    extensions: [gnome]
+    plugs:
+      - network
+      - home
+      - camera
+      - audio-playback
+      - password-manager-service
+
+parts:
+  orbguard:
+    source: app
+    plugin: flutter
+    flutter-target: lib/main.dart

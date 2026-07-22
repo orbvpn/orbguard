@@ -1,15 +1,11 @@
-# Builds the OrbGuard Windows MSIX for Microsoft Partner Center.
-#
-# Flutter Windows builds REQUIRE a Windows host, so this runs on a
-# windows-latest runner and publishes the .msix as a workflow artifact:
-# download it from the run page and upload to Partner Center
-# (Apps -> OrbGuard -> Packages).
-#
-# PREREQUISITE (one-time): reserve the app name in Partner Center, then copy
-# Product identity values (Identity Name / Publisher / Publisher Display Name)
-# into msix_config in app/pubspec.yaml — the placeholders there fail loudly
-# until replaced. `--store` signs nothing locally; the Store signs on ingest.
-name: Windows MSIX
+# Builds OrbGuard for Windows on a windows-latest runner (Flutter Windows
+# builds REQUIRE a Windows host):
+#  - ALWAYS: a direct-download ZIP of the release build (hosted on Azure Blob,
+#    linked from orbvpn.com/download/orbguard).
+#  - WHEN msix_config in app/pubspec.yaml carries real Partner Center identity
+#    values (no REPLACE placeholders): a store-ready .msix for Partner Center.
+# Download artifacts from the run page.
+name: Windows build (MSIX + ZIP)
 
 on:
   workflow_dispatch:
@@ -18,7 +14,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  build-msix:
+  build-windows:
     runs-on: windows-latest
     defaults:
       run:
@@ -32,24 +28,42 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Guard against placeholder identity
-        shell: bash
-        run: |
-          if grep -q "REPLACE" pubspec.yaml; then
-            echo "::error::msix_config still has Partner Center placeholders — fill identity_name/publisher/publisher_display_name from Partner Center Product identity first."
-            exit 1
-          fi
-
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build Windows release
         run: flutter build windows --release
 
+      - name: Zip release build (direct download)
+        shell: pwsh
+        run: |
+          $src = "build/windows/x64/runner/Release"
+          Compress-Archive -Path "$src/*" -DestinationPath "build/OrbGuard-windows-x64.zip"
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbguard-windows-zip
+          path: app/build/OrbGuard-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Check Partner Center identity present
+        id: identity
+        shell: bash
+        run: |
+          if grep -q "REPLACE" pubspec.yaml; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "msix_config still has Partner Center placeholders — skipping MSIX (ZIP artifact still produced)."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Package MSIX (store-signed)
+        if: steps.identity.outputs.ready == 'true'
         run: dart run msix:create --store
 
       - name: Upload MSIX artifact
+        if: steps.identity.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: orbguard-windows-msix
