@@ -160,9 +160,23 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     });
   }
 
+  /// Content padding for the tab list views. In the embedded tab path the
+  /// shell's floating bottom nav overlays the body, so the primary scrollable
+  /// needs extra bottom clearance for content to be fully visible at rest.
+  EdgeInsets get _tabContentPadding => EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        24 +
+            (widget.embedded
+                ? GlassTheme.bottomNavClearance +
+                    MediaQuery.of(context).padding.bottom
+                : 0),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return GlassTabPage(
+    final page = GlassTabPage(
       title: 'Desktop Security',
       hasSearch: true,
       searchHint: 'Search devices...',
@@ -218,6 +232,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         ),
       ],
     );
+    if (!widget.embedded) return page;
+    // Embedded tab path: the shell's transparent floating header overlays the
+    // top of the body, so push the fixed internal tab selector below it. The
+    // bottom clearance is applied inside each tab's scrollable padding.
+    return Padding(
+      padding: const EdgeInsets.only(top: GlassTheme.headerClearance),
+      child: page,
+    );
   }
 
   Widget _buildPersistenceTab() {
@@ -225,7 +247,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final safe = _persistenceItems.length - suspicious;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         // Scan button
         _isDesktopPlatform
@@ -552,7 +574,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           final unavailable = provider.codeSigningUnavailableReason;
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: _tabContentPadding,
             children: [
               GlassCard(
                 margin: EdgeInsets.zero,
@@ -658,7 +680,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final valid = _signedApps.where((a) => a.isSigned && a.isValid).length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         // Stats
         Row(
@@ -776,7 +798,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         _firewallRules.where((r) => r.action.toLowerCase() == 'block').length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         // REAL host firewall status, read from OS tooling
         // (socketfilterfw / netsh advfirewall / ufw+firewalld).
@@ -1388,7 +1410,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         // Summary card
         GlassCard(
@@ -1490,7 +1512,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final collecting = provider.isCollectingNetwork;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         GlassCard(
           margin: EdgeInsets.zero,
@@ -1686,7 +1708,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
     final byBrowser = (scanResult?['by_browser'] as Map?)?.cast<String, dynamic>() ?? {};
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _tabContentPadding,
       children: [
         // Summary card
         GlassCard(
@@ -1843,7 +1865,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         final quarantinedItems = snapshot.data ?? [];
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: _tabContentPadding,
           children: [
             // Header stats
             GlassCard(

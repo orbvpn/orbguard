@@ -117,13 +117,29 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       // Transparent so the app-wide ambient gradient shows through —
       // keeps this tab visually consistent with the other glass tabs.
       backgroundColor: Colors.transparent,
+      // No bottom SafeArea: the shell renders this tab full-bleed and the
+      // scrollable below insets itself by bottomNavClearance + the device
+      // bottom inset, so content scrolls BEHIND the transparent bottom nav.
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
           onRefresh: _onRefresh,
           color: AppColors.accentInk,
+          // Drop the refresh spinner below the transparent floating header.
+          edgeOffset: GlassTheme.headerClearance,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            // Full-bleed tab: clear the floating header (top) and the
+            // floating bottom nav + home indicator (bottom) so everything
+            // is visible at rest while still scrolling behind the bars.
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16 + GlassTheme.headerClearance,
+              bottom: 16 +
+                  GlassTheme.bottomNavClearance +
+                  MediaQuery.of(context).padding.bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

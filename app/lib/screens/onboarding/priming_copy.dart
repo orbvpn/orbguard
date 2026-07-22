@@ -59,13 +59,6 @@ const PrimingStep _notifications = PrimingStep(
   value: 'Get alerted the moment we spot a threat.',
 );
 
-const PrimingStep _storage = PrimingStep(
-  id: PrimingStepIds.storage,
-  icon: AppIcons.folder,
-  title: 'Storage',
-  value: 'Let OrbGuard check files and apps for spyware.',
-);
-
 const PrimingStep _sms = PrimingStep(
   id: PrimingStepIds.sms,
   icon: AppIcons.chatDots,
@@ -116,7 +109,8 @@ List<PrimingStep> primingStepsFor(TargetPlatform platform) {
   if (platform == TargetPlatform.android) {
     return const [
       _notifications,
-      _storage,
+      // (No storage step: file/APK scanning uses the system file picker and
+      // needs no storage permission.)
       _sms,
       _locationAndroid,
       _usageAccess,

@@ -290,41 +290,42 @@ class AntiSpywareApp extends StatelessWidget {
       ],
       child: _PremiumModeSync(
         child: Consumer<SettingsProvider>(
-        builder: (context, settings, _) => MaterialApp(
-          title: 'OrbGuard',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: settings.themeMode,
-          // Automatic screen-view analytics (no-op when analytics is disabled).
-          navigatorObservers: [
-            if (TelemetryService.instance.navigatorObserver != null)
-              TelemetryService.instance.navigatorObserver!,
-          ],
-          builder: (context, child) {
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            // Sync the brand token system with the active theme BEFORE any
-            // Brand.*/AppColors.* getter resolves — this is what flips every
-            // glass/ink token between light and dark.
-            AppColors.uiBrightness =
-                isDark ? Brightness.dark : Brightness.light;
-            return GlassGradientBackground(
-              isDark: isDark,
-              child: AppLockGate(child: child ?? const SizedBox.shrink()),
-            );
-          },
-          home: settings.isLoading
-              // Prefs still loading — the ambient gradient shows briefly; avoids
-              // flashing onboarding at returning users before the flag loads.
-              ? const SizedBox.shrink()
-              : !settings.hasSeenOnboarding
-                  ? OnboardingScreen(onDone: settings.completeOnboarding)
-                  : !settings.permissionsPrimed
-                      // First-run permission priming: value-first, staged,
-                      // skippable — the app finally asks for what it needs.
-                      ? PermissionPrimingScreen(onDone: settings.completePriming)
-                      : const HomeScreen(),
-        ),
+          builder: (context, settings, _) => MaterialApp(
+            title: 'OrbGuard',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: settings.themeMode,
+            // Automatic screen-view analytics (no-op when analytics is disabled).
+            navigatorObservers: [
+              if (TelemetryService.instance.navigatorObserver != null)
+                TelemetryService.instance.navigatorObserver!,
+            ],
+            builder: (context, child) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              // Sync the brand token system with the active theme BEFORE any
+              // Brand.*/AppColors.* getter resolves — this is what flips every
+              // glass/ink token between light and dark.
+              AppColors.uiBrightness =
+                  isDark ? Brightness.dark : Brightness.light;
+              return GlassGradientBackground(
+                isDark: isDark,
+                child: AppLockGate(child: child ?? const SizedBox.shrink()),
+              );
+            },
+            home: settings.isLoading
+                // Prefs still loading — the ambient gradient shows briefly; avoids
+                // flashing onboarding at returning users before the flag loads.
+                ? const SizedBox.shrink()
+                : !settings.hasSeenOnboarding
+                    ? OnboardingScreen(onDone: settings.completeOnboarding)
+                    : !settings.permissionsPrimed
+                        // First-run permission priming: value-first, staged,
+                        // skippable — the app finally asks for what it needs.
+                        ? PermissionPrimingScreen(
+                            onDone: settings.completePriming)
+                        : const HomeScreen(),
+          ),
         ),
       ),
     );
@@ -395,7 +396,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         supported: PlatformInfo.isAndroid,
         granted: () async => await Permission.sms.isGranted),
     GuardProbes.malwareScan(supported: PlatformInfo.isAndroid),
-    GuardProbes.alerts(granted: () async => await Permission.notification.isGranted),
+    GuardProbes.alerts(
+        granted: () async => await Permission.notification.isGranted),
     GuardProbes.breachMonitor(breachedAccounts: () async => null),
     GuardProbes.hiddenVpn(unknownVpnActive: () async => null),
     GuardProbes.secureCall(
@@ -503,8 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         showAppSheet(context,
             heightFactor: 0.94, child: const SmsProtectionScreen());
       case 'breach':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const DarkWebScreen());
+        showAppSheet(context, heightFactor: 0.94, child: const DarkWebScreen());
       case 'hidden_vpn':
         showAppSheet(context,
             heightFactor: 0.94, child: const HiddenVpnProxyScreen());
@@ -585,14 +586,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (await Permission.sms.isGranted) capability += 10;
     if (await Permission.location.isGranted) capability += 5;
 
-    // Storage - check via native method for Android 11+
-    try {
-      final storageResult =
-          await platform.invokeMethod('checkStoragePermission');
-      if (storageResult['hasPermission'] == true) capability += 10;
-    } catch (e) {
-      if (await Permission.storage.isGranted) capability += 10;
-    }
+    // File/APK scanning always works via the system file picker (SAF) — no
+    // storage permission gates it any more (MANAGE_EXTERNAL_STORAGE dropped
+    // for Play compliance), so the capability is constant.
+    capability += 10;
 
     // Special permissions (25% total)
     if (specialPermissions.hasUsageStats) capability += 15;
@@ -687,7 +684,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
   }
-
 
   final Remediation _remediation = Remediation();
 
@@ -797,23 +793,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       drawer: _buildNavigationDrawer(isPro),
       body: Stack(
         children: [
-          // Main content (constrained on wide screens, centered)
+          // Main content — FULL-BLEED: it runs to the bottom edge and under the
+          // floating header, so scrolling content passes BEHIND both bars
+          // (which are fully transparent). Tab bodies keep themselves readable
+          // at rest by padding their scrollables with
+          // GlassTheme.headerClearance (top) and bottomNavClearance (bottom).
           SafeArea(
+            bottom: false,
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints:
                     const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
-                child: Column(
-                  children: [
-                    // OrbX-style header
-                    _buildOrbXHeader(isDark, textColor, iconColor),
-                    // Body content — viewport ends above the floating nav
-                    Expanded(
-                      child: _buildCurrentScreen(effIndex),
-                    ),
-                    const SizedBox(height: GlassTheme.bottomNavClearance),
-                  ],
+                child: _buildCurrentScreen(effIndex),
+              ),
+            ),
+          ),
+          // Floating header — overlays the content, no background of its own.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                      maxWidth: GlassTheme.contentMaxWidth),
+                  child: _buildOrbXHeader(isDark, textColor, iconColor),
                 ),
               ),
             ),
@@ -850,7 +857,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Menu button (round glass, 50x50)
+          // Menu button — OrbX round glass (translucent + blur; the page shows
+          // through, frosted).
           Builder(
             builder: (context) => GestureDetector(
               onTap: () => Scaffold.of(context).openDrawer(),
@@ -874,9 +882,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           const SizedBox(width: 12),
-          // Title pill — matches the unified GlassPage header used across the
-          // app (glass fill + border + blur), so the main tabs are consistent
-          // with every sub-screen instead of a bare floating title.
+          // Title pill — OrbX glass frame (translucent fill + border + blur):
+          // the body scrolls behind it and shows through, frosted.
           Expanded(
             child: Container(
               height: 50,
@@ -1010,56 +1017,65 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return const DesktopSecurityScreen(embedded: true);
     }
 
-    // On mobile, show the scan button UI
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          GlassCircleButton(
-            size: 120,
-            tintColor: AppColors.accent,
-            onTap: () => _startScan(),
-            child: DuotoneIcon(
-              AppIcons.search,
-              size: 56,
-              color: AppColors.accentInk,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Tap to Start Scan',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Detection capability: ${_detectionCapability.round()}%',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 28),
-          // Scoped file check — sideloaded APKs are the real Android malware
-          // vector, and this needs no storage permission (user picks the file).
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ApkScanScreen()),
-            ),
-            child: Text(
-              'Check an app file (.apk)',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+    // On mobile, show the scan button UI. The shell overlays the transparent
+    // header + nav, so inset by their clearances to stay visually centered
+    // between them.
+    return Padding(
+      padding: EdgeInsets.only(
+        top: GlassTheme.headerClearance,
+        bottom: GlassTheme.bottomNavClearance +
+            MediaQuery.of(context).padding.bottom,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GlassCircleButton(
+              size: 120,
+              tintColor: AppColors.accent,
+              onTap: () => _startScan(),
+              child: DuotoneIcon(
+                AppIcons.search,
+                size: 56,
                 color: AppColors.accentInk,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'Tap to Start Scan',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Detection capability: ${_detectionCapability.round()}%',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 28),
+            // Scoped file check — sideloaded APKs are the real Android malware
+            // vector, and this needs no storage permission (user picks the file).
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApkScanScreen()),
+              ),
+              child: Text(
+                'Check an app file (.apk)',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accentInk,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

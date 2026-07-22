@@ -115,6 +115,11 @@ class GlassTheme {
   /// Vertical space reserved for the floating pill nav (60 height + 12 margin).
   static const double bottomNavClearance = 72.0;
 
+  /// Vertical space the floating header occupies (50 pill + 24 vertical
+  /// padding). Scrollable tab content starts below this at rest and passes
+  /// BEHIND the (fully transparent) header while scrolling.
+  static const double headerClearance = 74.0;
+
   // ============================================================================
   // BORDER RADIUS
   // ============================================================================

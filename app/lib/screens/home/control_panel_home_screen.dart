@@ -19,6 +19,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/theme/protection_verdict.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -93,8 +94,12 @@ class ControlPanelHomeScreen extends StatelessWidget {
 
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-              20, 8, 20, AppSpacing.bottomNavHeight),
+          padding: EdgeInsets.fromLTRB(
+              20,
+              8 + GlassTheme.headerClearance,
+              20,
+              GlassTheme.bottomNavClearance +
+                  MediaQuery.of(context).padding.bottom),
           children: [
             const SizedBox(height: 4),
 

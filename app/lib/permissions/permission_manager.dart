@@ -26,12 +26,10 @@ class PermissionManager {
       description: 'Required for basic threat detection',
       icon: AppIcons.shieldCheck,
       permissions: [
-        PermissionInfo(
-          permission: Permission.storage,
-          name: 'Storage Access',
-          reason: 'Scan files for malware and suspicious modifications',
-          impact: 'Enables file system threat detection',
-        ),
+        // NOTE: no storage permission here. File/APK scanning uses the system
+        // file picker (SAF) and needs NO storage permission; the old
+        // MANAGE_EXTERNAL_STORAGE-based "Storage Access" entry was structurally
+        // un-grantable after that permission was dropped for Play compliance.
         PermissionInfo(
           permission: Permission.phone,
           name: 'Phone State',
@@ -163,9 +161,9 @@ class PermissionManager {
     if (_permissionStates[Permission.location]?.isGranted ?? false) {
       capability += 5;
     }
-    if (_permissionStates[Permission.storage]?.isGranted ?? false) {
-      capability += 10;
-    }
+    // File/APK scanning always works via the system file picker (SAF) — no
+    // storage permission exists to gate it, so the capability is constant.
+    capability += 10;
 
     // Special permissions (25% total)
     if (_hasUsageStats) capability += 15;
@@ -190,14 +188,7 @@ class PermissionManager {
       requestEssentialPermissions() async {
     final results = <Permission, PermissionStatus>{};
 
-    // Request storage permission via native method (Android 11+)
-    if (PlatformInfo.isAndroid) {
-      await requestStoragePermission();
-      final hasStorage = await _checkStoragePermission();
-      results[Permission.storage] = hasStorage
-          ? PermissionStatus.granted
-          : PermissionStatus.denied;
-    }
+    // (No storage request: file scanning is SAF-picker based — nothing to grant.)
 
     // Request phone permission
     final phoneStatus = await Permission.phone.request();
@@ -551,8 +542,7 @@ class PermissionScanResult {
   int get totalPermissions =>
       granted.length + denied.length + permanentlyDenied.length;
 
-  bool get hasAllEssential =>
-      granted.contains('Storage Access') && granted.contains('Phone State');
+  bool get hasAllEssential => granted.contains('Phone State');
 
   bool get hasAllAdvanced =>
       granted.contains('SMS Access') && granted.contains('Location');

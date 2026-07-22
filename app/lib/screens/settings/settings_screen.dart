@@ -48,7 +48,19 @@ class SettingsScreen extends StatelessWidget {
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            // Embedded (tab) mode renders full-bleed behind the transparent
+            // floating header + bottom nav, so the list itself clears them.
+            // Standalone pushed routes keep the GlassPage header flow.
+            padding: embedded
+                ? EdgeInsets.fromLTRB(
+                    16,
+                    12 + GlassTheme.headerClearance,
+                    16,
+                    24 +
+                        GlassTheme.bottomNavClearance +
+                        MediaQuery.of(context).padding.bottom,
+                  )
+                : const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               // Account — shared OrbVPN/OrbNet sign-in (optional; unlocks
               // subscription/credits/remote control). Anonymous scanning works
@@ -525,7 +537,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 'Subscription',
                 account.hasPremium
-                    ? '${account.subscriptionLabel} — covers OrbGuard & OrbVPN'
+                    ? '${account.subscriptionLabel} — unlocks OrbGuard, OrbVPN & OrbBrowser'
                     : 'Free plan — view plans & subscribe',
                 'wallet',
                 onTap: () => Navigator.push(

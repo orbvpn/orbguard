@@ -16,7 +16,6 @@ import 'package:orbguard/screens/onboarding/permission_priming_screen.dart';
 /// Injected fakes — no platform channels, every call logged.
 PrimingRequests fakeRequests({
   bool notifications = true,
-  bool storage = true,
   bool sms = true,
   bool location = true,
   List<String>? log,
@@ -25,10 +24,6 @@ PrimingRequests fakeRequests({
     requestNotifications: () async {
       log?.add('notifications');
       return notifications;
-    },
-    requestStorage: () async {
-      log?.add('storage');
-      return storage;
     },
     requestSms: () async {
       log?.add('sms');
@@ -85,7 +80,7 @@ void main() {
   });
 
   group('Android priming flow', () {
-    testWidgets('renders all five step groups with their value copy',
+    testWidgets('renders all step groups with their value copy',
         (tester) async {
       await pumpPriming(tester, platform: TargetPlatform.android);
 
@@ -93,11 +88,9 @@ void main() {
       expect(find.text('Notifications'), findsOneWidget);
       expect(
           find.text('Get alerted the moment we spot a threat.'), findsOneWidget);
-      // 2. Storage
-      expect(find.text('Storage'), findsOneWidget);
-      expect(find.text('Let OrbGuard check files and apps for spyware.'),
-          findsOneWidget);
-      // 3. SMS
+      // (No Storage step: file scanning is SAF-picker based — nothing to ask.)
+      expect(find.text('Storage'), findsNothing);
+      // 2. SMS
       expect(find.text('SMS'), findsOneWidget);
       expect(find.text('Catch scam texts before you tap them.'), findsOneWidget);
       // 4. Location
@@ -155,10 +148,10 @@ void main() {
       await pumpPriming(tester,
           platform: TargetPlatform.android, requests: fakeRequests(log: log));
 
-      await tester.tap(inStep('storage', find.text('Skip')));
+      await tester.tap(inStep('sms', find.text('Skip')));
       await tester.pumpAndSettle();
 
-      expect(inStep('storage', find.text(kSkippedCopy)), findsOneWidget);
+      expect(inStep('sms', find.text(kSkippedCopy)), findsOneWidget);
       expect(log, isEmpty);
     });
 
@@ -188,10 +181,8 @@ void main() {
           requests: fakeRequests(location: false),
           onDone: () => done = true);
 
-      // Decide all four one-tap steps (mix of grant / deny / skip).
+      // Decide all three one-tap steps (mix of grant / deny / skip).
       await tester.tap(inStep('notifications', find.text('Allow')));
-      await tester.pumpAndSettle();
-      await tester.tap(inStep('storage', find.text('Allow')));
       await tester.pumpAndSettle();
       await tester.tap(inStep('sms', find.text('Skip')));
       await tester.pumpAndSettle();

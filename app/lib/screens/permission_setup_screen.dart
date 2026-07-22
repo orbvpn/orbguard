@@ -256,30 +256,20 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
   }
 
   Widget _buildStoragePermissionCard() {
-    // Use scan result for storage status (handles Android 11+ MANAGE_EXTERNAL_STORAGE)
-    final isGranted = _scanResult?.granted.contains('Storage Access') ?? false;
-
+    // HONEST: file/APK scanning uses the system file picker (SAF) and needs NO
+    // storage permission. The old "Storage Access" grant flow deep-linked to
+    // Android's "All files access" switch, which cannot be enabled since
+    // MANAGE_EXTERNAL_STORAGE was dropped for Play compliance — so instead of
+    // an impossible toggle, state the truth: this capability is always on.
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: DuotoneIcon(AppIcons.folder,
-            color: isGranted
-                ? AppColors.accentInk
-                : Theme.of(context).colorScheme.onSurfaceVariant),
-        title: const Text('Storage Access'),
-        subtitle: const Text('Scan files for malware and threats',
+        leading: DuotoneIcon(AppIcons.folder, color: AppColors.accentInk),
+        title: const Text('File scanning'),
+        subtitle: const Text(
+            'Check any file or APK you pick — no storage permission needed',
             style: TextStyle(fontSize: 12)),
-        trailing: isGranted
-            ? DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk)
-            : ElevatedButton(
-                onPressed: () => _requestPermission(Permission.storage, 'Storage Access'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.info,
-                  foregroundColor: Brand.onPink,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child: const Text('Grant'),
-              ),
+        trailing: DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk),
       ),
     );
   }
@@ -475,23 +465,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
   }
 
   Future<void> _requestPermission(Permission permission, String name) async {
-    // For storage permission on Android 11+, use native method
-    if (permission == Permission.storage) {
-      final success = await _permissionManager.requestStoragePermission();
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enable "All files access" for OrbGuard'),
-            backgroundColor: AppColors.warning,
-          ),
-        );
-        // Wait for user to return from settings
-        await Future.delayed(const Duration(seconds: 2));
-        await _checkPermissions();
-      }
-      return;
-    }
-
     final status = await _permissionManager.requestPermissionWithRationale(
       context: context,
       permission: permission,

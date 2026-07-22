@@ -70,10 +70,17 @@ class GlassBottomNavBar extends StatelessWidget {
         right: 16,
         bottom: bottomPadding + 12,
       ),
-      // Floating nav — NO background bar; the items sit directly over the page.
-      child: SizedBox(
+      // OrbX-style floating glass bar: translucent pill fill + border + blur —
+      // the page scrolls behind it and shows through, frosted.
+      child: Container(
         height: 60,
-        child: Padding(
+        decoration: GlassTheme.pillGlassDecoration(
+            isDark: Theme.of(context).brightness == Brightness.dark),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(GlassTheme.radiusPill),
+          child: BackdropFilter(
+            filter: GlassTheme.blurFilter,
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
                 children: List.generate(items.length, (index) {
@@ -132,6 +139,8 @@ class GlassBottomNavBar extends StatelessWidget {
                 }),
               ),
             ),
+          ),
+        ),
       ),
     );
   }

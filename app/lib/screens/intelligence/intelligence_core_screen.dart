@@ -101,10 +101,22 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
     }
   }
 
+  /// True only when this screen is the shell's embedded Intel tab (full-bleed
+  /// body under the shell's transparent floating header + bottom nav). The
+  /// asMainTab and standalone-route paths render their own GlassPage chrome.
+  bool get _isEmbeddedTab => widget.embedded && !widget.asMainTab;
+
+  /// Extra bottom inset for the embedded-tab path only: the shell's floating
+  /// bottom nav overlays the full-bleed body (SafeArea(bottom: false)), so
+  /// scrollables must clear the nav plus the device bottom inset.
+  double get _embeddedBottomInset => _isEmbeddedTab
+      ? GlassTheme.bottomNavClearance + MediaQuery.of(context).padding.bottom
+      : 0.0;
+
   @override
   Widget build(BuildContext context) {
     // Show tabs immediately - don't block on loading
-    return GlassTabPage(
+    final page = GlassTabPage(
       title: 'Intelligence Core',
       hasSearch: true,
       searchHint: 'Search indicators...',
@@ -152,6 +164,17 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         ),
       ],
     );
+    // Embedded Intel tab: the shell's transparent header overlays the top of
+    // the full-bleed body, so push the fixed Browse/Check/History selector
+    // below it. Bottom clearance lives inside each tab's scrollable padding
+    // (via _embeddedBottomInset) so content still scrolls behind the nav.
+    if (_isEmbeddedTab) {
+      return Padding(
+        padding: const EdgeInsets.only(top: GlassTheme.headerClearance),
+        child: page,
+      );
+    }
+    return page;
   }
 
   String _getTypeDisplayName(api.IndicatorType type) {
@@ -181,49 +204,56 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
 
   Widget _buildBrowseTab() {
     final cs = Theme.of(context).colorScheme;
-    // Show loading state inline
+    // Show loading state inline (keep it visually centered between the tab
+    // selector and the overlaid bottom nav in the embedded path).
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.accentInk),
-            const SizedBox(height: 16),
-            Text(
-              'Loading indicators...',
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          ],
+      return Padding(
+        padding: EdgeInsets.only(bottom: _embeddedBottomInset),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.accentInk),
+              const SizedBox(height: 16),
+              Text(
+                'Loading indicators...',
+                style: TextStyle(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     // Show error state
     if (_error != null && _indicators.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load indicators',
-              style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadIndicators,
-              icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
-            ),
-          ],
+      return Padding(
+        padding: EdgeInsets.only(bottom: _embeddedBottomInset),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const DuotoneIcon('danger_circle', size: 48, color: GlassTheme.errorColor),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load indicators',
+                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadIndicators,
+                icon: const DuotoneIcon('refresh', size: 18, color: Brand.onLime),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(backgroundColor: GlassTheme.primaryAccent),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -285,7 +315,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
         // Indicators List
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + _embeddedBottomInset),
             itemCount: filteredIndicators.length,
             itemBuilder: (context, index) {
               final indicator = filteredIndicators[index];
@@ -382,7 +412,7 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
   Widget _buildCheckTab() {
     final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + _embeddedBottomInset),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -497,28 +527,31 @@ class _IntelligenceCoreScreenState extends State<IntelligenceCoreScreen> {
 
   Widget _buildHistoryTab() {
     if (_checkHistory.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DuotoneIcon('history', size: 64, color: AppColors.accentInk.withAlpha(128)),
-            const SizedBox(height: 16),
-            Text(
-              'No Check History',
-              style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your indicator checks will appear here',
-              style: TextStyle(color: context.onSurfaceMuted),
-            ),
-          ],
+      return Padding(
+        padding: EdgeInsets.only(bottom: _embeddedBottomInset),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DuotoneIcon('history', size: 64, color: AppColors.accentInk.withAlpha(128)),
+              const SizedBox(height: 16),
+              Text(
+                'No Check History',
+                style: TextStyle(color: context.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your indicator checks will appear here',
+                style: TextStyle(color: context.onSurfaceMuted),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + _embeddedBottomInset),
       itemCount: _checkHistory.length,
       itemBuilder: (context, index) {
         final result = _checkHistory[index];

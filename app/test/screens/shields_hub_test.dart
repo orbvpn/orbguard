@@ -15,9 +15,18 @@ import 'package:orbguard/screens/shields/secure_call_screen.dart';
 void main() {
   Widget host() => const MaterialApp(home: Scaffold(body: ShieldsScreen()));
 
-  testWidgets('offers all six plain-English shields', (tester) async {
+  /// The hub now pads for the shell's floating header + nav clearances, so the
+  /// six cards run taller than the default 600px test surface — use a tall
+  /// surface so ListView builds every card without scrolling.
+  Future<void> pumpHub(WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(host());
     await tester.pump();
+  }
+
+  testWidgets('offers all six plain-English shields', (tester) async {
+    await pumpHub(tester);
 
     for (final title in const [
       'Spyware & Pegasus',

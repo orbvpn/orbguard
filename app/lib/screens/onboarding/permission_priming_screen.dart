@@ -24,7 +24,6 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../permissions/permission_manager.dart';
 import '../../permissions/special_permissions_manager.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
@@ -47,7 +46,6 @@ const String kPermissionsPrimedPrefsKey = 'permissions_primed';
 /// confirmed from here, and the UI says so).
 class PrimingRequests {
   final Future<bool> Function() requestNotifications;
-  final Future<bool> Function() requestStorage;
   final Future<bool> Function() requestSms;
   final Future<bool> Function() requestLocation;
   final Future<void> Function() openUsageAccess;
@@ -55,7 +53,6 @@ class PrimingRequests {
 
   const PrimingRequests({
     required this.requestNotifications,
-    required this.requestStorage,
     required this.requestSms,
     required this.requestLocation,
     required this.openUsageAccess,
@@ -68,16 +65,11 @@ class PrimingRequests {
   ///    prompt (its own bool only reflects the plugin call), then
   ///    `Permission.notification.isGranted` is read back as the source of
   ///    truth for what the chip may claim;
-  ///  • storage — [PermissionManager.requestStoragePermission] (native path,
-  ///    handles Android 11+ "All files access"), then the manager's own
-  ///    check reports the real state (mirrors PermissionSetupScreen's
-  ///    request-wait-recheck pattern);
   ///  • SMS / location — permission_handler requests, status read from the
   ///    returned [PermissionStatus];
   ///  • usage access / accessibility — [SpecialPermissionsManager] deep-links
   ///    into system Settings.
   factory PrimingRequests.production() {
-    final permissionManager = PermissionManager();
     final specialPermissions = SpecialPermissionsManager();
     return PrimingRequests(
       requestNotifications: () async {
@@ -95,15 +87,6 @@ class PrimingRequests {
         } catch (_) {
           return false;
         }
-      },
-      requestStorage: () async {
-        await permissionManager.requestStoragePermission();
-        // Give the system UI a beat (Android 11+ deep-links to "All files
-        // access"), then read the manager's native source of truth. Same
-        // pattern PermissionSetupScreen uses after this request.
-        await Future<void>.delayed(const Duration(seconds: 2));
-        final result = await permissionManager.checkAllPermissions();
-        return result.granted.contains('Storage Access');
       },
       requestSms: () async => (await Permission.sms.request()).isGranted,
       requestLocation: () async =>
@@ -209,8 +192,6 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
     switch (step.id) {
       case PrimingStepIds.notifications:
         return _requests.requestNotifications();
-      case PrimingStepIds.storage:
-        return _requests.requestStorage();
       case PrimingStepIds.sms:
         return _requests.requestSms();
       case PrimingStepIds.location:

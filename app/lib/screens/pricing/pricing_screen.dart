@@ -24,7 +24,7 @@ import '../legal/legal_screen.dart';
 /// only ever shown when the arithmetic is EXACTLY true (see [_effectiveYearly]).
 ///
 /// Three paid tiers map onto the shared OrbVPN account plans (a purchase here
-/// unlocks BOTH OrbGuard and OrbVPN):
+/// unlocks the whole Orb account — OrbGuard, OrbVPN and OrbBrowser):
 ///   Guard          → orbguard_basic_*   (→ orb_basic)
 ///   Guard+         → orbguard_premium_* (→ orb_premium)   [recommended]
 ///   Guard Ultimate → orbguard_ultimate_*(→ orb_family)
@@ -100,6 +100,7 @@ class _PricingScreenState extends State<PricingScreen> {
         'Scam link, QR code & permission checks',
         'Hidden VPN & proxy detection',
         'Secure device checkups',
+        'OrbVPN & OrbBrowser access included',
       ],
     ),
     _GuardTier(
@@ -221,7 +222,8 @@ class _PricingScreenState extends State<PricingScreen> {
               style: BrandText.h2(color: cs.onSurface, size: 26)),
           const SizedBox(height: 4),
           Text(
-            'Cancel anytime. One subscription covers OrbGuard and OrbVPN.',
+            'Cancel anytime. One subscription unlocks OrbGuard, OrbVPN '
+            '& OrbBrowser premium.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
           ),
           const SizedBox(height: 16),
@@ -342,7 +344,8 @@ class _AccountStateBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                      'Your premium features are unlocked on OrbGuard & OrbVPN. '
+                      'Your premium features are unlocked across OrbGuard, OrbVPN '
+                      '& OrbBrowser. '
                       'To change or cancel your plan, use your '
                       '${Platform.isAndroid ? 'Google Play' : 'App Store'} '
                       'subscription settings.',
@@ -384,7 +387,9 @@ class _AccountStateBanner extends StatelessWidget {
         leading: DuotoneIcon('login', size: 22, color: AppColors.accentInk),
         title: Text('Sign in to subscribe',
             style: BrandText.title(color: cs.onSurface, size: 14.5)),
-        subtitle: Text('Use your OrbVPN account — one subscription covers both',
+        subtitle: Text(
+            'Use your OrbVPN account — one subscription unlocks OrbGuard, '
+            'OrbVPN & OrbBrowser',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5)),
         trailing: DuotoneIcon('alt_arrow_right',
             size: 20, color: cs.onSurfaceVariant),

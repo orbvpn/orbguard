@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/colors.dart';
+import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../darkweb/darkweb_screen.dart';
@@ -46,7 +47,14 @@ class ShieldsScreen extends StatelessWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8 + GlassTheme.headerClearance,
+        16,
+        24 +
+            GlassTheme.bottomNavClearance +
+            MediaQuery.of(context).padding.bottom,
+      ),
       children: [
         Text('Your protection',
             style: BrandText.h2(color: cs.onSurface, size: 26)),
