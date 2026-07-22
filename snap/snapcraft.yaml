@@ -23,6 +23,8 @@ apps:
 
 parts:
   orbguard:
-    source: app
-    plugin: flutter
-    flutter-target: lib/main.dart
+    # Package the release bundle the workflow already built (flutter build
+    # linux runs before snapcraft in linux-build.yml) — the snapcraft flutter
+    # plugin's own in-container Flutter rebuild is redundant and crashes.
+    plugin: dump
+    source: app/build/linux/x64/release/bundle
