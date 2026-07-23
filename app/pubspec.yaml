@@ -111,9 +111,9 @@ dev_dependencies:
 # package the Store would reject.
 msix_config:
   display_name: OrbGuard
-  publisher_display_name: REPLACE_WITH_PartnerCenter_PublisherDisplayName
-  identity_name: REPLACE.WITH.PartnerCenter.IdentityName
-  publisher: CN=REPLACE-WITH-PARTNER-CENTER-GUID
+  publisher_display_name: ORB GLOBAL LTD
+  identity_name: ORBGROUP.OrbGuard
+  publisher: CN=2C449207-2B23-4797-AE9D-14ECBABB5966
   msix_version: 1.0.6.0
   logo_path: assets/branding/icon_master.png
   capabilities: internetClient, location, webcam, microphone
