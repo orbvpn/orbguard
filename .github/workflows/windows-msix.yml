@@ -34,6 +34,25 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      # Authenticode-sign orbguard.exe with Azure Trusted Signing (ORB GLOBAL
+      # LTD). Gated on the repo variable until the certificate profile exists
+      # (identity validation pending) — unsigned builds still ship meanwhile.
+      - name: Sign orbguard.exe (Trusted Signing)
+        if: vars.TRUSTED_SIGNING_READY == 'true'
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+          endpoint: https://weu.codesigning.azure.net/
+          trusted-signing-account-name: orbsigning
+          certificate-profile-name: orbguard-public
+          files-folder: app/build/windows/x64/runner/Release
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - name: Zip release build (direct download)
         shell: pwsh
         run: |
