@@ -33,6 +33,7 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A258CADB34D7F27027FF28BF /* ThreatIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */; };
 		AC775FD8B0D78307F2ECC23C /* CallDirectoryChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C680E5875D6CA75E6CCD05 /* CallDirectoryChannelHandler.swift */; };
+		B6C0FF412E10000500BA51CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */; };
 		B6C0FF3E2E10000200BA51CE /* BackgroundScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */; };
 		B8C18A1E677B2E5E6568F4B3 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
 		C9D1916001F7DF0141EE4105 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
@@ -136,6 +137,7 @@
 		B267E273F5A090151DE75F36 /* OrbGuardFilter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardFilter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5F326C45DDC8796893D44DD /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackgroundScanService.swift; sourceTree = "<group>"; };
+		B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D695DCFADB9715C6E72D94EB /* FilterDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilterDataProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -295,6 +297,7 @@
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
 				97C147021CF9000F007C117D /* Info.plist */,
+				B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */,
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
@@ -502,6 +505,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
+				B6C0FF412E10000500BA51CE /* PrivacyInfo.xcprivacy in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,

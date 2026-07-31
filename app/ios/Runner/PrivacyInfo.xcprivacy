@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  App-level privacy manifest for the Runner target.
+
+	  Vendored Pods ship their own PrivacyInfo.xcprivacy, but those do NOT cover
+	  Runner's own compiled Swift. Without this file the upload is rejected with
+	  ITMS-91053 (missing API declaration).
+
+	  Scope is deliberately narrow: only APIs reached from the files actually in
+	  Runner's Sources build phase. JailbreakAccess.swift, EnhancedScanner.swift
+	  and VPNManager.swift are present in the repo but are NOT compiled into the
+	  target, so the file-timestamp / boot-time reasons they would need are
+	  intentionally absent — over-declaring is itself a review flag.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<!--
+	  First-party code performs no tracking: Runner never touches the IDFA and
+	  the app presents no ATT prompt (there is no NSUserTrackingUsageDescription
+	  and no ATTrackingManager call). The bundled ad SDKs declare their own
+	  collection and tracking in their own manifests, which Apple aggregates.
+	  Keep NSPrivacyCollectedDataTypes in sync with the App Store Connect
+	  privacy answers if first-party collection is ever added.
+	-->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- CA92.1 — UserDefaults.standard, data readable only by this
+				     app: AppDelegate.swift:583, BackgroundScanService.swift:321,397 -->
+				<string>CA92.1</string>
+				<!-- 1C8F.1 — UserDefaults(suiteName:) on the shared app group,
+				     read/written by the app and its extensions:
+				     ios/Shared/SharedDataManager.swift:116-117 -->
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

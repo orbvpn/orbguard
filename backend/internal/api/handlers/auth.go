@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"orbguard-lab/internal/api/middleware"
@@ -36,6 +38,10 @@ type AuthHandler struct {
 	devices *repository.DeviceRepository
 	logger  *logger.Logger
 	secret  string
+	// Resolves the OrbNet account that owns a device, so RegisterDevice can
+	// refuse to mint a fresh credential for a phone somebody else has claimed.
+	// nil disables the check (no device-security service wired).
+	ownerLookup middleware.OwnerLookup
 }
 
 // NewAuthHandler creates a new AuthHandler. It also wires the shared Redis
@@ -57,7 +63,11 @@ func newAuthHandler(deps Dependencies) *AuthHandler {
 	if deps.Repos != nil {
 		devices = deps.Repos.Devices
 	}
-	return NewAuthHandler(deps.Cache, devices, deps.JWTSecret, deps.Logger)
+	h := NewAuthHandler(deps.Cache, devices, deps.JWTSecret, deps.Logger)
+	if deps.DeviceSecurityService != nil {
+		h.ownerLookup = deps.DeviceSecurityService.GetOrbNetOwner
+	}
+	return h
 }
 
 func authGenerateToken(length int) string {
@@ -190,6 +200,40 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// callerHoldsDeviceKey reports whether the request carries a credential that
+// already belongs to deviceID — i.e. the caller genuinely controls the device
+// it is re-registering.
+//
+// Accepts either the configured service secret (internal callers) or a live
+// device API key resolving to this same device_id, validated against the same
+// `auth:apikey:<key>` records middleware.APIKeyAuth reads. The endpoint is
+// public, so no middleware has populated the context by this point and the
+// header must be parsed here.
+func (h *AuthHandler) callerHoldsDeviceKey(r *http.Request, deviceID string) bool {
+	parts := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") || parts[1] == "" {
+		return false
+	}
+	token := parts[1]
+
+	if h.secret != "" &&
+		subtle.ConstantTimeCompare([]byte(token), []byte(h.secret)) == 1 {
+		return true
+	}
+
+	if h.cache == nil {
+		return false
+	}
+	var claims middleware.TokenClaims
+	if err := h.cache.GetJSON(r.Context(), "auth:apikey:"+token, &claims); err != nil {
+		return false
+	}
+	if !claims.ExpiresAt.IsZero() && time.Now().UTC().After(claims.ExpiresAt) {
+		return false
+	}
+	return claims.DeviceID != "" && claims.DeviceID == deviceID
+}
+
 // RegisterDevice handles POST /api/v1/auth/device
 func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -210,6 +254,34 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	if req.DeviceID == "" {
 		http.Error(w, `{"error":"device_id is required"}`, http.StatusBadRequest)
 		return
+	}
+
+	// A device_id that an OrbNet account has already CLAIMED must not be
+	// re-registered by an anonymous caller. This endpoint is public and takes
+	// device_id on trust, and DeviceOwnership admits any credential whose
+	// device_id matches (device_ownership.go:45-51) — so without this check,
+	// posting somebody else's device_id returned a working key for their
+	// phone: thief selfies, location history, and mark-stolen/lock/wipe.
+	//
+	// Unknown and unclaimed device ids are unaffected, which is how a new
+	// install bootstraps. A genuine re-registration by the device itself
+	// presents its existing key and passes.
+	if h.ownerLookup != nil {
+		ownerID, found, err := h.ownerLookup(r.Context(), req.DeviceID)
+		if err != nil {
+			h.logger.Error().Err(err).Str("device_id", req.DeviceID).
+				Msg("device ownership check failed during registration")
+			http.Error(w, `{"error":"failed to register device"}`, http.StatusInternalServerError)
+			return
+		}
+		if found && ownerID != nil && !h.callerHoldsDeviceKey(r, req.DeviceID) {
+			h.logger.Warn().Str("device_id", req.DeviceID).Str("ip", r.RemoteAddr).
+				Msg("rejected re-registration of a claimed device without proof of possession")
+			// 404 rather than 403, matching DeviceOwnership: registration must
+			// not become an oracle for which device ids exist or are claimed.
+			http.Error(w, `{"error":"device not found"}`, http.StatusNotFound)
+			return
+		}
 	}
 
 	apiKey := authGenerateToken(32)

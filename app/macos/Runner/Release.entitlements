@@ -16,5 +16,19 @@
 	<!-- Camera - required for thief-selfie capture in anti-theft mode -->
 	<key>com.apple.security.device.camera</key>
 	<true/>
+	<!-- Keychain access group - MANDATORY for flutter_secure_storage_darwin on
+	     macOS. Without it a sandboxed Release build gets errSecMissingEntitlement
+	     (-34018) when writing the session token, so sign-in appears to succeed
+	     and the user is bounced straight back out — the same "login was not
+	     successful" symptom Microsoft rejected the Windows build for. Does NOT
+	     reproduce under `flutter run` (unsandboxed); QA on a signed build. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.orb.guard</string>
+	</array>
+	<!-- file_picker is registered on macOS (APK/file scanning); without this a
+	     sandboxed build cannot read the file the user picked. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 </dict>
 </plist>
