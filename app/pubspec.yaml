@@ -114,9 +114,22 @@ msix_config:
   publisher_display_name: ORB GLOBAL LTD
   identity_name: ORBGROUP.OrbGuard
   publisher: CN=2C449207-2B23-4797-AE9D-14ECBABB5966
-  msix_version: 1.0.6.0
+  msix_version: 1.0.7.0
   logo_path: assets/branding/icon_master.png
-  capabilities: internetClient, location, webcam, microphone
+  # ONLY capabilities the Windows build actually exercises. geolocator_windows
+  # is registered (location); nothing on Windows opens a camera or a mic —
+  # mobile_scanner has no Windows implementation and audioplayers_windows is
+  # playback-only — so webcam/microphone were declared-but-unused, which is a
+  # rejection under Microsoft Store Policy 10.5.1 and forces an unnecessary
+  # consent prompt on first run.
+  capabilities: internetClient, location
+  # Registers orbguard:// with Windows so the emailed magic-link
+  # (orbguard://login?code=…) actually opens the app. Without this the Store
+  # reviewer clicks the sign-in link and Windows has no handler for it — the
+  # 10.1.2.10 "Unusable Feature: Sign in" rejection. Pairs with the
+  # SendAppLinkToInstance() forwarding in windows/runner/main.cpp, which hands
+  # the link to the ALREADY-RUNNING window instead of starting a second copy.
+  protocol_activation: orbguard
   store: true
 
 # App launcher icons across every platform, generated from the OrbGuard brand

@@ -7,7 +7,10 @@ project(runner LANGUAGES CXX)
 set(BINARY_NAME "orbguard")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.example.orbguard")
+# Real reverse-DNS id (matches the macOS bundle id), not the Flutter
+# com.example placeholder — this is the GApplication/D-Bus name and the
+# prgname the desktop environment matches against the .desktop entry.
+set(APPLICATION_ID "com.orb.guard")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

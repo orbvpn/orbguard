@@ -170,7 +170,7 @@ class AccountProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = _friendlyError(e);
+      _error = _friendlyError(e, magicFlow: true);
       _busy = false;
       notifyListeners();
       return false;
@@ -187,11 +187,13 @@ class AccountProvider extends ChangeNotifier {
       _user = res.user;
       _startRefresh();
       _bootstrapDeviceOwnership();
+      // One request authorises one sign-in.
+      await _repo.clearPendingMagicRequest();
       _busy = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = _friendlyError(e);
+      _error = _friendlyError(e, magicFlow: true);
       _busy = false;
       notifyListeners();
       return false;
@@ -355,6 +357,13 @@ class AccountProvider extends ChangeNotifier {
   /// The last email that signed in on this device (to pre-fill the form).
   Future<String?> lastLoggedInEmail() => _repo.getLastLoggedInEmail();
 
+  /// True when this device asked for a magic link recently. The deep-link
+  /// handler requires this before auto-consuming a code: an `orbguard://login`
+  /// URL is attacker-supplyable, and without the check an unsolicited link
+  /// would silently sign the user into the SENDER's account and then claim
+  /// this device to it via [_bootstrapDeviceOwnership].
+  Future<bool> hasPendingMagicRequest() => _repo.hasPendingMagicRequest();
+
   /// Clear the current error message (e.g. when the user edits a field).
   void clearError() {
     if (_error == null) return;
@@ -383,7 +392,8 @@ class AccountProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _friendlyError(Object e, {bool credentialsFlow = false}) {
+  String _friendlyError(Object e,
+      {bool credentialsFlow = false, bool magicFlow = false}) {
     if (net_err.isNetworkError(e)) {
       return 'Network error. Check your connection and try again.';
     }
@@ -392,9 +402,15 @@ class AccountProvider extends ChangeNotifier {
       // typed. Everywhere else a 401 means the SESSION died (expired/revoked
       // refresh) — saying "incorrect password" on e.g. delete-account would be
       // nonsense.
-      return credentialsFlow
-          ? 'Incorrect email or password.'
-          : 'Your session has expired. Please sign in again.';
+      if (credentialsFlow) return 'Incorrect email or password.';
+      // In the magic-link flow the user has no session yet, so "your session
+      // expired" is both wrong and a dead end — it tells them to do the thing
+      // they are already doing. Name the real problem and the way out.
+      if (magicFlow) {
+        return 'That sign-in code is invalid or has already been used. '
+            'Tap Resend link to get a new one.';
+      }
+      return 'Your session has expired. Please sign in again.';
     }
     final msg = e.toString().toLowerCase();
     if (msg.contains('exclude') ||

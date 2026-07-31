@@ -53,16 +53,32 @@ jobs:
           ln -s /opt/orbguard/orbguard $PKG/usr/bin/orbguard
           cp app/assets/branding/icon_master.png \
              $PKG/usr/share/icons/hicolor/512x512/apps/orbguard.png
+          # MimeType + the %u placeholder register orbguard:// with the desktop
+          # environment and pass the URI through to the binary, so the emailed
+          # magic link (orbguard://login?code=…) actually signs the user in.
+          # Without both, the link is dead on Linux — the same defect that
+          # failed Microsoft Store certification on Windows (10.1.2.10).
           cat > $PKG/usr/share/applications/orbguard.desktop <<DESKTOP
           [Desktop Entry]
           Name=OrbGuard
           Comment=Know if you're being watched — anti-spyware & scam protection
-          Exec=/opt/orbguard/orbguard
+          Exec=/opt/orbguard/orbguard %u
           Icon=orbguard
           Terminal=false
           Type=Application
           Categories=Utility;Security;
+          MimeType=x-scheme-handler/orbguard;
           DESKTOP
+          # The scheme association only takes effect once the MIME cache is
+          # rebuilt; dpkg does not do this on its own.
+          cat > $PKG/DEBIAN/postinst <<'POSTINST'
+          #!/bin/sh
+          set -e
+          if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+          fi
+          POSTINST
+          chmod 0755 $PKG/DEBIAN/postinst
           cat > $PKG/DEBIAN/control <<CONTROL
           Package: orbguard
           Version: ${APP_VERSION}

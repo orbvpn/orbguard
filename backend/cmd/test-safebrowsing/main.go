@@ -15,10 +15,14 @@ func main() {
 	// Initialize logger
 	log := logger.NewDevelopment()
 
-	// Get API key from environment or use the one provided
+	// The key comes from the environment only. A hardcoded fallback used to
+	// live here, which published a working Google API key to this public repo.
 	apiKey := os.Getenv("ORBGUARD_SOURCES_GOOGLE_SAFEBROWSING_API_KEY")
 	if apiKey == "" {
-		apiKey = "AIzaSyAls_vsqyw0KCr9G1G2v4pMhsjqOp3qaHY"
+		fmt.Fprintln(os.Stderr,
+			"ORBGUARD_SOURCES_GOOGLE_SAFEBROWSING_API_KEY is not set — "+
+				"export it before running this test tool.")
+		os.Exit(1)
 	}
 
 	fmt.Println("===========================================")

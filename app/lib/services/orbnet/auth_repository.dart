@@ -173,8 +173,37 @@ class AuthRepository {
     final response = await _authApi.requestMagicLink(email,
         allowRegistration: allowRegistration);
     final isNewUser = response['is_new_user'] == true;
+    // Record that THIS device asked for a link, so an unsolicited
+    // orbguard://login?code=… cannot silently sign the user into someone
+    // else's account. Survives a cold start, which is the normal case: the
+    // link is usually tapped after the app has been backgrounded or closed.
+    await _secureStorage.write(
+        key: _magicRequestedAtKey,
+        value: DateTime.now().toUtc().toIso8601String());
     return MagicLinkResult(success: true, isNewUser: isNewUser);
   }
+
+  static const _magicRequestedAtKey = 'magic_link_requested_at';
+
+  /// How long a magic-link request stays "expected" for auto sign-in. Comfortably
+  /// longer than a user takes to switch to their mail app, far shorter than a
+  /// window an attacker could rely on.
+  static const magicRequestWindow = Duration(minutes: 30);
+
+  /// True when this device requested a magic link recently enough that an
+  /// incoming deep-linked code should be consumed automatically.
+  Future<bool> hasPendingMagicRequest() async {
+    final raw = await _secureStorage.read(key: _magicRequestedAtKey);
+    if (raw == null) return false;
+    final at = DateTime.tryParse(raw);
+    if (at == null) return false;
+    return DateTime.now().toUtc().difference(at) <= magicRequestWindow;
+  }
+
+  /// Clears the marker once a code has been consumed (or the session ends), so
+  /// a single request cannot authorise repeated deep-link sign-ins.
+  Future<void> clearPendingMagicRequest() =>
+      _secureStorage.delete(key: _magicRequestedAtKey);
 
   /// Verify a magic-link code/token and complete sign-in.
   Future<AuthResponse> verifyMagicLogin(String email, String code) async {

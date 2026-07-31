@@ -310,7 +310,9 @@ class AntiSpywareApp extends StatelessWidget {
                   isDark ? Brightness.dark : Brightness.light;
               return GlassGradientBackground(
                 isDark: isDark,
-                child: AppLockGate(child: child ?? const SizedBox.shrink()),
+                child: _MagicLinkGate(
+                  child: AppLockGate(child: child ?? const SizedBox.shrink()),
+                ),
               );
             },
             home: settings.isLoading
@@ -330,6 +332,80 @@ class AntiSpywareApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Listens for the `orbguard://login?code=…` magic link and completes sign-in.
+///
+/// This lives in `MaterialApp.builder` rather than on HomeScreen deliberately.
+/// HomeScreen only mounts after onboarding AND permission priming, so a link
+/// tapped during first run reached a process with no listener attached — on
+/// Windows the forwarded link is delivered once into the plugin's event sink
+/// and is simply dropped if nothing is listening. Mounting here attaches the
+/// listener for the whole app lifetime, on every platform and every screen,
+/// while still sitting below MaterialApp's ScaffoldMessenger.
+class _MagicLinkGate extends StatefulWidget {
+  const _MagicLinkGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_MagicLinkGate> createState() => _MagicLinkGateState();
+}
+
+class _MagicLinkGateState extends State<_MagicLinkGate> {
+  late final MagicLinkDeepLinkHandler _magicLink =
+      MagicLinkDeepLinkHandler(_signInWithMagicCode);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_magicLink.start());
+    });
+  }
+
+  // Exchange a magic-link code for a session. The backend token is
+  // self-contained, so no email is needed (the field is unused there).
+  Future<void> _signInWithMagicCode(String code) async {
+    if (!mounted) return;
+    final account = context.read<AccountProvider>();
+    if (account.isLoggedIn) return; // already signed in — ignore stale links
+    // Capture across the async gap so we don't touch context after await.
+    final messenger = ScaffoldMessenger.of(context);
+    // Only consume a code this device actually asked for. An orbguard://login
+    // URL can be sent by anyone; auto-redeeming an unsolicited one signs the
+    // user into the SENDER's account and binds this device to it.
+    if (!await account.hasPendingMagicRequest()) {
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Open Sign in and request a link first, then tap the link we email '
+            'you.'),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    final ok = await account.verifyMagicCode('', code);
+    if (!mounted) return;
+    // No popUntil here: LoginScreen closes itself with pop(true) when the
+    // account flips to logged-in. popUntil(isFirst) resolved that awaited
+    // push with null — so callers that gate on the result (scan_gate,
+    // pricing_screen) silently abandoned the action the user signed in for —
+    // and it also tore down any intermediate routes.
+    messenger.showSnackBar(SnackBar(
+      content:
+          Text(ok ? 'Signed in' : 'That sign-in link is invalid or expired'),
+    ));
+  }
+
+  @override
+  void dispose() {
+    _magicLink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Keeps the persisted experience mode honest: Pro/expert is premium-only, so
@@ -397,16 +473,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         granted: () async => await Permission.sms.isGranted),
     GuardProbes.malwareScan(supported: PlatformInfo.isAndroid),
     GuardProbes.alerts(
+        // flutter_local_notifications has no Windows implementation.
+        supported: !PlatformInfo.isWindows,
         granted: () async => await Permission.notification.isGranted),
     GuardProbes.breachMonitor(breachedAccounts: () async => null),
     GuardProbes.hiddenVpn(unknownVpnActive: () async => null),
     GuardProbes.secureCall(
         supported: PlatformInfo.isAndroid || PlatformInfo.isIOS),
   ]);
-
-  // Signs the user in when they tap the orbguard://login?code=… magic link.
-  late final MagicLinkDeepLinkHandler _magicLink =
-      MagicLinkDeepLinkHandler(_signInWithMagicCode);
 
   @override
   void initState() {
@@ -416,39 +490,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _guards.refresh();
       _refreshActivity();
       _maybeRunFirstCheck();
-      unawaited(_magicLink.start());
     });
     _initializeApp();
-  }
-
-  // Exchange a magic-link code (from the deep link) for a session. The backend
-  // token is self-contained, so no email is needed (the field is unused there).
-  Future<void> _signInWithMagicCode(String code) async {
-    if (!mounted) return;
-    final account = context.read<AccountProvider>();
-    if (account.isLoggedIn) return; // already signed in — ignore stale links
-    // Capture across the async gap so we don't touch context after await.
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-    final ok = await account.verifyMagicCode('', code);
-    if (!mounted) return;
-    if (ok) {
-      // The deep link fires under HomeScreen; the login screen is pushed on top.
-      // Pop back to home so the user lands signed-in instead of being stranded
-      // on the sign-in screen.
-      navigator.popUntil((route) => route.isFirst);
-    }
-    messenger.showSnackBar(SnackBar(
-      content:
-          Text(ok ? 'Signed in' : 'That sign-in link is invalid or expired'),
-    ));
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _guards.dispose();
-    _magicLink.dispose();
     super.dispose();
   }
 
@@ -675,6 +724,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: FindingsScreen(
             threats: threats,
             checksRun: scanResult.itemsScanned,
+            checksUnavailable: scanResult.checksUnavailable,
             onOpenThreat: _remediate,
             onFixAll: threats.isNotEmpty
                 ? () => _remediate(_mostSevere(threats))
@@ -1225,19 +1275,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ));
                     },
                   ),
-                  _buildDrawerItem(
-                    svgIcon: 'qr_code',
-                    title: 'QR Scanner',
-                    subtitle: 'Safe QR code scanning',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const QrScannerScreen(),
-                          ));
-                    },
-                  ),
+                  // mobile_scanner ships no Windows/Linux implementation — the
+                  // camera view can never open there, so don't list it.
+                  if (!PlatformInfo.isWindows && !PlatformInfo.isLinux)
+                    _buildDrawerItem(
+                      svgIcon: 'qr_code',
+                      title: 'QR Scanner',
+                      subtitle: 'Safe QR code scanning',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const QrScannerScreen(),
+                            ));
+                      },
+                    ),
                   _buildDrawerItem(
                     svgIcon: 'danger_triangle',
                     title: 'Scam Detection',

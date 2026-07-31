@@ -38,5 +38,22 @@
 	<string>Location access is required by macOS to read WiFi network names (SSID/BSSID) for network security analysis.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Required for thief selfie capture in anti-theft mode.</string>
+	<!-- Registers orbguard:// on macOS so the emailed magic link
+	     (orbguard://login?code=…) opens the app and completes sign-in. iOS has
+	     had this since launch; macOS did not, which meant the Mac build carried
+	     the same dead sign-in link that failed Microsoft cert on Windows. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.orb.guard.magiclink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>orbguard</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -10,8 +10,20 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/account_provider.dart';
 import '../../services/iap/iap_service.dart';
+import '../../utils/platform_info.dart';
 import '../account/login_screen.dart';
 import '../legal/legal_screen.dart';
+
+/// Whether digital goods can be sold in-app on this platform.
+///
+/// in_app_purchase has no Windows/Linux implementation, so no purchase can
+/// complete there. Just as important, Microsoft Store Policy 10.8.1/10.8.2
+/// forbids a Store app from using a third-party commerce engine for digital
+/// goods OR steering customers to an outside purchase mechanism — so on those
+/// platforms the app must not show tiers, prices, buy buttons, or any mention
+/// of the App Store / Google Play. Signing in to unlock an entitlement bought
+/// elsewhere is permitted; advertising where to buy it is not.
+bool get _canSellHere => !(PlatformInfo.isWindows || PlatformInfo.isLinux);
 
 /// The transparent pricing screen — now wired to real in-app purchases.
 ///
@@ -229,7 +241,9 @@ class _PricingScreenState extends State<PricingScreen> {
           const SizedBox(height: 16),
           _AccountStateBanner(account: account),
           const SizedBox(height: 16),
-          if (!iap.isAvailable && !iap.isLoadingProducts)
+          if (!_canSellHere)
+            const _ManagedElsewhereNotice()
+          else if (!iap.isAvailable && !iap.isLoadingProducts)
             _StoreUnavailableNotice(onRetry: () => iap.loadProducts())
           else ...[
             _CycleToggle(
@@ -346,9 +360,13 @@ class _AccountStateBanner extends StatelessWidget {
                   Text(
                       'Your premium features are unlocked across OrbGuard, OrbVPN '
                       '& OrbBrowser. '
-                      'To change or cancel your plan, use your '
-                      '${Platform.isAndroid ? 'Google Play' : 'App Store'} '
-                      'subscription settings.',
+                      // Naming a rival store is prohibited steering under
+                      // Microsoft Store Policy 10.8.2, so on Windows/Linux
+                      // point at the place the plan actually lives instead.
+                      '${_canSellHere ? 'To change or cancel your plan, use your '
+                          '${Platform.isAndroid ? 'Google Play' : 'App Store'} '
+                          'subscription settings.' : 'Manage or cancel your plan wherever you originally '
+                          'set it up, or from your Orb account.'}',
                       style: BrandText.body(
                           color: cs.onSurfaceVariant, size: 13)),
                 ],
@@ -434,6 +452,49 @@ class _StoreUnavailableNotice extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           BrandButton.secondary(label: 'Try again', onPressed: onRetry),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown instead of the tier cards where in-app purchase is unavailable
+/// (Windows/Linux).
+///
+/// Deliberately names no external store and offers no purchase route:
+/// Microsoft Store Policy 10.8.2 treats "buy it on the App Store / Google
+/// Play" as prohibited steering. It states only that premium travels with the
+/// Orb account, which is what actually unlocks the features here.
+class _ManagedElsewhereNotice extends StatelessWidget {
+  const _ManagedElsewhereNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              DuotoneIcon(AppIcons.shield,
+                  size: 20, color: cs.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Premium travels with your Orb account',
+                    style: BrandText.title(color: cs.onSurface, size: 15)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sign in and any premium plan already on your Orb account unlocks '
+            'OrbGuard here automatically. Plans are not sold in this version '
+            'of the app.',
+            style: BrandText.body(color: cs.onSurfaceVariant, size: 13.5),
+          ),
         ],
       ),
     );

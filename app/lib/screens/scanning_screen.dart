@@ -25,15 +25,23 @@ import '../services/security/device_scan_service.dart';
 class ScanResult {
   final List<Map<String, dynamic>> threats;
 
-  /// Number of scan stages that genuinely ran. (The native scanners do not
-  /// report per-item counts, so no per-item number is fabricated here.)
+  /// Number of scan stages that genuinely ran clean. (The native scanners do
+  /// not report per-item counts, so no per-item number is fabricated here.)
+  /// Stages that errored or were unavailable are NOT counted here — they are
+  /// reported separately as [checksUnavailable].
   final int itemsScanned;
+
+  /// Stages that could not run on this platform/build. Surfaced verbatim on
+  /// the all-clear screen so "all clear" never overstates its coverage — on
+  /// desktop most native stages are unavailable.
+  final int checksUnavailable;
   final Duration scanDuration;
 
   ScanResult({
     required this.threats,
     required this.itemsScanned,
     required this.scanDuration,
+    this.checksUnavailable = 0,
   });
 }
 
@@ -177,7 +185,10 @@ class _ScanningScreenState extends State<ScanningScreen>
         context,
         ScanResult(
           threats: _threats,
-          itemsScanned: _stagesCompleted,
+          // Only stages that actually ran count as "ran clean"; the rest are
+          // reported as unavailable rather than padding the clean total.
+          itemsScanned: _stagesCompleted - _stageWarnings.length,
+          checksUnavailable: _stageWarnings.length,
           scanDuration: scanDuration,
         ),
       );

@@ -198,8 +198,8 @@ void main() {
   });
 
   testWidgets(
-      'magic-link path: typed email reaches loginWithMagicLink(); confirms link '
-      'sent (code entry is a fallback)', (tester) async {
+      'magic-link path: typed email reaches loginWithMagicLink(); code entry is '
+      'immediately available (no reveal)', (tester) async {
     final account = _FakeAccount();
     await _pumpLogin(tester, account);
 
@@ -214,14 +214,16 @@ void main() {
 
     expect(account.magicCalls, 1);
     expect(account.magicEmail, 'nima@example.com');
-    // On success the screen confirms the link was sent and offers a resend; the
-    // code path is a secondary fallback behind an explicit reveal.
     expect(find.textContaining('we sent a sign-in link to'), findsOneWidget);
+
+    // Regression guard for the Microsoft Store 10.1.2.10 rejection: the code
+    // field must be on screen the moment the link is sent. Hiding it behind a
+    // "Can't open the link?" reveal left the reviewer with no way to finish
+    // sign-in when the orbguard:// link did not open the app.
+    expect(find.byKey(const ValueKey('magic_code_field')), findsOneWidget);
+    expect(find.text('Verify & sign in'), findsOneWidget);
+    // Resending stays available, demoted below the primary action.
     expect(find.text('Resend link'), findsOneWidget);
-    expect(
-        find.text("Can't open the link? Enter the code instead"), findsOneWidget);
-    // Not auto-advanced to the code-entry step.
-    expect(find.text('Verify & sign in'), findsNothing);
 
     account.dispose();
   });

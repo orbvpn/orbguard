@@ -17,6 +17,7 @@ import '../presentation/widgets/duotone_icon.dart';
 import '../presentation/widgets/glass_container.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/settings_provider.dart';
+import '../utils/platform_info.dart';
 import '../models/api/threat_indicator.dart';
 import 'sms_protection/sms_protection_screen.dart';
 import 'url_protection/url_protection_screen.dart';
@@ -389,46 +390,55 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
         ),
         const SizedBox(height: 12),
         Row(
+          // Built from a list so an action that is unavailable on this
+          // platform can drop out without leaving a stray separator or an
+          // unbalanced Expanded in the Row.
           children: [
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: 'qr_code',
-                label: 'Scan QR',
-                color: AppColors.secondaryInk,
-                isDark: isDark,
-                onTap: () => _navigateTo(const QrScannerScreen()),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionCard(
+            for (final (i, action) in <({
+                  String icon,
+                  String label,
+                  Color color,
+                  Widget screen
+                })>[
+              // mobile_scanner has no Windows/Linux implementation, so the QR
+              // camera can never open there — don't offer the tile at all.
+              if (!PlatformInfo.isWindows && !PlatformInfo.isLinux)
+                (
+                  icon: 'qr_code',
+                  label: 'Scan QR',
+                  color: AppColors.secondaryInk,
+                  screen: const QrScannerScreen()
+                ),
+              (
                 icon: 'chat_dots',
                 label: 'Check SMS',
                 color: AppColors.chartColors[4], // spectrum purple
-                isDark: isDark,
-                onTap: () => _navigateTo(const SmsProtectionScreen()),
+                screen: const SmsProtectionScreen()
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionCard(
+              (
                 icon: 'link_round',
                 label: 'Check URL',
                 color: AppColors.amberInk,
-                isDark: isDark,
-                onTap: () => _navigateTo(const UrlProtectionScreen()),
+                screen: const UrlProtectionScreen()
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionCard(
+              (
                 icon: 'widget',
                 label: 'Scan Apps',
                 color: AppColors.accentInk,
-                isDark: isDark,
-                onTap: () => _navigateTo(const AppSecurityScreen()),
+                screen: const AppSecurityScreen()
               ),
-            ),
+            ].indexed) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  icon: action.icon,
+                  label: action.label,
+                  color: action.color,
+                  isDark: isDark,
+                  onTap: () => _navigateTo(action.screen),
+                ),
+              ),
+            ],
           ],
         ),
       ],

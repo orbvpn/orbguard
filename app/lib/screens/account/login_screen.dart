@@ -28,6 +28,7 @@ import '../legal/legal_screen.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../providers/account_provider.dart';
+import '../../utils/platform_info.dart';
 
 enum _LoginMode { password, magic }
 
@@ -46,13 +47,12 @@ class _LoginScreenState extends State<LoginScreen> {
   // Magic-link is the DEFAULT/PRIMARY path; password hides behind a reveal.
   _LoginMode _mode = _LoginMode.magic;
   bool _magicSent = false;
-  // After the link is sent we lead with "tap the link" (the email's
-  // orbguard://login link signs in automatically). The manual code entry is a
-  // fallback revealed on demand — mirrors the OrbVPN "click the link" flow.
-  bool _showCodeEntry = false;
   bool _obscurePassword = true;
   // Passkey button shows only when the device can run passkey ceremonies.
   bool _passkeyAvailable = false;
+  // Watched so an out-of-screen sign-in (magic-link deep link) closes the sheet.
+  AccountProvider? _account;
+  bool _wasLoggedIn = false;
 
   @override
   void initState() {
@@ -70,7 +70,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final account = context.read<AccountProvider>();
+    if (identical(account, _account)) return;
+    _account?.removeListener(_onAccountChanged);
+    _account = account;
+    _wasLoggedIn = account.isLoggedIn;
+    account.addListener(_onAccountChanged);
+  }
+
+  /// The magic-link deep link is handled ABOVE this screen, so a link tapped
+  /// while this sheet is open used to sign the user in behind it and leave
+  /// them staring at the form they had already filled in — the "login within
+  /// the product was not successful" the Microsoft reviewer reported. Close on
+  /// the logged-out -> logged-in transition, reusing the same pop(true)
+  /// contract the in-screen sign-in paths use.
+  void _onAccountChanged() {
+    final account = _account;
+    if (account == null || !mounted) return;
+    final isLoggedIn = account.isLoggedIn;
+    final wasLoggedIn = _wasLoggedIn;
+    _wasLoggedIn = isLoggedIn;
+    if (!wasLoggedIn && isLoggedIn) _dismiss(true);
+  }
+
+  @override
   void dispose() {
+    _account?.removeListener(_onAccountChanged);
     _emailController.dispose();
     _passwordController.dispose();
     _codeController.dispose();
@@ -82,6 +109,18 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showApple(BuildContext context) {
     final platform = Theme.of(context).platform;
     return platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS;
+  }
+
+  /// google_sign_in ships Android/iOS/macOS/web implementations only — it is
+  /// absent from windows/flutter/generated_plugins.cmake and the Linux build.
+  /// Rendering the button there gives a second sign-in method that can never
+  /// succeed, on the very screen Microsoft cited for 10.1.2.10.
+  bool _showGoogle(BuildContext context) {
+    if (PlatformInfo.isWindows || PlatformInfo.isLinux) return false;
+    final platform = Theme.of(context).platform;
+    return platform == TargetPlatform.android ||
+        platform == TargetPlatform.iOS ||
         platform == TargetPlatform.macOS;
   }
 
@@ -197,6 +236,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final account = context.read<AccountProvider>();
     final messenger = ScaffoldMessenger.of(context);
     FocusScope.of(context).unfocus();
+    // The code field is now shown as soon as the link is sent, so it can be
+    // empty when this fires. Say so instead of round-tripping a blank token
+    // and surfacing whatever generic error the backend returns.
+    if (_codeController.text.trim().isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Paste the sign-in code from your email first'),
+      ));
+      return;
+    }
     final ok = await account.verifyMagicCode(
       _emailController.text,
       _codeController.text.trim(),
@@ -214,7 +262,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _mode = mode;
       _magicSent = false;
-      _showCodeEntry = false;
       _codeController.clear();
     });
     context.read<AccountProvider>().clearError();
@@ -236,10 +283,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _socialButtons(context, account),
-                    const SizedBox(height: 18),
-                    _orDivider(context),
-                    const SizedBox(height: 18),
+                    // On Windows/Linux none of the social providers have an
+                    // implementation, so the whole block (and its "or"
+                    // divider) collapses rather than rendering dead controls.
+                    if (_hasSocialButtons(context)) ...[
+                      _socialButtons(context, account),
+                      const SizedBox(height: 18),
+                      _orDivider(context),
+                      const SizedBox(height: 18),
+                    ],
                     _mode == _LoginMode.password
                         ? _passwordForm(context, account)
                         : _magicForm(context, account),
@@ -318,24 +370,29 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// True when at least one social/passkey button can actually run here.
+  bool _hasSocialButtons(BuildContext context) =>
+      _showGoogle(context) || _showApple(context) || _passkeyAvailable;
+
   /// Google + (on Apple platforms) Apple — glass buttons, never lime.
   Widget _socialButtons(BuildContext context, AccountProvider account) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _socialButton(
-          context,
-          key: const ValueKey('google_signin_button'),
-          mark: SvgPicture.asset(
-            'assets/branding/google_g.svg', // vendor identity
-            width: 20,
-            height: 20,
+        if (_showGoogle(context))
+          _socialButton(
+            context,
+            key: const ValueKey('google_signin_button'),
+            mark: SvgPicture.asset(
+              'assets/branding/google_g.svg', // vendor identity
+              width: 20,
+              height: 20,
+            ),
+            label: 'Continue with Google',
+            onPressed: account.isBusy ? null : _signInWithGoogle,
           ),
-          label: 'Continue with Google',
-          onPressed: account.isBusy ? null : _signInWithGoogle,
-        ),
         if (_showApple(context)) ...[
-          const SizedBox(height: 12),
+          if (_showGoogle(context)) const SizedBox(height: 12),
           _socialButton(
             context,
             key: const ValueKey('apple_signin_button'),
@@ -464,53 +521,49 @@ class _LoginScreenState extends State<LoginScreen> {
           Text(
             'Check your email — we sent a sign-in link to '
             '${_emailController.text.trim()}.\n'
-            'Open it on this device and tap the link to sign in.',
+            'Tap the link on this device, or paste the code from that email '
+            'below.',
             style: BrandText.body(
                 color: context.colors.onSurfaceVariant, size: 13),
           ),
-          if (_showCodeEntry) ...[
-            const SizedBox(height: 16),
-            _fieldLabel(context, 'Sign-in code'),
-            const SizedBox(height: 8),
-            _field(
-              context,
-              controller: _codeController,
-              hint: 'Paste the code from your email',
-              icon: 'key',
-              enabled: !account.isBusy,
-            ),
-          ] else ...[
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: account.isBusy
-                    ? null
-                    : () => setState(() => _showCodeEntry = true),
-                child: Text(
-                  "Can't open the link? Enter the code instead",
-                  style: BrandText.title(
-                      color: context.colors.onSurfaceVariant, size: 13),
-                ),
-              ),
-            ),
-          ],
+          // Always visible, never behind a reveal. The deep link cannot work
+          // when the mail is read on another device (or on a platform without
+          // an orbguard:// handler), so the code entry is the guaranteed path
+          // to a session — hiding it is what made sign-in look broken to the
+          // Microsoft Store reviewer (10.1.2.10).
+          const SizedBox(height: 16),
+          _fieldLabel(context, 'Sign-in code'),
+          const SizedBox(height: 8),
+          _field(
+            context,
+            fieldKey: const ValueKey('magic_code_field'),
+            controller: _codeController,
+            hint: 'Paste the code from your email',
+            icon: 'key',
+            enabled: !account.isBusy,
+          ),
         ],
         const SizedBox(height: 20),
-        // The single lime action for this screen — the default sign-in path.
-        // After sending: "Verify & sign in" once the code fallback is revealed,
-        // otherwise "Resend link".
+        // The single lime action for this screen — send the link, then verify
+        // whatever code the user pasted.
         BrandButton(
-          label: !_magicSent
-              ? 'Email me a sign-in link'
-              : (_showCodeEntry ? 'Verify & sign in' : 'Resend link'),
+          label: !_magicSent ? 'Email me a sign-in link' : 'Verify & sign in',
           isLoading: account.isBusy,
           onPressed: account.isBusy
               ? null
-              : (!_magicSent
-                  ? _requestMagicCode
-                  : (_showCodeEntry ? _verifyMagicCode : _requestMagicCode)),
+              : (!_magicSent ? _requestMagicCode : _verifyMagicCode),
         ),
+        if (_magicSent) ...[
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: account.isBusy ? null : _requestMagicCode,
+            child: Text(
+              'Resend link',
+              style: BrandText.title(
+                  color: context.colors.onSurfaceVariant, size: 14),
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         // Subtle, non-lime reveal for the secondary password path.
         TextButton(

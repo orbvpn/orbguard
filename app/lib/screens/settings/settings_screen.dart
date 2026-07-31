@@ -614,6 +614,17 @@ class SettingsScreen extends StatelessWidget {
       ));
       return;
     }
+    // Sending a Microsoft Store customer to Apple's or Google's subscription
+    // page is prohibited steering under Microsoft Store Policy 10.8.2 — and
+    // neither page can manage anything for them anyway.
+    if (PlatformInfo.isWindows || PlatformInfo.isLinux) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Manage or cancel your plan wherever you originally set it up, '
+            'or from your Orb account.'),
+      ));
+      return;
+    }
     url ??= Platform.isAndroid
         ? 'https://play.google.com/store/account/subscriptions'
         : 'https://apps.apple.com/account/subscriptions';

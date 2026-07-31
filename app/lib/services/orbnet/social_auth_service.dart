@@ -123,11 +123,19 @@ class SocialAuthService {
   Future<void>? _googleInit;
 
   Future<void> _ensureGoogleInitialized() {
-    return _googleInit ??= GoogleSignIn.instance.initialize(
+    // Memoise only a SUCCESSFUL init. Caching the Future unconditionally meant
+    // one transient failure was replayed for the rest of the process lifetime,
+    // so Google sign-in stayed permanently broken until the app restarted.
+    return _googleInit ??= GoogleSignIn.instance
+        .initialize(
       clientId: _googleClientId.isEmpty ? null : _googleClientId,
       serverClientId:
           _googleServerClientId.isEmpty ? null : _googleServerClientId,
-    );
+    )
+        .catchError((Object e) {
+      _googleInit = null; // let the next attempt retry
+      throw e;
+    });
   }
 
   // ---- Google --------------------------------------------------------------

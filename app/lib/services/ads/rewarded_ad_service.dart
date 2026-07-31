@@ -105,13 +105,19 @@ class DefaultRewardedAdService implements RewardedAdService {
 
   bool get _isAndroid => Platform.isAndroid;
 
+  // Every ad network here (Unity, Adivery, Yandex) ships mobile-only SDKs that
+  // do not register on Windows/Linux/macOS. Without this gate the "watch an ad
+  // for scan credits" action rendered enabled on desktop and could never pay
+  // out — a dead control on a Store build.
+  bool get _isMobile => Platform.isAndroid || Platform.isIOS;
+
   // ── Per-network availability (config present AND platform-supported) ───────
   bool get _unityConfigured =>
-      _unityGameId.isNotEmpty && _unityPlacement.isNotEmpty;
+      _unityGameId.isNotEmpty && _unityPlacement.isNotEmpty && _isMobile;
   // Adivery ships an Android-only SDK.
   bool get _adiveryConfigured =>
       _adiveryAppId.isNotEmpty && _adiveryPlacement.isNotEmpty && _isAndroid;
-  bool get _yandexConfigured => _yandexUnitId.isNotEmpty;
+  bool get _yandexConfigured => _yandexUnitId.isNotEmpty && _isMobile;
 
   bool _configured(String provider) {
     switch (provider) {

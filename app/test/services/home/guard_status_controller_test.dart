@@ -11,7 +11,7 @@ void main() {
       GuardProbes.spywareWatch(autoScanOn: () async => true),
       GuardProbes.firewall(supported: true, enabled: () async => false),
       GuardProbes.smsFilter(supported: false, granted: () async => true),
-      GuardProbes.alerts(granted: () async => true),
+      GuardProbes.alerts(supported: true, granted: () async => true),
       GuardProbes.breachMonitor(breachedAccounts: () async => null),
       GuardProbes.hiddenVpn(unknownVpnActive: () async => false),
     ]);
@@ -31,6 +31,20 @@ void main() {
 
     expect(c.activeCount, 3);
     expect(c.availableCount, 5, reason: 'unavailable guard excluded');
+  });
+
+  test('alerts stay unavailable on a platform with no notification backend',
+      () async {
+    // permission_handler_windows answers "granted" to every query, so a
+    // granted permission must NOT be enough to claim alerts are armed —
+    // flutter_local_notifications has no Windows implementation to deliver one.
+    final c = GuardStatusController(probes: [
+      GuardProbes.alerts(supported: false, granted: () async => true),
+    ]);
+    await c.refresh();
+    expect(c.guards.single.state, GuardState.unavailable);
+    expect(c.guards.single.detail, isNot(contains('Armed')));
+    expect(c.availableCount, 0, reason: 'excluded from the coverage score');
   });
 
   test('a breach hit keeps the monitor active with the honest detail', () async {
