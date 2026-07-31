@@ -271,6 +271,13 @@ class CertificateAnalyzer {
       }
       debugPrint('Error getting certificates: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting certificates: $e');
       return [];
@@ -391,6 +398,13 @@ class PermissionAbuseDetector {
       }
       debugPrint('Error getting installed apps: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting installed apps: $e');
       return [];
@@ -470,6 +484,13 @@ class AccessibilityAbuseDetector {
       }
       debugPrint('Error getting accessibility services: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting accessibility services: $e');
       return [];
@@ -562,6 +583,13 @@ class KeystrokeLoggerDetector {
       }
       debugPrint('Error getting keyboards: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting keyboards: $e');
       return [];
@@ -721,6 +749,9 @@ class GeolocationStalkerDetector {
         'hours': hours,
       });
       return List<Map<String, dynamic>>.from(result['accesses'] ?? []);
+    } on MissingPluginException {
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       return [];
     }

@@ -630,10 +630,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Base capability from standard APIs
     double capability = 25.0;
 
-    // Add capability based on granted permissions (45% total)
-    if (await Permission.phone.isGranted) capability += 5;
-    if (await Permission.sms.isGranted) capability += 10;
-    if (await Permission.location.isGranted) capability += 5;
+    // Add capability based on granted permissions (45% total).
+    // Mobile only: phone/SMS/location back Android+iOS detection paths, and
+    // permission_handler_windows answers GRANTED to every query regardless of
+    // reality — so on desktop these terms were inventing 20 points. That
+    // pushed Windows to 55, clearing the `< 50` gate below and making the
+    // whole scan flow reachable on a platform with no native scanner at all.
+    if (PlatformInfo.isAndroid || PlatformInfo.isIOS) {
+      if (await Permission.phone.isGranted) capability += 5;
+      if (await Permission.sms.isGranted) capability += 10;
+      if (await Permission.location.isGranted) capability += 5;
+    }
 
     // File/APK scanning always works via the system file picker (SAF) — no
     // storage permission gates it any more (MANAGE_EXTERNAL_STORAGE dropped
