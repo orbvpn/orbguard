@@ -263,7 +263,9 @@ class CertificateAnalyzer {
   Future<List<Map<String, dynamic>>> _getInstalledCertificates() async {
     try {
       final result = await platform.invokeMethod('getInstalledCertificates');
-      return List<Map<String, dynamic>>.from(result['certificates'] ?? []);
+      return ((result as Map?)?['certificates'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -390,7 +392,9 @@ class PermissionAbuseDetector {
   Future<List<Map<String, dynamic>>> _getInstalledApps() async {
     try {
       final result = await platform.invokeMethod('getInstalledApps');
-      return List<Map<String, dynamic>>.from(result['apps'] ?? []);
+      return ((result as Map?)?['apps'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -476,7 +480,9 @@ class AccessibilityAbuseDetector {
       final result = await platform.invokeMethod(
         'getEnabledAccessibilityServices',
       );
-      return List<Map<String, dynamic>>.from(result['services'] ?? []);
+      return ((result as Map?)?['services'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -575,7 +581,9 @@ class KeystrokeLoggerDetector {
   Future<List<Map<String, dynamic>>> _getInstalledKeyboards() async {
     try {
       final result = await platform.invokeMethod('getInstalledKeyboards');
-      return List<Map<String, dynamic>>.from(result['keyboards'] ?? []);
+      return ((result as Map?)?['keyboards'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -609,7 +617,9 @@ class KeystrokeLoggerDetector {
   Future<List<Map<String, dynamic>>> _detectIMEAbuse() async {
     try {
       final result = await platform.invokeMethod('detectIMEAbuse');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -653,7 +663,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkSuspiciousRootBinaries() async {
     try {
       final result = await platform.invokeMethod('checkSuspiciousRootBinaries');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -662,7 +674,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkModifiedSystemFiles() async {
     try {
       final result = await platform.invokeMethod('checkModifiedSystemFiles');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -671,7 +685,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkMaliciousTweaks() async {
     try {
       final result = await platform.invokeMethod('checkMaliciousTweaks');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -680,7 +696,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkMaliciousDaemons() async {
     try {
       final result = await platform.invokeMethod('checkMaliciousDaemons');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -748,7 +766,9 @@ class GeolocationStalkerDetector {
       final result = await platform.invokeMethod('getLocationAccessHistory', {
         'hours': hours,
       });
-      return List<Map<String, dynamic>>.from(result['accesses'] ?? []);
+      return ((result as Map?)?['accesses'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on MissingPluginException {
       throw DetectionUnsupportedException(
           'no native detection channel on this platform');

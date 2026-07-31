@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "orbguard/system_channel.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +26,10 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  // OrbGuard's own native scanner. Registered alongside the generated plugins
+  // so `com.orb.guard/system` answers on Windows exactly as it does on Android
+  // and iOS; without it every scan stage reported itself unavailable.
+  orbguard::RegisterSystemChannel(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
