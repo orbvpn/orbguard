@@ -39,10 +39,13 @@ android {
         minSdk = flutter.minSdkVersion
         // Google Play requires a recent target API to release; match compileSdk.
         targetSdk = 36
-        // Bump on every Play upload (1 = draft, 2 = targetSdk36, 3 = dropped the
-        // unused READ_CALL_LOG permission).
-        versionCode = 6
-        versionName = "1.0"
+        // Derived from pubspec.yaml `version:` (currently 1.0.0+7 -> code 7),
+        // so `flutter build --build-number` and the pubspec stay authoritative.
+        // These were literals (versionCode 6 / versionName "1.0"), which meant
+        // --build-number was silently ignored and every AAB re-used code 6 —
+        // Play rejects that as "version code 6 has already been used".
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         multiDexEnabled = true
     }
 
