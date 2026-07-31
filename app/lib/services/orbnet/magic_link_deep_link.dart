@@ -12,6 +12,43 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 
+/// Normalises whatever the user pasted into a magic-link code.
+///
+/// The sign-in email renders the token only as a BUTTON — it never shows a
+/// readable code — so "paste the code from your email" had nothing to paste and
+/// the manual fallback was a dead end. What a user *can* copy is the link, and
+/// there are two shapes of it:
+///
+///  * the URL in the email:  `https://<api>/api/v1/auth/magic-link/mobile?token=T&client=orbguard`
+///  * the URL it redirects to: `orbguard://login?code=T`
+///
+/// OrbNet builds the second from the first with `code = token`, so BOTH query
+/// names carry the same value the verify endpoint wants. Accept either, plus a
+/// bare code typed by hand. Returns null when the input carries nothing usable.
+String? magicCodeFromPastedText(String input) {
+  final text = input.trim();
+  if (text.isEmpty) return null;
+
+  final uri = Uri.tryParse(text);
+  if (uri != null && uri.scheme.isNotEmpty) {
+    final fromUri = magicCodeFromUri(uri);
+    if (fromUri != null) return fromUri;
+    // Any http(s)/orbguard URL: take `code`, else `token`. Never fall through
+    // to returning the raw URL — posting a whole URL as the token just yields
+    // a confusing "invalid code" from the backend.
+    if (uri.scheme == 'http' ||
+        uri.scheme == 'https' ||
+        uri.scheme == 'orbguard') {
+      for (final key in const ['code', 'token']) {
+        final v = uri.queryParameters[key]?.trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+      return null;
+    }
+  }
+  return text;
+}
+
 /// Extracts the magic-link `code` from an `orbguard://login?code=…` URI.
 /// Returns null for any other link so unrelated deep links are ignored.
 String? magicCodeFromUri(Uri uri) {

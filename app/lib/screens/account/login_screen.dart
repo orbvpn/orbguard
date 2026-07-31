@@ -28,6 +28,7 @@ import '../legal/legal_screen.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../providers/account_provider.dart';
+import '../../services/orbnet/magic_link_deep_link.dart';
 import '../../utils/platform_info.dart';
 
 enum _LoginMode { password, magic }
@@ -236,19 +237,19 @@ class _LoginScreenState extends State<LoginScreen> {
     final account = context.read<AccountProvider>();
     final messenger = ScaffoldMessenger.of(context);
     FocusScope.of(context).unfocus();
-    // The code field is now shown as soon as the link is sent, so it can be
-    // empty when this fires. Say so instead of round-tripping a blank token
-    // and surfacing whatever generic error the backend returns.
-    if (_codeController.text.trim().isEmpty) {
+    // The field is shown as soon as the link is sent, so it can be empty when
+    // this fires. Say so instead of round-tripping a blank token and surfacing
+    // whatever generic error the backend returns.
+    // The email renders the token only as a button, never as readable text, so
+    // what the user can realistically copy is the LINK — accept either form.
+    final code = magicCodeFromPastedText(_codeController.text);
+    if (code == null) {
       messenger.showSnackBar(const SnackBar(
-        content: Text('Paste the sign-in code from your email first'),
+        content: Text('Paste the sign-in link from your email first'),
       ));
       return;
     }
-    final ok = await account.verifyMagicCode(
-      _emailController.text,
-      _codeController.text.trim(),
-    );
+    final ok = await account.verifyMagicCode(_emailController.text, code);
     if (!mounted) return;
     if (ok) {
       messenger.showSnackBar(
@@ -521,7 +522,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Text(
             'Check your email — we sent a sign-in link to '
             '${_emailController.text.trim()}.\n'
-            'Tap the link on this device, or paste the code from that email '
+            'Tap the link on this device — or copy that link and paste it '
             'below.',
             style: BrandText.body(
                 color: context.colors.onSurfaceVariant, size: 13),
@@ -532,13 +533,13 @@ class _LoginScreenState extends State<LoginScreen> {
           // to a session — hiding it is what made sign-in look broken to the
           // Microsoft Store reviewer (10.1.2.10).
           const SizedBox(height: 16),
-          _fieldLabel(context, 'Sign-in code'),
+          _fieldLabel(context, 'Sign-in link'),
           const SizedBox(height: 8),
           _field(
             context,
             fieldKey: const ValueKey('magic_code_field'),
             controller: _codeController,
-            hint: 'Paste the code from your email',
+            hint: 'Paste the sign-in link from your email',
             icon: 'key',
             enabled: !account.isBusy,
           ),
