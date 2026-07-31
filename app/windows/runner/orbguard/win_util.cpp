@@ -228,6 +228,8 @@ std::wstring KnownFolder(const GUID& id) {
   return result;
 }
 
+void ResetSignatureBudget() { g_signature_checks_used = 0; }
+
 SignatureStatus VerifyFileSignature(const std::wstring& path) {
   if (!FileExists(path)) return SignatureStatus::kUnknown;
   if (g_signature_checks_used >= kSignatureCheckBudget) {

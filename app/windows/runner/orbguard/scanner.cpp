@@ -94,11 +94,21 @@ std::wstring PathForPid(DWORD pid) {
   return path;
 }
 
+std::vector<ProcessInfo>& ProcessCache() {
+  static std::vector<ProcessInfo> cache;
+  return cache;
+}
+
+// Snapshot once per scan and share it across stages. The cache is invalidated
+// by BeginScan(); if it were process-lifetime, a second scan would report the
+// processes that were running during the first one.
 const std::vector<ProcessInfo>& Processes() {
-  static const std::vector<ProcessInfo> cached = [] {
-    std::vector<ProcessInfo> list;
+  std::vector<ProcessInfo>& cached = ProcessCache();
+  if (!cached.empty()) return cached;
+  {
+    std::vector<ProcessInfo>& list = cached;
     HANDLE snapshot = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) return list;
+    if (snapshot == INVALID_HANDLE_VALUE) return cached;
     PROCESSENTRY32W entry{};
     entry.dwSize = sizeof(entry);
     if (::Process32FirstW(snapshot, &entry)) {
@@ -112,8 +122,7 @@ const std::vector<ProcessInfo>& Processes() {
       } while (::Process32NextW(snapshot, &entry));
     }
     ::CloseHandle(snapshot);
-    return list;
-  }();
+  }
   return cached;
 }
 
@@ -748,6 +757,11 @@ EncodableValue GetLocationAccessHistory(int hours) {
     }));
   }
   return Wrap("accesses", std::move(accesses));
+}
+
+void BeginScan() {
+  ProcessCache().clear();
+  ResetSignatureBudget();
 }
 
 EncodableValue CheckElevatedAccess() {

@@ -49,9 +49,11 @@ void RegisterSystemChannel(flutter::FlutterEngine* engine) {
          std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
         const std::string& method = call.method_name();
 
-        // The Dart pipeline calls this before the native stages; there is no
-        // per-scan state to build on Windows, so acknowledge and continue.
+        // The Dart pipeline calls this once before the native stages.
         if (method == "initializeScan") {
+          // Drop the previous run's process snapshot and restore the signature
+          // budget so every scan sees the machine as it is right now.
+          BeginScan();
           result->Success(EncodableValue(true));
         } else if (method == "checkRootAccess") {
           result->Success(CheckElevatedAccess());

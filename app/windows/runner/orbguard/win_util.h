@@ -80,6 +80,11 @@ enum class SignatureStatus {
 
 SignatureStatus VerifyFileSignature(const std::wstring& path);
 
+// Restores the per-scan signature-check budget. Without this the budget is
+// spent once for the life of the process and every later scan silently stops
+// verifying signatures — quietly weakening every heuristic built on them.
+void ResetSignatureBudget();
+
 // True when the path sits under a directory any standard user can write to
 // (%TEMP%, AppData, Downloads, ProgramData, Public). Malware persists there
 // precisely because it needs no elevation.

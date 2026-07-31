@@ -37,6 +37,12 @@ flutter::EncodableValue GetAccessibilityServices();  // {"services": [...]}
 flutter::EncodableValue GetInstalledKeyboards();     // {"keyboards": [...]}
 flutter::EncodableValue GetLocationAccessHistory(int hours);  // {"accesses": [...]}
 
+// Invalidates the per-scan caches (process snapshot, signature budget). The
+// Dart pipeline calls `initializeScan` before every run, which is where this
+// belongs: without it, a second scan reuses the first scan's process list and
+// has no signature-check budget left.
+void BeginScan();
+
 // {"hasRoot": bool, "method": string} — on Windows "root" means elevated.
 flutter::EncodableValue CheckElevatedAccess();
 
