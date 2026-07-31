@@ -61,7 +61,10 @@ std::wstring ExecutablePathFromCommandLine(const std::wstring& command);
 
 bool FileExists(const std::wstring& path);
 
-std::wstring KnownFolder(REFKNOWNFOLDERID id);
+// Takes `const GUID&` rather than REFKNOWNFOLDERID so this header only needs
+// windows.h; KNOWNFOLDERID is a GUID, and the FOLDERID_* constants callers
+// pass come from <knownfolders.h> at the call site.
+std::wstring KnownFolder(const GUID& id);
 
 // Authenticode verification via WinVerifyTrust. This is the backbone of the
 // scanner's heuristics: on Windows, "unsigned binary running from a user-

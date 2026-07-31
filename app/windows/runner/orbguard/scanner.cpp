@@ -283,7 +283,7 @@ EncodableValue ScanFileSystem() {
   }
 
   // Startup folders (per-user and all-users).
-  for (REFKNOWNFOLDERID id : {FOLDERID_Startup, FOLDERID_CommonStartup}) {
+  for (const GUID& id : {FOLDERID_Startup, FOLDERID_CommonStartup}) {
     const std::wstring folder = KnownFolder(id);
     if (folder.empty()) continue;
     WIN32_FIND_DATAW find{};

@@ -218,7 +218,7 @@ bool FileExists(const std::wstring& path) {
          !(attributes & FILE_ATTRIBUTE_DIRECTORY);
 }
 
-std::wstring KnownFolder(REFKNOWNFOLDERID id) {
+std::wstring KnownFolder(const GUID& id) {
   PWSTR raw = nullptr;
   std::wstring result;
   if (SUCCEEDED(::SHGetKnownFolderPath(id, 0, nullptr, &raw)) && raw) {
@@ -270,7 +270,7 @@ SignatureStatus VerifyFileSignature(const std::wstring& path) {
 bool IsUserWritableLocation(const std::wstring& path) {
   static const std::vector<std::wstring> kRoots = [] {
     std::vector<std::wstring> roots;
-    for (REFKNOWNFOLDERID id :
+    for (const GUID& id :
          {FOLDERID_LocalAppData, FOLDERID_RoamingAppData, FOLDERID_Downloads,
           FOLDERID_ProgramData, FOLDERID_Public}) {
       std::wstring folder = KnownFolder(id);
