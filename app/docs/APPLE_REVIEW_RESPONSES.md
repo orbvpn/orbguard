@@ -1,8 +1,13 @@
 # App Review responses — OrbGuard (iOS + macOS)
 
-Two automated App Review messages, with the reply to send and the code change
-that backs it up. Both replies must also be pasted into
-**App Store Connect → App Review Information → Notes**.
+Two automated App Review messages, with the reply and the code change that backs
+it up.
+
+**STATUS: applied live via the App Store Connect API on 2026-08-01.** Both the
+App Description and the App Review Information → Notes were updated on the iOS
+(`30b84d62…`) and macOS (`9bac40ff…`) 1.0 versions, which were in REJECTED state
+and therefore editable. The replies below are what now sits in the review notes;
+they still need to be *sent* as replies in the Resolution Center.
 
 ---
 
@@ -101,14 +106,8 @@ Agreement as a custom EULA. Do one or the other, not neither.
 ### Reply to send
 
 > Thank you — corrected. OrbGuard uses Apple's standard Terms of Use (EULA), and
-> we have added a functional link to it in the App Description:
-> https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
->
-> The subscription terms in the description already state the plan names,
-> duration, that payment is charged to the Apple Account at confirmation, and
-> that subscriptions auto-renew unless turned off at least 24 hours before the
-> end of the period. The Terms of Use and Privacy Policy are also reachable
-> in-app from the subscription screen itself.
+we have added a functional link to it in the App Description: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/ 
+The subscription terms in the description already state the plan names, duration, that payment is charged to the Apple Account at confirmation, and that subscriptions auto-renew unless turned off at least 24 hours before the end of the period. The Terms of Use and Privacy Policy are also reachable in-app from the subscription screen itself.
 
 ---
 
@@ -124,3 +123,30 @@ Guideline 2.3.1 accurate-metadata risk, so the section has been removed from
 
 The Scam Text Filter claim is accurate on iOS and stays — it is a real
 `MessageFilterExtension` in the `OrbGuardSmsFilter` target.
+
+
+---
+
+## Still outstanding: macOS has no native scanner
+
+Found while correcting the macOS listing. `macos/Runner/MainFlutterWindow.swift`
+registers only three channels — `com.orb.guard/wifi`, `com.orb.guard/supplyChain`
+and `com.orb.guard/logs`. It does **not** register `com.orb.guard/system`, which
+every device-scan stage runs over.
+
+That is the same defect Windows had: all scan stages fail, `anyStageSucceeded`
+stays false, and `DeviceScanUnavailableException` surfaces as an error screen. A
+reviewer pressing the main action gets a failure.
+
+Unlike Windows, this is not simply a matter of writing the native code: Mac App
+Store apps are sandboxed (`com.apple.security.app-sandbox`), so they cannot
+enumerate other applications' files, inspect other processes, or read
+system-wide privacy records. A faithful port of the Windows scanner is not
+possible under the MAS sandbox. What a sandboxed Mac app *can* honestly do —
+Wi-Fi/network analysis, scam-link checks, account and device management — is
+what the rewritten description now claims, and the description states the
+sandbox limitation outright.
+
+Decision still needed: either build the reduced, sandbox-legal macOS check set
+so the primary action succeeds, or hold the macOS submission. Shipping it with
+a scan action that errors will fail review the same way Windows did.
