@@ -37,22 +37,25 @@
 		<string>group.com.orb.guard.shared</string>
 	</array>
 
-	<!-- Network Extensions - Required for VPN and DNS filtering. The host app
-	     also lists content-filter-provider because it hosts the OrbGuardFilter
-	     NEFilterDataProvider content filter (managed via NEFilterManager on
-	     MDM-supervised devices). -->
+	<!-- Network Extensions - content filter ONLY.
+	     OrbGuard ships exactly one network extension: the OrbGuardFilter
+	     NEFilterDataProvider (ios/OrbGuardFilter/, managed via NEFilterManager
+	     on MDM-supervised devices).
+
+	     packet-tunnel-provider / dns-proxy / app-proxy-provider and the Personal
+	     VPN entitlement were declared here but NOTHING implemented them:
+	     PacketTunnelProvider.swift and VPNManager.swift are compiled into zero
+	     targets, and no shipping source references NEVPNManager or
+	     NETunnelProviderManager. The app only DETECTS whether a VPN/proxy is
+	     active (a security signal it reports to the user) and can hand off to
+	     the separate OrbVPN app — it never creates or configures a VPN itself.
+
+	     Claiming them made App Review's automated analysis classify OrbGuard as
+	     a VPN app and pause the review. Entitlements must describe what the
+	     binary actually does. -->
 	<key>com.apple.developer.networking.networkextension</key>
 	<array>
-		<string>packet-tunnel-provider</string>
-		<string>dns-proxy</string>
-		<string>app-proxy-provider</string>
 		<string>content-filter-provider</string>
-	</array>
-
-	<!-- Personal VPN - Required for VPN configuration -->
-	<key>com.apple.developer.networking.vpn.api</key>
-	<array>
-		<string>allow-vpn</string>
 	</array>
 
 	<!-- Access WiFi Information - Required for NEHotspotNetwork.fetchCurrent

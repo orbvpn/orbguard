@@ -41,13 +41,13 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NEProviderClasses</key>
-	<dict>
-		<key>com.apple.networkextension.dns-proxy</key>
-		<string>$(PRODUCT_MODULE_NAME).DNSProxyProvider</string>
-		<key>com.apple.networkextension.packet-tunnel</key>
-		<string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
-	</dict>
+	<!-- NEProviderClasses intentionally absent. It named
+	     $(PRODUCT_MODULE_NAME).DNSProxyProvider and .PacketTunnelProvider —
+	     DNSProxyProvider does not exist anywhere, and PacketTunnelProvider.swift
+	     is compiled into no target. A NEProviderClasses entry also belongs in an
+	     EXTENSION's Info.plist, not the host app's; OrbGuardFilter declares its
+	     own. Declaring tunnel/proxy providers here is what made App Review's
+	     automated analysis classify OrbGuard as a VPN app. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

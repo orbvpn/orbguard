@@ -34,10 +34,6 @@ STOP SCAMS & PHISHING
 • Website protection warns you about dangerous and fraudulent sites
 • Check suspicious phone numbers and QR codes
 
-ON-DEVICE FIREWALL
-• Blocks known malicious, tracking and surveillance domains
-• Runs quietly with a live "blocked today" counter — protection stays on in the background
-
 ANTI-THEFT: FIND, LOCK, RECOVER
 • Locate your phone from the app or your OrbGuard web account
 • Sound an alarm, lock the screen, or mark it lost/stolen
@@ -58,10 +54,19 @@ OrbGuard offers optional Basic, Premium and Ultimate plans (monthly or yearly). 
 IMPORTANT
 OrbGuard's anti-theft features (location, remote lock, camera capture) are for YOUR OWN device and are always started by you, the owner — for example after your phone is lost or stolen. Do not use them to monitor anyone else.
 
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 Terms of Service: https://orbvpn.com/terms
 Privacy Policy: https://orbvpn.com/privacy
 Questions? support@orbvpn.com
 ```
+
+> **Do not remove the "Terms of Use (EULA)" line.** App Review rejected the
+> submission because an app offering auto-renewable subscriptions must carry a
+> functional Terms of Use link in its metadata. We use Apple's standard EULA, so
+> the link belongs in the App Description (the orbvpn.com/terms line is our own
+> service terms and does not satisfy this on its own). The alternative is to
+> register a custom EULA under App Store Connect → App Information → License
+> Agreement; if that is ever done, this line can be replaced by it.
 
 ## Support URL
 ```
