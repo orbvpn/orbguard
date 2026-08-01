@@ -52,6 +52,13 @@ class MainFlutterWindow: NSWindow {
         details: ["method": call.method, "platform": "macos"]))
     }
 
+    // System channel: the device-scan pipeline runs every stage over this.
+    // macOS never registered it, so every stage failed and the scan itself
+    // errored out. Implements the one inspection the App Sandbox permits
+    // (running applications) for real, and reports the rest as UNSUPPORTED
+    // rather than as empty "clean" results.
+    OrbGuardSystemChannel.register(messenger: messenger)
+
     // Logs channel (W5.15 macOS mirror): own-process logs via OSLogStore (macOS 12+).
     let logsChannel = FlutterMethodChannel(
       name: "com.orb.guard/logs",
