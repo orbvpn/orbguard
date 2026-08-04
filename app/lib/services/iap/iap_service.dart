@@ -145,6 +145,11 @@ class IapService extends ChangeNotifier {
 
   ProductDetails? productFor(String id) => _productsById[id];
 
+  /// Whether at least one store product has been loaded. False after a failed
+  /// or empty query — the paywall uses this to show a visible retry instead of
+  /// three permanently-disabled tiers.
+  bool get hasProducts => _productsById.isNotEmpty;
+
   // ---- Lifecycle -----------------------------------------------------------
 
   /// Connect to the store, start listening to the purchase stream, and load the

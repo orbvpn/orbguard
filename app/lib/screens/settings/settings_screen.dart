@@ -511,7 +511,7 @@ class SettingsScreen extends StatelessWidget {
           'shield_keyhole',
           AppColors.accentInk,
           [
-            if (!loggedIn)
+            if (!loggedIn) ...[
               _buildSettingsTile(
                 context,
                 'Sign in / Account',
@@ -521,8 +521,20 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                 ),
-              )
-            else ...[
+              ),
+              // Subscription: the purchase path must be findable without an
+              // account — signing in is only required at checkout.
+              _buildSettingsTile(
+                context,
+                'Subscription',
+                'View plans & subscribe — one subscription covers OrbGuard & OrbVPN',
+                'wallet',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PricingScreen()),
+                ),
+              ),
+            ] else ...[
               _buildSettingsTile(
                 context,
                 account.email ?? 'Signed in',
@@ -2092,7 +2104,8 @@ class DesktopPermissionsScreen extends StatelessWidget {
       ),
       const SizedBox(height: 24),
 
-      // Info about notarization
+      // MAS builds are App Store-signed and reviewed, not Developer-ID
+      // notarized — say the accurate thing.
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -2105,7 +2118,8 @@ class DesktopPermissionsScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'OrbGuard is notarized by Apple and does not require disabling Gatekeeper.',
+                'OrbGuard is signed and distributed through the Mac App Store '
+                'and runs fully sandboxed — no Gatekeeper changes needed.',
                 style: TextStyle(color: AppColors.accentInk, fontSize: 13),
               ),
             ),

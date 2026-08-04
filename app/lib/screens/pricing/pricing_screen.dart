@@ -148,6 +148,14 @@ class _PricingScreenState extends State<PricingScreen> {
     super.initState();
     // Surface one-shot purchase outcomes as snackbars.
     _resultsSub = IapService.instance.results.listen(_onIapResult);
+    // Products are queried once at app startup; if that query failed (offline
+    // launch, store hiccup, products propagating), opening the paywall is the
+    // moment to try again — otherwise every tier stays "Unavailable" for the
+    // whole process lifetime.
+    final iap = IapService.instance;
+    if (!iap.hasProducts && !iap.isLoadingProducts) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => iap.loadProducts());
+    }
   }
 
   @override
@@ -245,6 +253,11 @@ class _PricingScreenState extends State<PricingScreen> {
             const _ManagedElsewhereNotice()
           else if (!iap.isAvailable && !iap.isLoadingProducts)
             _StoreUnavailableNotice(onRetry: () => iap.loadProducts())
+          else if (!iap.hasProducts && !iap.isLoadingProducts)
+            // Store reachable but the product query returned nothing (products
+            // still propagating, or a transient query failure). Say so and
+            // offer a retry instead of rendering three dead tiers.
+            _PricesUnavailableNotice(onRetry: () => iap.loadProducts())
           else ...[
             _CycleToggle(
               cycle: _cycle,
@@ -448,6 +461,46 @@ class _StoreUnavailableNotice extends StatelessWidget {
           Text(
             'Subscriptions are purchased through the App Store or Google Play. '
             'We couldn\'t reach it just now.',
+            style: BrandText.body(color: cs.onSurfaceVariant, size: 13.5),
+          ),
+          const SizedBox(height: 14),
+          BrandButton.secondary(label: 'Try again', onPressed: onRetry),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown when the store is reachable but returned no subscription products
+/// (a transient query failure, or products still propagating in the store).
+class _PricesUnavailableNotice extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _PricesUnavailableNotice({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              DuotoneIcon(AppIcons.shield,
+                  size: 20, color: cs.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Plans couldn\'t be loaded',
+                    style: BrandText.title(color: cs.onSurface, size: 15)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'We reached the store but couldn\'t load the subscription plans. '
+            'This is usually temporary.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 13.5),
           ),
           const SizedBox(height: 14),
