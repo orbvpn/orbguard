@@ -1,0 +1,104 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - generic [ref=f4e5]:
+      - generic [ref=f4e7]:
+        - img "OrbVPN" [ref=f4e8]
+        - generic [ref=f4e9]:
+          - generic [ref=f4e10]: OrbNet
+          - generic [ref=f4e11]: Portal
+      - generic [ref=f4e12]:
+        - generic [ref=f4e13]:
+          - generic [ref=f4e14]: Overview
+          - list [ref=f4e16]:
+            - listitem [ref=f4e17]:
+              - link "Dashboard" [ref=f4e18] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=f4e25]:
+          - generic [ref=f4e26]: My Account
+          - list [ref=f4e28]:
+            - listitem [ref=f4e29]:
+              - link "Subscription" [ref=f4e30] [cursor=pointer]:
+                - /url: /dashboard/subscription
+            - listitem [ref=f4e34]:
+              - link "Billing" [ref=f4e35] [cursor=pointer]:
+                - /url: /dashboard/billing
+            - listitem [ref=f4e40]:
+              - link "Devices" [ref=f4e41] [cursor=pointer]:
+                - /url: /dashboard/devices
+            - listitem [ref=f4e46]:
+              - link "Anti-theft" [ref=f4e47] [cursor=pointer]:
+                - /url: /dashboard/anti-theft
+            - listitem [ref=f4e51]:
+              - link "Connections" [ref=f4e52] [cursor=pointer]:
+                - /url: /dashboard/connections
+            - listitem [ref=f4e56]:
+              - link "My Intelligence" [ref=f4e57] [cursor=pointer]:
+                - /url: /dashboard/my-intelligence
+        - generic [ref=f4e67]:
+          - generic [ref=f4e68]: Services
+          - list [ref=f4e70]:
+            - listitem [ref=f4e71]:
+              - link "WireGuard" [ref=f4e72] [cursor=pointer]:
+                - /url: /dashboard/wireguard
+            - listitem [ref=f4e76]:
+              - link "VLESS" [ref=f4e77] [cursor=pointer]:
+                - /url: /dashboard/vless
+            - listitem [ref=f4e81]:
+              - link "OpenConnect" [ref=f4e82] [cursor=pointer]:
+                - /url: /dashboard/openconnect
+            - listitem [ref=f4e87]:
+              - link "Static IP" [ref=f4e88] [cursor=pointer]:
+                - /url: /dashboard/static-ip
+            - listitem [ref=f4e95]:
+              - button "Smart DNS" [ref=f4e96]
+            - listitem [ref=f4e103]:
+              - link "OrbMesh Network" [ref=f4e104] [cursor=pointer]:
+                - /url: /dashboard/orbmesh
+        - generic [ref=f4e111]:
+          - generic [ref=f4e112]: Rewards
+          - list [ref=f4e114]:
+            - listitem [ref=f4e115]:
+              - link "Tokens" [ref=f4e116] [cursor=pointer]:
+                - /url: /dashboard/tokens
+            - listitem [ref=f4e123]:
+              - link "Mining" [ref=f4e124] [cursor=pointer]:
+                - /url: /dashboard/mining
+            - listitem [ref=f4e131]:
+              - link "Referrals" [ref=f4e132] [cursor=pointer]:
+                - /url: /dashboard/referrals
+        - generic [ref=f4e137]:
+          - generic [ref=f4e138]: Support
+          - list [ref=f4e140]:
+            - listitem [ref=f4e141]:
+              - link "Tickets" [ref=f4e142] [cursor=pointer]:
+                - /url: /dashboard/support/tickets
+            - listitem [ref=f4e147]:
+              - link "QR Login" [ref=f4e148] [cursor=pointer]:
+                - /url: /dashboard/settings/qr-login
+            - listitem [ref=f4e156]:
+              - link "Settings" [ref=f4e157] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f4e163]:
+        - listitem [ref=f4e164]:
+          - button "NG Nima Golsharifi USER" [ref=f4e165]:
+            - generic [ref=f4e166]: NG
+            - generic [ref=f4e168]:
+              - generic [ref=f4e169]: Nima Golsharifi
+              - generic [ref=f4e170]: USER
+    - main [ref=f4e173]:
+      - generic [ref=f4e174]:
+        - button "Toggle Sidebar" [ref=f4e175]
+        - navigation [ref=f4e177]:
+          - link [ref=f4e178] [cursor=pointer]:
+            - /url: /dashboard
+          - link "Dashboard" [ref=f4e185] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=f4e186]: Anti Theft
+      - main [ref=f4e190]:
+        - generic [ref=f4e192]:
+          - generic [ref=f4e193]:
+            - heading "Anti-theft" [level=1] [ref=f4e194]
+            - paragraph [ref=f4e197]: Find, ring, lock, or wipe the phones linked to your OrbGuard account
+          - button "Refresh" [disabled]
+  - region "Notifications alt+T"
+  - alert [ref=f4e205]

@@ -190,35 +190,16 @@ Three compounding causes, all real:
 
 ### Reply to paste in Resolution Center (after uploading build 9)
 
-> Thank you for the review. We have uploaded a new build (1.0.0 build 9) that
-> makes the In-App Purchases easier to locate, and here are the exact steps:
->
-> 1. Launch OrbGuard. The onboarding slides and the permissions primer can
->    both be skipped ("Skip" / "Skip for now").
-> 2. Tap the Settings tab (right-most item in the bottom navigation).
-> 3. The first section, "Account", contains "Subscription — View plans &
->    subscribe". Tapping it opens the Plans screen.
-> 4. The Plans screen lists our three auto-renewable subscription tiers —
->    Guard, Guard+ and Guard Ultimate — each with Monthly/Yearly options.
->    These are the six submitted In-App Purchases:
->    orbguard_basic_monthly, orbguard_basic_yearly, orbguard_premium_monthly,
->    orbguard_premium_yearly, orbguard_ultimate_monthly,
->    orbguard_ultimate_yearly.
->    (The same screen is also reachable via Settings → Trust & transparency →
->    "Plans & pricing", and a "Restore purchases" action is on the screen.)
-> 5. One subscription unlocks premium in OrbGuard and OrbVPN through the
->    shared Orb account, so checkout asks for a sign-in first. Please use the
->    demo account in App Review Information:
->    [FILL: demo email] / [FILL: demo password]
->    After signing in, tap "Choose Guard+" (or any tier) to start the standard
->    StoreKit purchase sheet.
->
-> The In-App Purchases are not restricted by storefront, region, or device
-> configuration — they are available in all storefronts. Receipt validation is
-> server-side and follows Apple's documented flow (verify against production,
-> retry against sandbox on status 21007), so purchases work in the
-> Apple-provided sandbox environment. The Paid Applications agreement is
-> accepted in App Store Connect.
+Thank you for the review. We have uploaded a new build (1.0.0 build 9) that makes the In-App Purchases easier to locate, and here are the exact steps:
+
+1. Launch OrbGuard. The onboarding slides and the permissions primer can both be skipped ("Skip" / "Skip for now").
+2. Tap the Settings tab (right-most item in the bottom navigation).
+3. The first section, "Account", contains "Subscription — View plans & subscribe". Tapping it opens the Plans screen.
+4. The Plans screen lists our three auto-renewable subscription tiers — Guard, Guard+ and Guard Ultimate — each with Monthly/Yearly options. These are the six submitted In-App Purchases: orbguard_basic_monthly, orbguard_basic_yearly, orbguard_premium_monthly, orbguard_premium_yearly, orbguard_ultimate_monthly, orbguard_ultimate_yearly. (The same screen is also reachable via Settings → Trust & transparency → "Plans & pricing", and a "Restore purchases" action is on the screen.)
+5. One subscription unlocks premium in OrbGuard and OrbVPN through the shared Orb account, so checkout asks for a sign-in first. Please use the demo account in App Review Information: [FILL: demo email] / [FILL: demo password] After signing in, tap "Choose Guard+" (or any tier) to start the standard StoreKit purchase sheet.
+
+The In-App Purchases are not restricted by storefront, region, or devicem configuration — they are available in all storefronts. Receipt validation is
+server-side and follows Apple's documented flow (verify against production, retry against sandbox on status 21007), so purchases work in the Apple-provided sandbox environment. The Paid Applications agreement is accepted in App Store Connect.
 
 ### Backend actions required BEFORE resubmitting (OrbNet repo — not this repo)
 

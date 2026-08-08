@@ -13,14 +13,19 @@
 	</array>
 
 	<!-- Associated Domains - passkey (WebAuthn) sign-in is bound to RP ID
-	     orbai.world; iOS requires this webcredentials association (plus the
-	     matching AASA file served at https://orbai.world/.well-known/) before the
-	     platform will present the passkey sheet. You MUST also enable the
-	     "Associated Domains" capability on the App ID (Apple Developer portal) so
-	     the provisioning profile carries it. -->
+	     orbvpn.com, which is the relying party the API now presents for every
+	     customer surface. A credential belongs to exactly one relying party and
+	     is invisible to every other, so this app, the OrbVPN app and the website
+	     have to name the same one or each ends up with its own passkey that the
+	     others cannot see — which is what happened while this said orbai.world.
+	     iOS requires this webcredentials association plus the matching AASA file
+	     at https://orbvpn.com/.well-known/apple-app-site-association, which is
+	     served and carries this app's ID. You MUST also enable the "Associated
+	     Domains" capability on the App ID (Apple Developer portal) so the
+	     provisioning profile carries it. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>webcredentials:orbai.world</string>
+		<string>webcredentials:orbvpn.com</string>
 	</array>
 
 	<!-- Apple Push Notifications (FCM anti-theft wake-ups). Requires the Push
