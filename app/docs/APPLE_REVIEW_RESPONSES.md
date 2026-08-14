@@ -374,11 +374,18 @@ onboarding, privacy explainer, settings tile.
 > was signed without its entitlements file, so it lacked the Sign in with
 > Apple entitlement and the authorization request failed immediately when
 > "Continue with Apple" was tapped. Build 10 is signed with the correct
-> entitlements and we have verified the full flow on iOS: the Apple
-> authorization sheet appears, and a successful sign-in creates a session
-> with our account service. (The same flow already worked in your macOS
-> review of this app on August 4, where the macOS binary carried the
-> entitlement correctly.)
+> entitlements — verified in the shipped binary — and we have verified the
+> full flow: the Apple authorization sheet appears, and a successful sign-in
+> creates a session with our account service. (The same flow already worked
+> in your macOS review of this app on August 4, where the macOS binary
+> carried the entitlement correctly.)
+
+**PRE-SEND CHECKLIST for the iOS reply:** the "we have verified the full
+flow" sentence is only true after ONE interactive test — install build 10
+from TestFlight on a real iPhone, tap Continue with Apple, complete the
+sheet, and confirm the account signs in (the backend will log
+`provider=apple` from `OrbGuard-Mobile-App`). Entitlement presence in the
+IPA is already verified (`codesign -d --entitlements`: applesignin ✓).
 >
 > We also improved the in-app error handling so that, if the device is not
 > signed in to an Apple Account, the app now explains that instead of showing
