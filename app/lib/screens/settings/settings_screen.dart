@@ -33,6 +33,7 @@ import '../../services/iap/iap_service.dart';
 import '../../widgets/premium/premium_gate.dart';
 import '../legal/legal_screen.dart';
 import 'notification_discipline_screen.dart';
+import '../../utils/device_words.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -242,7 +243,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     context,
                     'How your privacy works',
-                    'Everything runs on your phone — what we can and cannot see',
+                    'Everything runs on your ${DeviceWords.noun} — what we can and cannot see',
                     'incognito',
                     onTap: () => Navigator.push(
                       context,

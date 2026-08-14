@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:orbguard/screens/home/control_panel_home_screen.dart';
 import 'package:orbguard/services/home/guard_status_controller.dart';
+import 'package:orbguard/utils/device_words.dart';
 import 'package:orbguard/services/home/last_scan_verdict_controller.dart';
 import 'package:orbguard/services/home/privacy_score_engine.dart';
 import 'package:orbguard/widgets/home/pulse_orb.dart';
@@ -77,7 +78,9 @@ void main() {
       ),
     );
 
-    expect(find.text("Let's check your phone"), findsOneWidget);
+    // Copy is platform-aware ("phone"/"Mac"/"computer"); tests run on the
+    // host platform, so assert through the same helper the widget uses.
+    expect(find.text("Let's check your ${DeviceWords.noun}"), findsOneWidget);
     expect(find.textContaining('Monitoring live'), findsNothing,
         reason: 'no verified-active guard → no live claim');
     expect(find.byType(LiveDot), findsNothing,

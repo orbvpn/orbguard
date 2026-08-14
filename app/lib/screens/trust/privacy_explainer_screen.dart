@@ -18,6 +18,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/on_device_trust_badge.dart';
+import '../../utils/device_words.dart';
 
 /// The four trust promises, each shown as its own glass card:
 ///  1. Everything runs on your phone.
@@ -76,9 +77,9 @@ class PrivacyExplainerScreen extends StatelessWidget {
           _TrustCard(
             icon: 'smartphone',
             tint: AppColors.accentInk,
-            title: 'Everything runs on your phone',
+            title: 'Everything runs on your ${DeviceWords.noun}',
             body: 'Every scan happens locally, right here on your device — '
-                'never sent to a server first. Results stay on your phone '
+                'never sent to a server first. Results stay on your ${DeviceWords.noun} '
                 'unless you choose to share them, for example when '
                 'contacting support.',
           ),
@@ -87,7 +88,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             tint: AppColors.secondaryInk,
             title: "We can't read your messages or listen to your calls",
             body: 'OrbGuard cannot open WhatsApp, Signal, or Telegram, and it '
-                'cannot listen in on a call — your phone simply does not '
+                'cannot listen in on a call — your ${DeviceWords.noun} simply does not '
                 'allow any app that kind of access. That is not a gap. It is '
                 'by design, and it is a good thing.',
           ),

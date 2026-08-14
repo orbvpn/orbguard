@@ -8,6 +8,7 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/on_device_trust_badge.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../services/habit/protection_streak_controller.dart';
+import '../../utils/device_words.dart';
 import '../../widgets/habit/streak_card.dart';
 
 /// The consumer **Guard Home** — the calm centre of the app.
@@ -169,9 +170,9 @@ class _GuardHomeScreenState extends State<GuardHomeScreen> {
       case ProtectionLevel.attention:
         return 'A few things to review';
       case ProtectionLevel.atRisk:
-        return 'Your phone needs attention';
+        return 'Your ${DeviceWords.noun} needs attention';
       case ProtectionLevel.notAssessed:
-        return "Let's check your phone";
+        return "Let's check your ${DeviceWords.noun}";
     }
   }
 

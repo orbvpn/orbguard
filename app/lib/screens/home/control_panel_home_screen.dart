@@ -27,6 +27,7 @@ import '../../services/habit/protection_streak_controller.dart';
 import '../../services/home/guard_status_controller.dart';
 import '../../services/home/last_scan_verdict_controller.dart';
 import '../../services/home/privacy_score_engine.dart';
+import '../../utils/device_words.dart';
 import '../../widgets/home/guard_grid.dart';
 import '../../widgets/home/live_activity_card.dart';
 import '../../widgets/home/privacy_score_card.dart';
@@ -214,12 +215,12 @@ class ControlPanelHomeScreen extends StatelessWidget {
   }
 
   static String _headline(ProtectionLevel level) => switch (level) {
-        ProtectionLevel.notAssessed => "Let's check your phone",
+        ProtectionLevel.notAssessed => "Let's check your ${DeviceWords.noun}",
         ProtectionLevel.excellent ||
         ProtectionLevel.good =>
           "You're not being watched",
         ProtectionLevel.attention => 'A few things to review',
-        ProtectionLevel.atRisk => 'Your phone needs attention',
+        ProtectionLevel.atRisk => 'Your ${DeviceWords.noun} needs attention',
       };
 
   static String _heroIcon(ProtectionLevel level) => switch (level) {

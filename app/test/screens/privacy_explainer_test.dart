@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:orbguard/presentation/widgets/on_device_trust_badge.dart';
 import 'package:orbguard/screens/trust/privacy_explainer_screen.dart';
+import 'package:orbguard/utils/device_words.dart';
 
 /// Phase 3.1 — the Privacy Explainer is OrbGuard's credibility surface: it
 /// must actually state the four trust promises in plain English, and the
@@ -24,7 +25,10 @@ void main() {
       (tester) async {
     await pumpTallScreen(tester);
 
-    expect(find.text('Everything runs on your phone'), findsOneWidget);
+    // Copy is platform-aware ("phone"/"Mac"/"computer"); tests run on the
+    // host platform, so assert through the same helper the widget uses.
+    expect(find.text('Everything runs on your ${DeviceWords.noun}'),
+        findsOneWidget);
     expect(
       find.text("We can't read your messages or listen to your calls"),
       findsOneWidget,
