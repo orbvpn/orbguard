@@ -325,3 +325,109 @@ Known residue (do NOT claim otherwise to Apple): the Dart macOS persistence
 scanner (`macos_persistence_scanner_service.dart`) still carries placeholder
 `_knownMalwareHashes` values that can never match a real SHA-256 — macOS
 answers above deliberately do not claim hash-signature scanning of local files.
+
+---
+
+## 6. August 4–5 rejections (iOS a20d2258, macOS 9c836998) — build 10 fixes + replies
+
+### What actually broke (verified, not guessed)
+
+**iOS 2.1(a) — "Continue with Apple gives an error" (Aug 5, iPhone 17 Pro Max,
+iOS 26.6).** Root cause found in the project file: the Runner target never set
+`CODE_SIGN_ENTITLEMENTS`, so `ios/Runner/Runner.entitlements` — including
+`com.apple.developer.applesignin` — was never embedded in ANY shipped iOS
+build (`git log -S` shows the reference never existed). Without the
+entitlement, `ASAuthorizationController` fails immediately with error 1000
+before any network call. Server logs confirm it: on Aug 5 the OrbNet backend
+(Log Analytics, container app `orbnet-go`) received ZERO requests from
+`OrbGuard-Mobile-App`, while on Aug 4 the **macOS** reviewer (Apple IP
+17.11.35.231) completed Sign in with Apple successfully — the macOS target
+DOES wire its entitlements. Fixed in commit ee0f3b6 (entitlements wired into
+all three Runner configs; unused NE content-filter entitlement dropped; error
+code now logged with actionable copy for the not-signed-in case).
+
+**macOS 5.1.1(iv) — pre-permission screen used "Allow" buttons.** The
+first-run priming cards' action button label was `Allow`; Apple requires
+neutral wording. Now `Continue` (screen copy no longer says "Allow" anywhere).
+
+**macOS 2.1(a) — "Grant Essential did nothing, spinner forever."**
+permission_handler has no macOS implementation, so every status/request call
+on the Permission Setup screen threw `MissingPluginException`: the check that
+was in flight never cleared `_isChecking` (eternal spinner) and the request
+died silently (dead button). Rebuilt: non-Android platforms now show the two
+asks that really exist there (Notifications via flutter_local_notifications,
+Location via geolocator), a single "Continue" CTA that fires the real OS
+prompts, an honest System Settings path for remembered denials, and a
+try/finally so the spinner can never hang. The notification subsystem itself
+was also dead on macOS (initialize() force-unwraps macOS settings that were
+never passed) — fixed, so threat alerts now work on the Mac build.
+
+**macOS 2.1(a) — "Lets check your phone" on a Mac.** All device-naming copy
+now goes through `DeviceWords.noun` (phone/Mac/computer): home headlines,
+onboarding, privacy explainer, settings tile.
+
+### Reply to send — iOS (submission a20d2258, Guideline 2.1(a))
+
+> Thank you for the report — this is fixed in build 1.0 (10).
+>
+> The cause was a build configuration error on our side: the reviewed binary
+> was signed without its entitlements file, so it lacked the Sign in with
+> Apple entitlement and the authorization request failed immediately when
+> "Continue with Apple" was tapped. Build 10 is signed with the correct
+> entitlements and we have verified the full flow on iOS: the Apple
+> authorization sheet appears, and a successful sign-in creates a session
+> with our account service. (The same flow already worked in your macOS
+> review of this app on August 4, where the macOS binary carried the
+> entitlement correctly.)
+>
+> We also improved the in-app error handling so that, if the device is not
+> signed in to an Apple Account, the app now explains that instead of showing
+> a generic error.
+
+### Reply to send — macOS (submission 9c836998, all three issues)
+
+> Thank you for the detailed review — all three issues are addressed in build
+> 1.0 (10).
+>
+> **Guideline 5.1.1(iv) — permission priming buttons.** The buttons on the
+> "Turn on your protection" screen no longer say "Allow"; they now say
+> "Continue", and consent is only ever given in the system permission dialogs.
+>
+> **Guideline 2.1(a) — Permission Setup screen.** This screen was broken on
+> macOS: it relied on a permission plugin that has no macOS implementation, so
+> the progress indicator never resolved and "Grant Essential" performed no
+> action. It has been rebuilt for macOS: it now shows only the permissions
+> that exist on the Mac (Notifications and Location), the "Continue" button
+> triggers the real macOS permission prompts, and if macOS has remembered an
+> earlier decision the screen explains that and links to System Settings.
+> The "Let's check your phone" wording was also wrong on macOS — the app now
+> says "Let's check your Mac" (the copy is platform-aware everywhere).
+>
+> **Guideline 2.1 — Where are the AntiVirus/Malware features?** OrbGuard's
+> malware detection is built into the main scan — there is no separate
+> "antivirus" menu. Concretely:
+>
+> - **Home → "Run scan"** (also the Scan tab) runs the full checkup. On macOS
+>   this includes the malware-relevant checks the App Sandbox permits:
+>   analysis of running applications (apps launched from user-writable
+>   locations such as Downloads or mounted disk images instead of
+>   /Applications — the typical side-loading pattern — and non-Apple apps
+>   running invisibly with no Dock icon or menu bar, the typical monitoring
+>   pattern), plus network/Wi-Fi safety checks and checks of domains, IPs and
+>   URLs against our threat-intelligence service (which aggregates URLhaus,
+>   ThreatFox, MalwareBazaar, OpenPhish, Google Safe Browsing, CISA KEV, the
+>   Citizen Lab/Amnesty MVT spyware indicator sets, and more).
+> - **Protect tab** hosts the individual protections (web/link checking, scam
+>   detection, network security), each of which uses the same threat
+>   intelligence.
+> - Findings appear directly in the scan results with plain-language
+>   explanations and severity.
+>
+> So yes — the general scan is where malware detection happens; it is not a
+> separate feature. To keep the description honest: OrbGuard focuses on
+> spyware, stalkerware, scam and network threats. On macOS the App Sandbox
+> does not permit scanning other applications' files on disk, so detection is
+> behavior- and reputation-based (running apps, network, web); anything the
+> sandbox does not permit is shown in the app as "unavailable" rather than
+> silently reported as safe.
+
