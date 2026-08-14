@@ -42,26 +42,13 @@
 		<string>group.com.orb.guard.shared</string>
 	</array>
 
-	<!-- Network Extensions - content filter ONLY.
-	     OrbGuard ships exactly one network extension: the OrbGuardFilter
-	     NEFilterDataProvider (ios/OrbGuardFilter/, managed via NEFilterManager
-	     on MDM-supervised devices).
-
-	     packet-tunnel-provider / dns-proxy / app-proxy-provider and the Personal
-	     VPN entitlement were declared here but NOTHING implemented them:
-	     PacketTunnelProvider.swift and VPNManager.swift are compiled into zero
-	     targets, and no shipping source references NEVPNManager or
-	     NETunnelProviderManager. The app only DETECTS whether a VPN/proxy is
-	     active (a security signal it reports to the user) and can hand off to
-	     the separate OrbVPN app — it never creates or configures a VPN itself.
-
-	     Claiming them made App Review's automated analysis classify OrbGuard as
-	     a VPN app and pause the review. Entitlements must describe what the
-	     binary actually does. -->
-	<key>com.apple.developer.networking.networkextension</key>
-	<array>
-		<string>content-filter-provider</string>
-	</array>
+	<!-- No Network Extension entitlements. The OrbGuardFilter appex
+	     (NEFilterDataProvider, MDM-only) is NOT embedded in consumer builds
+	     and the app itself never configures NEFilterManager, so claiming
+	     content-filter-provider here would describe capability the shipped
+	     binary doesn't have — and NE entitlements previously made App Review's
+	     automated analysis classify OrbGuard as a VPN app. Restore this (on
+	     the appex, not the app) only when the filter actually ships. -->
 
 	<!-- Access WiFi Information - Required for NEHotspotNetwork.fetchCurrent
 	     (current SSID/BSSID on the com.orb.guard/wifi channel) -->

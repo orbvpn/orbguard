@@ -213,9 +213,20 @@ class SocialAuthService {
       if (e.code == AuthorizationErrorCode.canceled) {
         return SocialAuthResult.canceled(SocialAuthProvider.apple);
       }
-      return SocialAuthResult.failure(
-          SocialAuthProvider.apple, _appleFailCopy);
-    } catch (_) {
+      // Log the code (no PII): App Review's Aug 2026 iOS rejection was this
+      // exact path failing before any network call, and the swallowed code
+      // made it undiagnosable from the banner alone.
+      debugPrint('[OrbGuard] Apple sign-in failed: ${e.code} — ${e.message}');
+      // ASAuthorization error 1000 ("unknown") on a healthy build means the
+      // device has no Apple Account signed in — tell the user the fix.
+      final copy = e.code == AuthorizationErrorCode.unknown
+          ? "Couldn't start Sign in with Apple — check that this device is "
+              'signed in to an Apple Account in Settings, or use email '
+              'instead.'
+          : _appleFailCopy;
+      return SocialAuthResult.failure(SocialAuthProvider.apple, copy);
+    } catch (e) {
+      debugPrint('[OrbGuard] Apple sign-in error: ${e.runtimeType}');
       return SocialAuthResult.failure(
           SocialAuthProvider.apple, _appleFailCopy);
     }
