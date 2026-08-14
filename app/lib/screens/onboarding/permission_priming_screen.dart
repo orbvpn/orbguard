@@ -25,11 +25,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../permissions/special_permissions_manager.dart';
+import '../../permissions/universal_permissions.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
-import '../../services/notifications/notification_service.dart';
 import 'priming_copy.dart';
 
 /// Prefs flag set (true) before [PermissionPrimingScreen.onDone] fires — the
@@ -61,36 +61,21 @@ class PrimingRequests {
 
   /// Default wiring onto the app's existing permission plumbing:
   ///
-  ///  • notifications — [NotificationService.requestPermissions] fires the OS
-  ///    prompt (its own bool only reflects the plugin call), then
-  ///    `Permission.notification.isGranted` is read back as the source of
-  ///    truth for what the chip may claim;
-  ///  • SMS / location — permission_handler requests, status read from the
-  ///    returned [PermissionStatus];
+  ///  • notifications / location — [UniversalPermissions], which fires the OS
+  ///    prompt through a plugin that actually implements the current platform
+  ///    (permission_handler has no macOS implementation) and reads back the
+  ///    REAL post-request state as the source of truth for what the chip may
+  ///    claim;
+  ///  • SMS — permission_handler request (Android-only step), status read
+  ///    from the returned [PermissionStatus];
   ///  • usage access / accessibility — [SpecialPermissionsManager] deep-links
   ///    into system Settings.
   factory PrimingRequests.production() {
     final specialPermissions = SpecialPermissionsManager();
     return PrimingRequests(
-      requestNotifications: () async {
-        try {
-          await NotificationService.instance.requestPermissions();
-        } catch (_) {
-          // Service plugin unavailable — fall back so first run still asks.
-          try {
-            await Permission.notification.request();
-          } catch (_) {}
-        }
-        // Honesty: report the real post-request state, not the call result.
-        try {
-          return await Permission.notification.isGranted;
-        } catch (_) {
-          return false;
-        }
-      },
+      requestNotifications: UniversalPermissions.requestNotifications,
       requestSms: () async => (await Permission.sms.request()).isGranted,
-      requestLocation: () async =>
-          (await Permission.location.request()).isGranted,
+      requestLocation: UniversalPermissions.requestLocation,
       openUsageAccess: specialPermissions.requestUsageStatsPermission,
       openAccessibility: specialPermissions.requestAccessibilityPermission,
     );
@@ -286,7 +271,7 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
             style: BrandText.display(color: cs.onSurface, size: 30)),
         const SizedBox(height: 10),
         Text(
-          'Each permission unlocks part of your first checkup. Allow what '
+          'Each permission unlocks part of your first checkup. Turn on what '
           "you're comfortable with — skip anything, and change your mind "
           'later in Settings.',
           style: BrandText.body(color: cs.onSurfaceVariant, size: 15),

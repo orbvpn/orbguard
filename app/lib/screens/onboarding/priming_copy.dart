@@ -35,6 +35,10 @@ class PrimingStep {
 
   /// The value line: the WHY in one calm sentence.
   final String value;
+
+  /// App Review 5.1.1(iv): a custom pre-permission screen must NOT put
+  /// "Allow" on its action button — Apple requires neutral wording like
+  /// "Continue"/"Next" so consent happens only in the OS dialog.
   final String buttonLabel;
 
   /// True for the advanced steps that can only deep-link into system
@@ -47,7 +51,7 @@ class PrimingStep {
     required this.icon,
     required this.title,
     required this.value,
-    this.buttonLabel = 'Allow',
+    this.buttonLabel = 'Continue',
     this.opensSystemSettings = false,
   });
 }

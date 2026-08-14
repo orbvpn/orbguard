@@ -1,14 +1,27 @@
 // lib/screens/permission_setup_screen.dart
 // Interactive permission setup with explanations
+//
+// Two modes:
+//  • Android — the full Android permission model (phone/SMS/location plus the
+//    usage-access & accessibility Settings deep-links).
+//  • Everywhere else (iOS/macOS/Windows/Linux) — ONLY the two asks that exist
+//    there: notifications + location, requested through plugins that actually
+//    implement the platform. The Android list used permission_handler, which
+//    has NO macOS implementation, so on the Mac build every status check threw
+//    MissingPluginException: the spinner never resolved and "Grant Essential"
+//    did nothing — the exact macOS 2.1(a) App Review rejection (Aug 2026).
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../permissions/permission_manager.dart';
+import '../permissions/universal_permissions.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
 import '../presentation/theme/app_snack.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
+import '../utils/platform_info.dart';
 
 class PermissionSetupScreen extends StatefulWidget {
   const PermissionSetupScreen({super.key});
@@ -22,6 +35,15 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
   final PermissionManager _permissionManager = PermissionManager();
   PermissionScanResult? _scanResult;
   bool _isChecking = false;
+
+  /// Only Android gets the deep Android permission model.
+  final bool _androidMode = PlatformInfo.isAndroid;
+
+  // Simple-mode (non-Android) state: the two universal asks.
+  bool _notifGranted = false;
+  bool _locGranted = false;
+  bool _requesting = false;
+  bool _hasRequestedOnce = false;
 
   @override
   void initState() {
@@ -46,13 +68,27 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
 
   Future<void> _checkPermissions() async {
     setState(() => _isChecking = true);
-
-    final result = await _permissionManager.checkAllPermissions();
-
-    setState(() {
-      _scanResult = result;
-      _isChecking = false;
-    });
+    try {
+      if (_androidMode) {
+        final result = await _permissionManager.checkAllPermissions();
+        if (mounted) setState(() => _scanResult = result);
+      } else {
+        final notif = await UniversalPermissions.notificationsGranted();
+        final loc = await UniversalPermissions.locationGranted();
+        if (mounted) {
+          setState(() {
+            _notifGranted = notif;
+            _locGranted = loc;
+          });
+        }
+      }
+    } catch (e) {
+      // Never strand the user on the spinner — an unavailable permission
+      // backend reads as "nothing granted", not an infinite progress state.
+      debugPrint('[OrbGuard] permission check failed: ${e.runtimeType}');
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
   }
 
   @override
@@ -69,11 +105,174 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       ),
       body: _isChecking
           ? const Center(child: CircularProgressIndicator())
-          : _scanResult == null
-              ? const Center(child: Text('Loading...'))
-              : _buildPermissionList(),
-      bottomNavigationBar: _buildBottomBar(),
+          : !_androidMode
+              ? _buildSimpleList()
+              : _scanResult == null
+                  ? const Center(child: Text('Loading...'))
+                  : _buildPermissionList(),
+      bottomNavigationBar:
+          _androidMode ? _buildBottomBar() : _buildSimpleBottomBar(),
     );
+  }
+
+  // ==========================================================================
+  // SIMPLE MODE (iOS / macOS / Windows / Linux): notifications + location
+  // ==========================================================================
+
+  bool get _allSimpleGranted => _notifGranted && _locGranted;
+
+  Widget _buildSimpleList() {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _buildGroupHeader('Permissions', AppIcons.shieldCheck),
+        const SizedBox(height: 4),
+        Text(
+          'Two optional permissions round out your protection. Scanning '
+          'itself works without them.',
+          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        _buildSimpleCard(
+          'Notifications',
+          'Get alerted the moment we spot a threat',
+          AppIcons.bell,
+          _notifGranted,
+        ),
+        _buildSimpleCard(
+          'Location',
+          "Check that the Wi-Fi network you're on is safe",
+          AppIcons.mapPoint,
+          _locGranted,
+        ),
+        if (_hasRequestedOnce && !_allSimpleGranted) ...[
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    // Honest: the OS remembers an earlier "don't allow" and
+                    // will not re-prompt — the only path is system Settings.
+                    PlatformInfo.isMacOS
+                        ? 'If macOS did not ask, it remembered an earlier '
+                            'choice. You can enable OrbGuard under System '
+                            'Settings → Notifications, and System Settings → '
+                            'Privacy & Security → Location Services.'
+                        : 'If nothing was asked, the system remembered an '
+                            'earlier choice — you can enable OrbGuard in the '
+                            'system Settings app.',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: _openSystemSettings,
+                    child: const Text('Open Settings'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 80), // Space for bottom bar
+      ],
+    );
+  }
+
+  Widget _buildSimpleCard(
+      String name, String description, String icon, bool granted) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: DuotoneIcon(icon,
+            color: granted ? AppColors.accentInk : cs.onSurfaceVariant),
+        title: Text(name),
+        subtitle: Text(description, style: const TextStyle(fontSize: 12)),
+        trailing: granted
+            ? DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk)
+            : Text('Not set',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+      ),
+    );
+  }
+
+  Widget _buildSimpleBottomBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.overlayLight,
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _requesting
+            ? null
+            : _allSimpleGranted
+                ? () => Navigator.pop(context, true)
+                : _requestUniversal,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: GlassTheme.primaryAccent,
+          foregroundColor: Brand.onLime,
+          padding: const EdgeInsets.all(16),
+        ),
+        child: _requesting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              )
+            // 5.1.1(iv): neutral wording — consent happens in the OS dialogs.
+            : Text(_allSimpleGranted ? 'Done' : 'Continue',
+                style: const TextStyle(fontSize: 16)),
+      ),
+    );
+  }
+
+  /// Fires the two OS prompts in sequence, then re-reads the real state.
+  Future<void> _requestUniversal() async {
+    setState(() => _requesting = true);
+    try {
+      final notif = await UniversalPermissions.requestNotifications();
+      final loc = await UniversalPermissions.requestLocation();
+      if (!mounted) return;
+      setState(() {
+        _notifGranted = notif;
+        _locGranted = loc;
+        _hasRequestedOnce = true;
+      });
+      showResultSnackBar(
+        context,
+        _allSimpleGranted
+            ? 'All set — alerts and Wi-Fi checks are on'
+            : 'You can change this anytime in system Settings',
+        background:
+            _allSimpleGranted ? AppColors.success : AppColors.warning,
+      );
+    } finally {
+      if (mounted) setState(() => _requesting = false);
+    }
+  }
+
+  Future<void> _openSystemSettings() async {
+    try {
+      if (PlatformInfo.isMacOS) {
+        await launchUrl(Uri.parse(
+            'x-apple.systempreferences:com.apple.preference.notifications'));
+      } else {
+        await openAppSettings();
+      }
+    } catch (e) {
+      debugPrint('[OrbGuard] could not open system settings: ${e.runtimeType}');
+    }
   }
 
   Widget _buildPermissionList() {

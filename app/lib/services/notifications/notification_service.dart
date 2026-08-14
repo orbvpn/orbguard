@@ -117,10 +117,19 @@ class NotificationService {
       requestSoundPermission: false,
       notificationCategories: NotificationCategories.iosCategories,
     );
+    // macOS settings are MANDATORY on macOS: initialize() force-unwraps
+    // `settings.macOS`, so omitting them threw an ArgumentError and left the
+    // whole notification subsystem dead on the Mac build.
+    const macSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
     final initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
+      macOS: macSettings,
     );
 
     await _notifications.initialize(
@@ -193,6 +202,12 @@ class NotificationService {
               AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
       return result ?? false;
+    } else if (PlatformInfo.isMacOS) {
+      final result = await _notifications
+          .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+      return result ?? false;
     }
     return false;
   }
@@ -206,7 +221,20 @@ class NotificationService {
           ?.areNotificationsEnabled();
       return result ?? false;
     }
-    // iOS permissions checked at runtime
+    if (PlatformInfo.isMacOS) {
+      final options = await _notifications
+          .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin>()
+          ?.checkPermissions();
+      return options?.isEnabled ?? false;
+    }
+    if (PlatformInfo.isIOS) {
+      final options = await _notifications
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.checkPermissions();
+      return options?.isEnabled ?? false;
+    }
     return true;
   }
 

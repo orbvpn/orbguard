@@ -120,12 +120,12 @@ void main() {
           platform: TargetPlatform.android,
           requests: fakeRequests(notifications: true, log: log));
 
-      await tester.tap(inStep('notifications', find.text('Allow')));
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
 
       expect(log, contains('notifications'));
       expect(inStep('notifications', find.text('On')), findsOneWidget);
-      expect(inStep('notifications', find.text('Allow')), findsNothing);
+      expect(inStep('notifications', find.text('Continue')), findsNothing);
       expect(inStep('notifications', find.text(kSkippedCopy)), findsNothing);
     });
 
@@ -134,7 +134,7 @@ void main() {
       await pumpPriming(tester,
           platform: TargetPlatform.android, requests: fakeRequests(sms: false));
 
-      await tester.tap(inStep('sms', find.text('Allow')));
+      await tester.tap(inStep('sms', find.text('Continue')));
       await tester.pumpAndSettle();
 
       // Never claims On when the permission is not actually granted.
@@ -182,12 +182,12 @@ void main() {
           onDone: () => done = true);
 
       // Decide all three one-tap steps (mix of grant / deny / skip).
-      await tester.tap(inStep('notifications', find.text('Allow')));
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
       await tester.tap(inStep('sms', find.text('Skip')));
       await tester.pumpAndSettle();
       expect(find.text('Run my first check'), findsNothing);
-      await tester.tap(inStep('location', find.text('Allow')));
+      await tester.tap(inStep('location', find.text('Continue')));
       await tester.pumpAndSettle();
 
       // Advanced steps stay undecided — they must not gate the CTA.
@@ -253,7 +253,7 @@ void main() {
 
       expect(find.text('Run my first check'), findsNothing);
 
-      await tester.tap(inStep('notifications', find.text('Allow')));
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
       await tester.tap(inStep('location', find.text('Skip')));
       await tester.pumpAndSettle();

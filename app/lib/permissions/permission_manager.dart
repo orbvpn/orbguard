@@ -98,7 +98,15 @@ class PermissionManager {
             _permissionStates[permInfo.permission] = PermissionStatus.denied;
           }
         } else {
-          final status = await permInfo.permission.status;
+          // A platform without an implementation for this permission
+          // (MissingPluginException) reads as denied — one bad probe must
+          // never abort the whole check and strand the screen on its spinner.
+          PermissionStatus status;
+          try {
+            status = await permInfo.permission.status;
+          } catch (_) {
+            status = PermissionStatus.denied;
+          }
           _permissionStates[permInfo.permission] = status;
 
           if (status.isGranted) {
