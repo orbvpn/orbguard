@@ -203,4 +203,4 @@ Nothing else changed: code, AAB (versionCode 11), listing and Data safety are th
 - 2026-08-30: Publishing overview → **Send 7 changes for review** confirmed (Production, Open
   testing, Closed testing Alpha + OrbGuard → 1.0.0/11, short + full description, Data safety).
   Google's pre-submission quick checks were running; changes are forwarded to review when they pass.
-
+- 2026-08-30 18:48: quick checks passed → **Submission 11 — In review** (Production, Open testing, Closed testing Alpha + OrbGuard, Store Listing, App Content). Code committed as 6e0a971.
