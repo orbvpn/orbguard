@@ -393,48 +393,23 @@ IPA is already verified (`codesign -d --entitlements`: applesignin ✓).
 
 ### Reply to send — macOS (submission 9c836998, all three issues)
 
-> Thank you for the detailed review — all three issues are addressed in build
-> 1.0 (10).
->
-> **Guideline 5.1.1(iv) — permission priming buttons.** The buttons on the
-> "Turn on your protection" screen no longer say "Allow"; they now say
-> "Continue", and consent is only ever given in the system permission dialogs.
->
-> **Guideline 2.1(a) — Permission Setup screen.** This screen was broken on
-> macOS: it relied on a permission plugin that has no macOS implementation, so
-> the progress indicator never resolved and "Grant Essential" performed no
-> action. It has been rebuilt for macOS: it now shows only the permissions
-> that exist on the Mac (Notifications and Location), the "Continue" button
-> triggers the real macOS permission prompts, and if macOS has remembered an
-> earlier decision the screen explains that and links to System Settings.
-> The "Let's check your phone" wording was also wrong on macOS — the app now
-> says "Let's check your Mac" (the copy is platform-aware everywhere).
->
-> **Guideline 2.1 — Where are the AntiVirus/Malware features?** OrbGuard's
-> malware detection is built into the main scan — there is no separate
-> "antivirus" menu. Concretely:
->
-> - **Home → "Run scan"** (also the Scan tab) runs the full checkup. On macOS
->   this includes the malware-relevant checks the App Sandbox permits:
->   analysis of running applications (apps launched from user-writable
->   locations such as Downloads or mounted disk images instead of
->   /Applications — the typical side-loading pattern — and non-Apple apps
->   running invisibly with no Dock icon or menu bar, the typical monitoring
->   pattern), plus network/Wi-Fi safety checks and checks of domains, IPs and
->   URLs against our threat-intelligence service (which aggregates URLhaus,
->   ThreatFox, MalwareBazaar, OpenPhish, Google Safe Browsing, CISA KEV, the
->   Citizen Lab/Amnesty MVT spyware indicator sets, and more).
-> - **Protect tab** hosts the individual protections (web/link checking, scam
->   detection, network security), each of which uses the same threat
->   intelligence.
-> - Findings appear directly in the scan results with plain-language
->   explanations and severity.
->
-> So yes — the general scan is where malware detection happens; it is not a
-> separate feature. To keep the description honest: OrbGuard focuses on
-> spyware, stalkerware, scam and network threats. On macOS the App Sandbox
-> does not permit scanning other applications' files on disk, so detection is
-> behavior- and reputation-based (running apps, network, web); anything the
-> sandbox does not permit is shown in the app as "unavailable" rather than
-> silently reported as safe.
+Thank you for the detailed review — all three issues are addressed in build 1.0 (10).
 
+Guideline 5.1.1(iv) — permission priming buttons.** The buttons on the "Turn on your protection" screen no longer say "Allow"; they now say "Continue", and consent is only ever given in the system permission dialogs.
+
+**Guideline 2.1(a) — Permission Setup screen.** This screen was broken on macOS: it relied on a permission plugin that has no macOS implementation, so
+the progress indicator never resolved and "Grant Essential" performed no action. It has been rebuilt for macOS: it now shows only the permissions that exist on the Mac (Notifications and Location), the "Continue" button triggers the real macOS permission prompts, and if macOS has remembered an earlier decision the screen explains that and links to System Settings.
+The "Let's check your phone" wording was also wrong on macOS — the app now says "Let's check your Mac" (the copy is platform-aware everywhere).
+
+Guideline 2.1 — Where are the AntiVirus/Malware features?
+OrbGuard's malware detection is built into the main scan — there is no separate "antivirus" menu. Concretely:
+
+Home → "Run scan" (also the Scan tab) runs the full checkup. On macOS this includes the malware-relevant checks the App Sandbox permits:
+analysis of running applications (apps launched from user-writable locations such as Downloads or mounted disk images instead of /Applications — the typical side-loading pattern — and non-Apple apps running invisibly with no Dock icon or menu bar, the typical monitoring pattern), plus network/Wi-Fi safety checks and checks of domains, IPs and URLs against our threat-intelligence service (which aggregates URLhaus, ThreatFox, MalwareBazaar, OpenPhish, Google Safe Browsing, CISA KEV, the Citizen Lab/Amnesty MVT spyware indicator sets, and more).Protect tab hosts the individual protections (web/link checking, scam detection, network security), each of which uses the same threat intelligence.
+- Findings appear directly in the scan results with plain-language explanations and severity.
+So yes — the general scan is where malware detection happens; it is not a separate feature. To keep the description honest: OrbGuard focuses on spyware, stalkerware, scam and network threats. On macOS the App Sandbox does not permit scanning other applications' files on disk, so detection is behavior- and reputation-based (running apps, network, web); anything the sandbox does not permit is shown in the app as "unavailable" rather than silently reported as safe.
+
+
+## 7. Round 7 (2026-08-22) — iOS 3.1.2(c) + macOS VPN questionnaire + Google Play
+
+See `STORE_REVIEW_ROUND7.md` (replies, App Review notes, Play Console steps). Build 1.0.0+11.

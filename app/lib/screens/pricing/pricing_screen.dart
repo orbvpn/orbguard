@@ -814,6 +814,8 @@ class _PriceRow extends StatelessWidget {
 
   /// Effective per-month string when billed yearly, formatted in the store's
   /// currency symbol (rounded to the cent). Null if the yearly price is unknown.
+  /// App Review 3.1.2(c): this is shown ONLY as a small secondary line — the
+  /// billed amount must always be the most prominent price element.
   String? _effectivePerMonth() {
     final y = yearly;
     if (y == null) return null;
@@ -848,9 +850,12 @@ class _PriceRow extends StatelessWidget {
     }
 
     final monthlyCycle = cycle == _BillingCycle.monthly;
-    // Headline: the monthly price directly, or the effective /mo for yearly.
-    final headline =
-        monthlyCycle ? product.price : (_effectivePerMonth() ?? product.price);
+    // App Review 3.1.2(c): the BILLED amount is the headline — largest,
+    // boldest, first — for both cycles ("$X / month" or "$Y / year"). The
+    // per-month equivalent of a yearly plan is a small subordinate note.
+    final headline = product.price;
+    final period = monthlyCycle ? '/ month' : '/ year';
+    final perMonth = monthlyCycle ? null : _effectivePerMonth();
     final freeMonths = _freeMonthsIfExact();
 
     return Column(
@@ -865,22 +870,30 @@ class _PriceRow extends StatelessWidget {
                   style: BrandText.mono(
                       color: cs.onSurface, size: 30, weight: FontWeight.w700)),
             ),
-            const SizedBox(width: 4),
-            Text('/mo',
+            const SizedBox(width: 6),
+            Text(period,
                 style: BrandText.mono(color: cs.onSurfaceVariant, size: 15)),
           ],
         ),
         const SizedBox(height: 4),
         if (monthlyCycle)
           Text(
-            'Renews monthly at ${product.price}.',
+            'Billed ${product.price} every month. Renews automatically.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
           )
         else ...[
           Text(
-            'Renews yearly at ${product.price}.',
+            'Billed ${product.price} once a year. Renews automatically.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
           ),
+          if (perMonth != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Works out to about $perMonth a month.',
+                style: BrandText.body(color: cs.onSurfaceVariant, size: 11.5),
+              ),
+            ),
           if (freeMonths != null)
             Padding(
               padding: const EdgeInsets.only(top: 2),

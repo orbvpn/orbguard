@@ -43,16 +43,6 @@ class PermissionManager {
       description: 'Enables deep threat analysis',
       icon: AppIcons.search,
       permissions: [
-        // Prominent disclosure (Google Play policy): SMS text is sent to
-        // OrbGuard's servers for scam/phishing analysis — say so BEFORE asking.
-        PermissionInfo(
-          permission: Permission.sms,
-          name: 'SMS Access',
-          reason: 'Screens texts for scams, phishing and SMS-based exploits. '
-              'Message text is sent securely to OrbGuard servers for this '
-              'analysis only — never sold or used for ads.',
-          impact: 'Critical for scam-text and zero-click exploit detection',
-        ),
         PermissionInfo(
           permission: Permission.location,
           name: 'Location',
@@ -72,7 +62,6 @@ class PermissionManager {
   // Current permission states
   final Map<Permission, PermissionStatus> _permissionStates = {};
   bool _hasUsageStats = false;
-  bool _hasAccessibility = false;
   bool _hasRootAccess = false;
   String _accessMethod = 'Standard';
 
@@ -122,10 +111,8 @@ class PermissionManager {
 
     // Check special permissions
     _hasUsageStats = await _checkUsageStatsPermission();
-    _hasAccessibility = await _checkAccessibilityPermission();
 
     if (_hasUsageStats) result.granted.add('Usage Stats');
-    if (_hasAccessibility) result.granted.add('Accessibility');
 
     // Check root/shell access
     await _checkSystemAccess();
@@ -163,9 +150,6 @@ class PermissionManager {
     if (_permissionStates[Permission.phone]?.isGranted ?? false) {
       capability += 5;
     }
-    if (_permissionStates[Permission.sms]?.isGranted ?? false) {
-      capability += 10;
-    }
     if (_permissionStates[Permission.location]?.isGranted ?? false) {
       capability += 5;
     }
@@ -175,7 +159,6 @@ class PermissionManager {
 
     // Special permissions (25% total)
     if (_hasUsageStats) capability += 15;
-    if (_hasAccessibility) capability += 10;
 
     // Enhanced/Root access (15% total)
     if (_hasRootAccess) {
@@ -208,7 +191,6 @@ class PermissionManager {
   /// Request advanced permissions
   Future<Map<Permission, PermissionStatus>> requestAdvancedPermissions() async {
     final permissions = [
-      Permission.sms,
       Permission.location,
       Permission.phone,
     ];
@@ -343,19 +325,6 @@ class PermissionManager {
     }
   }
 
-  /// Check if Accessibility permission is granted
-  Future<bool> _checkAccessibilityPermission() async {
-    if (!PlatformInfo.isAndroid) return false;
-
-    try {
-      final result =
-          await platform.invokeMethod('checkAccessibilityPermission');
-      return result['hasPermission'] ?? false;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Request Usage Stats permission (navigates to Settings)
   Future<bool> requestUsageStatsPermission(BuildContext context) async {
     final shouldOpen = await showAppSheet<bool>(
@@ -410,60 +379,6 @@ class PermissionManager {
     return false;
   }
 
-  /// Request Accessibility permission (navigates to Settings)
-  Future<bool> requestAccessibilityPermission(BuildContext context) async {
-    final shouldOpen = await showAppSheet<bool>(
-      context,
-      child: _ConfirmSheet(
-        title: 'Enable Accessibility Service',
-        secondaryLabel: 'Cancel',
-        primaryLabel: 'Open Settings',
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('This permission allows OrbGuard to:\n\n'
-                '• Detect malicious accessibility services\n'
-                '• Monitor screen content for threats\n'
-                '• Identify keylogger attempts\n\n'
-                'This helps detect spyware that uses accessibility features.'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  DuotoneIcon(AppIcons.dangerTriangle, color: AppColors.secondaryInk),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'OrbGuard will NOT read your screen content. This permission is only used to detect malicious services.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (shouldOpen ?? false) {
-      try {
-        await platform.invokeMethod('openAccessibilitySettings');
-        return true;
-      } catch (e) {
-        debugPrint('Error opening accessibility settings: $e');
-        return false;
-      }
-    }
-
-    return false;
-  }
-
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
@@ -501,7 +416,6 @@ class PermissionManager {
     final permissionMap = {
       Permission.storage: 'Storage',
       Permission.phone: 'Phone',
-      Permission.sms: 'SMS',
       Permission.location: 'Location',
       Permission.locationAlways: 'Background Location',
     };
@@ -552,11 +466,9 @@ class PermissionScanResult {
 
   bool get hasAllEssential => granted.contains('Phone State');
 
-  bool get hasAllAdvanced =>
-      granted.contains('SMS Access') && granted.contains('Location');
+  bool get hasAllAdvanced => granted.contains('Location');
 
-  bool get hasSpecialPermissions =>
-      granted.contains('Usage Stats') || granted.contains('Accessibility');
+  bool get hasSpecialPermissions => granted.contains('Usage Stats');
 }
 
 /// A branded confirm sheet that mirrors [SheetPanel] but completes the

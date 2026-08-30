@@ -6,22 +6,23 @@ package com.orb.guard
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * SMSAnalyzer - Singleton class for SMS analysis and platform channel communication
+ * SMSAnalyzer - analysis bridge for the scam-text checker.
+ *
+ * OrbGuard declares NO SMS permissions and never reads the inbox or listens
+ * for incoming texts (Google Play's anti-SMS-phishing use case requires a
+ * pre-qualification OrbGuard does not hold). Text reaches the checker only
+ * when the user pastes it or shares it to OrbGuard (MainActivity ACTION_SEND).
  */
 class SMSAnalyzer private constructor(private val context: Context) {
 
@@ -214,75 +215,6 @@ class SMSAnalyzer private constructor(private val context: Context) {
     }
 
     /**
-     * Read SMS messages from device inbox
-     */
-    fun readSmsInbox(limit: Int = 100): List<Map<String, Any?>> {
-        val messages = mutableListOf<Map<String, Any?>>()
-
-        try {
-            val uri: Uri = Telephony.Sms.Inbox.CONTENT_URI
-            val projection = arrayOf(
-                Telephony.Sms._ID,
-                Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY,
-                Telephony.Sms.DATE,
-                Telephony.Sms.READ,
-                Telephony.Sms.SEEN,
-                Telephony.Sms.TYPE
-            )
-
-            val cursor: Cursor? = context.contentResolver.query(
-                uri,
-                projection,
-                null,
-                null,
-                "${Telephony.Sms.DATE} DESC LIMIT $limit"
-            )
-
-            cursor?.use {
-                while (it.moveToNext()) {
-                    val id = it.getLong(it.getColumnIndexOrThrow(Telephony.Sms._ID))
-                    val address = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: "Unknown"
-                    val body = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""
-                    val date = it.getLong(it.getColumnIndexOrThrow(Telephony.Sms.DATE))
-                    val read = it.getInt(it.getColumnIndexOrThrow(Telephony.Sms.READ)) == 1
-                    val seen = it.getInt(it.getColumnIndexOrThrow(Telephony.Sms.SEEN)) == 1
-
-                    val message = ParsedSmsMessage(
-                        sender = address,
-                        content = body,
-                        timestamp = date
-                    )
-
-                    messages.add(message.toMap() + mapOf(
-                        "dbId" to id,
-                        "isRead" to read,
-                        "isSeen" to seen
-                    ))
-                }
-            }
-
-            Log.d(TAG, "Read ${messages.size} messages from inbox")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Permission denied reading SMS: ${e.message}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reading SMS: ${e.message}")
-        }
-
-        return messages
-    }
-
-    /**
-     * Check if SMS permission is granted
-     */
-    fun hasSmsPermission(): Boolean {
-        return context.checkSelfPermission(android.Manifest.permission.READ_SMS) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                context.checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-    }
-
-    /**
      * Get analysis result for a message
      */
     fun getAnalysisResult(messageId: String): AnalysisResult? {
@@ -361,4 +293,30 @@ data class AnalysisResult(
             "recommendations" to recommendations
         )
     }
+}
+
+/**
+ * A message handed to the checker (shared or pasted by the user).
+ */
+data class ParsedSmsMessage(
+    val sender: String,
+    val content: String,
+    val timestamp: Long,
+    val serviceCenterAddress: String = "",
+    val isReplyPathPresent: Boolean = false,
+    val protocolIdentifier: Int = 0,
+    val status: Int = -1
+) {
+    fun generateId(): String = "${sender}_${timestamp}_${content.hashCode()}"
+
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to generateId(),
+        "sender" to sender,
+        "content" to content,
+        "timestamp" to timestamp,
+        "serviceCenterAddress" to serviceCenterAddress,
+        "isReplyPathPresent" to isReplyPathPresent,
+        "protocolIdentifier" to protocolIdentifier,
+        "status" to status
+    )
 }

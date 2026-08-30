@@ -3,7 +3,7 @@
 //
 // Two modes:
 //  • Android — the full Android permission model (phone/SMS/location plus the
-//    usage-access & accessibility Settings deep-links).
+//    usage-access Settings deep-link).
 //  • Everywhere else (iOS/macOS/Windows/Linux) — ONLY the two asks that exist
 //    there: notifications + location, requested through plugins that actually
 //    implement the platform. The Android list used permission_handler, which
@@ -311,12 +311,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         ),
         const SizedBox(height: 12),
         _buildPermissionCard(
-          'SMS Access',
-          'Detect SMS-based exploits (Pegasus)',
-          Permission.sms,
-          AppIcons.chatDots,
-        ),
-        _buildPermissionCard(
           'Location',
           'Detect location stalking behavior',
           Permission.location,
@@ -339,12 +333,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           'Monitor app behavior patterns',
           _scanResult!.granted.contains('Usage Stats'),
           () => _requestUsageStats(),
-        ),
-        _buildSpecialPermissionCard(
-          'Accessibility',
-          'Detect malicious accessibility services',
-          _scanResult!.granted.contains('Accessibility'),
-          () => _requestAccessibility(),
         ),
 
         const SizedBox(height: 80), // Space for bottom bar
@@ -692,14 +680,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     }
   }
 
-  Future<void> _requestAccessibility() async {
-    final success =
-        await _permissionManager.requestAccessibilityPermission(context);
-    if (success) {
-      await Future.delayed(const Duration(seconds: 2));
-      await _checkPermissions();
-    }
-  }
 
   // ============================================================================
   // PERMISSION EXPLANATIONS
@@ -711,8 +691,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
           'OrbGuard needs to scan your files and installed apps to detect malware, suspicious modifications, and hidden threats.',
       Permission.phone:
           'This allows monitoring of device state to detect system-level compromises and root/jailbreak modifications.',
-      Permission.sms:
-          'Pegasus and similar spyware often use SMS-based zero-click exploits. This permission lets us scan SMS databases for exploit patterns.',
       Permission.location:
           'Location permission helps detect apps that excessively track your location, a common behavior of stalkerware.',
     };
@@ -727,8 +705,6 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       Permission.storage:
           'Lets OrbGuard open files you choose to check (older Android only)',
       Permission.phone: 'Detects system compromises and security bypasses',
-      Permission.sms:
-          'Critical for detecting SMS-based zero-click exploits like those used by Pegasus',
       Permission.location:
           'Identifies location stalking and excessive tracking behavior',
     };

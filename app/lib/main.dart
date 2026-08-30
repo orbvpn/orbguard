@@ -468,9 +468,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     GuardProbes.firewall(
         supported: PlatformInfo.isAndroid,
         enabled: () async => context.read<NetworkFirewallProvider>().isEnabled),
+    // Scam-text check: paste/share based on every platform (OrbGuard holds
+    // no SMS permission). "Active" == the user hasn't switched it off.
     GuardProbes.smsFilter(
-        supported: PlatformInfo.isAndroid,
-        granted: () async => await Permission.sms.isGranted),
+        supported: true,
+        granted: () async => context.read<SmsProvider>().protectionEnabled),
     GuardProbes.malwareScan(supported: PlatformInfo.isAndroid),
     GuardProbes.alerts(
         // flutter_local_notifications has no Windows implementation.
@@ -638,7 +640,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // whole scan flow reachable on a platform with no native scanner at all.
     if (PlatformInfo.isAndroid || PlatformInfo.isIOS) {
       if (await Permission.phone.isGranted) capability += 5;
-      if (await Permission.sms.isGranted) capability += 10;
       if (await Permission.location.isGranted) capability += 5;
     }
 
@@ -649,7 +650,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Special permissions (25% total)
     if (specialPermissions.hasUsageStats) capability += 15;
-    if (specialPermissions.hasAccessibility) capability += 10;
 
     // Enhanced/Root access (15% total)
     if (_hasRootAccess) {

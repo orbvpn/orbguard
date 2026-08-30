@@ -135,9 +135,6 @@ enum SmsPlatformStatus {
   /// Inbox readable: platform supported and permission granted.
   ready,
 
-  /// Platform supports SMS but the READ_SMS permission is missing.
-  permissionRequired,
-
   /// This platform does not expose an SMS inbox (e.g. iOS, desktop, web).
   unsupported,
 
@@ -173,7 +170,7 @@ class SmsProvider extends ChangeNotifier {
   bool _initialized = false;
 
   // State
-  List<SmsMessage> _messages = [];
+  final List<SmsMessage> _messages = [];
   List<String> _blockedSenders = [];
   Set<String> _deletedMessageIds = {};
 
@@ -192,7 +189,6 @@ class SmsProvider extends ChangeNotifier {
   // Honest pipeline state
   SmsPlatformStatus _platformStatus = SmsPlatformStatus.unknown;
   String? _platformStatusDetail;
-  bool _hasSmsPermission = false;
   bool _hasLoadedOnce = false;
 
   // Backend health (real outcome of the last analyze call).
@@ -223,9 +219,28 @@ class SmsProvider extends ChangeNotifier {
 
   SmsPlatformStatus get platformStatus => _platformStatus;
   String? get platformStatusDetail => _platformStatusDetail;
-  bool get hasSmsPermission => _hasSmsPermission;
   bool get isPlatformSupported => _platform.isSupported;
   bool get hasLoadedOnce => _hasLoadedOnce;
+
+  /// Text shared to OrbGuard (Android share sheet) that the SMS screen has
+  /// not consumed yet. The screen takes it with [takeSharedText] and runs
+  /// the checker on it.
+  String? get pendingSharedText => _pendingSharedText;
+  String? _pendingSharedText;
+
+  /// Called by the platform service when text is shared into the app.
+  void receiveSharedText(String text) {
+    if (text.trim().isEmpty) return;
+    _pendingSharedText = text.trim();
+    notifyListeners();
+  }
+
+  /// Hand the pending shared text to the caller and clear it.
+  String? takeSharedText() {
+    final t = _pendingSharedText;
+    _pendingSharedText = null;
+    return t;
+  }
 
   bool? get lastAnalyzeSucceeded => _lastAnalyzeSucceeded;
   String? get lastAnalyzeError => _lastAnalyzeError;
@@ -292,14 +307,18 @@ class SmsProvider extends ChangeNotifier {
     _updateStats();
     notifyListeners();
 
+    // A cold start from the share sheet: native held the text until now.
+    final shared = await _platform.fetchPendingSharedText();
+    if (shared != null) receiveSharedText(shared);
+
     await loadMessages();
   }
 
-  /// Load SMS messages from the real device inbox via the platform channel.
-  ///
-  /// On unsupported platforms (iOS/desktop/web) this surfaces an explicit
-  /// unavailable state instead of an empty "clean" inbox. New (never
-  /// analyzed) messages are then analyzed through the backend batch endpoint.
+  /// Refresh the message list. OrbGuard never reads the device inbox (no SMS
+  /// permission — Google Play policy), so on every platform this surfaces an
+  /// explicit unavailable state rather than an empty "clean" inbox; the list
+  /// only ever holds messages the user pasted or shared. Any never-analyzed
+  /// ones are then analyzed through the backend batch endpoint.
   Future<void> loadMessages() async {
     _isLoading = true;
     _error = null;
@@ -309,20 +328,12 @@ class SmsProvider extends ChangeNotifier {
       if (!_platform.isSupported) {
         _platformStatus = SmsPlatformStatus.unsupported;
         _platformStatusDetail = _platform.unsupportedReason;
-        _hasSmsPermission = false;
+        _hasLoadedOnce = true;
+        _updateStats();
         return;
       }
-
-      _hasSmsPermission = await _platform.checkSmsPermission();
-      if (!_hasSmsPermission) {
-        _platformStatus = SmsPlatformStatus.permissionRequired;
-        _platformStatusDetail =
-            'SMS permission has not been granted. Grant it to scan your inbox.';
-        return;
-      }
-
-      final inbox = await _platform.readSmsInbox(limit: 200);
-      _mergeInbox(inbox);
+      // Unreachable today (isSupported is always false) — kept so the
+      // ready-state plumbing stays honest if an inbox source ever returns.
       _platformStatus = SmsPlatformStatus.ready;
       _platformStatusDetail = null;
       _hasLoadedOnce = true;
@@ -343,58 +354,8 @@ class SmsProvider extends ChangeNotifier {
     }
 
     // Analyze messages that have never been analyzed (batch backend flow).
-    if (_platformStatus == SmsPlatformStatus.ready && unanalyzedCount > 0) {
+    if (unanalyzedCount > 0) {
       await analyzeAllMessages();
-    }
-  }
-
-  /// Merge a freshly read inbox into the current list, preserving in-memory
-  /// analyses, re-attaching persisted analyses, and honoring local deletions.
-  void _mergeInbox(List<SmsMessage> inbox) {
-    final existingById = {for (final m in _messages) m.id: m};
-    final merged = <SmsMessage>[];
-    final seen = <String>{};
-
-    for (final incoming in inbox) {
-      if (incoming.id.isEmpty || _deletedMessageIds.contains(incoming.id)) {
-        continue;
-      }
-      seen.add(incoming.id);
-      final existing = existingById[incoming.id];
-      merged.add(incoming.copyWith(
-        analysisResult:
-            existing?.analysisResult ?? _analysisHistory[incoming.id],
-        isAnalyzing: existing?.isAnalyzing ?? false,
-        isRead: (existing?.isRead ?? false) || incoming.isRead,
-      ));
-    }
-
-    // Keep messages we already have that the inbox read did not return
-    // (e.g. just received via the broadcast receiver, or beyond the limit).
-    for (final m in _messages) {
-      if (!seen.contains(m.id) && !_deletedMessageIds.contains(m.id)) {
-        merged.add(m.copyWith(
-          analysisResult: m.analysisResult ?? _analysisHistory[m.id],
-        ));
-      }
-    }
-
-    _messages = merged;
-  }
-
-  /// Trigger the Android runtime permission dialog. The grant result arrives
-  /// asynchronously; callers should invoke [loadMessages] again (e.g. on app
-  /// resume) to re-check.
-  Future<void> requestSmsPermission() async {
-    try {
-      await _platform.requestSmsPermission();
-    } on SmsPlatformUnavailableException catch (e) {
-      _platformStatus = SmsPlatformStatus.unsupported;
-      _platformStatusDetail = e.message;
-      notifyListeners();
-    } catch (e) {
-      _error = 'Permission request failed: $e';
-      notifyListeners();
     }
   }
 

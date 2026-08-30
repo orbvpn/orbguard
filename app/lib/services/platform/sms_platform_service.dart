@@ -1,13 +1,17 @@
 /// SMS Platform Service
-/// Flutter-side platform channel for Android SMS integration.
+/// Flutter-side platform channel for the Android scam-text checker.
+///
+/// OrbGuard holds NO SMS permission on any platform and never reads the
+/// inbox or listens for incoming texts (Google Play restricts the
+/// anti-SMS-phishing use case to pre-qualified vendors). Text reaches the
+/// checker only when the user pastes it or shares it to OrbGuard from
+/// another app (Android `ACTION_SEND` → `onSharedText` / `getSharedText`).
 ///
 /// The native side of this channel lives in
 /// `android/app/src/main/kotlin/com/orb/guard/MainActivity.kt`
-/// (`setupSmsChannel`) and `SMSAnalyzer.kt`. There is intentionally no iOS
-/// implementation: iOS does not expose the SMS inbox to third-party apps, so
-/// every inbox-related call on non-Android platforms surfaces an explicit
-/// [SmsPlatformUnavailableException] instead of pretending to return an
-/// empty-but-clean result.
+/// (`setupSmsChannel`) and `SMSAnalyzer.kt`. [isSupported] (inbox readable)
+/// is therefore false everywhere, so every inbox-related path surfaces an
+/// explicit unavailable state instead of an empty-but-clean result.
 library;
 
 import 'dart:async';
@@ -56,33 +60,44 @@ class SmsPlatformService {
   bool _isInitialized = false;
   SmsProvider? _smsProvider;
 
-  /// Whether the device SMS inbox is reachable on this platform.
-  /// Only Android exposes SMS to apps; iOS/macOS/desktop/web do not.
-  bool get isSupported =>
+  /// Whether the device SMS inbox is readable. Always false: OrbGuard
+  /// deliberately holds no SMS permission (see the library doc above).
+  bool get isSupported => false;
+
+  /// Whether the native share-sheet channel (`onSharedText`) exists here.
+  bool get hasShareChannel =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   /// Human-readable reason used when [isSupported] is false.
   String get unsupportedReason {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'OrbGuard does not read your SMS inbox (Google Play policy). '
+          'To check a text, share it to OrbGuard from your Messages app or '
+          'paste it in the Check tab.';
+    }
     if (kIsWeb) {
       return 'The SMS inbox is not accessible from the web. '
-          'Use the Check tab to analyze message text manually.';
+          'Paste a message in the Check tab to analyze it.';
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
         return 'iOS does not allow apps to read the SMS inbox. '
-            'Use the Check tab to analyze message text manually.';
-      case TargetPlatform.android:
-        return 'SMS channel unavailable.';
+            'Paste a message in the Check tab to analyze it.';
       default:
         return '${defaultTargetPlatform.name} does not expose an SMS inbox. '
-            'Use the Check tab to analyze message text manually.';
+            'Paste a message in the Check tab to analyze it.';
     }
   }
 
   bool get isInitialized => _isInitialized;
 
-  /// Stream of incoming SMS messages (forwarded from the Android receiver).
+  /// Stream of messages handed to the checker by the native side.
   Stream<SmsMessage> get smsStream => _smsStreamController.stream;
+
+  /// Text shared to OrbGuard via the Android share sheet while running.
+  Stream<String> get sharedTextStream => _sharedTextController.stream;
+  final StreamController<String> _sharedTextController =
+      StreamController<String>.broadcast();
 
   /// Initialize the service. Called by [SmsProvider.init]; the provider owns
   /// this service's lifecycle and receives all incoming messages.
@@ -107,13 +122,39 @@ class SmsPlatformService {
         return _onSmsReceived(call.arguments);
       case 'blockSender':
         return _onBlockSender(call.arguments);
+      case 'onSharedText':
+        return _onSharedText(call.arguments);
       default:
         debugPrint('SmsPlatformService: Unknown method ${call.method}');
         return null;
     }
   }
 
-  /// Handle incoming SMS from native
+  /// Text shared into a RUNNING app (ACTION_SEND → MainActivity.onNewIntent).
+  Future<void> _onSharedText(dynamic arguments) async {
+    final text = (arguments is Map ? arguments['text'] : arguments)?.toString();
+    if (text == null || text.trim().isEmpty) return;
+    _sharedTextController.add(text.trim());
+    _smsProvider?.receiveSharedText(text.trim());
+  }
+
+  /// Text shared into a COLD-started app (held natively until Dart asks).
+  /// Returns null where there is no share channel or nothing is pending.
+  Future<String?> fetchPendingSharedText() async {
+    if (!hasShareChannel) return null;
+    try {
+      final text = await _channel.invokeMethod<String>('getSharedText');
+      if (text == null || text.trim().isEmpty) return null;
+      return text.trim();
+    } on MissingPluginException {
+      return null;
+    } catch (e) {
+      debugPrint('SmsPlatformService: getSharedText failed: $e');
+      return null;
+    }
+  }
+
+  /// Handle a message handed over by native
   Future<void> _onSmsReceived(dynamic arguments) async {
     try {
       final Map<String, dynamic> data = Map<String, dynamic>.from(arguments);
@@ -177,7 +218,7 @@ class SmsPlatformService {
     String messageId,
     SmsAnalysisResult result,
   ) async {
-    if (!isSupported) return;
+    if (!hasShareChannel) return;
     try {
       await _channel.invokeMethod('onAnalysisComplete', {
         'messageId': messageId,
@@ -211,85 +252,13 @@ class SmsPlatformService {
     }
   }
 
-  /// Check if SMS permission is granted.
-  ///
-  /// Returns false on platforms without an SMS inbox; throws
-  /// [SmsPlatformUnavailableException] if the Android channel itself is
-  /// missing from the binary so callers can distinguish "denied" from
-  /// "broken".
-  Future<bool> checkSmsPermission() async {
-    if (!isSupported) return false;
-    try {
-      final result = await _channel.invokeMethod<Map>('checkSmsPermission');
-      return result?['hasPermission'] as bool? ?? false;
-    } on MissingPluginException {
-      throw const SmsPlatformUnavailableException(
-          'SMS channel is not registered in this build.');
-    }
-  }
-
-  /// Request SMS permission (Android runtime permission dialog).
-  ///
-  /// The result is not delivered synchronously; callers must re-check via
-  /// [checkSmsPermission] (e.g. on app resume).
-  Future<void> requestSmsPermission() async {
-    if (!isSupported) {
-      throw SmsPlatformUnavailableException(unsupportedReason);
-    }
-    try {
-      await _channel.invokeMethod('requestSmsPermission');
-    } on MissingPluginException {
-      throw const SmsPlatformUnavailableException(
-          'SMS channel is not registered in this build.');
-    }
-  }
-
-  /// Read SMS inbox from device.
-  ///
-  /// Throws [SmsPlatformUnavailableException] on platforms that do not
-  /// expose the SMS inbox, and rethrows channel errors. It never converts a
-  /// failure into an empty (fake-clean) inbox.
-  Future<List<SmsMessage>> readSmsInbox({int limit = 100}) async {
-    if (!isSupported) {
-      throw SmsPlatformUnavailableException(unsupportedReason);
-    }
-    try {
-      final result = await _channel.invokeMethod<Map>('readSmsInbox', {
-        'limit': limit,
-      });
-
-      final messages = result?['messages'] as List<dynamic>? ?? [];
-
-      return messages.map((m) {
-        final data = Map<String, dynamic>.from(m as Map);
-        return SmsMessage(
-          id: data['id'] as String? ?? '',
-          sender: data['sender'] as String? ?? 'Unknown',
-          content: data['content'] as String? ?? '',
-          timestamp: DateTime.fromMillisecondsSinceEpoch(
-            (data['timestamp'] as int?) ??
-                DateTime.now().millisecondsSinceEpoch,
-          ),
-          isRead: data['isRead'] as bool? ?? false,
-        );
-      }).toList();
-    } on MissingPluginException {
-      throw const SmsPlatformUnavailableException(
-          'SMS channel is not registered in this build.');
-    }
-  }
-
   /// Update SMS protection settings on the native side.
   Future<void> updateSettings({
     bool protectionEnabled = true,
     bool notifyOnThreat = true,
     bool autoBlockDangerous = false,
   }) async {
-    if (!isSupported) {
-      debugPrint(
-          'SmsPlatformService: updateSettings skipped (platform unsupported)');
-      return;
-    }
+    if (!hasShareChannel) return;
     try {
       await _channel.invokeMethod('updateSettings', {
         'protectionEnabled': protectionEnabled,
@@ -303,7 +272,7 @@ class SmsPlatformService {
 
   /// Clear native cache
   Future<void> clearCache() async {
-    if (!isSupported) return;
+    if (!hasShareChannel) return;
     try {
       await _channel.invokeMethod('clearCache');
     } catch (e) {
@@ -314,6 +283,7 @@ class SmsPlatformService {
   /// Dispose the service
   void dispose() {
     _smsStreamController.close();
+    _sharedTextController.close();
     _isInitialized = false;
   }
 }

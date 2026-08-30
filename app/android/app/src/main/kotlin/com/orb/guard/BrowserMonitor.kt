@@ -182,19 +182,8 @@ class BrowserMonitor private constructor(private val context: Context) {
     private fun handleThreat(url: String, result: UrlAnalysisResult, browserName: String) {
         Log.w(TAG, "Threat detected: $url (${result.threatLevel})")
 
-        // Show warning overlay
-        if (result.threatLevel == "dangerous" || result.threatLevel == "critical") {
-            BrowserAccessibilityService.getInstance()?.showWarningOverlay(
-                url,
-                UrlThreatInfo(
-                    url = url,
-                    isThreat = true,
-                    threatLevel = result.threatLevel,
-                    reason = result.reason,
-                    categories = result.categories
-                )
-            )
-        }
+        // (No in-browser overlay: OrbGuard has no AccessibilityService. The
+        // DNS firewall blocks known-bad domains; here we only notify.)
 
         // Show notification
         if (notifyOnThreat) {

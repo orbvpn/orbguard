@@ -21,7 +21,6 @@
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../permissions/special_permissions_manager.dart';
@@ -40,23 +39,19 @@ const String kPermissionsPrimedPrefsKey = 'permissions_primed';
 /// fires. Production wiring comes from [PrimingRequests.production]; tests
 /// inject fakes so no platform channel is ever touched.
 ///
-/// The four `request*` functions must return the REAL post-request granted
-/// state — the screen renders exactly what they report. The two `open*`
-/// functions only deep-link into system Settings (their outcome cannot be
+/// The `request*` functions must return the REAL post-request granted
+/// state — the screen renders exactly what they report. The `open*`
+/// function only deep-links into system Settings (its outcome cannot be
 /// confirmed from here, and the UI says so).
 class PrimingRequests {
   final Future<bool> Function() requestNotifications;
-  final Future<bool> Function() requestSms;
   final Future<bool> Function() requestLocation;
   final Future<void> Function() openUsageAccess;
-  final Future<void> Function() openAccessibility;
 
   const PrimingRequests({
     required this.requestNotifications,
-    required this.requestSms,
     required this.requestLocation,
     required this.openUsageAccess,
-    required this.openAccessibility,
   });
 
   /// Default wiring onto the app's existing permission plumbing:
@@ -66,18 +61,14 @@ class PrimingRequests {
   ///    (permission_handler has no macOS implementation) and reads back the
   ///    REAL post-request state as the source of truth for what the chip may
   ///    claim;
-  ///  • SMS — permission_handler request (Android-only step), status read
-  ///    from the returned [PermissionStatus];
-  ///  • usage access / accessibility — [SpecialPermissionsManager] deep-links
-  ///    into system Settings.
+  ///  • usage access — [SpecialPermissionsManager] deep-links into system
+  ///    Settings.
   factory PrimingRequests.production() {
     final specialPermissions = SpecialPermissionsManager();
     return PrimingRequests(
       requestNotifications: UniversalPermissions.requestNotifications,
-      requestSms: () async => (await Permission.sms.request()).isGranted,
       requestLocation: UniversalPermissions.requestLocation,
       openUsageAccess: specialPermissions.requestUsageStatsPermission,
-      openAccessibility: specialPermissions.requestAccessibilityPermission,
     );
   }
 }
@@ -177,16 +168,11 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
     switch (step.id) {
       case PrimingStepIds.notifications:
         return _requests.requestNotifications();
-      case PrimingStepIds.sms:
-        return _requests.requestSms();
       case PrimingStepIds.location:
         return _requests.requestLocation();
       case PrimingStepIds.usageAccess:
         await _requests.openUsageAccess();
         return false; // Unverifiable — card shows the "opened" state instead.
-      case PrimingStepIds.accessibility:
-        await _requests.openAccessibility();
-        return false;
     }
     return false;
   }

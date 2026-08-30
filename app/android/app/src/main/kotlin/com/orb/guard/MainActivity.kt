@@ -107,23 +107,8 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 
-                "checkAccessibilityPermission" -> {
-                    val hasPermission = checkAccessibilityPermission()
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-                
-                "requestAccessibilityPermission" -> {
-                    requestAccessibilityPermission()
-                    result.success(true)
-                }
-
                 "openUsageStatsSettings" -> {
                     requestUsageStatsPermission()
-                    result.success(true)
-                }
-
-                "openAccessibilitySettings" -> {
-                    requestAccessibilityPermission()
                     result.success(true)
                 }
 
@@ -372,63 +357,6 @@ class MainActivity: FlutterActivity() {
         }
     }
     
-    private fun checkAccessibilityPermission(): Boolean {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-
-        if (accessibilityEnabled == 1) {
-            val service = "$packageName/$packageName.AccessibilityMonitorService"
-            val settingValue = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-
-            // Log for debugging
-            android.util.Log.d("OrbGuard", "Looking for service: $service")
-            android.util.Log.d("OrbGuard", "Enabled services: $settingValue")
-
-            // Check both possible formats
-            val found = settingValue?.contains(service) == true ||
-                        settingValue?.contains("$packageName/.AccessibilityMonitorService") == true ||
-                        settingValue?.contains("AccessibilityMonitorService") == true
-
-            android.util.Log.d("OrbGuard", "Accessibility found: $found")
-            return found
-        }
-        return false
-    }
-    
-    private fun requestAccessibilityPermission() {
-        try {
-            // Create the component name for our accessibility service
-            val componentName = ComponentName(packageName, "$packageName.AccessibilityMonitorService")
-
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-            // Add extras to highlight our service in the list
-            val bundle = Bundle()
-            val componentNameString = componentName.flattenToString()
-            bundle.putString(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:show_fragment_args", bundle)
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback to general accessibility settings
-            try {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            } catch (e2: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                startActivity(intent)
-            }
-        }
-    }
-
     // ============================================================================
     // STORAGE PERMISSION (Android 11+)
     // ============================================================================
@@ -947,30 +875,18 @@ class MainActivity: FlutterActivity() {
 
         // Set the method channel for the analyzer
         smsAnalyzer?.setMethodChannel(smsChannel)
+        smsMethodChannel = smsChannel
 
         smsChannel.setMethodCallHandler { call, result ->
             when (call.method) {
-                // Check SMS permission
-                "checkSmsPermission" -> {
-                    val hasPermission = smsAnalyzer?.hasSmsPermission() ?: false
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-
-                // Request SMS permission
-                "requestSmsPermission" -> {
-                    requestSmsPermission()
-                    result.success(true)
-                }
-
-                // Read SMS inbox
-                "readSmsInbox" -> {
-                    val limit = call.argument<Int>("limit") ?: 100
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val messages = smsAnalyzer?.readSmsInbox(limit) ?: emptyList()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("messages" to messages))
-                        }
-                    }
+                // Text shared to OrbGuard via the system share sheet
+                // (ACTION_SEND text/plain) before Dart was listening — Dart
+                // pulls it once at startup; a share into a running app is
+                // pushed through "onSharedText" instead (see handleShareIntent).
+                "getSharedText" -> {
+                    val text = pendingSharedText
+                    pendingSharedText = null
+                    result.success(text)
                 }
 
                 // Update SMS protection settings
@@ -1013,15 +929,39 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun requestSmsPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(
-                arrayOf(
-                    android.Manifest.permission.READ_SMS,
-                    android.Manifest.permission.RECEIVE_SMS
-                ),
-                200
-            )
+    // ============================================================================
+    // SHARE-TO-CHECK (ACTION_SEND text/plain)
+    // ============================================================================
+    //
+    // OrbGuard holds NO SMS permissions (Google Play restricts the anti-SMS-
+    // phishing use case), so the scam-text checker receives text the user
+    // shares from Messages / WhatsApp / any app via the share sheet.
+
+    private var smsMethodChannel: MethodChannel? = null
+    private var pendingSharedText: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleShareIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("text/") != true) return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+        if (text.isNullOrEmpty()) return
+        // Consume it so a configuration change does not re-deliver the same text.
+        intent.removeExtra(Intent.EXTRA_TEXT)
+        val channel = smsMethodChannel
+        if (channel != null) {
+            channel.invokeMethod("onSharedText", mapOf("text" to text))
+        } else {
+            pendingSharedText = text
         }
     }
 
@@ -1037,18 +977,6 @@ class MainActivity: FlutterActivity() {
 
         browserChannel.setMethodCallHandler { call, result ->
             when (call.method) {
-                // Check browser accessibility permission
-                "checkBrowserAccessibilityPermission" -> {
-                    val hasPermission = checkBrowserAccessibilityPermission()
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-
-                // Request browser accessibility permission
-                "requestBrowserAccessibilityPermission" -> {
-                    requestBrowserAccessibilityPermission()
-                    result.success(true)
-                }
-
                 // Update browser protection settings
                 "updateSettings" -> {
                     val protectionEnabled = call.argument<Boolean>("protectionEnabled") ?: true
@@ -1056,7 +984,6 @@ class MainActivity: FlutterActivity() {
                     val blockDangerous = call.argument<Boolean>("blockDangerous") ?: false
 
                     browserMonitor?.updateSettings(protectionEnabled, notifyOnThreat, blockDangerous)
-                    BrowserAccessibilityService.getInstance()?.updateSettings(protectionEnabled, true)
                     result.success(true)
                 }
 
@@ -1126,51 +1053,6 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun checkBrowserAccessibilityPermission(): Boolean {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-
-        if (accessibilityEnabled == 1) {
-            val service = "$packageName/$packageName.BrowserAccessibilityService"
-            val settingValue = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-
-            return settingValue?.contains(service) == true ||
-                    settingValue?.contains("$packageName/.BrowserAccessibilityService") == true ||
-                    settingValue?.contains("BrowserAccessibilityService") == true
-        }
-        return false
-    }
-
-    private fun requestBrowserAccessibilityPermission() {
-        try {
-            val componentName = ComponentName(packageName, "$packageName.BrowserAccessibilityService")
-
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-            val bundle = Bundle()
-            val componentNameString = componentName.flattenToString()
-            bundle.putString(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:show_fragment_args", bundle)
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            try {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            } catch (e2: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                startActivity(intent)
-            }
-        }
-    }
 }
 
 // ============================================================================

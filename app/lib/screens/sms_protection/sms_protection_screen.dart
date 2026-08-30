@@ -23,8 +23,7 @@ class SmsProtectionScreen extends StatefulWidget {
   State<SmsProtectionScreen> createState() => _SmsProtectionScreenState();
 }
 
-class _SmsProtectionScreenState extends State<SmsProtectionScreen>
-    with WidgetsBindingObserver {
+class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
   // The provider is owned by the app (registered in main.dart) and only
   // consumed here; this field is re-bound from context.watch in build().
   late SmsProvider _provider;
@@ -33,49 +32,41 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   bool _isManualAnalyzing = false;
   String _searchQuery = '';
 
+  /// Text shared to OrbGuard from another app — prefilled into the checker
+  /// (and analyzed immediately). Bumped via [_sharedTextSeq] so the input
+  /// widget re-seeds even when the same text is shared twice.
+  String? _sharedText;
+  int _sharedTextSeq = 0;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // Idempotent: loads persisted state, owns the platform service and
-      // reads the device inbox (no-op if main.dart already initialized it).
+      // Idempotent: loads persisted state and owns the platform service
+      // (no-op if main.dart already initialized it).
       context.read<SmsProvider>().init();
+      _consumeSharedText();
     });
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) {
-      final provider = context.read<SmsProvider>();
-      // The Android permission dialog result arrives out-of-band; re-check
-      // when the user returns to the app.
-      if (provider.platformStatus == SmsPlatformStatus.permissionRequired) {
-        provider.loadMessages();
-      }
-    }
+  /// Pull any text shared via the share sheet out of the provider, show it
+  /// in the Check tab and run the analysis. OrbGuard never reads the inbox,
+  /// so this is the only automatic way a message enters the checker.
+  void _consumeSharedText() {
+    final provider = context.read<SmsProvider>();
+    final text = provider.takeSharedText();
+    if (text == null) return;
+    setState(() {
+      _sharedText = text;
+      _sharedTextSeq++;
+      _manualAnalysisResult = null;
+    });
+    _analyzeManual(text, null);
   }
 
   Future<void> _onRefresh() async {
     await _provider.loadMessages();
-  }
-
-  Future<void> _requestPermission() async {
-    final provider = context.read<SmsProvider>();
-    await provider.requestSmsPermission();
-    // Re-check shortly after; the dialog result also triggers a re-check on
-    // app resume via didChangeAppLifecycleState.
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      await provider.loadMessages();
-    }
   }
 
   void _navigateToDetail(SmsMessage message) {
@@ -127,6 +118,11 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   @override
   Widget build(BuildContext context) {
     _provider = context.watch<SmsProvider>();
+    if (_provider.pendingSharedText != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeSharedText();
+      });
+    }
 
     return GlassTabPage(
       key: _tabPageKey,
@@ -143,15 +139,18 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
       ],
       headerContent: _buildActionsRow(),
       tabs: [
-        GlassTab(
-          label: 'Inbox',
-          iconPath: 'inbox',
-          content: _buildInboxTab(),
-        ),
+        // Check comes first: it is THE feature (paste / share a text).
+        // OrbGuard never reads the inbox, so "Messages" only lists texts
+        // the user has handed to the checker.
         GlassTab(
           label: 'Check',
           iconPath: 'shield_check',
           content: _buildCheckTab(),
+        ),
+        GlassTab(
+          label: 'Messages',
+          iconPath: 'inbox',
+          content: _buildInboxTab(),
         ),
         GlassTab(
           label: 'Stats',
@@ -282,23 +281,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              if (_searchQuery.isEmpty &&
-                  _provider.platformStatus ==
-                      SmsPlatformStatus.permissionRequired)
-                ElevatedButton.icon(
-                  onPressed: _requestPermission,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Brand.lime,
-                    foregroundColor: Brand.onLime,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
-                  icon: const DuotoneIcon('shield_check',
-                      size: 18, color: Brand.onLime),
-                  label: const Text('Grant SMS Permission'),
-                ),
               if (_provider.filter != SmsFilter.all && _searchQuery.isEmpty)
                 OutlinedButton(
                   onPressed: () => _provider.setFilter(SmsFilter.all),
@@ -318,15 +300,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
   /// the pipeline is ready (or still being checked) and nothing needs action.
   Widget? _pipelineBanner() {
     switch (_provider.platformStatus) {
-      case SmsPlatformStatus.permissionRequired:
-        return _InboxBanner(
-          icon: 'shield_keyhole_minimalistic',
-          color: AppColors.warning,
-          message: 'SMS permission is required to scan your inbox for '
-              'phishing and scam texts.',
-          actionLabel: 'Grant Permission',
-          onAction: _requestPermission,
-        );
       case SmsPlatformStatus.unsupported:
         return _InboxBanner(
           icon: 'info_circle',
@@ -354,9 +327,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
     switch (_provider.filter) {
       case SmsFilter.all:
         switch (_provider.platformStatus) {
-          case SmsPlatformStatus.permissionRequired:
-            return 'Grant SMS permission to start protecting your messages, '
-                'or use the Check tab to analyze messages manually.';
           case SmsPlatformStatus.unsupported:
             return _provider.platformStatusDetail ??
                 'The SMS inbox is not accessible on this platform. '
@@ -365,7 +335,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
             return _provider.platformStatusDetail ??
                 'Could not read the SMS inbox. Pull down to retry.';
           case SmsPlatformStatus.ready:
-            return 'Your SMS inbox is empty.';
+            return 'No messages checked yet. Paste or share a text to '
+                'check it.';
           case SmsPlatformStatus.unknown:
             return 'Checking SMS access...';
         }
@@ -388,6 +359,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
         children: [
           // Manual input
           SmsInputWidget(
+            key: ValueKey('sms_input_$_sharedTextSeq'),
+            initialText: _sharedText,
             onAnalyze: _analyzeManual,
             isAnalyzing: _isManualAnalyzing,
           ),
@@ -609,10 +582,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
             label: 'SMS Monitoring',
             status: monitoring.$1,
             statusColor: monitoring.$2,
-            onTap: _provider.platformStatus ==
-                    SmsPlatformStatus.permissionRequired
-                ? _requestPermission
-                : null,
           ),
           const SizedBox(height: 12),
           _StatusRow(
@@ -656,8 +625,6 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen>
     switch (_provider.platformStatus) {
       case SmsPlatformStatus.ready:
         return ('Active', AppColors.accentInk);
-      case SmsPlatformStatus.permissionRequired:
-        return ('Permission Needed', AppColors.secondaryInk);
       case SmsPlatformStatus.unsupported:
         return ('Unavailable', AppColors.severityInfo);
       case SmsPlatformStatus.error:
@@ -777,20 +744,17 @@ class _StatusRow extends StatelessWidget {
   final String label;
   final String status;
   final Color statusColor;
-  final VoidCallback? onTap;
-
   const _StatusRow({
     required this.icon,
     required this.label,
     required this.status,
     required this.statusColor,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final row = Row(
+    return Row(
       children: [
         DuotoneIcon(icon, size: 20, color: cs.onSurfaceVariant),
         const SizedBox(width: 12),
@@ -821,13 +785,6 @@ class _StatusRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-
-    if (onTap == null) return row;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
-      child: row,
     );
   }
 }

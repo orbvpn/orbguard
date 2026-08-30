@@ -168,13 +168,13 @@ $app specifically collects and why.
   account. Sign-in options include email link, password, passkey, and Google/Apple.
 • Device & security data: device model, OS version, security posture, app/network
   signals, and scan results used to detect threats and show your privacy score.
-• SMS message content (Android, only if you enable the Scam Text Filter and grant
-  SMS access): the text and sender of screened messages are transmitted over TLS
-  to $company servers to analyse them for scams, phishing and malicious links.
-  This may include processing by our AI service providers acting as processors
-  under contract. We use this ONLY to detect and warn you about threats — never
-  to sell, advertise or profile you. You can turn the filter off or revoke SMS
-  permission at any time in your device settings.
+• Message text you choose to check: $app never reads your SMS inbox and holds
+  no SMS permission. When you paste a message into the scam-text checker or
+  share one to $app from another app, that text (and the sender, if you enter
+  it) is transmitted over TLS to $company servers to analyse it for scams,
+  phishing and malicious links. This may include processing by our AI service
+  providers acting as processors under contract. We use this ONLY to detect
+  and warn you about threats — never to sell, advertise or profile you.
 • Links and QR codes you scan or check are sent to $company servers to evaluate
   their reputation and warn you about phishing or malicious destinations.
 • Location data: when you enable Locate or periodic reporting, we process the device's

@@ -1008,10 +1008,14 @@ class SmsInputWidget extends StatefulWidget {
   final Function(String content, String? sender) onAnalyze;
   final bool isAnalyzing;
 
+  /// Pre-filled message text (e.g. shared to OrbGuard via the share sheet).
+  final String? initialText;
+
   const SmsInputWidget({
     super.key,
     required this.onAnalyze,
     this.isAnalyzing = false,
+    this.initialText,
   });
 
   @override
@@ -1019,8 +1023,18 @@ class SmsInputWidget extends StatefulWidget {
 }
 
 class _SmsInputWidgetState extends State<SmsInputWidget> {
-  final _contentController = TextEditingController();
+  late final _contentController =
+      TextEditingController(text: widget.initialText ?? '');
   final _senderController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // The Analyze button is enabled from the text, so rebuild on edits.
+    _contentController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
@@ -1047,7 +1061,8 @@ class _SmsInputWidgetState extends State<SmsInputWidget> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Paste a suspicious message to analyze',
+            'Paste a suspicious text here, or share it to OrbGuard from your '
+            'Messages app',
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 12,

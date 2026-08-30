@@ -120,9 +120,10 @@ class GuardProbes {
         );
       };
 
-  /// Scam-text filter: active when the SMS permission is genuinely granted
-  /// (Android). iOS enablement lives in Settings and can't be queried —
-  /// pass [supported] false there rather than pretending.
+  /// Scam-text check: OrbGuard never reads the SMS inbox (no SMS
+  /// permission — Google Play policy); the checker analyses text the user
+  /// pastes or shares to the app. [granted] reports whether the user has
+  /// left the feature switched on.
   static GuardProbe smsFilter({
     required bool supported,
     required Future<bool> Function() granted,
@@ -131,7 +132,7 @@ class GuardProbes {
         if (!supported) {
           return const GuardStatus(
             id: 'sms_filter',
-            name: 'Scam text filter',
+            name: 'Scam text check',
             state: GuardState.unavailable,
             detail: 'Not available on this device',
           );
@@ -139,9 +140,9 @@ class GuardProbes {
         final ok = await granted();
         return GuardStatus(
           id: 'sms_filter',
-          name: 'Scam text filter',
+          name: 'Scam text check',
           state: ok ? GuardState.active : GuardState.actionNeeded,
-          detail: ok ? 'Screening incoming texts' : 'Allow SMS access to enable',
+          detail: ok ? 'Paste or share a text to check it' : 'Turned off in Settings',
         );
       };
 

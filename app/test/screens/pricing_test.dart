@@ -90,7 +90,10 @@ void main() {
     expect(find.text('\$4.99'), findsOneWidget); // Guard
     expect(find.text('\$9.99'), findsOneWidget); // Guard+
     expect(find.text('\$14.99'), findsOneWidget); // Guard Ultimate
-    expect(find.text('Renews monthly at \$4.99.'), findsOneWidget);
+    // App Review 3.1.2(c): the billed amount is the headline and the
+    // renewal line repeats it as the billed figure.
+    expect(find.text('Billed \$4.99 every month. Renews automatically.'),
+        findsOneWidget);
   });
 
   testWidgets('contains no fake-urgency / dark-pattern copy', (tester) async {
@@ -127,16 +130,22 @@ void main() {
     }
   });
 
-  testWidgets('yearly toggle shows the real effective per-month price',
+  testWidgets('yearly toggle headlines the BILLED yearly amount (3.1.2(c))',
       (tester) async {
     await pumpTall(tester);
 
     await tester.tap(find.text('Yearly'));
     await tester.pump();
 
-    // Guard: $49.90/yr ÷ 12 = $4.1583… → honestly rounded to $4.16/mo.
-    expect(find.text('\$4.16'), findsOneWidget);
-    expect(find.text('Renews yearly at \$49.90.'), findsOneWidget);
+    // The headline is the billed amount ($49.90 / year), NOT the per-month
+    // equivalent; the equivalent ($49.90 ÷ 12 = $4.1583… → $4.16) appears
+    // only as a small subordinate note.
+    expect(find.text('\$49.90'), findsOneWidget);
+    expect(find.text('/ year'), findsWidgets);
+    expect(find.text('\$4.16'), findsNothing);
+    expect(find.text('Billed \$49.90 once a year. Renews automatically.'),
+        findsOneWidget);
+    expect(find.text('Works out to about \$4.16 a month.'), findsOneWidget);
     // 49.90 == 10 × 4.99, so "2 months free" is literally true (shown on every
     // tier since each yearly is exactly 10× its monthly here).
     expect(

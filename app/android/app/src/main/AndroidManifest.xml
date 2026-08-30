@@ -44,16 +44,17 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- ============================================ -->
-    <!-- SMS SCANNING — anti-SMS-phishing / smishing detection (SMSAnalyzer):
-         reads and screens incoming + inbox messages for scam and exploit
-         (e.g. Pegasus-style) links. Declared to Google Play under the
-         "Anti-SMS Phishing" permitted use.
-         NOTE: READ_CALL_LOG is deliberately NOT declared — nothing in the app
-         reads the call log. (The permission NAME appears in our scanner's
-         dangerous-permission lists only to flag OTHER apps that request it.) -->
+    <!-- SMS — deliberately NO READ_SMS / RECEIVE_SMS. Google Play restricts
+         the anti-SMS-phishing use case to vendors with a published track
+         record (pre-qualification), so OrbGuard never reads the inbox or
+         listens for incoming texts. The scam-text checker works on text the
+         user pastes into the app or shares to it from the Messages app via
+         the ACTION_SEND intent-filter on MainActivity below.
+         NOTE: READ_CALL_LOG is also NOT declared — nothing in the app reads
+         the call log. (The permission NAMES appear in our scanner's
+         dangerous-permission lists only to flag OTHER apps that request
+         them.) -->
     <!-- ============================================ -->
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <!-- ============================================ -->
     <!-- PACKAGE USAGE (Monitor app behavior) -->
@@ -62,10 +63,12 @@
         tools:ignore="ProtectedPermissions" />
 
     <!-- ============================================ -->
-    <!-- ACCESSIBILITY (Detect malicious services) -->
+    <!-- ACCESSIBILITY — deliberately NO AccessibilityService. Detecting
+         malicious accessibility services (stalkerware screen-readers) only
+         needs Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, which requires
+         no permission and no service of our own (see
+         MainActivity.getEnabledAccessibilityServices). -->
     <!-- ============================================ -->
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
-        tools:ignore="ProtectedPermissions" />
 
     <!-- ============================================ -->
     <!-- SYSTEM FEATURES (For deep scanning) -->
@@ -112,6 +115,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- "Share to OrbGuard": the scam-text checker accepts text shared
+                 from Messages/WhatsApp/any app via the system share sheet.
+                 This replaces reading the SMS inbox (no SMS permissions). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
             <!-- Magic-link deep link: the OrbGuard-branded sign-in email links to
                  orbguard://login?code=... (backend chooses this scheme when the
                  request carries client=orbguard). Opens OrbGuard, not OrbVPN. -->
@@ -128,59 +140,14 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Accessibility Service for detecting malicious services -->
-        <service
-            android:name=".AccessibilityMonitorService"
-            android:exported="false"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <!-- SMS Broadcast Receiver for real-time SMS protection -->
-        <receiver
-            android:name=".SMSReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Browser Accessibility Service for URL protection -->
-        <service
-            android:name=".BrowserAccessibilityService"
-            android:exported="false"
-            android:label="OrbGuard Web Protection"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/browser_accessibility_config" />
-        </service>
-
-        <!-- Messaging Accessibility Service for WhatsApp/Telegram protection -->
-        <service
-            android:name=".MessagingAccessibilityService"
-            android:exported="false"
-            android:label="OrbGuard Messaging Protection"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/messaging_accessibility_config" />
-        </service>
-
-        <!-- On-device network firewall (local DNS-filtering VpnService) -->
+        <!-- On-device network firewall (local DNS-filtering VpnService).
+             Google Play VpnService policy: this is a device-level security
+             use (firewall). The tunnel is LOCAL ONLY — it routes just the
+             virtual DNS resolver address, answers DNS on-device and forwards
+             everything else over the normal network; no traffic is sent to an
+             OrbGuard/VPN server, nothing is logged off-device. The user must
+             accept Android's VPN consent dialog before it starts, and the use
+             is disclosed in the Play listing + in-app before enabling. -->
         <service
             android:name=".OrbFirewallVpnService"
             android:exported="false"
