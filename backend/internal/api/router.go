@@ -10,6 +10,7 @@ import (
 
 	"orbguard-lab/internal/api/handlers"
 	apimiddleware "orbguard-lab/internal/api/middleware"
+	"orbguard-lab/internal/api/site"
 	"orbguard-lab/internal/config"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/pkg/logger"
@@ -67,6 +68,11 @@ func (r *Router) Setup() http.Handler {
 
 	// Public routes
 	router.Group(func(pub chi.Router) {
+		// Public legal & pricing pages (payment-provider / consumer-law
+		// requirement: Terms naming the legal entity, Privacy Policy, and the
+		// subscription plans must be viewable outside the app).
+		site.Register(pub)
+
 		// Health check
 		pub.Get("/health", r.handlers.Health.Check)
 		pub.Get("/ready", r.handlers.Health.Ready)
