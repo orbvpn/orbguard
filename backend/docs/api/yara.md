@@ -9,6 +9,34 @@ All YARA endpoints require authentication and are prefixed with:
 /api/v1/yara
 ```
 
+## Permission model
+
+| Operation | Paths | Who |
+|-----------|-------|-----|
+| Scan, read rules and metadata, parse a rule, submit a rule for review | `POST /scan*`, `POST /quick-scan`, `GET /rules`, `GET /rules/{id}`, `GET /categories`, `GET /stats`, `POST /parse`, `POST /submit` | Any bearer credential (device API key, session token, OrbNet JWT, service secret) |
+| Change the **global** rule set | `POST /rules`, `DELETE /rules/{id}`, `POST /reload` and the canonical aliases `POST /api/v1/admin/yara/rules`, `DELETE /api/v1/admin/yara/rules/{id}`, `POST /api/v1/admin/yara/reload` | Bearer credential **and** `X-Admin-Token` header |
+| Review community submissions | `/api/v1/admin/yara/submissions*` | Bearer credential **and** `X-Admin-Token` header |
+
+A device API key is minted anonymously (`POST /api/v1/auth/device`), so anything
+it can do, anyone can do. Adding, deleting or reloading rules changes detection
+for every OrbGuard user, which is why those calls need the admin token even on
+their original `/yara/...` paths (kept so no client 404s). The app only reads
+rules and scans. Admin-token handling (lockout, audit log, rotation) is described
+in [SECURITY.md](../SECURITY.md).
+
+Request bodies are capped: 256 KiB for `/parse` and `/submit` (rule text), 64 MiB
+for `/scan`, `/scan/apk`, `/scan/ipa` and `/quick-scan`. A larger body is answered
+`413`: a declared `Content-Length` over the cap is refused before the body is read,
+and a body of unknown length is cut off at the cap.
+
+Rule text on `/parse` and `/submit` is bounded before anything is compiled: at most
+1,024 string patterns per rule, 64 KiB per pattern, 65,536 regexp instructions per
+regex pattern and 262,144 for all regex patterns of one request together (a counted
+repetition multiplies, so `/x{1000}/` alone is 1,000 instructions). A rule over a
+limit is reported as a validation error like any other (`/parse` answers `200` with
+`"valid": false`, `/submit` answers `422`). A 5 second deadline backstops the
+compile; a request that hits it is answered `400 rule validation timed out`.
+
 ## Endpoints
 
 ### POST /scan
@@ -184,7 +212,9 @@ Get a specific rule by ID.
 
 ### POST /rules
 
-Add a new YARA rule (admin only).
+Add a new YARA rule (admin only: requires `X-Admin-Token` in addition to the
+bearer credential; also available as `POST /api/v1/admin/yara/rules`). Without
+the admin token the call is refused with `403`; the rule set is unchanged.
 
 **Request Body:**
 ```json
@@ -220,7 +250,8 @@ Add a new YARA rule (admin only).
 
 ### DELETE /rules/{id}
 
-Remove a YARA rule (admin only).
+Remove a YARA rule (admin only: requires `X-Admin-Token`; also available as
+`DELETE /api/v1/admin/yara/rules/{id}`). Answers `204 No Content`.
 
 **Response:**
 ```json
@@ -334,7 +365,8 @@ Get YARA engine statistics.
 
 ### POST /reload
 
-Reload all YARA rules from disk (admin only).
+Reload all YARA rules from disk (admin only: requires `X-Admin-Token`; also
+available as `POST /api/v1/admin/yara/reload`).
 
 **Response:**
 ```json

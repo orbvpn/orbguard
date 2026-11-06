@@ -38,8 +38,11 @@ func NewRouter(cfg config.Config, h *handlers.Handlers, c *cache.RedisCache, log
 func (r *Router) Setup() http.Handler {
 	router := chi.NewRouter()
 
-	// Core middleware
+	// Core middleware. PeerAddress must run before RealIP: it keeps the TCP
+	// peer the admin lockout keys on, which RealIP is about to overwrite
+	// with client-supplied headers.
 	router.Use(middleware.RequestID)
+	router.Use(apimiddleware.PeerAddress)
 	router.Use(middleware.RealIP)
 	router.Use(apimiddleware.Logger(r.logger))
 	router.Use(middleware.Recoverer)
@@ -330,11 +333,16 @@ func (r *Router) Setup() http.Handler {
 			yara.Post("/scan/ipa", r.handlers.YARA.ScanIPA)
 			yara.Post("/quick-scan", r.handlers.YARA.QuickScan)
 
-			// Rule management
+			// Rule management. Reading is open to every authenticated client
+			// (the app lists rules); changing the GLOBAL rule set is admin
+			// only — a device key is minted anonymously, and a rule it adds,
+			// deletes or reloads would hit every OrbGuard user. The original
+			// paths stay admin-gated so no client 404s; the same handlers are
+			// also mounted under /admin/yara below.
 			yara.Get("/rules", r.handlers.YARA.ListRules)
 			yara.Get("/rules/{id}", r.handlers.YARA.GetRule)
-			yara.Post("/rules", r.handlers.YARA.AddRule)
-			yara.Delete("/rules/{id}", r.handlers.YARA.DeleteRule)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/rules", r.handlers.YARA.AddRule)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Delete("/rules/{id}", r.handlers.YARA.DeleteRule)
 
 			// Parsing and validation
 			yara.Post("/parse", r.handlers.YARA.ParseRule)
@@ -347,7 +355,7 @@ func (r *Router) Setup() http.Handler {
 			yara.Get("/stats", r.handlers.YARA.GetStats)
 
 			// Admin
-			yara.Post("/reload", r.handlers.YARA.ReloadRules)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/reload", r.handlers.YARA.ReloadRules)
 		})
 
 		// Correlation Engine endpoints
@@ -829,6 +837,12 @@ func (r *Router) Setup() http.Handler {
 			admin.Get("/yara/submissions", r.handlers.YARA.ListSubmissions)
 			admin.Post("/yara/submissions/{id}/approve", r.handlers.YARA.ApproveSubmission)
 			admin.Post("/yara/submissions/{id}/reject", r.handlers.YARA.RejectSubmission)
+
+			// Global YARA rule management (canonical admin paths; the
+			// /yara/rules and /yara/reload originals are admin-gated aliases)
+			admin.Post("/yara/rules", r.handlers.YARA.AddRule)
+			admin.Delete("/yara/rules/{id}", r.handlers.YARA.DeleteRule)
+			admin.Post("/yara/reload", r.handlers.YARA.ReloadRules)
 
 			// Stats
 			admin.Get("/stats/detailed", r.handlers.Admin.DetailedStats)

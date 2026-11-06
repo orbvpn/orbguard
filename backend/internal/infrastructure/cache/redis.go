@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -289,4 +290,60 @@ func (c *RedisCache) CheckRateLimit(ctx context.Context, key string, limit int64
 	resetTime := now.Add(window)
 
 	return count <= limit, remaining, resetTime, nil
+}
+
+// RecordFailure counts one failure against key and (re)arms its window, so a
+// lock holds for `window` after the LAST failure rather than the first. INCR
+// and EXPIRE run in one MULTI/EXEC transaction: a plain pipeline could apply
+// the INCR and lose the EXPIRE on a dropped connection, leaving a counter
+// with no expiry, and a locked counter that never expires locks its address
+// for good. Unlike CheckRateLimit the key has no fixed-window alignment: a
+// lockout must not lapse just because the clock crossed a boundary. Returns
+// the new count.
+func (c *RedisCache) RecordFailure(ctx context.Context, key string, window time.Duration) (int64, error) {
+	pipe := c.TxPipeline()
+	incr := pipe.Incr(ctx, c.key(key))
+	pipe.Expire(ctx, c.key(key), window)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// FailureCount returns the failures recorded against key in its live window
+// and how long that window still has to run. A key that was never set, or
+// has expired, reports (0, 0, nil). A key that exists WITHOUT an expiry
+// reports its count with a negative duration so the caller can tell a
+// damaged counter from one about to lapse; the two reads share a MULTI/EXEC
+// so the count and the TTL describe the same moment.
+func (c *RedisCache) FailureCount(ctx context.Context, key string) (int64, time.Duration, error) {
+	pipe := c.TxPipeline()
+	get := pipe.Get(ctx, c.key(key))
+	ttl := pipe.TTL(ctx, c.key(key))
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return 0, 0, err
+	}
+	count, err := get.Int64()
+	if errors.Is(err, redis.Nil) {
+		return 0, 0, nil
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	remaining := ttl.Val()
+	switch remaining {
+	case -2:
+		// Gone between the two commands; a transaction makes that
+		// unreachable, but the answer is still "no counter".
+		return 0, 0, nil
+	case -1:
+		// Exists with no expiry: go-redis reports -1ns for a persistent key.
+		return count, -1, nil
+	}
+	return count, remaining, nil
+}
+
+// ClearFailures forgets the failures recorded against key.
+func (c *RedisCache) ClearFailures(ctx context.Context, key string) error {
+	return c.Delete(ctx, key)
 }

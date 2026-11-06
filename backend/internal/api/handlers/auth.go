@@ -46,9 +46,17 @@ type AuthHandler struct {
 
 // NewAuthHandler creates a new AuthHandler. It also wires the shared Redis
 // cache into the auth middleware so bearer tokens issued here are the only
-// tokens that validate on protected routes.
+// tokens that validate on protected routes, and installs the admin
+// credential plus the Redis-backed per-address lockout behind AdminAuth.
 func NewAuthHandler(c *cache.RedisCache, devices *repository.DeviceRepository, secret string, log *logger.Logger) *AuthHandler {
 	middleware.ConfigureAuth(c, os.Getenv("ORBGUARD_APP_ENVIRONMENT"), log)
+	// A nil *RedisCache must stay a nil interface, or the middleware would
+	// call methods on a nil receiver instead of disabling the lockout.
+	var lockout middleware.AdminLockoutStore
+	if c != nil {
+		lockout = c
+	}
+	middleware.ConfigureAdminAuth(os.Getenv(middleware.AdminTokenEnvVar), lockout, log)
 	return &AuthHandler{
 		cache:   c,
 		devices: devices,

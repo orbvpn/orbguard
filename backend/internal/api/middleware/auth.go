@@ -3,11 +3,14 @@ package middleware
 import (
 	"context"
 	"crypto/subtle"
+	"net"
 	"net/http"
-	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"orbguard-lab/pkg/logger"
 )
@@ -34,11 +37,61 @@ const (
 	// ContextKeySubscriptionValid holds the bool subscription_valid claim from
 	// an OrbNet JWT — used to gate premium remote-control actions.
 	ContextKeySubscriptionValid ContextKey = "subscription_valid"
+	// ContextKeyPeerAddr holds the TCP peer address (host:port) exactly as the
+	// listener saw it, recorded by PeerAddress before RealIP rewrites
+	// RemoteAddr from client-supplied headers.
+	ContextKeyPeerAddr ContextKey = "peer_addr"
 )
 
-// adminTokenEnvVar is the environment variable holding the admin credential.
-// There is intentionally no default: if it is unset, admin routes are disabled.
-const adminTokenEnvVar = "ORBGUARD_ADMIN_TOKEN"
+const (
+	// AdminTokenEnvVar is the environment variable holding the admin
+	// credential. There is intentionally no default: unset or weak, admin
+	// routes are disabled (fail closed).
+	AdminTokenEnvVar = "ORBGUARD_ADMIN_TOKEN"
+
+	// adminTokenHeader is the ONLY place the admin credential is read from.
+	// Query strings end up in access logs, proxies and browser history, and
+	// bodies belong to the handler, so neither is accepted as a fallback.
+	adminTokenHeader = "X-Admin-Token"
+
+	// adminTokenMinLen is the shortest admin token accepted. The lockout
+	// pauses whenever Redis is unreachable, so the token on its own has to
+	// make online guessing absurd; a real secret is 40+ random characters.
+	adminTokenMinLen = 32
+
+	// adminLockoutThreshold wrong tokens from one address (see lockoutAddress)
+	// within adminLockoutWindow lock that address out of every admin route,
+	// the right token included, until the window closes; each further
+	// failure re-arms the window.
+	adminLockoutThreshold = 5
+	adminLockoutWindow    = 15 * time.Minute
+	adminLockoutKeyPrefix = "auth:admin:fail:"
+
+	// xForwardedFor is the header the ingress appends the peer address to.
+	xForwardedFor = "X-Forwarded-For"
+)
+
+// adminTokenPlaceholders are values that have appeared in examples, dev
+// configs or docs. None of them is a credential, whatever its length.
+var adminTokenPlaceholders = map[string]bool{
+	"dev-admin-token": true,
+	"changeme":        true,
+	"admin":           true,
+}
+
+// AdminLockoutStore is the failure-counter interface behind the admin
+// lockout. *cache.RedisCache satisfies it with an atomic INCR+EXPIRE.
+//
+// RecordFailure adds one failure to key, (re)arms its expiry to window and
+// returns the new count. FailureCount returns the live count and the time the
+// counter still has to live; a negative duration means the counter exists but
+// has NO expiry, which the caller must treat as damaged rather than as a lock
+// of unknown length. ClearFailures forgets the counter.
+type AdminLockoutStore interface {
+	RecordFailure(ctx context.Context, key string, window time.Duration) (int64, error)
+	FailureCount(ctx context.Context, key string) (int64, time.Duration, error)
+	ClearFailures(ctx context.Context, key string) error
+}
 
 // TokenClaims is the canonical payload stored in Redis for both session
 // tokens (auth:token:<token>) and device API keys (auth:apikey:<key>).
@@ -62,8 +115,10 @@ var (
 	authEnvironment string
 	authLogger      *logger.Logger
 
-	adminTokenOnce  sync.Once
-	adminTokenValue string
+	// adminToken is the accepted credential; "" disables admin routes.
+	adminToken   string
+	adminLockout AdminLockoutStore
+	adminLog     *logger.Logger
 )
 
 // ConfigureAuth wires the token store used by APIKeyAuth to validate
@@ -89,13 +144,233 @@ func authState() (TokenStore, string, *logger.Logger) {
 	return authStore, authEnvironment, authLogger
 }
 
-// adminCredential returns the env-configured admin token. Empty means
-// admin authentication is disabled (fail closed).
-func adminCredential() string {
-	adminTokenOnce.Do(func() {
-		adminTokenValue = strings.TrimSpace(os.Getenv(adminTokenEnvVar))
+// adminTokenWeak reports whether token is unusable as the admin credential
+// and why: not set, shorter than adminTokenMinLen, or a known placeholder.
+// The reason is safe to log; it never includes the token itself.
+func adminTokenWeak(token string) (reason string, weak bool) {
+	token = strings.TrimSpace(token)
+	switch {
+	case token == "":
+		return "not set", true
+	case adminTokenPlaceholders[strings.ToLower(token)]:
+		return "known placeholder value", true
+	case len(token) < adminTokenMinLen:
+		return "shorter than " + strconv.Itoa(adminTokenMinLen) + " characters", true
+	}
+	return "", false
+}
+
+// ConfigureAdminAuth installs the admin credential (normally the value of
+// AdminTokenEnvVar) and the counter store behind the per-address lockout.
+// It runs once at startup. A weak token is refused HERE, not at request
+// time: admin routes then answer 403 exactly as if nothing were configured,
+// and the ERROR log says why, so the process keeps serving device traffic
+// instead of starting with a guessable credential. A nil lockout store
+// disables the lockout (logged) and leaves the constant-time compare as the
+// only brake on guessing.
+func ConfigureAdminAuth(token string, lockout AdminLockoutStore, log *logger.Logger) {
+	token = strings.TrimSpace(token)
+	reason, weak := adminTokenWeak(token)
+	if weak {
+		token = ""
+	}
+
+	authMu.Lock()
+	adminToken = token
+	adminLockout = lockout
+	adminLog = log
+	authMu.Unlock()
+
+	if log == nil {
+		return
+	}
+	l := log.WithComponent("auth-middleware")
+	switch {
+	case weak && reason == "not set":
+		l.Warn().Msg(AdminTokenEnvVar + " is not set; admin routes are disabled")
+	case weak:
+		l.Error().Str("reason", reason).
+			Msg(AdminTokenEnvVar + " rejected as weak; admin routes are disabled until it holds a strong value")
+	default:
+		l.Info().
+			Int("token_len", len(token)).
+			Bool("lockout_enabled", lockout != nil).
+			Msg("admin auth configured")
+	}
+	if lockout == nil {
+		l.Warn().Msg("no lockout store wired; wrong admin tokens are refused but not counted")
+	}
+}
+
+// adminState snapshots the admin configuration for one request.
+func adminState() (string, AdminLockoutStore, *logger.Logger) {
+	authMu.RLock()
+	defer authMu.RUnlock()
+	return adminToken, adminLockout, adminLog
+}
+
+// PeerAddress records the connection's real peer address in the request
+// context before anything rewrites RemoteAddr. chi's RealIP replaces
+// RemoteAddr with whatever the client put in True-Client-IP, X-Real-IP or the
+// first X-Forwarded-For hop: right for access logs behind a trusted ingress,
+// useless for anything a hostile client must not be able to steer. It must be
+// registered ahead of RealIP.
+func PeerAddress(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), ContextKeyPeerAddr, r.RemoteAddr)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-	return adminTokenValue
+}
+
+// hostOnly strips the port from a host:port address; a bare address (RealIP
+// leaves no port, IPv6 literals have no brackets) comes back unchanged.
+func hostOnly(addr string) string {
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	return addr
+}
+
+// peerIP is the TCP peer's address without the port: the one PeerAddress
+// recorded before RealIP ran, or RemoteAddr itself when that middleware is
+// not in the chain (bare handlers in tests).
+func peerIP(r *http.Request) string {
+	addr := r.RemoteAddr
+	if peer, ok := r.Context().Value(ContextKeyPeerAddr).(string); ok && peer != "" {
+		addr = peer
+	}
+	return hostOnly(addr)
+}
+
+// sharedAddressSpace is RFC 6598 (100.64.0.0/10). Internet clients never
+// appear from it, infrastructure does: the Container Apps ingress connects to
+// the app from such addresses.
+var sharedAddressSpace = &net.IPNet{IP: net.IPv4(100, 64, 0, 0).To4(), Mask: net.CIDRMask(10, 32)}
+
+// infrastructureAddr reports whether ip belongs to our own network path (an
+// ingress or proxy) rather than to an Internet client.
+func infrastructureAddr(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsUnspecified() || sharedAddressSpace.Contains(ip)
+}
+
+// lockoutAddress is the client address the admin lockout is keyed on. It has
+// to be one the caller cannot choose: keyed on RemoteAddr after RealIP, a
+// guesser would rotate X-Real-IP per attempt and never trip the lock, and any
+// device key could name an operator's address to lock the operator out.
+//
+// Forwarding headers only mean something when the TCP peer is our own
+// infrastructure. A public peer connected directly, and every hop it sent is
+// its own claim, so the peer is the answer. Behind the ingress (Envoy, which
+// APPENDS the address it accepted the connection from to X-Forwarded-For),
+// the hops are read from the right, past any infrastructure hop a further
+// internal proxy appended, and the first public address is the client as the
+// ingress saw it; whatever the client wrote sits to its left and is never
+// reached. True-Client-IP and X-Real-IP pass the ingress untouched and are
+// ignored. A hop that is not an address was not written by a proxy, so the
+// walk stops there, as it does when no hop is public, and the peer is used.
+func lockoutAddress(r *http.Request) string {
+	peer := peerIP(r)
+	peerAddr := net.ParseIP(peer)
+	if peerAddr != nil && !infrastructureAddr(peerAddr) {
+		return peerAddr.String()
+	}
+	hops := strings.Split(strings.Join(r.Header.Values(xForwardedFor), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		ip := net.ParseIP(hostOnly(strings.TrimSpace(hops[i])))
+		if ip == nil {
+			break
+		}
+		if !infrastructureAddr(ip) {
+			return ip.String()
+		}
+	}
+	if peerAddr != nil {
+		return peerAddr.String()
+	}
+	return peer
+}
+
+// lockoutKey is the failure-counter key for a client address. An IPv6 client
+// picks the low 64 bits of its own address, so IPv6 is counted per /64, the
+// smallest block a subscriber is handed; per address, one host could spread
+// its guesses over 2^64 counters.
+func lockoutKey(addr string) string {
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+		return adminLockoutKeyPrefix + ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+	}
+	return adminLockoutKeyPrefix + addr
+}
+
+// adminLockedOut reports whether the counter at key (client address ip) has
+// reached the failure threshold in its live window, how long that lock still
+// has to run, and the failure count. A store error is logged and treated as
+// "not locked": an unreachable Redis must neither wave a wrong token through
+// (the constant-time compare still runs) nor shut every admin out, so the
+// lockout simply pauses. A counter that has lost its expiry would lock the
+// address forever (the right token is refused while locked, so nothing else
+// could ever clear it); it is dropped and logged instead.
+func adminLockedOut(ctx context.Context, store AdminLockoutStore, key, ip string, log *logger.Logger) (bool, time.Duration, int64) {
+	if store == nil {
+		return false, 0, 0
+	}
+	count, remaining, err := store.FailureCount(ctx, key)
+	if err != nil {
+		if log != nil {
+			log.WithComponent("auth-middleware").Warn().Err(err).
+				Str("remote_ip", ip).
+				Msg("admin lockout store unavailable; proceeding without lockout")
+		}
+		return false, 0, 0
+	}
+	if count < adminLockoutThreshold {
+		return false, 0, count
+	}
+	if remaining < 0 {
+		if log != nil {
+			log.WithComponent("auth-middleware").Warn().
+				Str("remote_ip", ip).
+				Int64("failures", count).
+				Msg("admin failure counter had no expiry; cleared instead of locking the address indefinitely")
+		}
+		if err := store.ClearFailures(ctx, key); err != nil && log != nil {
+			log.WithComponent("auth-middleware").Warn().Err(err).
+				Str("remote_ip", ip).
+				Msg("could not clear damaged admin failure counter")
+		}
+		return false, 0, 0
+	}
+	return true, remaining, count
+}
+
+// recordAdminFailure counts a wrong token against key (client address ip) and
+// returns the new count, or 0 when the store is absent or failing (logged;
+// see adminLockedOut).
+func recordAdminFailure(ctx context.Context, store AdminLockoutStore, key, ip string, log *logger.Logger) int64 {
+	if store == nil {
+		return 0
+	}
+	count, err := store.RecordFailure(ctx, key, adminLockoutWindow)
+	if err != nil {
+		if log != nil {
+			log.WithComponent("auth-middleware").Warn().Err(err).
+				Str("remote_ip", ip).
+				Msg("admin lockout store unavailable; failure not counted")
+		}
+		return 0
+	}
+	return count
+}
+
+// writeAdminLocked answers a locked-out address. Retry-After carries the
+// time left on the lock so a legitimate operator knows how long to wait.
+func writeAdminLocked(w http.ResponseWriter, retryAfter time.Duration) {
+	secs := int64(retryAfter / time.Second)
+	if secs < 1 {
+		secs = 1
+	}
+	w.Header().Set("Retry-After", strconv.FormatInt(secs, 10))
+	http.Error(w, `{"error":"too many invalid admin tokens from this address; try again later"}`, http.StatusTooManyRequests)
 }
 
 // lookupToken resolves a presented bearer token against the token store.
@@ -212,9 +487,19 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 }
 
 // AdminAuth returns middleware that requires admin privileges. The admin
-// credential is the ORBGUARD_ADMIN_TOKEN environment variable; if it is not
-// set, admin routes are disabled entirely (fail closed). The secret parameter
-// is retained for call-site compatibility but is not a valid admin credential.
+// credential is installed by ConfigureAdminAuth (from ORBGUARD_ADMIN_TOKEN);
+// if it is unset or weak, admin routes are disabled entirely (fail closed).
+// The secret parameter is retained for call-site compatibility but is not a
+// valid admin credential.
+//
+// Per request: a bearer credential must already have passed APIKeyAuth; an
+// address (lockoutAddress: the client as the ingress saw it, never a header
+// the client wrote; IPv6 per /64) with adminLockoutThreshold recent wrong
+// tokens is refused with 429 before the token is even compared; the token is
+// read from the X-Admin-Token header only; a mismatch is counted and answered
+// 403 (429 once the threshold is reached); a match resets the counter and the
+// call is written to the "admin-audit" log with its outcome, never with the
+// token.
 func AdminAuth(_ string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -225,39 +510,87 @@ func AdminAuth(_ string) func(next http.Handler) http.Handler {
 				return
 			}
 
-			expected := adminCredential()
+			expected, lockout, log := adminState()
 			if expected == "" {
-				_, _, log := authState()
 				if log != nil {
 					log.WithComponent("auth-middleware").Error().
 						Str("path", r.URL.Path).
-						Msg("admin access attempted but " + adminTokenEnvVar + " is not configured; admin routes are disabled")
+						Msg("admin access attempted but " + AdminTokenEnvVar + " is not configured or was rejected as weak; admin routes are disabled")
 				}
 				http.Error(w, `{"error":"admin access is not configured"}`, http.StatusForbidden)
 				return
 			}
 
-			adminToken := r.Header.Get("X-Admin-Token")
+			ip := lockoutAddress(r)
+			key := lockoutKey(ip)
+			locked, retryAfter, failures := adminLockedOut(r.Context(), lockout, key, ip, log)
+			if locked {
+				if log != nil {
+					log.WithComponent("auth-middleware").Warn().
+						Str("path", r.URL.Path).
+						Str("remote_ip", ip).
+						Int64("failures", failures).
+						Msg("admin request from a locked-out address refused")
+				}
+				writeAdminLocked(w, retryAfter)
+				return
+			}
+
+			adminToken := r.Header.Get(adminTokenHeader)
 			if adminToken == "" {
 				http.Error(w, `{"error":"admin token required"}`, http.StatusForbidden)
 				return
 			}
 
 			if subtle.ConstantTimeCompare([]byte(adminToken), []byte(expected)) != 1 {
-				_, _, log := authState()
+				count := recordAdminFailure(r.Context(), lockout, key, ip, log)
 				if log != nil {
 					log.WithComponent("auth-middleware").Warn().
 						Str("path", r.URL.Path).
-						Str("remote", r.RemoteAddr).
+						Str("remote_ip", ip).
+						Int("presented_len", len(adminToken)).
+						Int64("failures", count).
 						Msg("invalid admin token presented")
+				}
+				if count >= adminLockoutThreshold {
+					writeAdminLocked(w, adminLockoutWindow)
+					return
 				}
 				http.Error(w, `{"error":"invalid admin token"}`, http.StatusForbidden)
 				return
 			}
 
+			// A correct token forgives earlier typos from the same address so
+			// an operator is not locked out by their own slips.
+			if failures > 0 && lockout != nil {
+				if err := lockout.ClearFailures(r.Context(), key); err != nil && log != nil {
+					log.WithComponent("auth-middleware").Warn().Err(err).
+						Str("remote_ip", ip).
+						Msg("could not reset admin failure counter")
+				}
+			}
+
 			// Add admin flag to context
 			ctx := context.WithValue(r.Context(), ContextKeyIsAdmin, true)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+			start := time.Now()
+			next.ServeHTTP(ww, r.WithContext(ctx))
+
+			// Whoever the bearer credential identified: a session user, a
+			// device, an OrbNet account (web panel JWT) or the service secret.
+			if log != nil {
+				log.WithComponent("admin-audit").Info().
+					Str("method", r.Method).
+					Str("path", r.URL.Path).
+					Str("user_id", GetUserID(ctx)).
+					Str("device_id", GetDeviceID(ctx)).
+					Int64("orbnet_user_id", GetOrbNetUserID(ctx)).
+					Bool("service", IsServiceRequest(ctx)).
+					Str("remote_ip", ip).
+					Int("status", ww.Status()).
+					Dur("duration", time.Since(start)).
+					Msg("admin call")
+			}
 		})
 	}
 }
@@ -284,6 +617,15 @@ func GetDeviceID(ctx context.Context) string {
 		return id
 	}
 	return ""
+}
+
+// GetOrbNetUserID returns the OrbNet account id the request authenticated
+// as (OrbNet JWT), or 0 for every other credential type.
+func GetOrbNetUserID(ctx context.Context) int64 {
+	if id, ok := ctx.Value(ContextKeyOrbNetUserID).(int64); ok && id > 0 {
+		return id
+	}
+	return 0
 }
 
 // IsServiceRequest returns whether the request authenticated with the

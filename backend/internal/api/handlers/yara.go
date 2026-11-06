@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -15,6 +18,33 @@ import (
 	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
 )
+
+const (
+	// maxRuleBodyBytes caps the JSON body of /yara/parse and /yara/submit.
+	// Both are reachable with a free device key and feed the rule compiler,
+	// so the input they accept is bounded; real rule sets are a few KiB.
+	maxRuleBodyBytes = 256 << 10
+
+	// maxScanBodyBytes caps the JSON body of the /yara/scan* endpoints. The
+	// payload is a base64 APK/IPA (4/3 inflation), so this admits ~48 MiB of
+	// binary, comfortably above what the app uploads.
+	maxScanBodyBytes = 64 << 20
+)
+
+// ruleValidateTimeout is the backstop deadline on one parse+compile of
+// submitted rule text. The work itself is bounded before anything compiles
+// (yaradet.MaxPatternBytes per pattern, yaradet.MaxRegexInsts per regex,
+// yaradet.MaxSubmissionRegexInsts per submission), which keeps a maximal
+// 256 KiB submission to a few hundred milliseconds of CPU at worst; the
+// deadline covers a starved CPU and is checked between rule blocks and
+// between patterns, one pattern being the largest unit it cannot interrupt.
+// A variable, not a constant, so tests can drive the timeout path
+// deterministically.
+var ruleValidateTimeout = 5 * time.Second
+
+// errRuleValidationTimeout is returned by validateRuleSource when the
+// compiler did not finish within ruleValidateTimeout.
+var errRuleValidationTimeout = errors.New("rule validation timed out")
 
 // YARAHandler handles YARA-related HTTP requests
 type YARAHandler struct {
@@ -56,6 +86,21 @@ func (h *YARAHandler) respondError(w http.ResponseWriter, status int, message st
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
+// validateRuleSource runs the real parser/compiler over submitted rule text
+// under ruleValidateTimeout. It runs on the request goroutine on purpose: the
+// compiler stops at the next pattern boundary once the deadline passes, so
+// there is no worker left running behind an early answer.
+func (h *YARAHandler) validateRuleSource(ctx context.Context, src string) (*yaradet.RuleValidation, error) {
+	ctx, cancel := context.WithTimeout(ctx, ruleValidateTimeout)
+	defer cancel()
+
+	validation, err := h.parser.ValidateSourceContext(ctx, src)
+	if err != nil {
+		return nil, errRuleValidationTimeout
+	}
+	return validation, nil
+}
+
 // Scan performs a YARA scan on provided data
 // @Summary Scan data with YARA rules
 // @Description Scan binary data, base64, or hex-encoded data against YARA rules
@@ -67,8 +112,7 @@ func (h *YARAHandler) respondError(w http.ResponseWriter, status int, message st
 // @Router /api/v1/yara/scan [post]
 func (h *YARAHandler) Scan(w http.ResponseWriter, r *http.Request) {
 	var req models.YARAScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxScanBodyBytes, &req) {
 		return
 	}
 
@@ -99,8 +143,7 @@ func (h *YARAHandler) Scan(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/yara/scan/apk [post]
 func (h *YARAHandler) ScanAPK(w http.ResponseWriter, r *http.Request) {
 	var req ScanAPKRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxScanBodyBytes, &req) {
 		return
 	}
 
@@ -145,8 +188,7 @@ type ScanAPKRequest struct {
 // @Router /api/v1/yara/scan/ipa [post]
 func (h *YARAHandler) ScanIPA(w http.ResponseWriter, r *http.Request) {
 	var req ScanIPARequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxScanBodyBytes, &req) {
 		return
 	}
 
@@ -226,9 +268,9 @@ func (h *YARAHandler) ListRules(w http.ResponseWriter, r *http.Request) {
 	rules := h.yaraService.GetRules(filter)
 
 	h.respondJSON(w, http.StatusOK, ListRulesResponse{
-		Rules: rules,
-		Total: len(rules),
-		Limit: limit,
+		Rules:  rules,
+		Total:  len(rules),
+		Limit:  limit,
 		Offset: offset,
 	})
 }
@@ -333,8 +375,7 @@ func (h *YARAHandler) DeleteRule(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/yara/parse [post]
 func (h *YARAHandler) ParseRule(w http.ResponseWriter, r *http.Request) {
 	var req ParseRuleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxRuleBodyBytes, &req) {
 		return
 	}
 
@@ -346,7 +387,12 @@ func (h *YARAHandler) ParseRule(w http.ResponseWriter, r *http.Request) {
 	// Validate using the same parser and pattern compiler the live
 	// /yara/scan path uses (internal/detection/yara), so a rule that
 	// validates here is guaranteed to load into the engine.
-	validation := h.parser.ValidateSource(req.RuleContent)
+	validation, err := h.validateRuleSource(r.Context(), req.RuleContent)
+	if err != nil {
+		h.logger.Warn().Int("content_len", len(req.RuleContent)).Msg("rule validation timed out")
+		h.respondError(w, http.StatusBadRequest, "rule validation timed out; submit fewer or simpler rules per request")
+		return
+	}
 
 	resp := ParseRuleResponse{
 		Valid:    validation.Valid,
@@ -459,8 +505,7 @@ type CategoryInfo struct {
 // @Router /api/v1/yara/submit [post]
 func (h *YARAHandler) SubmitRule(w http.ResponseWriter, r *http.Request) {
 	var submission models.YARARuleSubmission
-	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxRuleBodyBytes, &submission) {
 		return
 	}
 
@@ -483,7 +528,13 @@ func (h *YARAHandler) SubmitRule(w http.ResponseWriter, r *http.Request) {
 
 	// Validate first with the real parser/compiler; invalid rules are
 	// rejected immediately with the actual parse errors and not stored.
-	validation := h.parser.ValidateSource(submission.RawRule)
+	validation, err := h.validateRuleSource(r.Context(), submission.RawRule)
+	if err != nil {
+		h.logger.Warn().Str("name", submission.Name).Int("content_len", len(submission.RawRule)).
+			Msg("rule validation timed out")
+		h.respondError(w, http.StatusBadRequest, "rule validation timed out; submit fewer or simpler rules per request")
+		return
+	}
 	if !validation.Valid {
 		h.respondJSON(w, http.StatusUnprocessableEntity, map[string]any{
 			"error":    "rule validation failed",
@@ -722,8 +773,7 @@ func (h *YARAHandler) RejectSubmission(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/yara/quick-scan [post]
 func (h *YARAHandler) QuickScan(w http.ResponseWriter, r *http.Request) {
 	var req QuickScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
+	if !readJSONBody(w, r, maxScanBodyBytes, &req) {
 		return
 	}
 
