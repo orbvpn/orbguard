@@ -62,11 +62,19 @@ String? magicCodeFromUri(Uri uri) {
 /// Listens for magic-link deep links (cold-start + while running) and invokes
 /// [onCode] with the extracted code. Best-effort and self-contained; never
 /// throws into the caller. Call [dispose] to stop listening.
+///
+/// [initialLink] and [linkStream] default to app_links; tests pass their own.
 class MagicLinkDeepLinkHandler {
-  MagicLinkDeepLinkHandler(this._onCode);
+  MagicLinkDeepLinkHandler(
+    this._onCode, {
+    Future<Uri?> Function()? initialLink,
+    Stream<Uri> Function()? linkStream,
+  }) : _initialLink = initialLink ?? (() => AppLinks().getInitialLink()),
+       _linkStream = linkStream ?? (() => AppLinks().uriLinkStream);
 
   final Future<void> Function(String code) _onCode;
-  final AppLinks _appLinks = AppLinks();
+  final Future<Uri?> Function() _initialLink;
+  final Stream<Uri> Function() _linkStream;
   StreamSubscription<Uri>? _sub;
   bool _started = false;
 
@@ -75,16 +83,30 @@ class MagicLinkDeepLinkHandler {
     _started = true;
 
     // Cold start: the app was launched by tapping the link.
+    Uri? initial;
     try {
-      final initial = await _appLinks.getInitialLink();
+      initial = await _initialLink();
       if (initial != null) await _handle(initial);
     } catch (e) {
       debugPrint('[OrbGuard] initial deep link error: $e');
     }
 
     // Warm: links received while the app is already running.
-    _sub = _appLinks.uriLinkStream.listen(
-      (uri) => _handle(uri),
+    //
+    // Every app_links platform hands the launch link to the stream's first
+    // listener as well (getInitialLink does not mark it delivered), so the
+    // link just handled arrives again as the first event. Redeeming it twice
+    // asks the server for a second sign-in, which on a two-factor account
+    // means a second code step replacing the one the user is looking at.
+    // Only that first echo is skipped; tapping the link again still counts.
+    final launchLink = initial;
+    var echoPending = launchLink != null;
+    _sub = _linkStream().listen(
+      (uri) {
+        final isEcho = echoPending && uri == launchLink;
+        echoPending = false;
+        if (!isEcho) unawaited(_handle(uri));
+      },
       onError: (Object e) => debugPrint('[OrbGuard] deep link stream error: $e'),
     );
   }

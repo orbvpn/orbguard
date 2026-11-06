@@ -9,6 +9,11 @@
 // path) → a subtle "Use password instead" reveal for email+password (with an
 // optional TOTP step) → "Skip for now".
 //
+// Two-factor accounts: after any first factor the server may ask for the
+// authenticator code. The password form takes it inline (re-posting the
+// password); every other method switches the card to a code step that
+// completes the pending sign-in. Both fields also take a recovery code.
+//
 // HONESTY: the Google/Apple buttons drive the REAL native flow. On failure
 // (user cancels aside) a clear error is shown — never a fake success.
 
@@ -36,14 +41,28 @@ enum _LoginMode { password, magic }
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
+  /// Whether a sign-in screen is mounted. TwoFactorResume checks this before
+  /// opening one for a code step, so a link tapped while the screen is
+  /// already up finishes in it instead of stacking a second one.
+  static bool get isOpen => _LoginScreenState._mountedCount > 0;
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static int _mountedCount = 0;
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
+  // The second-factor code, kept apart from _codeController: that one holds
+  // the pasted magic LINK, which must not prefill the code step it leads to.
+  final _twoFactorCodeController = TextEditingController();
+  // The code field accepts both kinds of code either way; this only swaps in
+  // a keyboard that can type a recovery code's letters and hyphen.
+  bool _useRecoveryCode = false;
+  bool _hadPendingTwoFactor = false;
 
   // Magic-link is the DEFAULT/PRIMARY path; password hides behind a reveal.
   _LoginMode _mode = _LoginMode.magic;
@@ -58,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _mountedCount++;
     // Pre-fill the last email that signed in on this device.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final account = context.read<AccountProvider>();
@@ -78,6 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _account?.removeListener(_onAccountChanged);
     _account = account;
     _wasLoggedIn = account.isLoggedIn;
+    _hadPendingTwoFactor = account.hasPendingTwoFactor;
     account.addListener(_onAccountChanged);
   }
 
@@ -93,15 +114,36 @@ class _LoginScreenState extends State<LoginScreen> {
     final isLoggedIn = account.isLoggedIn;
     final wasLoggedIn = _wasLoggedIn;
     _wasLoggedIn = isLoggedIn;
+    // A code step that just opened — from this screen or from a deep link
+    // handled above it — starts empty and on the authenticator keyboard.
+    final hasPending = account.hasPendingTwoFactor;
+    if (hasPending && !_hadPendingTwoFactor) {
+      _twoFactorCodeController.clear();
+      if (_useRecoveryCode) setState(() => _useRecoveryCode = false);
+    }
+    _hadPendingTwoFactor = hasPending;
     if (!wasLoggedIn && isLoggedIn) _dismiss(true);
+  }
+
+  /// Leaving the screen by hand — Skip for now, the back button, a back
+  /// gesture — abandons a code step it was showing, so the pending token goes
+  /// now instead of idling. Only a pop gets here: the app lock disposing the
+  /// screen with the whole navigator does not, and the pending sign-in then
+  /// survives for TwoFactorResume to bring back. A pop with true is the
+  /// sign-in finishing, which has already settled the step.
+  void _onPopInvoked(bool didPop, Object? result) {
+    if (!didPop || result == true) return;
+    _account?.cancelTwoFactor();
   }
 
   @override
   void dispose() {
+    _mountedCount--;
     _account?.removeListener(_onAccountChanged);
     _emailController.dispose();
     _passwordController.dispose();
     _codeController.dispose();
+    _twoFactorCodeController.dispose();
     super.dispose();
   }
 
@@ -125,9 +167,25 @@ class _LoginScreenState extends State<LoginScreen> {
         platform == TargetPlatform.macOS;
   }
 
+  /// Closes this screen with [signedIn] as its result.
+  ///
+  /// It acts on this screen's own route, never on whatever is on top. A
+  /// sign-in success reaches here twice — from the handler that awaited it
+  /// and from [_onAccountChanged] — and the route stays mounted through its
+  /// exit animation; once it is leaving it is no longer active, so the second
+  /// call cannot close the screen underneath (the one that opened sign-in
+  /// and awaits its result). And when another route sits above this one —
+  /// the Terms page opened from here as a deep-linked sign-in lands — pop()
+  /// would close that page and leave the sign-in screen up, so this route is
+  /// removed from under it instead.
   void _dismiss([bool signedIn = false]) {
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop(signedIn);
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(context);
+    if (!route.isCurrent) {
+      navigator.removeRoute(route, signedIn);
+    } else if (navigator.canPop()) {
+      navigator.pop(signedIn);
     }
   }
 
@@ -213,8 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final ok = await account.login(
       _emailController.text,
       _passwordController.text,
-      totpCode:
-          account.requiresTwoFactor ? _codeController.text.trim() : null,
+      totpCode: account.requiresTwoFactor ? _twoFactorCodeController.text : null,
     );
     if (!mounted) return;
     if (ok) {
@@ -223,6 +280,26 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       _dismiss(true);
     }
+  }
+
+  /// The code step's lime action: complete the pending sign-in with whatever
+  /// was typed — authenticator code or recovery code alike.
+  Future<void> _completeTwoFactor() async {
+    final account = context.read<AccountProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    FocusScope.of(context).unfocus();
+    final ok = await account.completeTwoFactor(_twoFactorCodeController.text);
+    if (!mounted) return;
+    if (ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('Signed in')));
+      _dismiss(true);
+    }
+  }
+
+  void _cancelTwoFactor() {
+    _twoFactorCodeController.clear();
+    setState(() => _useRecoveryCode = false);
+    context.read<AccountProvider>().cancelTwoFactor();
   }
 
   Future<void> _requestMagicCode() async {
@@ -264,12 +341,21 @@ class _LoginScreenState extends State<LoginScreen> {
       _mode = mode;
       _magicSent = false;
       _codeController.clear();
+      _twoFactorCodeController.clear();
+      _useRecoveryCode = false;
     });
     context.read<AccountProvider>().clearError();
   }
 
   @override
   Widget build(BuildContext context) {
+    return PopScope<Object?>(
+      onPopInvokedWithResult: _onPopInvoked,
+      child: _page(context),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     return GlassPage(
       title: 'Account',
       body: Consumer<AccountProvider>(
@@ -281,23 +367,29 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               GlassCard(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // On Windows/Linux none of the social providers have an
-                    // implementation, so the whole block (and its "or"
-                    // divider) collapses rather than rendering dead controls.
-                    if (_hasSocialButtons(context)) ...[
-                      _socialButtons(context, account),
-                      const SizedBox(height: 18),
-                      _orDivider(context),
-                      const SizedBox(height: 18),
-                    ],
-                    _mode == _LoginMode.password
-                        ? _passwordForm(context, account)
-                        : _magicForm(context, account),
-                  ],
-                ),
+                // A pending code step replaces the whole card: the first
+                // factor is done and the code is the one thing left to do,
+                // so it gets the screen's single lime action to itself.
+                child: account.hasPendingTwoFactor
+                    ? _twoFactorPanel(context, account)
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // On Windows/Linux none of the social providers have
+                          // an implementation, so the whole block (and its
+                          // "or" divider) collapses rather than rendering dead
+                          // controls.
+                          if (_hasSocialButtons(context)) ...[
+                            _socialButtons(context, account),
+                            const SizedBox(height: 18),
+                            _orDivider(context),
+                            const SizedBox(height: 18),
+                          ],
+                          _mode == _LoginMode.password
+                              ? _passwordForm(context, account)
+                              : _magicForm(context, account),
+                        ],
+                      ),
               ),
               if (account.lastError != null) ...[
                 const SizedBox(height: 16),
@@ -619,17 +711,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         if (needs2fa) ...[
           const SizedBox(height: 16),
-          _fieldLabel(context, 'Authenticator code'),
+          _fieldLabel(context,
+              _useRecoveryCode ? 'Recovery code' : 'Authenticator code'),
           const SizedBox(height: 8),
-          _field(
-            context,
-            controller: _codeController,
-            hint: '6-digit code',
-            icon: 'key',
-            keyboardType: TextInputType.number,
-            enabled: !account.isBusy,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
+          _twoFactorCodeField(context, account),
+          _recoveryCodeToggle(context, account),
         ],
         const SizedBox(height: 20),
         // In password mode this is the single lime action.
@@ -650,6 +736,99 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// The code step for a sign-in that began with a magic link, Google, Apple
+  /// or a passkey and now waits for the account's second factor.
+  Widget _twoFactorPanel(BuildContext context, AccountProvider account) {
+    final email = account.twoFactorEmail;
+    return Column(
+      key: const ValueKey('two_factor_panel'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Two-factor authentication',
+          style: BrandText.heading(color: context.colors.onSurface, size: 19),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          email == null
+              ? 'Enter the 6-digit code from your authenticator app to finish '
+                  'signing in.'
+              : 'Enter the 6-digit code from your authenticator app to finish '
+                  'signing in as $email.',
+          style:
+              BrandText.body(color: context.colors.onSurfaceVariant, size: 13),
+        ),
+        const SizedBox(height: 16),
+        _fieldLabel(
+            context, _useRecoveryCode ? 'Recovery code' : 'Authenticator code'),
+        const SizedBox(height: 8),
+        _twoFactorCodeField(context, account),
+        if (account.twoFactorAcceptsRecoveryCode)
+          _recoveryCodeToggle(context, account),
+        const SizedBox(height: 12),
+        BrandButton(
+          label: 'Verify & sign in',
+          isLoading: account.isBusy,
+          onPressed: account.isBusy ? null : _completeTwoFactor,
+        ),
+        const SizedBox(height: 10),
+        TextButton(
+          key: const ValueKey('two_factor_start_over'),
+          onPressed: account.isBusy ? null : _cancelTwoFactor,
+          child: Text(
+            'Start over',
+            style: BrandText.title(
+                color: context.colors.onSurfaceVariant, size: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The second-factor code field, shared by the password form and the code
+  /// step. The server tells a 6-digit TOTP code from a recovery code
+  /// (xxxx-xxxxxx, hex) by its shape, so the field must let both through:
+  /// filtering to digits would silently strip a recovery code to nothing.
+  Widget _twoFactorCodeField(BuildContext context, AccountProvider account) {
+    return _field(
+      context,
+      fieldKey: const ValueKey('two_factor_code_field'),
+      controller: _twoFactorCodeController,
+      hint: _useRecoveryCode ? 'xxxx-xxxxxx' : '6-digit code',
+      icon: 'key',
+      keyboardType: _useRecoveryCode
+          ? TextInputType.visiblePassword
+          : TextInputType.number,
+      enabled: !account.isBusy,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z\- ]')),
+        LengthLimitingTextInputFormatter(64),
+      ],
+    );
+  }
+
+  /// Swaps the keyboard between the number pad (authenticator codes) and one
+  /// that can type a recovery code. A number pad has no letters, so without
+  /// this a user holding only a recovery code could not type it on a phone.
+  Widget _recoveryCodeToggle(BuildContext context, AccountProvider account) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        key: const ValueKey('two_factor_recovery_toggle'),
+        onPressed: account.isBusy
+            ? null
+            : () => setState(() => _useRecoveryCode = !_useRecoveryCode),
+        child: Text(
+          _useRecoveryCode
+              ? 'Use your authenticator code'
+              : 'Use a recovery code',
+          style:
+              BrandText.title(color: context.colors.onSurfaceVariant, size: 13),
+        ),
+      ),
     );
   }
 

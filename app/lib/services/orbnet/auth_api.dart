@@ -1,9 +1,9 @@
 // lib/services/orbnet/auth_api.dart
 //
-// Thin wrappers over the OrbNet auth endpoints. Ported from OrbX (passkey/QR/
-// device-management endpoints omitted for Phase A1 — email+password and
-// magic-link are the supported paths). All endpoints are POST with no auth
-// header (skipAuth), except /auth/logout which sends the current session.
+// Thin wrappers over the OrbNet auth endpoints. Ported from OrbX (QR/
+// device-management endpoints omitted). The sign-in endpoints are POST with no
+// auth header (skipAuth), including the second-factor completion; the
+// passkey-management, account and logout calls send the current session.
 
 import 'orbnet_api_client.dart';
 
@@ -112,11 +112,30 @@ class AuthApi {
     );
   }
 
-  /// Verify a magic-link token / code and complete sign-in.
+  /// Verify a magic-link token / code and complete sign-in. For an account
+  /// with TOTP enabled the answer is a `requires_2fa` challenge instead of
+  /// tokens; finish it with [completeTwoFactor].
   Future<Map<String, dynamic>> verifyMagicLink(String token) async {
     return await _client.post<Map<String, dynamic>>(
       '/auth/magic-link/verify',
       data: {'token': token, 'client': kOrbGuardClient},
+      skipAuth: true,
+    );
+  }
+
+  /// Second step of any sign-in that answered `requires_2fa`: the pending
+  /// token from that answer plus the user's 6-digit TOTP code or a recovery
+  /// code. Returns the same auth envelope the first step would have.
+  ///
+  /// No bearer and no `client`: the pending token is the proof, and it already
+  /// remembers which app and which kind of session it is for.
+  Future<Map<String, dynamic>> completeTwoFactor({
+    required String pendingToken,
+    required String code,
+  }) async {
+    return await _client.post<Map<String, dynamic>>(
+      '/auth/2fa/complete',
+      data: {'pending_token': pendingToken, 'code': code},
       skipAuth: true,
     );
   }

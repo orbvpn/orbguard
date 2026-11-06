@@ -25,16 +25,50 @@ import 'auth_api.dart';
 import 'passkey_webauthn_service.dart';
 import 'models/auth_response.dart';
 import 'models/passkey_info.dart';
+import 'models/two_factor_challenge.dart';
 import 'models/user.dart';
 import 'network_error.dart' as net_err;
 import 'orbnet_api_client.dart';
 import 'social_auth_service.dart';
 
-/// Thrown when the account has 2FA enabled and a TOTP code is required.
+/// Thrown when a sign-in's first factor succeeded but the account has TOTP
+/// enabled, so a second factor is owed before any session exists.
+///
+/// [challenge] carries the pending token for `POST /auth/2fa/complete`. It is
+/// null only when the server asked for a code without sending one; the
+/// password path answers that by re-posting the password with the code.
 class TwoFactorRequiredException implements Exception {
   final String message;
-  TwoFactorRequiredException(
-      [this.message = 'Two-factor authentication required']);
+  final TwoFactorChallenge? challenge;
+  TwoFactorRequiredException({
+    this.challenge,
+    this.message = 'Two-factor authentication required',
+  });
+  @override
+  String toString() => message;
+}
+
+/// Why OrbNet refused a second-factor code.
+enum TwoFactorFailure {
+  /// Wrong TOTP or recovery code (TWO_FACTOR_INVALID). The pending sign-in is
+  /// still open, so the user can try another code.
+  invalidCode,
+
+  /// Too many wrong codes in a short time (TWO_FACTOR_LOCKED) or too many
+  /// requests. Waiting is the only fix; the pending sign-in is not spent.
+  locked,
+
+  /// The pending sign-in is over (TWO_FACTOR_PENDING_INVALID): expired,
+  /// already completed, or its magic link already used. Sign in again.
+  expired,
+}
+
+/// A second-factor code OrbNet refused, classified by [reason]. [message] is
+/// the server's own wording.
+class TwoFactorException implements Exception {
+  final TwoFactorFailure reason;
+  final String message;
+  TwoFactorException(this.reason, this.message);
   @override
   String toString() => message;
 }
@@ -119,7 +153,8 @@ class AuthRepository {
   // ---- Login ---------------------------------------------------------------
 
   /// Login with email + password. Throws [TwoFactorRequiredException] when the
-  /// account needs a TOTP code.
+  /// account needs a TOTP code, and [TwoFactorException] when the [totpCode]
+  /// sent with a re-post is refused.
   Future<AuthResponse> login(String email, String password,
       {String? totpCode}) async {
     email = email.trim().toLowerCase();
@@ -131,8 +166,18 @@ class AuthRepository {
     await _secureStorage.delete(key: 'auth_token');
     await _secureStorage.delete(key: 'refresh_token');
 
-    final result =
-        await _authApi.login(email: email, password: password, totpCode: totpCode);
+    final Map<String, dynamic> result;
+    try {
+      result = await _authApi.login(
+          email: email, password: password, totpCode: totpCode);
+    } on ApiException catch (e) {
+      // A wrong or rate-limited code answers with the second-factor errors
+      // /auth/2fa/complete uses. Left as a plain 401 it would read as
+      // "incorrect email or password" while the password was right.
+      final failure = _twoFactorFailureForCode(e.code);
+      if (failure == null) rethrow;
+      throw TwoFactorException(failure, e.message);
+    }
 
     final AuthResponse response = await _persistAuthResult(result);
     _log('Login successful: ${response.user.email}');
@@ -205,13 +250,63 @@ class AuthRepository {
   Future<void> clearPendingMagicRequest() =>
       _secureStorage.delete(key: _magicRequestedAtKey);
 
-  /// Verify a magic-link code/token and complete sign-in.
+  /// Verify a magic-link code/token and complete sign-in. For an account with
+  /// TOTP enabled this throws [TwoFactorRequiredException] carrying the
+  /// pending challenge; nothing is stored until [completeTwoFactor] succeeds.
   Future<AuthResponse> verifyMagicLogin(String email, String code) async {
     final result = await _authApi.verifyMagicLink(code);
     final response = await _persistAuthResult(result);
     _log('Magic login successful: ${response.user.email}');
     return response;
   }
+
+  // ---- Second factor -------------------------------------------------------
+
+  /// Finish a sign-in that stopped for the second factor (magic link, Google,
+  /// Apple or passkey): send the challenge's [pendingToken] with the user's
+  /// 6-digit TOTP code or a recovery code, then persist the session through
+  /// the same path the first step would have used.
+  ///
+  /// Throws [TwoFactorException] when the code or the pending sign-in is
+  /// refused. Network and other failures surface unchanged, so the caller can
+  /// keep the challenge and let the user retry.
+  Future<AuthResponse> completeTwoFactor(
+      String pendingToken, String code) async {
+    final Map<String, dynamic> result;
+    try {
+      result = await _authApi.completeTwoFactor(
+          pendingToken: pendingToken, code: code);
+    } on ApiException catch (e) {
+      final failure = _completionFailure(e);
+      if (failure == null) rethrow;
+      throw TwoFactorException(failure, e.message);
+    }
+    final response = await _persistAuthResult(result);
+    _log('Two-factor sign-in completed: ${response.user.email}');
+    return response;
+  }
+
+  /// Classifies a refused completion. Beyond the three documented codes: the
+  /// route shares /auth/login's per-IP limiter, whose 429 says RATE_LIMITED —
+  /// to the user that is the same "wait, then try again", and the pending
+  /// sign-in survives it. Any other 401 there can only mean the pending token
+  /// itself was refused, so it is treated as over: inviting more codes against
+  /// a token that can no longer succeed would only frustrate the user.
+  static TwoFactorFailure? _completionFailure(ApiException e) {
+    final byCode = _twoFactorFailureForCode(e.code);
+    if (byCode != null) return byCode;
+    if (e.statusCode == 429) return TwoFactorFailure.locked;
+    if (e is AuthenticationException) return TwoFactorFailure.expired;
+    return null;
+  }
+
+  static TwoFactorFailure? _twoFactorFailureForCode(String? code) =>
+      switch (code) {
+        'TWO_FACTOR_INVALID' => TwoFactorFailure.invalidCode,
+        'TWO_FACTOR_LOCKED' => TwoFactorFailure.locked,
+        'TWO_FACTOR_PENDING_INVALID' => TwoFactorFailure.expired,
+        _ => null,
+      };
 
   // ---- Social OAuth (Google / Apple) --------------------------------------
 
@@ -354,8 +449,13 @@ class AuthRepository {
   Future<AuthResponse> _persistAuthResult(Map<String, dynamic> result) async {
     final data = result['data'] as Map<String, dynamic>? ?? result;
 
+    // Every sign-in method lands here, so this is the one place the
+    // second-factor challenge is read. It carries no tokens and only the
+    // email, so nothing is cached or written: the session starts when
+    // completeTwoFactor succeeds.
     if (data['requires_2fa'] == true) {
-      throw TwoFactorRequiredException();
+      throw TwoFactorRequiredException(
+          challenge: TwoFactorChallenge.fromAuthData(data));
     }
 
     final tokens = data['tokens'] as Map<String, dynamic>?;

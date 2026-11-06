@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orbguard/services/orbnet/magic_link_deep_link.dart';
 
@@ -78,6 +80,96 @@ void main() {
     test('a link carrying no code yields null, never the raw URL', () {
       expect(magicCodeFromPastedText('https://orbvpn.com/'), isNull);
       expect(magicCodeFromPastedText('orbguard://login'), isNull);
+    });
+  });
+
+  // app_links hands the link that launched the app to getInitialLink AND to
+  // the first listener of its stream. Redeemed twice, the second answer would
+  // replace the code step the first one opened.
+  group('MagicLinkDeepLinkHandler', () {
+    final launch = Uri.parse('orbguard://login?code=LAUNCH');
+
+    /// A link stream that, like app_links, first gives its listener [replay].
+    StreamController<Uri> linkStream({Uri? replay}) {
+      late final StreamController<Uri> controller;
+      controller = StreamController<Uri>(onListen: () {
+        if (replay != null) controller.add(replay);
+      });
+      addTearDown(controller.close);
+      return controller;
+    }
+
+    MagicLinkDeepLinkHandler handler(
+      List<String> codes, {
+      required Future<Uri?> Function() initialLink,
+      required StreamController<Uri> links,
+    }) {
+      final handler = MagicLinkDeepLinkHandler(
+        (code) async => codes.add(code),
+        initialLink: initialLink,
+        linkStream: () => links.stream,
+      );
+      addTearDown(handler.dispose);
+      return handler;
+    }
+
+    Future<void> flush() => Future<void>.delayed(Duration.zero);
+
+    test('the launch link is redeemed once, not again when the stream replays it',
+        () async {
+      final codes = <String>[];
+      final links = linkStream(replay: launch);
+      await handler(codes, initialLink: () async => launch, links: links)
+          .start();
+      await flush();
+      expect(codes, ['LAUNCH']);
+
+      // The same link tapped again while the app runs is a real tap.
+      links.add(launch);
+      await flush();
+      expect(codes, ['LAUNCH', 'LAUNCH']);
+    });
+
+    test('a different first link after the launch link is redeemed', () async {
+      final codes = <String>[];
+      final links = linkStream();
+      await handler(codes, initialLink: () async => launch, links: links)
+          .start();
+      links.add(Uri.parse('orbguard://login?code=OTHER'));
+      await flush();
+      expect(codes, ['LAUNCH', 'OTHER']);
+    });
+
+    test('with no launch link the first link is redeemed', () async {
+      final codes = <String>[];
+      final links = linkStream();
+      await handler(codes, initialLink: () async => null, links: links).start();
+      links.add(launch);
+      await flush();
+      expect(codes, ['LAUNCH']);
+    });
+
+    test('a failed launch-link lookup still listens for links', () async {
+      final codes = <String>[];
+      final links = linkStream();
+      await handler(codes,
+              initialLink: () async => throw StateError('no app_links'),
+              links: links)
+          .start();
+      links.add(launch);
+      await flush();
+      expect(codes, ['LAUNCH']);
+    });
+
+    test('links that are not sign-in links are ignored', () async {
+      final codes = <String>[];
+      final links = linkStream();
+      await handler(codes, initialLink: () async => null, links: links).start();
+      links
+        ..add(Uri.parse('orbguard://settings?code=X'))
+        ..add(Uri.parse('orbvpn://login?code=Y'));
+      await flush();
+      expect(codes, isEmpty);
     });
   });
 }

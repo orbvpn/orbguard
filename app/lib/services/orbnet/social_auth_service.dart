@@ -16,7 +16,7 @@
 
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -40,6 +40,8 @@ class SocialAuthCancelledException implements Exception {
 /// On [success], [data] carries the raw OrbNet `/auth/oauth/login` envelope
 /// (`{success, data:{user, tokens:{access_token, refresh_token}}}`) so the
 /// repository can persist it through the exact same path as email/magic login.
+/// For an account with TOTP enabled that envelope is the `requires_2fa`
+/// challenge instead, which the same path turns into the code prompt.
 class SocialAuthResult {
   final bool success;
   final bool cancelled;
@@ -164,7 +166,7 @@ class SocialAuthService {
             SocialAuthProvider.google, _googleFailCopy);
       }
 
-      return _exchangeWithBackend(
+      return exchangeWithBackend(
           idToken, 'google', SocialAuthProvider.google, _googleFailCopy);
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
@@ -207,7 +209,7 @@ class SocialAuthService {
             SocialAuthProvider.apple, _appleFailCopy);
       }
 
-      return _exchangeWithBackend(
+      return exchangeWithBackend(
           idToken, 'apple', SocialAuthProvider.apple, _appleFailCopy);
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
@@ -236,7 +238,8 @@ class SocialAuthService {
 
   /// Exchange a provider idToken for OrbNet JWTs and validate the envelope
   /// actually carries an access token before claiming success.
-  Future<SocialAuthResult> _exchangeWithBackend(
+  @visibleForTesting
+  Future<SocialAuthResult> exchangeWithBackend(
     String idToken,
     String provider,
     SocialAuthProvider providerEnum,
@@ -247,6 +250,15 @@ class SocialAuthService {
           await _authApi.oauthLogin(provider: provider, token: idToken);
 
       final data = result['data'] as Map<String, dynamic>? ?? result;
+
+      // For an account with TOTP enabled a good provider token earns a
+      // second-factor challenge, not tokens. That is the first factor
+      // succeeding, so hand the envelope on: the repository turns it into the
+      // code prompt exactly as it does for a magic link.
+      if (data['requires_2fa'] == true) {
+        return SocialAuthResult.success(providerEnum, result);
+      }
+
       final tokens = data['tokens'] as Map<String, dynamic>?;
       final accessToken = (tokens?['access_token'] ??
           data['access_token'] ??

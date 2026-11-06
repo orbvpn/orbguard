@@ -174,6 +174,9 @@ class OrbNetApiClient {
       '/auth/reset-password',
       '/auth/magic-link',
       '/auth/oauth',
+      // The second sign-in step proves itself with the pending token in the
+      // body. Listed exactly: the other /auth/2fa/* routes need the session.
+      '/auth/2fa/complete',
       '/health',
     ];
     return publicPaths.any((p) => path.startsWith(p));
@@ -306,27 +309,31 @@ class OrbNetApiClient {
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
         String message = 'Request failed';
+        String? code;
         if (data is Map<String, dynamic>) {
-          message = (data['detail'] ??
-              data['message'] ??
-              data['title'] ??
-              data['error'] ??
-              message) as String;
+          message = _firstString(
+                  data, const ['detail', 'message', 'title', 'error']) ??
+              message;
+          code = _errorCode(data);
         }
         if (statusCode == 401) {
-          return AuthenticationException(message);
+          return AuthenticationException(message,
+              code: code, statusCode: statusCode);
         } else if (statusCode == 403) {
-          return AuthorizationException(message);
+          return AuthorizationException(message,
+              code: code, statusCode: statusCode);
         } else if (statusCode == 402) {
-          return PaymentRequiredException(message);
+          return PaymentRequiredException(message,
+              code: code, statusCode: statusCode);
         } else if (statusCode == 404) {
-          return NotFoundException(message);
+          return NotFoundException(message, code: code, statusCode: statusCode);
         } else if (statusCode == 422) {
-          return ValidationException(message);
+          return ValidationException(message,
+              code: code, statusCode: statusCode);
         } else if (statusCode != null && statusCode >= 500) {
-          return ServerException(message);
+          return ServerException(message, code: code, statusCode: statusCode);
         }
-        return ApiException(message);
+        return ApiException(message, code: code, statusCode: statusCode);
       case DioExceptionType.cancel:
         return ApiException('Request cancelled');
       case DioExceptionType.badCertificate:
@@ -337,6 +344,31 @@ class OrbNetApiClient {
         }
         return ApiException('An unexpected error occurred');
     }
+  }
+
+  /// The first of [keys] whose value is a non-empty string. A body that puts
+  /// an object under one of them must not turn error handling itself into a
+  /// TypeError.
+  static String? _firstString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value is String && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static final RegExp _errorCodeShape = RegExp(r'^[A-Z][A-Z0-9_]*$');
+
+  /// OrbNet's machine-readable error code: `code` in its RFC 7807 problem
+  /// bodies, `error` in the older device-limit shape. Some endpoints put a
+  /// sentence under `error`, which is not a code, so only an UPPER_SNAKE value
+  /// is taken from there.
+  static String? _errorCode(Map<String, dynamic> data) {
+    final code = data['code'];
+    if (code is String && code.isNotEmpty) return code;
+    final error = data['error'];
+    if (error is String && _errorCodeShape.hasMatch(error)) return error;
+    return null;
   }
 
   void _log(String message) {
@@ -376,41 +408,50 @@ class OrbNetApiClient {
 /// Base API exception.
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+
+  /// OrbNet's machine-readable error code (e.g. `TWO_FACTOR_INVALID`) when the
+  /// response carried one. The message is for people; a flow that has to tell
+  /// apart two failures with the same HTTP status keys on this instead.
+  final String? code;
+
+  /// The HTTP status of the response that produced this error, if any.
+  final int? statusCode;
+
+  ApiException(this.message, {this.code, this.statusCode});
   @override
   String toString() => message;
 }
 
 /// Authentication exception (401).
 class AuthenticationException extends ApiException {
-  AuthenticationException(super.message);
+  AuthenticationException(super.message, {super.code, super.statusCode});
 }
 
 /// Authorization exception (403).
 class AuthorizationException extends ApiException {
-  AuthorizationException(super.message);
+  AuthorizationException(super.message, {super.code, super.statusCode});
 }
 
 /// Payment/quota required (402). The server positively refused an operation the
 /// account can't currently afford — used by scan-credit consumption to signal an
 /// empty balance ("out of credits, watch an ad").
 class PaymentRequiredException extends ApiException {
-  PaymentRequiredException(super.message);
+  PaymentRequiredException(super.message, {super.code, super.statusCode});
 }
 
 /// Not found exception (404).
 class NotFoundException extends ApiException {
-  NotFoundException(super.message);
+  NotFoundException(super.message, {super.code, super.statusCode});
 }
 
 /// Validation exception (422).
 class ValidationException extends ApiException {
-  ValidationException(super.message);
+  ValidationException(super.message, {super.code, super.statusCode});
 }
 
 /// Server exception (5xx).
 class ServerException extends ApiException {
-  ServerException(super.message);
+  ServerException(super.message, {super.code, super.statusCode});
 }
 
 /// Network-layer exception (timeout, connection refused, DNS, TLS). No HTTP

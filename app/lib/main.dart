@@ -102,6 +102,7 @@ import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
 import 'providers/account_provider.dart';
+import 'screens/account/two_factor_resume.dart';
 import 'services/orbnet/magic_link_deep_link.dart';
 import 'providers/scan_credit_provider.dart';
 import 'services/ads/rewarded_ad_service.dart';
@@ -127,6 +128,11 @@ import 'services/device_agent/push_service.dart';
 late ThreatIntelligenceManager threatIntel;
 late AdvancedDetectionManager advancedDetection;
 late SpecialPermissionsManager specialPermissions;
+
+/// The root navigator. [TwoFactorResume] wraps it in MaterialApp.builder, so
+/// this key is how it opens the sign-in screen for a pending two-factor code
+/// step.
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -291,6 +297,7 @@ class AntiSpywareApp extends StatelessWidget {
       child: _PremiumModeSync(
         child: Consumer<SettingsProvider>(
           builder: (context, settings, _) => MaterialApp(
+            navigatorKey: _rootNavigatorKey,
             title: 'OrbGuard',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
@@ -311,7 +318,14 @@ class AntiSpywareApp extends StatelessWidget {
               return GlassGradientBackground(
                 isDark: isDark,
                 child: _MagicLinkGate(
-                  child: AppLockGate(child: child ?? const SizedBox.shrink()),
+                  // Inside the lock, so the code-step check reruns whenever
+                  // an unlock rebuilds the navigator the lock tore down.
+                  child: AppLockGate(
+                    child: TwoFactorResume(
+                      navigatorKey: _rootNavigatorKey,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                  ),
                 ),
               );
             },
@@ -387,6 +401,17 @@ class _MagicLinkGateState extends State<_MagicLinkGate> {
     if (!mounted) return;
     final ok = await account.verifyMagicCode('', code);
     if (!mounted) return;
+    if (!ok && account.hasPendingTwoFactor) {
+      // The link was good, but the account has two-factor authentication on
+      // and the sign-in now waits for its code. That step lives on the
+      // sign-in screen, which TwoFactorResume opens if none is: right away,
+      // or after unlock when the app lock covers the app.
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Enter the code from your authenticator app to finish signing in.'),
+      ));
+      return;
+    }
     // No popUntil here: LoginScreen closes itself with pop(true) when the
     // account flips to logged-in. popUntil(isFirst) resolved that awaited
     // push with null — so callers that gate on the result (scan_gate,

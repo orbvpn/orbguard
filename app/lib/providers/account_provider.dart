@@ -22,27 +22,68 @@ import '../services/orbnet/token_service.dart';
 import '../services/orbnet/models/auth_response.dart';
 import '../services/orbnet/models/passkey_info.dart';
 import '../services/orbnet/models/subscription_status.dart';
+import '../services/orbnet/models/two_factor_challenge.dart';
 import '../services/orbnet/models/user.dart';
+
+/// The sign-in method that left a second factor pending. Completion has to
+/// finish the way that method finishes: for a magic link that includes
+/// spending this device's "asked for a link" marker.
+enum _TwoFactorOrigin { magicLink, google, apple, passkey }
+
+/// A sign-in waiting for its second factor, and how it began.
+class _PendingTwoFactor {
+  const _PendingTwoFactor(this.challenge, this.origin, this.deadline);
+  final TwoFactorChallenge challenge;
+  final _TwoFactorOrigin origin;
+
+  /// When the server stops honouring [challenge]'s pending token.
+  final DateTime deadline;
+}
 
 class AccountProvider extends ChangeNotifier {
   late final AuthRepository _repo;
   late final TokenService _tokenService;
   late final bool _enableProactiveRefresh;
+  late final DateTime Function() _now;
 
   User? _user;
   bool _isInitialized = false;
   bool _busy = false;
   String? _error;
-  bool _requiresTwoFactor = false;
+
+  // A password sign-in waiting for its code. It is answered by re-posting the
+  // password with the code (login(totpCode:)), which the server still honours.
+  bool _passwordTwoFactor = false;
+
+  // A magic-link, Google, Apple or passkey sign-in waiting for its code. The
+  // challenge's pending token is a short-lived bearer for the second step, so
+  // it lives in memory only — never in storage, never in a log line.
+  //
+  // It outlives the sign-in screen on purpose. The app lock disposes every
+  // route while it covers the app, and with the lock on it does so each time
+  // the user switches to the authenticator app to read the code; the screen
+  // is put back afterwards (TwoFactorResume). So the challenge ends only when
+  // the user leaves the step, finishes it, starts another sign-in, signs out,
+  // or its time is up.
+  _PendingTwoFactor? _pendingTwoFactor;
+
+  // The server's bounds on a second-factor code (CompleteTwoFactorRequest
+  // `code`, LoginRequest `totp_code`): a 6-digit TOTP code at the short end,
+  // recovery codes well inside the long.
+  static const int _minTwoFactorCodeLength = 6;
+  static const int _maxTwoFactorCodeLength = 64;
 
   /// [enableProactiveRefresh] can be turned off in tests to avoid background
-  /// timers. Inject [authRepository]/[tokenService] for testing.
+  /// timers. Inject [authRepository]/[tokenService] for testing, and [clock]
+  /// to move time past a pending sign-in's deadline.
   AccountProvider({
     AuthRepository? authRepository,
     TokenService? tokenService,
     bool enableProactiveRefresh = true,
+    DateTime Function()? clock,
   }) {
     _enableProactiveRefresh = enableProactiveRefresh;
+    _now = clock ?? DateTime.now;
     _repo = authRepository ??
         AuthRepository(secureStorage: const FlutterSecureStorage());
     _tokenService = tokenService ?? TokenService(_repo);
@@ -74,8 +115,23 @@ class AccountProvider extends ChangeNotifier {
   /// The last user-facing error message (null when none).
   String? get lastError => _error;
 
-  /// True when the last login attempt needs a TOTP code.
-  bool get requiresTwoFactor => _requiresTwoFactor;
+  /// True when the last sign-in attempt is waiting for a second factor: the
+  /// 6-digit code from an authenticator app, or a recovery code.
+  bool get requiresTwoFactor => _passwordTwoFactor || _pendingTwoFactor != null;
+
+  /// True when the waiting sign-in began with a magic link, Google, Apple or a
+  /// passkey and completes through [completeTwoFactor]. False while a password
+  /// sign-in waits: that one re-posts the password with the code via [login].
+  /// The pending sign-in does not depend on any screen staying open.
+  bool get hasPendingTwoFactor => _pendingTwoFactor != null;
+
+  /// The account the pending second factor is for, as the server named it.
+  String? get twoFactorEmail => _pendingTwoFactor?.challenge.email;
+
+  /// Whether the code step may take a recovery code. True for the password
+  /// step too: the server checks `totp_code` with the same rules.
+  bool get twoFactorAcceptsRecoveryCode =>
+      _pendingTwoFactor?.challenge.acceptsRecoveryCode ?? true;
 
   /// Subscription status parsed from the current access-token claims.
   SubscriptionStatusFromToken get subscription =>
@@ -130,14 +186,32 @@ class AccountProvider extends ChangeNotifier {
 
   /// Sign in with email + password. Returns true on success. On a 2FA-enabled
   /// account, returns false and sets [requiresTwoFactor]; call again with a
-  /// [totpCode]. Never wipes an existing session on a network error.
+  /// [totpCode] (authenticator or recovery code). A blank [totpCode] counts as
+  /// none. Never wipes an existing session on a network error.
   Future<bool> login(String email, String password, {String? totpCode}) async {
     if (_busy) return false;
+    // A blank code field is no code: the password goes out alone and the
+    // server answers for the account typed in. The field stays on the form
+    // once a code was asked for, so this is how the user still reaches an
+    // account without TOTP; one with TOTP is just asked again, and the
+    // server counts an attempt only when there is a code to check.
+    final typed = totpCode?.replaceAll(_whitespace, '') ?? '';
+    final code = typed.isEmpty ? null : _twoFactorCodeOrNull(typed);
+    if (typed.isNotEmpty && code == null) {
+      // The re-post checks the code with the same rules as the code step,
+      // so the same malformed code is refused here without a request; the
+      // password step stays open for a proper one.
+      _error = _twoFactorCodeShape;
+      notifyListeners();
+      return false;
+    }
     _setBusy(true);
     _error = null;
-    _requiresTwoFactor = false;
+    _passwordTwoFactor = false;
+    // A new first factor supersedes a code step left open by another method.
+    _pendingTwoFactor = null;
     try {
-      final res = await _repo.login(email, password, totpCode: totpCode);
+      final res = await _repo.login(email, password, totpCode: code);
       _user = res.user;
       _startRefresh();
       _bootstrapDeviceOwnership();
@@ -145,8 +219,18 @@ class AccountProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on TwoFactorRequiredException {
-      _requiresTwoFactor = true;
+      // The password step keeps its re-post (the UI sends the password again
+      // with the code), so a pending token in this answer is not held.
+      _passwordTwoFactor = true;
       _error = 'Enter the 6-digit code from your authenticator app.';
+      _busy = false;
+      notifyListeners();
+      return false;
+    } on TwoFactorException catch (e) {
+      // The password was right and only the code was refused: stay on the
+      // code step instead of blaming the password.
+      _passwordTwoFactor = true;
+      _error = _twoFactorMessage(e.reason);
       _busy = false;
       notifyListeners();
       return false;
@@ -164,6 +248,8 @@ class AccountProvider extends ChangeNotifier {
     if (_busy) return false;
     _setBusy(true);
     _error = null;
+    // Asking for a fresh link starts over; a code step still open is moot.
+    _pendingTwoFactor = null;
     try {
       await _repo.requestMagicLink(email);
       _busy = false;
@@ -178,12 +264,20 @@ class AccountProvider extends ChangeNotifier {
   }
 
   /// Verify a magic-link code and complete sign-in. Returns true on success.
+  /// For an account with TOTP enabled it returns false with
+  /// [hasPendingTwoFactor] set: finish with [completeTwoFactor].
   Future<bool> verifyMagicCode(String email, String code) async {
     if (_busy) return false;
     _setBusy(true);
     _error = null;
+    _passwordTwoFactor = false;
+    // A code step already open stays until this verify has an answer. The
+    // same link can arrive twice (app_links replays a launch link to its
+    // first listener) or be tapped again, and if that second request fails
+    // the step it would have replaced is still good.
     try {
       final res = await _repo.verifyMagicLogin(email, code);
+      _pendingTwoFactor = null;
       _user = res.user;
       _startRefresh();
       _bootstrapDeviceOwnership();
@@ -192,22 +286,118 @@ class AccountProvider extends ChangeNotifier {
       _busy = false;
       notifyListeners();
       return true;
+    } on TwoFactorRequiredException catch (e) {
+      // The link proved the mailbox; the account still owes its code. The
+      // server leaves the link unspent until the code is right, and the
+      // "asked for a link" marker stays too, so an abandoned code step can be
+      // restarted by opening the same link again.
+      _awaitSecondFactor(e, _TwoFactorOrigin.magicLink);
+      _busy = false;
+      notifyListeners();
+      return false;
     } catch (e) {
-      _error = _friendlyError(e, magicFlow: true);
+      // With a code step still open, that step is what the user finishes; a
+      // refused or failed extra link says nothing about it, and an error
+      // about the link would only sit under the code field.
+      if (_pendingTwoFactor == null) {
+        _error = _friendlyError(e, magicFlow: true);
+      }
       _busy = false;
       notifyListeners();
       return false;
     }
   }
 
+  /// Finish the pending sign-in with [code]: the 6-digit authenticator code
+  /// or a recovery code. Returns true once signed in, which then looks exactly
+  /// like a direct success of the method that started it (session stored,
+  /// refresh running, device claimed). A wrong code, a lockout or a network
+  /// failure keeps the pending sign-in so the user can retry; an expired one
+  /// is dropped and the user starts again.
+  Future<bool> completeTwoFactor(String code) async {
+    if (_busy) return false;
+    final pending = _pendingTwoFactor;
+    if (pending == null || _isPastDeadline(pending)) {
+      // Nothing to send the code with, or the server's window for it has
+      // closed: either way the answer is "start again", without a request.
+      _pendingTwoFactor = null;
+      _error = _twoFactorExpired;
+      notifyListeners();
+      return false;
+    }
+    final normalized = _twoFactorCodeOrNull(code);
+    if (normalized == null) {
+      _error = _twoFactorCodeShape;
+      notifyListeners();
+      return false;
+    }
+    _setBusy(true);
+    _error = null;
+    try {
+      final res = await _repo.completeTwoFactor(
+          pending.challenge.pendingToken, normalized);
+      _pendingTwoFactor = null;
+      _user = res.user;
+      _startRefresh();
+      _bootstrapDeviceOwnership();
+      if (pending.origin == _TwoFactorOrigin.magicLink) {
+        // One request authorises one sign-in, as on a direct success.
+        await _repo.clearPendingMagicRequest();
+      }
+      _busy = false;
+      notifyListeners();
+      return true;
+    } on TwoFactorException catch (e) {
+      if (e.reason == TwoFactorFailure.expired) _pendingTwoFactor = null;
+      _error = _twoFactorMessage(e.reason);
+      _busy = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = _friendlyError(e);
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Abandon the code step: the user chose to start over, or left the sign-in
+  /// screen. A pending token is dropped now rather than left to expire. A
+  /// password step ends too, so the next sign-in screen opens on the plain
+  /// form: the account typed there has not been asked for a code.
+  void cancelTwoFactor() {
+    if (_pendingTwoFactor == null && !_passwordTwoFactor && _error == null) {
+      return;
+    }
+    _pendingTwoFactor = null;
+    _passwordTwoFactor = false;
+    _error = null;
+    notifyListeners();
+  }
+
+  /// Ends a pending sign-in whose time is up, with the message that says so,
+  /// and returns true when it ended one. The code step cannot tell by itself
+  /// that its minutes ran out while the app sat behind the lock or in the
+  /// background, so whatever is about to put it back on screen asks first.
+  bool expireStaleTwoFactor() {
+    final pending = _pendingTwoFactor;
+    if (pending == null || !_isPastDeadline(pending)) return false;
+    _pendingTwoFactor = null;
+    _error = _twoFactorExpired;
+    notifyListeners();
+    return true;
+  }
+
   /// Sign in with Google. Returns true on success. A user cancellation returns
   /// false WITHOUT setting an error (silent). Any real failure — including a
   /// missing native config or a backend audience rejection — sets a clear
   /// [lastError]; it never fakes a session.
-  Future<bool> loginWithGoogle() => _socialLogin(_repo.signInWithGoogle);
+  Future<bool> loginWithGoogle() =>
+      _socialLogin(_repo.signInWithGoogle, _TwoFactorOrigin.google);
 
   /// Sign in with Apple. Same contract as [loginWithGoogle].
-  Future<bool> loginWithApple() => _socialLogin(_repo.signInWithApple);
+  Future<bool> loginWithApple() =>
+      _socialLogin(_repo.signInWithApple, _TwoFactorOrigin.apple);
 
   /// Whether this device supports passkey sign-in (gates the passkey button).
   Future<bool> isPasskeyAvailable() => _repo.isPasskeyAvailable();
@@ -217,8 +407,8 @@ class AccountProvider extends ChangeNotifier {
 
   /// Sign in with a platform passkey. Same contract as [loginWithGoogle]:
   /// true on success, silent false on cancel, clear [lastError] on real failure.
-  Future<bool> loginWithPasskey(String email) =>
-      _socialLogin(() => _repo.signInWithPasskey(email));
+  Future<bool> loginWithPasskey(String email) => _socialLogin(
+      () => _repo.signInWithPasskey(email), _TwoFactorOrigin.passkey);
 
   /// Register a passkey for the signed-in account (biometric setup). Returns
   /// true on success; sets [lastError] and returns false on failure/cancel.
@@ -268,7 +458,8 @@ class AccountProvider extends ChangeNotifier {
       _tokenService.stopProactiveRefresh();
       await _repo.deleteAccount();
       _user = null;
-      _requiresTwoFactor = false;
+      _passwordTwoFactor = false;
+      _pendingTwoFactor = null;
       _busy = false;
       notifyListeners();
       return true;
@@ -281,12 +472,15 @@ class AccountProvider extends ChangeNotifier {
   }
 
   /// Shared driver for the social sign-in paths — mirrors [login]'s shape
-  /// (busy → repo → set user/session → notify), plus silent cancellation.
-  Future<bool> _socialLogin(Future<AuthResponse> Function() signIn) async {
+  /// (busy → repo → set user/session → notify), plus silent cancellation and
+  /// the second-factor step a TOTP account owes after the provider sheet.
+  Future<bool> _socialLogin(
+      Future<AuthResponse> Function() signIn, _TwoFactorOrigin origin) async {
     if (_busy) return false;
     _setBusy(true);
     _error = null;
-    _requiresTwoFactor = false;
+    _passwordTwoFactor = false;
+    _pendingTwoFactor = null;
     try {
       final res = await signIn();
       _user = res.user;
@@ -297,6 +491,11 @@ class AccountProvider extends ChangeNotifier {
       return true;
     } on SocialAuthCancelledException {
       // The user backed out of the native sheet — not an error.
+      _busy = false;
+      notifyListeners();
+      return false;
+    } on TwoFactorRequiredException catch (e) {
+      _awaitSecondFactor(e, origin);
       _busy = false;
       notifyListeners();
       return false;
@@ -326,7 +525,8 @@ class AccountProvider extends ChangeNotifier {
     }
     _user = null;
     _error = null;
-    _requiresTwoFactor = false;
+    _passwordTwoFactor = false;
+    _pendingTwoFactor = null;
     notifyListeners();
   }
 
@@ -372,6 +572,62 @@ class AccountProvider extends ChangeNotifier {
   }
 
   // ---- Internals -----------------------------------------------------------
+
+  static const String _twoFactorExpired =
+      'Your sign-in expired. Please start again.';
+
+  static const String _twoFactorCodeShape =
+      'Enter the 6-digit code from your authenticator app, or one of your '
+      'recovery codes.';
+
+  // One definition of the spaces a typed code may carry, so "blank" in
+  // login() and the length check in _twoFactorCodeOrNull() cannot disagree.
+  static final RegExp _whitespace = RegExp(r'\s');
+
+  /// [code] as the server reads it, whitespace dropped, or null when no code
+  /// is that short or that long. The server drops spaces too, but only after
+  /// its length check, so "123 45" would pass that check and spend one of the
+  /// few attempts the lockout allows on a code that cannot be right.
+  static String? _twoFactorCodeOrNull(String code) {
+    final normalized = code.replaceAll(_whitespace, '');
+    if (normalized.length < _minTwoFactorCodeLength ||
+        normalized.length > _maxTwoFactorCodeLength) {
+      return null;
+    }
+    return normalized;
+  }
+
+  bool _isPastDeadline(_PendingTwoFactor pending) =>
+      !_now().isBefore(pending.deadline);
+
+  static String _twoFactorMessage(TwoFactorFailure reason) => switch (reason) {
+        TwoFactorFailure.invalidCode =>
+          'That code is incorrect. Enter the current code from your '
+              'authenticator app and try again.',
+        TwoFactorFailure.locked =>
+          'Too many attempts. Wait a few minutes, then try again.',
+        TwoFactorFailure.expired => _twoFactorExpired,
+      };
+
+  /// Holds the challenge a first factor earned so the code step can complete
+  /// it. Without a pending token there is nothing to send a code with — only
+  /// the password re-post can answer such a server — so say that instead of
+  /// showing a code field that could never succeed.
+  void _awaitSecondFactor(
+      TwoFactorRequiredException e, _TwoFactorOrigin origin) {
+    final challenge = e.challenge;
+    if (challenge == null) {
+      // The newest answer about this sign-in wins over a code step still
+      // open from an earlier one: showing both would contradict itself.
+      _pendingTwoFactor = null;
+      _error = 'This account uses two-factor authentication. Choose '
+          '"Use password instead" and enter your authenticator code there.';
+      return;
+    }
+    _pendingTwoFactor = _PendingTwoFactor(
+        challenge, origin, _now().add(challenge.expiresIn));
+    _error = null;
+  }
 
   void _startRefresh() {
     if (_enableProactiveRefresh) _tokenService.startProactiveRefresh();
