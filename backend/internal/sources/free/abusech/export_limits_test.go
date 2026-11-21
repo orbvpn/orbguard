@@ -164,21 +164,49 @@ func TestExportLargestLegalRowsStayBounded(t *testing.T) {
 func TestExportStrayQuoteCannotSpliceRows(t *testing.T) {
 	broken := `"500","` + limitsWhen + `","http://broken.example/a","online","` + limitsWhen +
 		`","malware_download","elf,"https://urlhaus.example/1/","r` + "\n"
-	body := urlhausHeader + limitsRows(30) + broken + strings.ReplaceAll(limitsRows(30), "bad", "later")
+	// Here the last field never closes although the row has the right column
+	// count, so only the closing-quote rule can reject it.
+	unclosed := `"501","` + limitsWhen + `","http://broken.example/b","online","` + limitsWhen +
+		`","malware_download","elf","https://urlhaus.example/2/","r` + "\n"
+	body := urlhausHeader + limitsRows(30) + broken + unclosed + strings.ReplaceAll(limitsRows(30), "bad", "later")
 
 	c := limitsConnector(t, "http://127.0.0.1:1")
 	parsed, err := parseExport(strings.NewReader(body), c.feed.spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parsed.read != 61 || parsed.bad != 1 || len(parsed.rows) != 60 {
-		t.Fatalf("read=%d bad=%d kept=%d, want 61, 1 and 60", parsed.read, parsed.bad, len(parsed.rows))
+	if parsed.read != 62 || parsed.bad != 2 || len(parsed.rows) != 60 {
+		t.Fatalf("read=%d bad=%d kept=%d, want 62, 2 and 60", parsed.read, parsed.bad, len(parsed.rows))
 	}
 	for _, row := range parsed.rows {
 		if strings.Contains(row.get("url"), "broken.example") {
 			t.Fatalf("the broken row was kept: %q", row.get("url"))
 		}
 	}
+}
+
+// A connection lost after the sniff window, with many whole rows already read,
+// must fail the fetch rather than deliver the part that arrived.
+func TestExportCutOffAfterManyRowsIsAFailedFetch(t *testing.T) {
+	body := urlhausHeader + limitsRows(400)
+	if len(body) <= exportSniffBytes {
+		t.Fatalf("fixture of %d bytes does not pass the sniff window", len(body))
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprint(len(body)*2))
+		_, _ = io.WriteString(w, body)
+		w.(http.Flusher).Flush()
+		if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+			_ = conn.Close()
+		}
+	}))
+	defer srv.Close()
+
+	result, err := limitsConnector(t, srv.URL).Fetch(context.Background())
+	if err == nil || result.Success || len(result.RawIndicators) != 0 {
+		t.Fatalf("a cut-off file was accepted: err=%v success=%v rows=%d", err, result.Success, len(result.RawIndicators))
+	}
+	assertNoKey(t, "cut-off", err.Error())
 }
 
 func TestExportQuotedFieldsAreRead(t *testing.T) {
