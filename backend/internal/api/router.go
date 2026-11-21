@@ -138,9 +138,9 @@ func (r *Router) Setup() http.Handler {
 		// Sources endpoints
 		api.Route("/sources", func(sources chi.Router) {
 			sources.Get("/", r.handlers.Sources.List)
-			sources.Post("/", r.handlers.Sources.Create)
+			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/", r.handlers.Sources.Create)
 			sources.Get("/{slug}", r.handlers.Sources.Get)
-			sources.Patch("/{slug}", r.handlers.Sources.Update)
+			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/{slug}", r.handlers.Sources.Update)
 		})
 
 		// Alerts endpoints
@@ -181,8 +181,8 @@ func (r *Router) Setup() http.Handler {
 		// Path aliases: /api/v1/intel/sources -> /api/v1/sources (Flutter compatibility)
 		api.Get("/intel/sources", r.handlers.Sources.List)
 		api.Get("/intel/sources/{slug}", r.handlers.Sources.Get)
-		api.Post("/intel/sources", r.handlers.Sources.Create)
-		api.Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
+		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/intel/sources", r.handlers.Sources.Create)
+		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
 
 		// URL/Safe Web protection endpoints
 		api.Route("/url", func(url chi.Router) {
@@ -751,6 +751,9 @@ func (r *Router) Setup() http.Handler {
 
 		// Playbooks endpoints
 		api.Route("/playbooks", func(pb chi.Router) {
+			// The store is global and has no owner field, so no route is safe
+			// for a device key.
+			pb.Use(apimiddleware.AdminAuth(r.config.JWT.Secret))
 			pb.Get("/", r.handlers.Playbooks.List)
 			pb.Post("/", r.handlers.Playbooks.Create)
 			pb.Get("/executions", r.handlers.Playbooks.GetExecutions)
