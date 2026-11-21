@@ -132,6 +132,9 @@ func main() {
 	registry := sources.NewRegistry(log)
 	registerConnectors(registry, log)
 	registry.ConfigureFromSourcesConfig(cfg.Sources)
+	if redisCache != nil {
+		abusech.ShareFetchGate(registry.List(), redisCache)
+	}
 
 	// Register connectors with aggregator
 	for _, conn := range registry.List() {

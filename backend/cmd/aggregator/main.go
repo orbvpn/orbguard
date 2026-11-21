@@ -148,6 +148,9 @@ func NewAggregatorWorker(
 	registry := sources.NewRegistry(log)
 	registerConnectors(registry, log)
 	registry.ConfigureFromSourcesConfig(cfg.Sources)
+	if cache != nil {
+		abusech.ShareFetchGate(registry.List(), cache)
+	}
 
 	// Register connectors with aggregator
 	for _, conn := range registry.List() {
