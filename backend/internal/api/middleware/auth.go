@@ -318,6 +318,16 @@ func ClientSubscriber(r *http.Request) string {
 	return addr
 }
 
+// ClientSite is the client address for a limit shared by keys that cannot be
+// told apart otherwise: the IPv4 address, or the IPv6 /48.
+func ClientSite(r *http.Request) string {
+	addr := ClientAddress(r)
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+		return ClientNetwork(r)
+	}
+	return addr
+}
+
 // KeyIssuerTag is the value stored on a new device key: a hash of the client
 // network it was issued on, so the stored key holds no address.
 func KeyIssuerTag(r *http.Request) string {

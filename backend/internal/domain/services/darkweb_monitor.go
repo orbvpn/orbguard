@@ -33,6 +33,9 @@ var (
 	// ErrBreachProvidersFailed means a check could not be completed. It holds
 	// no provider error text, which can contain the address that was checked.
 	ErrBreachProvidersFailed = errors.New("breach providers failed")
+	// errBreachCheckPartial is ErrBreachProvidersFailed when at least one
+	// provider did answer, so the lookup was a real one.
+	errBreachCheckPartial = fmt.Errorf("check incomplete: %w", ErrBreachProvidersFailed)
 	// ErrDarkWebStorageUnavailable is returned when the service is running
 	// without a database and a persistence-backed operation is requested.
 	ErrDarkWebStorageUnavailable = errors.New("dark web monitoring storage unavailable: database not connected")
@@ -163,7 +166,7 @@ func (m *DarkWebMonitor) paidEmailLookup(ctx context.Context, email string, char
 
 	result, err := m.checkEmailProviders(ctx, email)
 	if err != nil {
-		m.refundPaidLookup(ctx, reservation)
+		m.settleFailedLookup(ctx, reservation, err)
 		// A request the client abandoned says nothing about the providers.
 		if errors.Is(err, ErrBreachProvidersFailed) && ctx.Err() == nil {
 			m.rememberPaidLookup(ctx, email, nil)
@@ -243,6 +246,9 @@ func (m *DarkWebMonitor) checkEmailProviders(ctx context.Context, email string) 
 	}
 
 	if failed > 0 && len(merged) == 0 {
+		if failed < len(results) {
+			return nil, errBreachCheckPartial
+		}
 		return nil, ErrBreachProvidersFailed
 	}
 
@@ -687,7 +693,7 @@ func (m *DarkWebMonitor) sweepAssets(ctx context.Context, assets []models.Monito
 		// sees fresh data, then update the cache for subsequent reads.
 		result, err := m.checkEmailProviders(ctx, asset.AssetValue)
 		if err != nil {
-			m.refundPaidLookup(ctx, reservation)
+			m.settleFailedLookup(ctx, reservation, err)
 			m.logger.Warn().Err(err).Str("asset_id", asset.ID.String()).Msg("failed to refresh asset")
 			if consecutiveFailures++; consecutiveFailures >= sweepMaxConsecutiveFailures {
 				return fmt.Errorf("refresh stopped: %w", err)

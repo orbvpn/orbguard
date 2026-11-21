@@ -101,6 +101,9 @@ func paidLookupCaller(r *http.Request) services.PaidLookupCaller {
 		time.Since(expiry.Add(-authAPIKeyTTL)) >= establishedDeviceKeyAge {
 		caller.Tier = services.PaidLookupEstablished
 		caller.Issuer = middleware.GetDeviceKeyIssuer(ctx)
+		if caller.Issuer == "" {
+			caller.Address = middleware.ClientSite(r)
+		}
 	}
 	return caller
 }

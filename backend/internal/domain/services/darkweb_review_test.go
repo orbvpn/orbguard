@@ -297,10 +297,10 @@ func TestAgedKeysOnASharedExitAreLimitedPerKey(t *testing.T) {
 	const exit = "198.51.100.70"
 	for key := 0; key < 12; key++ {
 		for i := 0; i < 10; i++ {
-			rig.checkEmail(fmt.Sprintf("old-abuser-%d", key), exit, "", key*100+i)
+			rig.checkEmail(fmt.Sprintf("old-net%d-abuser", key), exit, "", key*100+i)
 		}
 	}
-	if rec := rig.checkEmail("old-innocent", exit, "", 9000); rec.Code != http.StatusOK {
+	if rec := rig.checkEmail("old-net99-innocent", exit, "", 9000); rec.Code != http.StatusOK {
 		t.Fatalf("another user on the same exit: want 200, got %d", rec.Code)
 	}
 }
@@ -688,5 +688,196 @@ func TestCachedAnswerChargesARegistrationAndKeepsNoClearEmail(t *testing.T) {
 				t.Fatalf("clear email in the value of %s", key)
 			}
 		}
+	}
+}
+
+// budgetUnits is the service-wide counter of today's paid lookups.
+func budgetUnits(store *memQuota) int64 {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	for key, count := range store.counts {
+		if strings.HasSuffix(key, ":total") && !strings.Contains(key, ":refund:") {
+			return count
+		}
+	}
+	return 0
+}
+
+// droppedCheck sends a lookup whose client goes away during the provider call.
+func droppedCheck(rig *quotaRig, setCancel func(context.CancelFunc), bearer, clientIP, email string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	setCancel(cancel)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/darkweb/check/email",
+		strings.NewReader(`{"email":"`+email+`"}`)).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	req.RemoteAddr = quotaIngressPeer
+	req.Header.Set("X-Forwarded-For", clientIP)
+	rig.h.ServeHTTP(httptest.NewRecorder(), req)
+}
+
+// cancellingTransport ends the request's context during the call.
+type cancellingTransport struct {
+	calls  atomic.Int64
+	cancel context.CancelFunc
+}
+
+func (f *cancellingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	f.calls.Add(1)
+	if f.cancel != nil {
+		f.cancel()
+	}
+	return nil, context.Canceled
+}
+
+func TestALookupAProviderAnsweredStaysCharged(t *testing.T) {
+	rig := newProviderRig(t, 20, nil, &statusTransport{status: http.StatusInternalServerError, body: `{}`}, nil)
+	for i := 0; i < 20; i++ {
+		rec := rig.checkEmail("old-partial", "198.51.100.13", "", 5000+i)
+		if i < 8 && rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("lookup %d: a partial answer must be 503, got %d", i, rec.Code)
+		}
+	}
+	if got := rig.hibp.calls.Load(); got != 8 {
+		t.Fatalf("one key, limit 8: %d answered calls", got)
+	}
+	if got := budgetUnits(rig.store); got != 8 {
+		t.Fatalf("answered lookups must stay charged: %d units", got)
+	}
+
+	spread := newProviderRig(t, 20, nil, &statusTransport{status: http.StatusInternalServerError, body: `{}`}, nil)
+	for k := 0; k < 40; k++ {
+		for i := 0; i < 8; i++ {
+			spread.checkEmail(fmt.Sprintf("old-spread-%d", k), fmt.Sprintf("198.51.100.%d", k+1), "", 6000+k*100+i)
+		}
+	}
+	if got := spread.hibp.calls.Load(); got != 16 {
+		t.Fatalf("budget 20, aged share 16: %d answered calls", got)
+	}
+}
+
+func TestAPartialAnswerIsRememberedForTheCaller(t *testing.T) {
+	leak := &statusTransport{status: http.StatusInternalServerError, body: `{}`}
+	rig := newProviderRig(t, 500, nil, leak, nil)
+	for attempt := 0; attempt < 4; attempt++ {
+		if rec := rig.checkOne("old-partial-retry", "198.51.100.14", "retry@example.com"); rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("attempt %d: want 503, got %d", attempt, rec.Code)
+		}
+	}
+	if got := rig.hibp.calls.Load(); got != 1 {
+		t.Fatalf("retries of a partial answer: %d provider rounds", got)
+	}
+	if got := budgetUnits(rig.store); got != 1 {
+		t.Fatalf("retries of a partial answer: %d units", got)
+	}
+}
+
+func TestALookupNoProviderAnsweredIsRefunded(t *testing.T) {
+	rig := newProviderRig(t, 500, nil, &statusTransport{status: http.StatusForbidden, body: `{}`}, nil)
+	rig.hibp.status = http.StatusUnauthorized
+	for i := 0; i < 3; i++ {
+		if rec := rig.checkEmail("old-refused", "198.51.100.15", "", i); rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("lookup %d: want 503, got %d", i, rec.Code)
+		}
+	}
+	if got := budgetUnits(rig.store); got != 0 {
+		t.Fatalf("no provider answered, %d units still charged", got)
+	}
+}
+
+func TestDroppedRequestsAfterAnAnswerStayCharged(t *testing.T) {
+	dropping := &cancellingTransport{}
+	rig := newProviderRig(t, 500, nil, dropping, nil)
+	for i := 0; i < 30; i++ {
+		droppedCheck(rig, func(c context.CancelFunc) { dropping.cancel = c }, "old-drop", "198.51.100.16", "same@example.com")
+	}
+	if got := dropping.calls.Load(); got != 8 {
+		t.Fatalf("30 dropped requests for one email and key: %d provider rounds", got)
+	}
+}
+
+func TestDroppedRequestsBeforeAnyAnswerStayCharged(t *testing.T) {
+	rig := newQuotaRig(t, 500, nil)
+	rig.hibp.err = context.Canceled
+	var cancel context.CancelFunc
+	rig.hibp.onCall = func() { cancel() }
+	for i := 0; i < 30; i++ {
+		droppedCheck(rig, func(c context.CancelFunc) { cancel = c }, "old-drop-first", "198.51.100.17", "same@example.com")
+	}
+	if got := rig.hibp.calls.Load(); got != 8 {
+		t.Fatalf("a dropped call may still be billed: %d provider rounds", got)
+	}
+}
+
+func TestSweepKeepsTheChargeOfAPartialAnswer(t *testing.T) {
+	log := &logger.Logger{Logger: zerolog.Nop()}
+	fake := &fakeHIBP{status: http.StatusNotFound}
+	client := services.NewHIBPClient(services.HIBPConfig{APIKey: "test-key"}, log)
+	client.SetTransportForTest(fake)
+	leak := services.NewLeakCheckClient(services.LeakCheckClientConfig{APIKey: "test-key"}, log)
+	leak.SetTransportForTest(&statusTransport{status: http.StatusInternalServerError, body: `{}`})
+	monitor := services.NewDarkWebMonitor(client, leak, nil, nil, nil, log)
+	store := &memQuota{counts: map[string]int64{}, values: map[string]string{}, ttls: map[string]time.Duration{}}
+	monitor.SetPaidLookupsForTest(store, 100)
+
+	if _, err := monitor.SweepAssetsForTest(context.Background(), sweepAssets(10)); !errors.Is(err, services.ErrBreachProvidersFailed) {
+		t.Fatalf("want the sweep to stop on provider failures, got %v", err)
+	}
+	if got := budgetUnits(store); got != 3 {
+		t.Fatalf("three answered lookups: %d units charged", got)
+	}
+}
+
+func TestKeysWithoutAnIssuerShareALimitPerAddress(t *testing.T) {
+	rig := newQuotaRig(t, 500, nil)
+	const shared = "198.51.100.77"
+	for k := 0; k < 60; k++ {
+		for i := 0; i < 8; i++ {
+			rig.checkEmail(fmt.Sprintf("old-legacy-%d", k), shared, "", k*10+i)
+		}
+	}
+	if got := rig.hibp.calls.Load(); got != 20 {
+		t.Fatalf("one address spent %d lookups", got)
+	}
+	if rec := rig.checkEmail("old-bystander", "203.0.113.40", "", 90001); rec.Code != http.StatusOK {
+		t.Fatalf("an older key elsewhere: want 200, got %d", rec.Code)
+	}
+	if rec := rig.checkEmail("new-bystander", "203.0.113.41", "", 90002); rec.Code != http.StatusOK {
+		t.Fatalf("a new install elsewhere: want 200, got %d", rec.Code)
+	}
+}
+
+func TestAddressLimitOfOlderKeysLeavesOtherCallersOnThatAddress(t *testing.T) {
+	rig := newQuotaRig(t, 500, nil)
+	const exit = "198.51.100.78"
+	for k := 0; k < 6; k++ {
+		for i := 0; i < 8; i++ {
+			rig.checkEmail(fmt.Sprintf("old-unstamped-%d", k), exit, "", k*10+i)
+		}
+	}
+	if rec := rig.checkEmail("old-unstamped-late", exit, "", 500); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("over the address limit: want 429, got %d", rec.Code)
+	}
+	if rec := rig.checkEmail("old-net3-stamped", exit, "", 501); rec.Code != http.StatusOK {
+		t.Fatalf("a key with an issuer on that exit: want 200, got %d", rec.Code)
+	}
+	if rec := rig.checkEmail("new-on-exit", exit, "", 502); rec.Code != http.StatusOK {
+		t.Fatalf("a new install on that exit: want 200, got %d", rec.Code)
+	}
+}
+
+func TestOlderKeysCannotRotateInsideAnIPv6Prefix(t *testing.T) {
+	rig := newQuotaRig(t, 500, nil)
+	for p := 0; p < 40; p++ {
+		for i := 0; i < 8; i++ {
+			rig.checkEmail(fmt.Sprintf("old-v6-%d", p), fmt.Sprintf("2001:db8:1:%x::1", p), "", p*10+i)
+		}
+	}
+	if got := rig.hibp.calls.Load(); got != 20 {
+		t.Fatalf("one /48 spent %d lookups", got)
+	}
+	if rec := rig.checkEmail("old-v6-other", "2001:db8:2::1", "", 9000); rec.Code != http.StatusOK {
+		t.Fatalf("another /48: want 200, got %d", rec.Code)
 	}
 }

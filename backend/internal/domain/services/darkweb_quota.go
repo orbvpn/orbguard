@@ -21,10 +21,11 @@ import (
 //     the ingress saw it, IPv6 per /64), at a low number;
 //   - for an older key, per network the key was issued on, so keys minted in
 //     bulk share one allowance while strangers behind one VPN exit do not;
+//   - for an older key issued before that tag existed, per client address;
 //   - one service-wide total, with a lower ceiling for each kind of caller.
 //
-// A refused request consumes nothing, and a failed provider call gives its
-// unit back, within a small hourly allowance so that failing lookups cannot
+// A refused request consumes nothing. A lookup that no provider answered gives
+// its unit back, within a small hourly allowance so that failing lookups cannot
 // become free provider calls. If Redis cannot answer, the lookup is refused:
 // the paid call is never made without a reservation.
 
@@ -69,6 +70,9 @@ const (
 	paidLookupsPerAccount    = 50
 	paidLookupsPerNewAddress = 5
 	paidLookupsPerIssuer     = 20
+	// paidLookupsPerUntaggedAddress gives one address what one issuing network
+	// gets, well above normal daily use from one address.
+	paidLookupsPerUntaggedAddress = 20
 
 	paidLookupKeyTTL     = 48 * time.Hour
 	paidLookupRedisLimit = time.Second
@@ -92,7 +96,8 @@ const paidLookupSweepIdentity = "sweep"
 type PaidLookupCaller struct {
 	Tier     PaidLookupTier
 	Identity string
-	// Address is the trusted client address. Used for PaidLookupNewDevice.
+	// Address is the trusted client address. Used for PaidLookupNewDevice and
+	// for a PaidLookupEstablished key without an Issuer.
 	Address string
 	// Issuer tags the network an older key was issued on. Keys issued before
 	// the tag existed have none.
@@ -196,6 +201,12 @@ func (m *DarkWebMonitor) reservePaidLookup(ctx context.Context) (*paidLookupRese
 		if caller.Issuer != "" {
 			keys = append(keys, prefix+"issuer:"+paidLookupKeyPart(caller.Issuer))
 			limits = append(limits, paidLookupsPerIssuer)
+		} else {
+			if caller.Address == "" {
+				return nil, ErrPaidLookupUnavailable
+			}
+			keys = append(keys, prefix+"untagged:"+paidLookupKeyPart(caller.Address))
+			limits = append(limits, paidLookupsPerUntaggedAddress)
 		}
 	}
 	keys = append(keys, prefix+"total")
@@ -212,6 +223,16 @@ func (m *DarkWebMonitor) reservePaidLookup(ctx context.Context) (*paidLookupRese
 		return nil, ErrPaidLookupLimited
 	}
 	return &paidLookupReservation{caller: caller, keys: keys}, nil
+}
+
+// settleFailedLookup decides what a failed lookup costs. The unit stays spent
+// if any provider answered, or if the client went away, because the call may
+// still have reached a provider.
+func (m *DarkWebMonitor) settleFailedLookup(ctx context.Context, reservation *paidLookupReservation, err error) {
+	if ctx.Err() != nil || errors.Is(err, errBreachCheckPartial) {
+		return
+	}
+	m.refundPaidLookup(ctx, reservation)
 }
 
 // refundPaidLookup gives back the unit of a lookup no provider answered. Past

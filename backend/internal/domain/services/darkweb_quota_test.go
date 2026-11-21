@@ -151,11 +151,16 @@ type fakeHIBP struct {
 	body   string
 	err    error
 	paths  sync.Map
+	// onCall runs at the start of every request.
+	onCall func()
 }
 
 func (f *fakeHIBP) RoundTrip(r *http.Request) (*http.Response, error) {
 	f.calls.Add(1)
 	f.paths.Store(r.URL.Path, true)
+	if f.onCall != nil {
+		f.onCall()
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
