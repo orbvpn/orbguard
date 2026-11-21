@@ -56,6 +56,11 @@ func TestDistinctNetworksReachTheReportedStateNeverVerifiedScam(t *testing.T) {
 
 func TestReportWithoutServerDerivedNetworkIsNotCounted(t *testing.T) {
 	s := newReportService()
+	// One report short of the threshold, so that a counted empty reporter
+	// would be the one that flags the number.
+	for i := 0; i < phoneReportThreshold-1; i++ {
+		s.ReportNumber(reportedNumber, "scam", fmt.Sprintf("198.51.%d.0/24", i))
+	}
 	for i := 0; i < phoneReportThreshold*2; i++ {
 		s.ReportNumber(reportedNumber, "scam", "")
 	}
