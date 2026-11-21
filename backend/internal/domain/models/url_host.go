@@ -38,7 +38,13 @@ func IndicatorURLHost(raw string) (host string, ok bool) {
 	if strings.HasSuffix(parsed.Host, ":") {
 		return "", false
 	}
-	if strings.ContainsAny(parsed.Host, "[]") && !validBracketHost(parsed.Host) {
+	// Read from the raw text: some Go releases drop what stands before the
+	// bracket, so parsed.Host of http://a[::1] is already [::1].
+	authority := raw[strings.Index(raw, "://")+3:]
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	if strings.ContainsAny(authority, "[]") && !validBracketHost(authority) {
 		return "", false
 	}
 
