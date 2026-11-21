@@ -135,6 +135,7 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 	entries := make([]models.ShutdownLogEntry, 0)
 	processOccurrences := make(map[string]*models.StickyProcess)
 
+	recognised := 0
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
@@ -143,6 +144,9 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 		entry, err := p.parseLine(line)
 		if err != nil {
 			continue // Skip unparseable lines
+		}
+		if entry.EventType != "" { // set only when the line format matched
+			recognised++
 		}
 
 		entries = append(entries, entry)
@@ -173,6 +177,9 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
+	}
+	if recognised == 0 {
+		return nil, models.ErrNothingExamined
 	}
 
 	// Analyze for anomalies
@@ -267,6 +274,18 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 
 	result.Complete()
 	return result, nil
+}
+
+// Recognises reports whether data holds at least one line in the format Parse reads.
+func (p *ShutdownLogParser) Recognises(data []byte) bool {
+	for len(data) > 0 {
+		var line []byte
+		line, data, _ = bytes.Cut(data, []byte("\n"))
+		if logEntryPattern.Match(bytes.TrimSuffix(line, []byte("\r"))) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseLine parses a single shutdown log line

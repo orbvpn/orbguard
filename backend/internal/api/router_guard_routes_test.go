@@ -377,10 +377,10 @@ func TestFullAnalysisWithARealScanIsUnchanged(t *testing.T) {
 	cases := []struct {
 		name, body, scan string
 	}{
-		{"ios shutdown log", `{"device_id":"d","platform":"ios","include_timeline":true,"shutdown_log":"SIGTERM: [client:123] remaining client pid: 456 (/usr/libexec/test)\n"}`, "shutdown_log"},
+		{"ios shutdown log", `{"device_id":"d","platform":"ios","include_timeline":true,"shutdown_log":"2024-05-01 10:11:12.123 +0000 101 SpringBoard[101]: client exiting\n"}`, "shutdown_log"},
 		{"android logcat", `{"device_id":"d","platform":"android","include_timeline":true,"logcat_data":"01-01 00:00:00.000  1000  1000 I ActivityManager: Start proc 1234:com.example/u0a1\n"}`, "logcat"},
 		// One readable artifact is a real scan even when another one fails.
-		{"partial", `{"device_id":"d","platform":"ios","backup_path":"/nonexistent/gfix-test-backup","shutdown_log":"SIGTERM: [client:123] remaining client pid: 456 (/usr/libexec/test)\n"}`, "shutdown_log"},
+		{"partial", `{"device_id":"d","platform":"ios","backup_path":"/nonexistent/gfix-test-backup","shutdown_log":"2024-05-01 10:11:12.123 +0000 101 SpringBoard[101]: client exiting\n"}`, "shutdown_log"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -196,6 +196,12 @@ func (p *BackupParser) Parse(backupPath string) (*models.ForensicResult, error) 
 	// Scan actual backup files for IOC matches
 	p.scanBackupFiles(backupPath, result, timeline)
 
+	// No readable manifest entry (not a backup, or an encrypted one) and no
+	// finding: nothing in this artifact was examined.
+	if len(files) == 0 && len(result.Anomalies) == 0 {
+		return nil, models.ErrNothingExamined
+	}
+
 	// Detect threats based on anomalies
 	threats := p.detectThreats(result.Anomalies)
 	for _, threat := range threats {

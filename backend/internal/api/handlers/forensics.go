@@ -49,6 +49,20 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 	}
 }
 
+// respondNothingExamined answers 422 when an analysis recognised nothing, and
+// reports whether it did. The app does not retry a 422 and shows its failure
+// card; the body has no "anomalies", so it can never be read as a clean result.
+func respondNothingExamined(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, forensics.ErrNothingExamined) {
+		return false
+	}
+	respondJSON(w, http.StatusUnprocessableEntity, map[string]string{
+		"error": "Nothing was examined, so this is not an all-clear. No log or backup was provided or could be read. Choose a specific analysis and provide a log or backup.",
+		"code":  "nothing_examined",
+	})
+	return true
+}
+
 // GetCapabilities handles GET /api/v1/forensics/capabilities
 func (h *ForensicsHandler) GetCapabilities(w http.ResponseWriter, r *http.Request) {
 	capabilities := map[string]interface{}{
@@ -114,6 +128,9 @@ func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Req
 	}
 
 	result, err := h.service.AnalyzeShutdownLog(r.Context(), []byte(req.LogData), req.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze shutdown log")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -151,6 +168,9 @@ func (h *ForensicsHandler) UploadShutdownLog(w http.ResponseWriter, r *http.Requ
 	}
 
 	result, err := h.service.AnalyzeShutdownLog(r.Context(), data, deviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze uploaded shutdown log")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -180,6 +200,9 @@ func (h *ForensicsHandler) AnalyzeBackup(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.service.AnalyzeBackup(r.Context(), req.BackupPath, req.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze backup")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -208,6 +231,9 @@ func (h *ForensicsHandler) AnalyzeDataUsage(w http.ResponseWriter, r *http.Reque
 	}
 
 	result, err := h.service.AnalyzeDataUsage(r.Context(), req.DBPath, req.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze data usage")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -237,6 +263,9 @@ func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Req
 	}
 
 	result, err := h.service.AnalyzeSysdiagnose(r.Context(), req.ArchivePath, req.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze sysdiagnose")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -264,6 +293,9 @@ func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), []byte(req.LogData), req.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze logcat")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -296,6 +328,9 @@ func (h *ForensicsHandler) UploadLogcat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), data, deviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze uploaded logcat")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)
@@ -596,6 +631,9 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 
 	backupRoot := locateBackupRoot(extractDir)
 	result, err := h.service.AnalyzeBackup(r.Context(), backupRoot, artifact.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze uploaded iOS backup")
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "analysis failed"})
@@ -625,6 +663,9 @@ func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Requ
 	defer artifact.Cleanup()
 
 	result, err := h.service.AnalyzeSysdiagnose(r.Context(), artifact.Path, artifact.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze uploaded sysdiagnose archive")
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "analysis failed"})
@@ -731,6 +772,9 @@ func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Reques
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), data, artifact.DeviceID)
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze uploaded bugreport")
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "analysis failed"})
@@ -783,13 +827,7 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 	}
 
 	result, err := h.service.RunFullAnalysis(r.Context(), scanReq)
-	if errors.Is(err, forensics.ErrNothingExamined) {
-		// 422 is not retried by the app and reaches its failure card; the body
-		// has no "anomalies", so it can never be read as a clean result.
-		respondJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error": "Nothing was examined, so this is not an all-clear. No log or backup was provided or could be read. Choose a specific analysis and provide a log or backup.",
-			"code":  "nothing_examined",
-		})
+	if respondNothingExamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -821,6 +859,9 @@ func (h *ForensicsHandler) QuickCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.QuickCheck(r.Context(), req.Platform, []byte(req.LogData))
+	if respondNothingExamined(w, err) {
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to run quick check")
 		http.Error(w, `{"error":"check failed"}`, http.StatusInternalServerError)

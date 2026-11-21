@@ -163,6 +163,10 @@ func (p *DataUsageParser) Parse(dbPath string) (*models.ForensicResult, error) {
 		entries = append(entries, entry)
 	}
 
+	if len(entries) == 0 {
+		return nil, models.ErrNothingExamined
+	}
+
 	// Analyze entries for anomalies
 	for i := range entries {
 		entry := &entries[i]

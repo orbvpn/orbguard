@@ -2,7 +2,6 @@ package forensics
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -15,9 +14,8 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
-// ErrNothingExamined means a full analysis performed no scan at all: no
-// artifact was supplied for the platform, or none could be read.
-var ErrNothingExamined = errors.New("no forensic artifact was examined")
+// ErrNothingExamined means an analysis recognised nothing in what it was given.
+var ErrNothingExamined = models.ErrNothingExamined
 
 // Service provides forensic analysis capabilities
 type Service struct {
@@ -496,9 +494,24 @@ func (s *Service) QuickCheck(ctx context.Context, platform string, data []byte) 
 
 	if result.IndicatorsFound > 0 {
 		result.RecommendFullScan = true
+	} else if !s.recognisesLog(platform, data) {
+		// No indicator in text that is not a log of this platform says
+		// nothing about the device.
+		return nil, ErrNothingExamined
 	}
 
 	return result, nil
+}
+
+// recognisesLog reports whether data holds a line the platform's parser reads.
+func (s *Service) recognisesLog(platform string, data []byte) bool {
+	switch platform {
+	case "ios":
+		return s.shutdownLogParser.Recognises(data)
+	case "android":
+		return s.logcatParser.Recognises(data)
+	}
+	return false
 }
 
 // QuickCheckResult represents the result of a quick check

@@ -98,11 +98,22 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	p.logger.Info().Str("path", archivePath).Msg("analyzing sysdiagnose archive")
 
 	// Determine archive type and extract
-	extractedFiles, tempDir, err := p.extractArchive(archivePath)
+	known := make(map[string]bool)
+	extractedFiles, tempDir, err := p.extractArchive(archivePath, known)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract archive: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
+
+	// A sysdiagnose file whose content reached analysis counts as examined.
+	// shutdown.log counts only if its parser recognises it, below.
+	recognised := false
+	for key := range known {
+		if key != "shutdown.log" && len(extractedFiles[key]) > 0 {
+			recognised = true
+			break
+		}
+	}
 
 	timeline := models.NewTimeline()
 
@@ -115,6 +126,7 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	if shutdownLogContent, ok := extractedFiles["shutdown.log"]; ok {
 		shutdownResult, err := p.shutdownLogParser.Parse(shutdownLogContent)
 		if err == nil {
+			recognised = true
 			// Merge shutdown.log results
 			for _, a := range shutdownResult.Anomalies {
 				a.ID = uuid.New().String() // Ensure unique IDs
@@ -138,6 +150,10 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	// Detect coordinated suspicious activity patterns
 	p.detectCoordinatedActivity(result, timeline)
 
+	if !recognised && len(result.Anomalies) == 0 {
+		return nil, models.ErrNothingExamined
+	}
+
 	// Extract device info from sysdiagnose
 	p.extractDeviceInfo(extractedFiles, result)
 
@@ -158,8 +174,9 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	return result, nil
 }
 
-// extractArchive extracts a sysdiagnose archive (tar.gz or zip)
-func (p *SysdiagnoseParser) extractArchive(archivePath string) (map[string][]byte, string, error) {
+// extractArchive extracts a sysdiagnose archive (tar.gz or zip). known receives
+// the sysdiagnoseFiles keys that were found with content.
+func (p *SysdiagnoseParser) extractArchive(archivePath string, known map[string]bool) (map[string][]byte, string, error) {
 	files := make(map[string][]byte)
 
 	// Create temp directory
@@ -171,12 +188,12 @@ func (p *SysdiagnoseParser) extractArchive(archivePath string) (map[string][]byt
 	// Determine archive type
 	ext := strings.ToLower(filepath.Ext(archivePath))
 	if ext == ".gz" || strings.HasSuffix(archivePath, ".tar.gz") {
-		err = p.extractTarGz(archivePath, tempDir, files)
+		err = p.extractTarGz(archivePath, tempDir, files, known)
 	} else if ext == ".zip" {
-		err = p.extractZip(archivePath, tempDir, files)
+		err = p.extractZip(archivePath, tempDir, files, known)
 	} else {
 		// Try reading as directory
-		err = p.readDirectory(archivePath, files)
+		err = p.readDirectory(archivePath, files, known)
 	}
 
 	if err != nil {
@@ -188,7 +205,7 @@ func (p *SysdiagnoseParser) extractArchive(archivePath string) (map[string][]byt
 }
 
 // extractTarGz extracts a tar.gz archive
-func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[string][]byte) error {
+func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[string][]byte, known map[string]bool) error {
 	f, err := os.Open(archivePath)
 	if err != nil {
 		return err
@@ -225,6 +242,9 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[
 					continue
 				}
 				files[key] = content
+				if len(content) > 0 {
+					known[key] = true
+				}
 				break
 			}
 		}
@@ -243,7 +263,7 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[
 }
 
 // extractZip extracts a zip archive
-func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[string][]byte) error {
+func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[string][]byte, known map[string]bool) error {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return err
@@ -268,6 +288,9 @@ func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[st
 					continue
 				}
 				files[key] = content
+				if len(content) > 0 {
+					known[key] = true
+				}
 				break
 			}
 		}
@@ -291,7 +314,7 @@ func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[st
 }
 
 // readDirectory reads files from an extracted directory
-func (p *SysdiagnoseParser) readDirectory(dirPath string, files map[string][]byte) error {
+func (p *SysdiagnoseParser) readDirectory(dirPath string, files map[string][]byte, known map[string]bool) error {
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip errors
@@ -314,6 +337,9 @@ func (p *SysdiagnoseParser) readDirectory(dirPath string, files map[string][]byt
 		for key, pattern := range sysdiagnoseFiles {
 			if strings.Contains(relPath, pattern) || basename == pattern {
 				files[key] = content
+				if len(content) > 0 {
+					known[key] = true
+				}
 				break
 			}
 		}

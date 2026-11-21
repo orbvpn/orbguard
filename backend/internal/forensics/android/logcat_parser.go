@@ -168,6 +168,9 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+	if len(entries) == 0 {
+		return nil, models.ErrNothingExamined
+	}
 
 	// Analyze patterns across entries
 	p.analyzePatterns(entries, result, timeline)
@@ -186,6 +189,21 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 
 	result.Complete()
 	return result, nil
+}
+
+// Recognises reports whether data holds at least one line in a format Parse reads.
+func (p *LogcatParser) Recognises(data []byte) bool {
+	for len(data) > 0 {
+		var line []byte
+		line, data, _ = bytes.Cut(data, []byte("\n"))
+		line = bytes.TrimSuffix(line, []byte("\r"))
+		for _, pattern := range logcatPatterns {
+			if pattern.Match(line) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // parseLine parses a single logcat line
