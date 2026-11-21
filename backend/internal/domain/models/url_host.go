@@ -38,12 +38,39 @@ func IndicatorURLHost(raw string) (host string, ok bool) {
 	if strings.HasSuffix(parsed.Host, ":") {
 		return "", false
 	}
+	if strings.ContainsAny(parsed.Host, "[]") && !validBracketHost(parsed.Host) {
+		return "", false
+	}
 
 	name := parsed.Hostname()
 	if ip := net.ParseIP(name); ip != nil {
 		return ip.String(), true
 	}
 	return validHostName(name)
+}
+
+// validBracketHost accepts exactly [ipv6] or [ipv6]:port. net/url is not relied
+// on for this: Go releases differ on what they allow around the brackets, and
+// this answer must not change with the toolchain that built the image.
+func validBracketHost(host string) bool {
+	if !strings.HasPrefix(host, "[") {
+		return false
+	}
+	end := strings.IndexByte(host, ']')
+	if end < 0 {
+		return false
+	}
+	inner, rest := host[1:end], host[end+1:]
+	if !strings.Contains(inner, ":") || net.ParseIP(inner) == nil {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	if rest[0] != ':' || len(rest) == 1 {
+		return false
+	}
+	return strings.Trim(rest[1:], "0123456789") == ""
 }
 
 func validHostName(name string) (string, bool) {
