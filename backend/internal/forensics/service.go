@@ -187,6 +187,9 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "shutdown_log")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "shutdown_log")
+				}
 			}
 		}
 
@@ -241,6 +244,9 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "logcat")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "logcat")
+				}
 			}
 		}
 	}
@@ -284,10 +290,10 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 	// Enhance with IOC scanner (Citizen Lab/Amnesty MVT integration)
 	s.iocScanner.EnhanceForensicResult(combinedResult)
 
-	// Never clean while something supplied went unexamined. Findings still
-	// stand, and the result lists what was skipped.
+	// Never clean while something supplied went unexamined. Only a high or
+	// critical finding may stand, and the result lists what was skipped.
 	if len(notExamined) > 0 {
-		if len(combinedResult.Anomalies) == 0 {
+		if !combinedResult.HasHighFinding() {
 			s.logger.Warn().
 				Str("device_id", req.DeviceID).
 				Strs("not_examined", notExamined).

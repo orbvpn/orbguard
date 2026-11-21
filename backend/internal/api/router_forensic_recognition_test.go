@@ -31,8 +31,7 @@ const (
 var unrecognisedLogs = map[string]string{
 	"prose":             "this is not a log\n",
 	"logcat banner":     "--------- beginning of main\n",
-	"client list":       "remaining client pid: 456 (/usr/libexec/test)\nAfter 2.34s, these clients are still here:\nSIGTERM: [client:123]\n",
-	"logcat with uid":   "11-21 08:12:33.123  1000  1234  5678 I ActivityManager: Displayed com.example/.Main\n",
+	"status lines only": "After 2.34s, these clients are still here:\nSIGTERM: [client:123]\n",
 	"logcat with year":  "2026-11-21 08:12:33.123  1234  5678 I ActivityManager: Displayed com.example/.Main\n",
 	"whitespace only":   " \n\t\n",
 	"shutdown no zone":  "2024-05-01 10:11:12.123 101 SpringBoard[101]: client exiting\n",
@@ -204,8 +203,9 @@ func TestLogRoutesRefuseWhatTheyDoNotRecognise(t *testing.T) {
 func TestLogRoutesKeepACleanResultForRecognisedLogs(t *testing.T) {
 	h := newGuardRouter(t)
 	noise := "some line the parser skips\n"
+	nineOf := func(line string) string { return strings.Repeat(line, 9) }
 	for _, route := range shutdownRoutes() {
-		for name, log := range map[string]string{"entry": iosEntry, "entry among noise": noise + iosEntry + noise} {
+		for name, log := range map[string]string{"entry": iosEntry, "entry with one noise line": noise + nineOf(iosEntry)} {
 			t.Run(route.name+"/"+name, func(t *testing.T) {
 				assertExaminedClean(t, route.send(t, h, log))
 			})
@@ -216,7 +216,7 @@ func TestLogRoutesKeepACleanResultForRecognisedLogs(t *testing.T) {
 			"threadtime":             logcatThreadtime,
 			"brief":                  logcatBrief,
 			"time":                   logcatTime,
-			"threadtime among noise": "--------- beginning of main\n" + logcatThreadtime + noise,
+			"threadtime with one noise line": "--------- beginning of main\n" + nineOf(logcatThreadtime) + noise,
 		} {
 			t.Run(route.name+"/"+name, func(t *testing.T) {
 				assertExaminedClean(t, route.send(t, h, log))
@@ -332,7 +332,7 @@ func TestSysdiagnoseUploadRecognition(t *testing.T) {
 			assertExaminedClean(t, send(t, map[string][]byte{"sysdiagnose_2026/logs/lockdownd/lockdownd.log": []byte("hello")}))
 		})
 		t.Run(kind+"/finding in an unrelated file is kept", func(t *testing.T) {
-			assertHasFindings(t, send(t, map[string][]byte{"notes.txt": []byte("seen /private/var/db/abc123 here")}))
+			assertHasFindings(t, send(t, map[string][]byte{"notes.txt": []byte(spywareInText)}))
 		})
 	}
 

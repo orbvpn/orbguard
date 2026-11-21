@@ -368,6 +368,21 @@ func (r *ForensicResult) AddAnomaly(anomaly Anomaly) {
 	r.Anomalies = append(r.Anomalies, anomaly)
 }
 
+// HasHighFinding reports whether the result holds a high or critical finding.
+func (r *ForensicResult) HasHighFinding() bool {
+	for _, a := range r.Anomalies {
+		if a.Severity == ForensicSeverityCritical || a.Severity == ForensicSeverityHigh {
+			return true
+		}
+	}
+	for _, t := range r.DetectedThreats {
+		if t.Severity == ForensicSeverityCritical || t.Severity == ForensicSeverityHigh {
+			return true
+		}
+	}
+	return false
+}
+
 // AddThreat adds a detected threat to the result
 func (r *ForensicResult) AddThreat(threat DetectedThreat) {
 	r.DetectedThreats = append(r.DetectedThreats, threat)

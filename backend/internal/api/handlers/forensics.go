@@ -57,7 +57,7 @@ func respondUnexamined(w http.ResponseWriter, err error) bool {
 	var partly *fmodels.PartlyExaminedError
 	if errors.As(err, &partly) {
 		respondJSON(w, http.StatusUnprocessableEntity, map[string]any{
-			"error":        "Part of this could not be read, so this is not an all-clear. Nothing was found in the part that was read. Provide a complete, readable copy and try again.",
+			"error":        "Part of this could not be read, so this is not an all-clear. Provide a complete, readable copy and try again.",
 			"code":         "partly_examined",
 			"not_examined": partly.NotExamined,
 		})

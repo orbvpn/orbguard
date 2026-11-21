@@ -22,7 +22,7 @@ const (
 	lockdownEntry     = "sysdiagnose_2026/logs/lockdownd/lockdownd.log"
 	stickyLine        = "2024-05-01 10:11:12.123 +0000 101 roleaccountd[101]: client exiting path: /private/var/db/abc delay: 3.5\n"
 	stickyTitle       = "Suspicious Sticky Process Detected"
-	spywareInText     = "seen /private/var/db/abc123 here"
+	spywareInText     = "seen /private/var/db/0123456789abcdef0123456789abcdef here"
 )
 
 type archiveEntry struct {
@@ -160,7 +160,7 @@ func TestSysdiagnoseArchiveReportsAFindingInItsShutdownLog(t *testing.T) {
 
 func TestSysdiagnoseArchiveWithUnparseableShutdownLogIsNotClean(t *testing.T) {
 	h := newGuardRouter(t)
-	log := archiveEntry{shutdownEntry, []byte("remaining client pid: 456 (/usr/libexec/test)\n")}
+	log := archiveEntry{shutdownEntry, []byte("this is not a log\n")}
 	other := archiveEntry{lockdownEntry, []byte("hello")}
 	for _, kind := range archiveKinds() {
 		for name, entries := range map[string][]archiveEntry{"log first": {log, other}, "log last": {other, log}} {

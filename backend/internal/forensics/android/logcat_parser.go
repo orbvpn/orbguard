@@ -94,6 +94,50 @@ var logcatPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^([VDIWEF])/([^(]+)\(\s*(\d+)\):\s*(.*)$`),
 	// time format: MM-DD HH:MM:SS.mmm PRIORITY/TAG(PID): MESSAGE
 	regexp.MustCompile(`^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])/([^(]+)\(\s*(\d+)\):\s*(.*)$`),
+	// threadtime with -v uid: MM-DD HH:MM:SS.mmm UID PID TID PRIORITY TAG: MESSAGE
+	regexp.MustCompile(`^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(\S+)\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+([^:]+):\s*(.*)$`),
+}
+
+// Lines that are not log entries but belong to a log or a bugreport.
+var (
+	logcatBannerPattern     = regexp.MustCompile(`^-{9} (?:beginning of|switch to) `)
+	bugreportSectionPattern = regexp.MustCompile(`^------ .* ------$`)
+	bugreportLogcatSection  = regexp.MustCompile(`^------ .*\blogcat\b.* ------$`)
+)
+
+// logcatShare counts recognised lines. In a bugreport only the log sections
+// count: its other sections are not logs and would never match.
+type logcatShare struct {
+	read, total       int
+	logRead, logTotal int
+	inLog             bool
+}
+
+func (c *logcatShare) add(line string, parsed bool) {
+	if strings.TrimSpace(line) == "" {
+		return
+	}
+	if strings.HasPrefix(line, "------ ") && bugreportSectionPattern.MatchString(line) {
+		c.inLog = bugreportLogcatSection.MatchString(line)
+		return
+	}
+	read := 0
+	if parsed || logcatBannerPattern.MatchString(line) {
+		read = 1
+	}
+	c.read += read
+	c.total++
+	if c.inLog {
+		c.logRead += read
+		c.logTotal++
+	}
+}
+
+func (c *logcatShare) enough() bool {
+	if c.logTotal > 0 {
+		return models.RecognisedEnough(c.logRead, c.logTotal)
+	}
+	return models.RecognisedEnough(c.read, c.total)
 }
 
 // Parse parses logcat data and returns forensic results
@@ -103,6 +147,7 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	entries := make([]models.LogcatEntry, 0)
 	timeline := models.NewTimeline()
+	var share logcatShare
 
 	lineNum := 0
 	for scanner.Scan() {
@@ -110,6 +155,7 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 		line := scanner.Text()
 
 		entry, ok := p.parseLine(line, lineNum)
+		share.add(line, ok)
 		if !ok {
 			continue
 		}
@@ -187,23 +233,42 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 	result.RawData["total_entries"] = len(entries)
 	result.RawData["suspicious_entries"] = len(result.Anomalies)
 
+	// A log read only in part is never clean. Only a high or critical finding
+	// may stand, and the result then lists what was skipped.
+	if !share.enough() {
+		notExamined := []string{"logcat lines in an unread format"}
+		if !result.HasHighFinding() {
+			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
+		}
+		result.RawData["not_examined"] = notExamined
+	}
+
 	result.Complete()
 	return result, nil
 }
 
-// Recognises reports whether data holds at least one line in a format Parse reads.
+// Recognises reports whether data reads as a logcat: at least one entry, and
+// recognised lines make up the share RecognisedEnough asks for.
 func (p *LogcatParser) Recognises(data []byte) bool {
+	var share logcatShare
+	entries := 0
 	for len(data) > 0 {
-		var line []byte
-		line, data, _ = bytes.Cut(data, []byte("\n"))
-		line = bytes.TrimSuffix(line, []byte("\r"))
+		var raw []byte
+		raw, data, _ = bytes.Cut(data, []byte("\n"))
+		line := strings.TrimSuffix(string(raw), "\r")
+		parsed := false
 		for _, pattern := range logcatPatterns {
-			if pattern.Match(line) {
-				return true
+			if pattern.MatchString(line) {
+				parsed = true
+				break
 			}
 		}
+		if parsed {
+			entries++
+		}
+		share.add(line, parsed)
 	}
-	return false
+	return entries > 0 && share.enough()
 }
 
 // parseLine parses a single logcat line
@@ -243,6 +308,17 @@ func (p *LogcatParser) parseLine(line string, lineNum int) (models.LogcatEntry, 
 				entry.Tag = strings.TrimSpace(matches[3])
 				entry.PID, _ = strconv.Atoi(matches[4])
 				entry.Message = matches[5]
+				return entry, true
+
+			case 8: // threadtime with a UID column
+				ts, _ := time.Parse("01-02 15:04:05.000", matches[1])
+				entry.Timestamp = time.Date(time.Now().Year(), ts.Month(), ts.Day(),
+					ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
+				entry.PID, _ = strconv.Atoi(matches[3])
+				entry.TID, _ = strconv.Atoi(matches[4])
+				entry.Priority = matches[5]
+				entry.Tag = strings.TrimSpace(matches[6])
+				entry.Message = matches[7]
 				return entry, true
 			}
 		}

@@ -18,3 +18,11 @@ type PartlyExaminedError struct {
 func (e *PartlyExaminedError) Error() string {
 	return fmt.Sprintf("%d supplied item(s) could not be examined", len(e.NotExamined))
 }
+
+// RecognisedEnough reports whether recognised lines are a large enough share
+// of a log's non-blank lines to call the log read. Real logs are almost wholly
+// entry, header and status lines, so one in ten unread lines means the format
+// is not the one this parser reads.
+func RecognisedEnough(recognised, total int) bool {
+	return total > 0 && recognised*10 >= total*9
+}
