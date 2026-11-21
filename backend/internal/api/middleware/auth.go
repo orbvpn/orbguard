@@ -41,6 +41,9 @@ const (
 	// listener saw it, recorded by PeerAddress before RealIP rewrites
 	// RemoteAddr from client-supplied headers.
 	ContextKeyPeerAddr ContextKey = "peer_addr"
+	// ContextKeyDeviceKeyExpiry holds the expiry of the device API key the
+	// request authenticated with. Absent for every other credential.
+	ContextKeyDeviceKeyExpiry ContextKey = "device_key_expiry"
 )
 
 const (
@@ -297,6 +300,16 @@ func ClientAddress(r *http.Request) string {
 	return lockoutAddress(r)
 }
 
+// ClientSubscriber is the client address reduced to what one subscriber
+// controls: the IPv4 address, or the IPv6 /64.
+func ClientSubscriber(r *http.Request) string {
+	addr := ClientAddress(r)
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+		return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+	}
+	return addr
+}
+
 // ClientNetwork is the client's network (IPv4 /24, IPv6 /48), the unit that
 // counts as one reporter: one host can usually change its address inside it.
 // It is empty when the client address cannot be parsed.
@@ -394,20 +407,21 @@ func writeAdminLocked(w http.ResponseWriter, retryAfter time.Duration) {
 }
 
 // lookupToken resolves a presented bearer token against the token store.
-// It checks session tokens first, then device API keys. Expiry is enforced
-// both by the Redis TTL (a missing key) and the explicit expires_at field.
-func lookupToken(ctx context.Context, store TokenStore, token string) (TokenClaims, bool) {
+// It checks session tokens first, then device API keys, and reports whether a
+// device API key matched. Expiry is enforced both by the Redis TTL (a missing
+// key) and the explicit expires_at field.
+func lookupToken(ctx context.Context, store TokenStore, token string) (claims TokenClaims, deviceKey, ok bool) {
 	for _, key := range []string{"auth:token:" + token, "auth:apikey:" + token} {
-		var claims TokenClaims
-		if err := store.GetJSON(ctx, key, &claims); err != nil {
+		var found TokenClaims
+		if err := store.GetJSON(ctx, key, &found); err != nil {
 			continue
 		}
-		if !claims.ExpiresAt.IsZero() && time.Now().After(claims.ExpiresAt) {
+		if !found.ExpiresAt.IsZero() && time.Now().After(found.ExpiresAt) {
 			continue
 		}
-		return claims, true
+		return found, strings.HasPrefix(key, "auth:apikey:"), true
 	}
-	return TokenClaims{}, false
+	return TokenClaims{}, false, false
 }
 
 // APIKeyAuth returns middleware that validates bearer token authentication.
@@ -488,7 +502,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				return
 			}
 
-			claims, ok := lookupToken(r.Context(), store, token)
+			claims, deviceKey, ok := lookupToken(r.Context(), store, token)
 			if !ok {
 				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
 				return
@@ -500,6 +514,9 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 			}
 			if claims.DeviceID != "" {
 				ctx = context.WithValue(ctx, ContextKeyDeviceID, claims.DeviceID)
+			}
+			if deviceKey && !claims.ExpiresAt.IsZero() {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeyExpiry, claims.ExpiresAt)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -637,6 +654,20 @@ func GetDeviceID(ctx context.Context) string {
 		return id
 	}
 	return ""
+}
+
+// GetDeviceKeyExpiry returns the expiry of the device API key the request
+// authenticated with.
+func GetDeviceKeyExpiry(ctx context.Context) (time.Time, bool) {
+	expiry, ok := ctx.Value(ContextKeyDeviceKeyExpiry).(time.Time)
+	return expiry, ok
+}
+
+// GetSubscriptionValid reports the subscription_valid claim of a verified
+// OrbNet JWT; it is false for every other credential.
+func GetSubscriptionValid(ctx context.Context) bool {
+	valid, ok := ctx.Value(ContextKeySubscriptionValid).(bool)
+	return ok && valid
 }
 
 // GetOrbNetUserID returns the OrbNet account id the request authenticated

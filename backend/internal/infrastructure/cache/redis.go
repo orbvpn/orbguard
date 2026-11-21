@@ -305,6 +305,43 @@ func (c *RedisCache) ReleaseOwnedLock(ctx context.Context, lockKey, owner string
 	return deleted == 1, nil
 }
 
+// reserveQuotaScript adds one to every key, or to none when any key is at its
+// limit, so a refused request consumes nothing. ARGV[1] is the TTL in seconds
+// and ARGV[i+1] the limit of KEYS[i]. It returns the 1-based index of the key
+// at its limit, or 0 when reserved.
+var reserveQuotaScript = redis.NewScript(`
+for i, key in ipairs(KEYS) do
+  if tonumber(redis.call('GET', key) or '0') >= tonumber(ARGV[i + 1]) then
+    return i
+  end
+end
+for _, key in ipairs(KEYS) do
+  redis.call('INCR', key)
+  redis.call('EXPIRE', key, ARGV[1])
+end
+return 0
+`)
+
+// ReserveQuota atomically reserves one unit on every key. It returns 0 when
+// reserved, or the 1-based index of the first key already at its limit.
+func (c *RedisCache) ReserveQuota(ctx context.Context, keys []string, limits []int64, ttl time.Duration) (int, error) {
+	if len(keys) == 0 || len(keys) != len(limits) {
+		return 0, errors.New("reserve quota: keys and limits must match")
+	}
+	prefixed := make([]string, len(keys))
+	args := make([]any, 0, len(limits)+1)
+	args = append(args, int64(ttl/time.Second))
+	for i, key := range keys {
+		prefixed[i] = c.key(key)
+		args = append(args, limits[i])
+	}
+	exhausted, err := reserveQuotaScript.Run(ctx, c.client, prefixed, args...).Int()
+	if err != nil {
+		return 0, err
+	}
+	return exhausted, nil
+}
+
 // CheckRateLimit checks and increments the rate limit counter
 // Returns (allowed, remaining, resetTime, error)
 func (c *RedisCache) CheckRateLimit(ctx context.Context, key string, limit int64, window time.Duration) (bool, int64, time.Time, error) {

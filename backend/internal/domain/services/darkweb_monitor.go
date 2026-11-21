@@ -71,6 +71,9 @@ type DarkWebMonitor struct {
 	refreshing  atomic.Bool
 	refreshLock refreshLocker
 	sweep       func(context.Context) error
+
+	paidLookups       paidLookupStore
+	paidLookupsPerDay int64
 }
 
 // NewDarkWebMonitor creates a new dark web monitor. leakCheck and intelX may
@@ -92,22 +95,40 @@ func NewDarkWebMonitor(
 		repo:       repo,
 		cache:      redisCache,
 		logger:     log.WithComponent("darkweb-monitor"),
+
+		paidLookupsPerDay: paidLookupsPerDay(),
 	}
 	m.sweep = m.sweepMonitoredAssets
 	if redisCache != nil {
 		m.refreshLock = redisCache
+		m.paidLookups = redisCache
 	}
 	return m
 }
 
 // CheckEmail checks if an email has been breached, aggregating all configured
-// breach providers. Results are cached for one hour.
+// breach providers. Results are cached for one hour. A cache miss spends paid
+// provider quota and is refused with ErrPaidLookupLimited or
+// ErrPaidLookupUnavailable when the caller's budget does not allow it.
 func (m *DarkWebMonitor) CheckEmail(ctx context.Context, req *models.BreachCheckRequest) (*models.BreachCheckResponse, error) {
+	return m.checkEmail(ctx, req, false)
+}
+
+// checkEmail is CheckEmail for a caller that may already hold a reservation.
+func (m *DarkWebMonitor) checkEmail(ctx context.Context, req *models.BreachCheckRequest, reserved bool) (*models.BreachCheckResponse, error) {
 	// Check cache first
 	cacheKey := m.getCacheKey("email", req.Email)
-	var cachedResult models.BreachCheckResponse
-	if err := m.cache.GetJSON(ctx, cacheKey, &cachedResult); err == nil {
-		return &cachedResult, nil
+	if m.cache != nil {
+		var cachedResult models.BreachCheckResponse
+		if err := m.cache.GetJSON(ctx, cacheKey, &cachedResult); err == nil {
+			return &cachedResult, nil
+		}
+	}
+
+	if !reserved {
+		if err := m.reservePaidLookup(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	result, err := m.checkEmailProviders(ctx, req.Email)
@@ -123,7 +144,9 @@ func (m *DarkWebMonitor) CheckEmail(ctx context.Context, req *models.BreachCheck
 	}
 
 	// Cache result for 1 hour
-	_ = m.cache.SetJSON(ctx, cacheKey, result, emailCheckCacheTTL)
+	if m.cache != nil {
+		_ = m.cache.SetJSON(ctx, cacheKey, result, emailCheckCacheTTL)
+	}
 
 	return result, nil
 }
@@ -268,6 +291,16 @@ func (m *DarkWebMonitor) CheckPassword(ctx context.Context, req *models.Password
 	return result, nil
 }
 
+// PasswordRange returns every known hash suffix for a five character SHA-1
+// prefix, for the client to compare on its own device. The prefix is neither
+// logged nor stored.
+func (m *DarkWebMonitor) PasswordRange(ctx context.Context, prefix string) ([]models.PasswordRangeEntry, error) {
+	if m.hibpClient == nil {
+		return nil, ErrPasswordRangeUnavailable
+	}
+	return m.hibpClient.PasswordRange(ctx, prefix)
+}
+
 // AddMonitoredAsset adds an asset for continuous monitoring. Re-adding an
 // asset the user already monitors re-activates the existing record.
 func (m *DarkWebMonitor) AddMonitoredAsset(ctx context.Context, userID, deviceID string, assetType models.BreachType, value string) (*models.MonitoredAsset, error) {
@@ -288,22 +321,27 @@ func (m *DarkWebMonitor) AddMonitoredAsset(ctx context.Context, userID, deviceID
 		IsActive:    true,
 	}
 
-	// Perform initial check (best effort — the asset is still stored when
-	// providers are unavailable; the refresh job retries later).
+	// Check before storing. Every registration of an email takes one unit of
+	// the budget, even on a cache hit, because each stored row is looked up
+	// again by every refresh sweep. An email that could not be checked is not
+	// stored: clients show a stored asset with no breaches as safe.
 	var initialBreaches []models.Breach
 	if assetType == models.BreachTypeEmail {
-		result, err := m.CheckEmail(ctx, &models.BreachCheckRequest{
+		if err := m.reservePaidLookup(ctx); err != nil {
+			return nil, err
+		}
+		result, err := m.checkEmail(ctx, &models.BreachCheckRequest{
 			Email:    value,
 			DeviceID: deviceID,
-		})
+		}, true)
 		if err != nil {
-			m.logger.Warn().Err(err).Str("display", asset.DisplayName).Msg("initial breach check failed; asset will be checked by refresh job")
-		} else {
-			asset.BreachCount = result.BreachCount
-			now := time.Now()
-			asset.LastChecked = &now
-			initialBreaches = result.Breaches
+			m.logger.Warn().Err(err).Str("display", asset.DisplayName).Msg("initial breach check failed; asset not stored")
+			return nil, fmt.Errorf("initial breach check failed: %w", err)
 		}
+		asset.BreachCount = result.BreachCount
+		now := time.Now()
+		asset.LastChecked = &now
+		initialBreaches = result.Breaches
 	}
 
 	if err := m.repo.UpsertAsset(ctx, asset); err != nil {

@@ -218,6 +218,7 @@ func (r *Router) Setup() http.Handler {
 			// Breach checking
 			dw.Post("/check/email", r.handlers.DarkWeb.CheckEmail)
 			dw.Post("/check/password", r.handlers.DarkWeb.CheckPassword)
+			dw.Post("/password/range", r.handlers.DarkWeb.PasswordRange)
 
 			// Asset monitoring
 			dw.Get("/monitor", r.handlers.DarkWeb.GetMonitoredAssets)
