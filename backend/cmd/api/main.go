@@ -307,6 +307,9 @@ func main() {
 	// Initialize AI-powered scam detection service
 	scamConfig := buildScamDetectorConfig(cfg, log)
 	scamDetector := ai.NewScamDetector(log, scamConfig)
+	if redisCache != nil {
+		scamDetector.SetPhoneReportStore(ai.NewRedisPhoneReportStore(redisCache))
+	}
 	speechProvider := "disabled"
 	if scamConfig.EnableSpeech {
 		if scamConfig.AzureOpenAIEndpoint != "" && scamConfig.AzureOpenAIKey != "" && scamConfig.AzureOpenAITranscribeDeployment != "" {

@@ -409,6 +409,8 @@ type ScamReport struct {
 
 	// ReporterNetwork is set by the server from the trusted client address.
 	ReporterNetwork string `json:"-"`
+	// ReporterKey names the authenticated credential, set by the server.
+	ReporterKey string `json:"-"`
 }
 
 // BulkScanRequest represents a request to scan multiple messages

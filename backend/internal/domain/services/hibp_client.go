@@ -21,6 +21,9 @@ import (
 // ErrBreachNotFound is returned when a breach lookup by name finds nothing.
 var ErrBreachNotFound = errors.New("breach not found")
 
+// errHIBPNotBreached is the provider's own 404: the account is in no breach.
+var errHIBPNotBreached = errors.New("hibp: account not found")
+
 // ErrPasswordRangeUnavailable means no usable range answer was obtained. It
 // deliberately carries no cause: a transport error holds the request URL, and
 // with it the hash prefix, which must not reach a log.
@@ -80,8 +83,8 @@ func (c *HIBPClient) CheckEmail(ctx context.Context, email string) (*models.Brea
 	// Get breaches for this email
 	breaches, err := c.getBreachedAccount(ctx, email)
 	if err != nil {
-		// 404 means not breached
-		if strings.Contains(err.Error(), "404") {
+		// Only the provider's 404 status means not breached.
+		if errors.Is(err, errHIBPNotBreached) {
 			response.RiskLevel = models.BreachSeverityLow
 			response.Recommendations = []string{"No breaches found. Continue using strong, unique passwords."}
 			return response, nil
@@ -279,7 +282,7 @@ func (c *HIBPClient) getBreachedAccount(ctx context.Context, email string) ([]mo
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("404 not found")
+		return nil, errHIBPNotBreached
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {

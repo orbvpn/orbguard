@@ -34,6 +34,16 @@ func NewRouter(cfg config.Config, h *handlers.Handlers, c *cache.RedisCache, log
 	}
 }
 
+// passwordRangePerMinute is the per-address limit of the password range route:
+// the configured global limit when lower, otherwise 30.
+func (r *Router) passwordRangePerMinute() int64 {
+	const routeLimit = 30
+	if configured := r.config.RateLimit.RequestsPerMinute; r.config.RateLimit.Enabled && configured > 0 && configured < routeLimit {
+		return int64(configured)
+	}
+	return routeLimit
+}
+
 // Setup sets up the Chi router with all routes and middleware
 func (r *Router) Setup() http.Handler {
 	router := chi.NewRouter()
@@ -218,7 +228,8 @@ func (r *Router) Setup() http.Handler {
 			// Breach checking
 			dw.Post("/check/email", r.handlers.DarkWeb.CheckEmail)
 			dw.Post("/check/password", r.handlers.DarkWeb.CheckPassword)
-			dw.Post("/password/range", r.handlers.DarkWeb.PasswordRange)
+			dw.With(apimiddleware.TrustedAddressRateLimit(r.cache, "darkweb-password-range", r.passwordRangePerMinute())).
+				Post("/password/range", r.handlers.DarkWeb.PasswordRange)
 
 			// Asset monitoring
 			dw.Get("/monitor", r.handlers.DarkWeb.GetMonitoredAssets)

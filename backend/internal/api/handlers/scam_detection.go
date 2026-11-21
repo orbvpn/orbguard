@@ -198,6 +198,7 @@ func (h *ScamDetectionHandler) Report(w http.ResponseWriter, r *http.Request) {
 		ReportedAt:  time.Now(),
 
 		ReporterNetwork: middleware.ClientNetwork(r),
+		ReporterKey:     middleware.CallerIdentity(r.Context()),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
@@ -295,6 +296,7 @@ func (h *ScamDetectionHandler) ReportPhone(w http.ResponseWriter, r *http.Reques
 		ReportedAt:  time.Now(),
 
 		ReporterNetwork: middleware.ClientNetwork(r),
+		ReporterKey:     middleware.CallerIdentity(r.Context()),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {

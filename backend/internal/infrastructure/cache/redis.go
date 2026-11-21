@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -340,6 +341,71 @@ func (c *RedisCache) ReserveQuota(ctx context.Context, keys []string, limits []i
 		return 0, err
 	}
 	return exhausted, nil
+}
+
+// releaseQuotaScript gives one unit back on every key, never going below zero.
+var releaseQuotaScript = redis.NewScript(`
+for _, key in ipairs(KEYS) do
+  if tonumber(redis.call('GET', key) or '0') > 0 then
+    redis.call('DECR', key)
+  end
+end
+return 0
+`)
+
+// ReleaseQuota returns the unit a ReserveQuota took on keys.
+func (c *RedisCache) ReleaseQuota(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	prefixed := make([]string, len(keys))
+	for i, key := range keys {
+		prefixed[i] = c.key(key)
+	}
+	return releaseQuotaScript.Run(ctx, c.client, prefixed).Err()
+}
+
+// recordDistinctReportScript adds one reporter to two per-subject sets, each
+// capped at ARGV[4] members. A subject not seen before also takes one unit of
+// the daily counter KEYS[3], so reports cannot grow Redis without bound.
+var recordDistinctReportScript = redis.NewScript(`
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[2])
+if redis.call('EXISTS', KEYS[1], KEYS[2]) == 0 then
+  if tonumber(redis.call('GET', KEYS[3]) or '0') >= tonumber(ARGV[5]) then
+    return 0
+  end
+  redis.call('INCR', KEYS[3])
+  redis.call('EXPIRE', KEYS[3], 172800)
+end
+for i = 1, 2 do
+  local member = ARGV[5 + i]
+  if redis.call('ZSCORE', KEYS[i], member) or redis.call('ZCARD', KEYS[i]) < tonumber(ARGV[4]) then
+    redis.call('ZADD', KEYS[i], ARGV[1], member)
+  end
+  redis.call('EXPIRE', KEYS[i], ARGV[3])
+end
+return 1
+`)
+
+// RecordDistinctReport records one reporter and one network for a subject.
+func (c *RedisCache) RecordDistinctReport(ctx context.Context, keysKey, networksKey, dayKey, reporter, network string, now time.Time, window time.Duration, maxPerSet, maxNewPerDay int64) error {
+	return recordDistinctReportScript.Run(ctx, c.client,
+		[]string{c.key(keysKey), c.key(networksKey), c.key(dayKey)},
+		now.Unix(), now.Add(-window).Unix(), int64(window/time.Second), maxPerSet, maxNewPerDay, reporter, network,
+	).Err()
+}
+
+// CountDistinctReporters counts the reporters and networks seen after since.
+func (c *RedisCache) CountDistinctReporters(ctx context.Context, keysKey, networksKey string, since time.Time) (int64, int64, error) {
+	floor := "(" + strconv.FormatInt(since.Unix(), 10)
+	pipe := c.client.Pipeline()
+	keys := pipe.ZCount(ctx, c.key(keysKey), floor, "+inf")
+	networks := pipe.ZCount(ctx, c.key(networksKey), floor, "+inf")
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, 0, err
+	}
+	return keys.Val(), networks.Val(), nil
 }
 
 // CheckRateLimit checks and increments the rate limit counter

@@ -127,22 +127,19 @@ func TestPhoneReportsFromOneClientWithForgedHopsDoNotFlag(t *testing.T) {
 	}
 }
 
-func TestPhoneReportsFromDistinctNetworksFlagAsReportedOnly(t *testing.T) {
+// One credential is one reporter however many networks it reports from.
+func TestOneKeyOnFiveNetworksDoesNotFlagANumber(t *testing.T) {
 	h := newGfix3Router(t)
 	const number = "+4915112340002"
 	baseline, _ := phoneRisk(t, h, number)
 	for i := 0; i < 5; i++ {
-		if risk, isScam := phoneRisk(t, h, number); isScam || risk != baseline {
-			t.Fatalf("changed after %d networks: risk %v (baseline %v), scam %v", i, risk, baseline, isScam)
-		}
 		rec := do(h, http.MethodPost, "/api/v1/scam/phone/report", strings.NewReader(`{"phone_number":"`+number+`"}`), asDevice(), fromIP(fmt.Sprintf("198.51.%d.7", i)))
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("report: want 201, got %d", rec.Code)
 		}
 	}
-	risk, isScam := phoneRisk(t, h, number)
-	if isScam || risk <= baseline {
-		t.Fatalf("after five networks want a raised risk and no scam verdict: risk %v (baseline %v), scam %v", risk, baseline, isScam)
+	if risk, isScam := phoneRisk(t, h, number); isScam || risk != baseline {
+		t.Fatalf("one key changed the number: risk %v (baseline %v), scam %v", risk, baseline, isScam)
 	}
 }
 

@@ -30,9 +30,10 @@ import (
 )
 
 const (
-	quotaIngressPeer = "100.100.0.7:43210"
-	quotaJWTSecret   = "quota-test-orbnet-secret-0123456789abcdef"
-	deviceKeyTTL     = 365 * 24 * time.Hour
+	quotaIngressPeer   = "100.100.0.7:43210"
+	quotaJWTSecret     = "quota-test-orbnet-secret-0123456789abcdef"
+	quotaServiceSecret = "quota-test-service-secret-0123456789abcdef"
+	deviceKeyTTL       = 365 * 24 * time.Hour
 )
 
 // quotaTokens resolves "new-<n>" as a key issued now and "old-<n>" as one
@@ -62,7 +63,13 @@ func (quotaTokens) GetJSON(_ context.Context, key string, dest any) error {
 	default:
 		return errors.New("not found")
 	}
-	raw, err := json.Marshal(apimiddleware.TokenClaims{DeviceID: "dev-" + token, ExpiresAt: expires})
+	claims := map[string]any{"device_id": "dev-" + token, "expires_at": expires}
+	// "old-net<n>-..." is an aged key that was issued on network n.
+	if rest, stamped := strings.CutPrefix(token, "old-net"); stamped {
+		network, _, _ := strings.Cut(rest, "-")
+		claims["issued_from"] = "issuer-" + network
+	}
+	raw, err := json.Marshal(claims)
 	if err != nil {
 		return err
 	}
@@ -73,6 +80,8 @@ func (quotaTokens) GetJSON(_ context.Context, key string, dest any) error {
 type memQuota struct {
 	mu     sync.Mutex
 	counts map[string]int64
+	values map[string]string
+	ttls   map[string]time.Duration
 	err    error
 }
 
@@ -91,6 +100,48 @@ func (q *memQuota) ReserveQuota(_ context.Context, keys []string, limits []int64
 		q.counts[key]++
 	}
 	return 0, nil
+}
+
+func (q *memQuota) ReleaseQuota(_ context.Context, keys []string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.err != nil {
+		return q.err
+	}
+	for _, key := range keys {
+		if q.counts[key] > 0 {
+			q.counts[key]--
+		}
+	}
+	return nil
+}
+
+func (q *memQuota) GetJSON(_ context.Context, key string, dest any) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.err != nil {
+		return q.err
+	}
+	raw, ok := q.values[key]
+	if !ok {
+		return errors.New("not found")
+	}
+	return json.Unmarshal([]byte(raw), dest)
+}
+
+func (q *memQuota) SetJSON(_ context.Context, key string, value any, ttl time.Duration) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.err != nil {
+		return q.err
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	q.values[key] = string(raw)
+	q.ttls[key] = ttl
+	return nil
 }
 
 // fakeHIBP counts calls and answers like the provider: 404 means not breached.
@@ -125,6 +176,13 @@ type quotaRig struct {
 
 func newQuotaRig(t *testing.T, perDay int64, repo *repository.DarkWebRepository) *quotaRig {
 	t.Helper()
+	return newProviderRig(t, perDay, repo, nil, nil)
+}
+
+// newProviderRig also configures LeakCheck and Intelligence X when their
+// transports are given.
+func newProviderRig(t *testing.T, perDay int64, repo *repository.DarkWebRepository, leak, intel http.RoundTripper) *quotaRig {
+	t.Helper()
 	logs := &bytes.Buffer{}
 	log := &logger.Logger{Logger: zerolog.New(logs)}
 	apimiddleware.ConfigureAuth(quotaTokens{}, "test", log)
@@ -135,11 +193,22 @@ func newQuotaRig(t *testing.T, perDay int64, repo *repository.DarkWebRepository)
 	fake := &fakeHIBP{status: http.StatusNotFound}
 	client := services.NewHIBPClient(services.HIBPConfig{APIKey: "test-key"}, log)
 	client.SetTransportForTest(fake)
-	monitor := services.NewDarkWebMonitor(client, nil, nil, repo, nil, log)
-	store := &memQuota{counts: map[string]int64{}}
+	var leakCheck *services.LeakCheckClient
+	if leak != nil {
+		leakCheck = services.NewLeakCheckClient(services.LeakCheckClientConfig{APIKey: "test-key"}, log)
+		leakCheck.SetTransportForTest(leak)
+	}
+	var intelX *services.IntelXClient
+	if intel != nil {
+		intelX = services.NewIntelXClient(services.IntelXClientConfig{APIKey: "test-key"}, log)
+		intelX.SetTransportForTest(intel)
+	}
+	monitor := services.NewDarkWebMonitor(client, leakCheck, intelX, repo, nil, log)
+	store := &memQuota{counts: map[string]int64{}, values: map[string]string{}, ttls: map[string]time.Duration{}}
 	monitor.SetPaidLookupsForTest(store, perDay)
 	cfg := config.Config{}
 	cfg.JWT.OrbNetAccessSecret = quotaJWTSecret
+	cfg.JWT.Secret = quotaServiceSecret
 	h := &handlers.Handlers{DarkWeb: handlers.NewDarkWebHandler(monitor, log)}
 	return &quotaRig{h: api.NewRouter(cfg, h, nil, log).Setup(), store: store, hibp: fake, logs: logs}
 }
@@ -183,20 +252,20 @@ func orbnetJWT(t *testing.T, userID int64, subscribed bool) string {
 
 func TestOneDeviceKeyStopsAtItsDailyLimit(t *testing.T) {
 	rig := newQuotaRig(t, 1000, nil)
-	for i := 0; i < 10; i++ {
-		if rec := rig.checkEmail("new-1", "198.51.100.1", "", i); rec.Code != http.StatusOK {
+	for i := 0; i < 8; i++ {
+		if rec := rig.checkEmail("old-1", "198.51.100.1", "", i); rec.Code != http.StatusOK {
 			t.Fatalf("lookup %d: want 200, got %d: %s", i, rec.Code, rec.Body)
 		}
 	}
-	rec := rig.checkEmail("new-1", "198.51.100.1", "", 11)
+	rec := rig.checkEmail("old-1", "198.51.100.1", "", 11)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("over the device limit: want 429, got %d", rec.Code)
 	}
 	if rec.Header().Get("Retry-After") == "" {
 		t.Fatal("429 must carry Retry-After")
 	}
-	if got := rig.hibp.calls.Load(); got != 10 {
-		t.Fatalf("upstream calls: want 10, got %d", got)
+	if got := rig.hibp.calls.Load(); got != 8 {
+		t.Fatalf("upstream calls: want 8, got %d", got)
 	}
 }
 
@@ -205,8 +274,8 @@ func TestManyFreeKeysWithForgedHopsStopAtTheAddressLimit(t *testing.T) {
 	for i := 0; i < 80; i++ {
 		rig.checkEmail(fmt.Sprintf("new-%d", i), "198.51.100.2", fmt.Sprintf("203.0.113.%d", i), i)
 	}
-	if got := rig.hibp.calls.Load(); got != 30 {
-		t.Fatalf("one address with free keys and forged hops: want 30 upstream calls, got %d", got)
+	if got := rig.hibp.calls.Load(); got != 5 {
+		t.Fatalf("one address with free keys and forged hops: want 5 upstream calls, got %d", got)
 	}
 }
 
@@ -215,8 +284,8 @@ func TestIPv6ClientCannotRotateInsideItsSlash64(t *testing.T) {
 	for i := 0; i < 80; i++ {
 		rig.checkEmail(fmt.Sprintf("new-%d", i), fmt.Sprintf("2001:db8:1:2::%x", i+1), "", i)
 	}
-	if got := rig.hibp.calls.Load(); got != 30 {
-		t.Fatalf("one /64: want 30 upstream calls, got %d", got)
+	if got := rig.hibp.calls.Load(); got != 5 {
+		t.Fatalf("one /64: want 5 upstream calls, got %d", got)
 	}
 }
 
@@ -232,7 +301,7 @@ func TestFreshKeysCannotSpendTheReserveOfRealUsers(t *testing.T) {
 	if rec := rig.checkEmail("old-1", "203.0.113.1", "", 500); rec.Code != http.StatusOK {
 		t.Fatalf("an established device after the flood: want 200, got %d", rec.Code)
 	}
-	if rec := rig.checkEmail(orbnetJWT(t, 7, true), "203.0.113.2", "", 501); rec.Code != http.StatusOK {
+	if rec := rig.checkEmail(paidClaimsJWT(t, 7, true, false, "STRIPE"), "203.0.113.2", "", 501); rec.Code != http.StatusOK {
 		t.Fatalf("a paying account after the flood: want 200, got %d", rec.Code)
 	}
 }
@@ -260,7 +329,7 @@ func TestAgedKeysLeaveTheLastShareToPayingAccounts(t *testing.T) {
 	if rec := rig.checkEmail(orbnetJWT(t, 8, false), "203.0.113.3", "", 600); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("a free account must not reach the paying share: got %d", rec.Code)
 	}
-	if rec := rig.checkEmail(orbnetJWT(t, 9, true), "203.0.113.4", "", 601); rec.Code != http.StatusOK {
+	if rec := rig.checkEmail(paidClaimsJWT(t, 9, true, false, "STRIPE"), "203.0.113.4", "", 601); rec.Code != http.StatusOK {
 		t.Fatalf("a paying account: want 200, got %d", rec.Code)
 	}
 }

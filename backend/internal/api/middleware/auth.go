@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"strconv"
@@ -44,6 +46,10 @@ const (
 	// ContextKeyDeviceKeyExpiry holds the expiry of the device API key the
 	// request authenticated with. Absent for every other credential.
 	ContextKeyDeviceKeyExpiry ContextKey = "device_key_expiry"
+	// ContextKeyPayingAccount is true for an OrbNet JWT that shows a paid plan.
+	ContextKeyPayingAccount ContextKey = "paying_account"
+	// ContextKeyDeviceKeyIssuer holds the IssuedFrom tag of that key.
+	ContextKeyDeviceKeyIssuer ContextKey = "device_key_issuer"
 )
 
 const (
@@ -104,6 +110,8 @@ type TokenClaims struct {
 	UserID    string    `json:"user_id,omitempty"`
 	DeviceID  string    `json:"device_id,omitempty"`
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	// IssuedFrom tags the client network a device key was issued on.
+	IssuedFrom string `json:"issued_from,omitempty"`
 }
 
 // TokenStore is the read interface the auth middleware needs to validate
@@ -310,6 +318,17 @@ func ClientSubscriber(r *http.Request) string {
 	return addr
 }
 
+// KeyIssuerTag is the value stored on a new device key: a hash of the client
+// network it was issued on, so the stored key holds no address.
+func KeyIssuerTag(r *http.Request) string {
+	network := ClientNetwork(r)
+	if network == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(network))
+	return hex.EncodeToString(sum[:8])
+}
+
 // ClientNetwork is the client's network (IPv4 /24, IPv6 /48), the unit that
 // counts as one reporter: one host can usually change its address inside it.
 // It is empty when the client address cannot be parsed.
@@ -475,6 +494,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
 				ctx = context.WithValue(ctx, ContextKeyOrbNetUserID, claims.UserID)
 				ctx = context.WithValue(ctx, ContextKeySubscriptionValid, claims.SubscriptionValid)
+				ctx = context.WithValue(ctx, ContextKeyPayingAccount, claims.IsPaying())
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -517,6 +537,9 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 			}
 			if deviceKey && !claims.ExpiresAt.IsZero() {
 				ctx = context.WithValue(ctx, ContextKeyDeviceKeyExpiry, claims.ExpiresAt)
+			}
+			if deviceKey && claims.IssuedFrom != "" {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeyIssuer, claims.IssuedFrom)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -663,11 +686,36 @@ func GetDeviceKeyExpiry(ctx context.Context) (time.Time, bool) {
 	return expiry, ok
 }
 
-// GetSubscriptionValid reports the subscription_valid claim of a verified
-// OrbNet JWT; it is false for every other credential.
-func GetSubscriptionValid(ctx context.Context) bool {
-	valid, ok := ctx.Value(ContextKeySubscriptionValid).(bool)
-	return ok && valid
+// IsPayingAccount reports whether the request carries a verified OrbNet JWT
+// that shows a paid plan.
+func IsPayingAccount(ctx context.Context) bool {
+	paying, _ := ctx.Value(ContextKeyPayingAccount).(bool)
+	return paying
+}
+
+// GetDeviceKeyIssuer returns the IssuedFrom tag of the device API key the
+// request authenticated with, or "" when it has none.
+func GetDeviceKeyIssuer(ctx context.Context) string {
+	issuer, _ := ctx.Value(ContextKeyDeviceKeyIssuer).(string)
+	return issuer
+}
+
+// CallerIdentity names the authenticated credential: one name for all keys of
+// one device.
+func CallerIdentity(ctx context.Context) string {
+	switch {
+	case IsServiceRequest(ctx):
+		return "service"
+	case GetOrbNetUserID(ctx) > 0:
+		return "account:" + strconv.FormatInt(GetOrbNetUserID(ctx), 10)
+	case GetDeviceID(ctx) != "":
+		return "device:" + GetDeviceID(ctx)
+	case GetUserID(ctx) != "":
+		return "user:" + GetUserID(ctx)
+	case GetAPIKey(ctx) != "":
+		return "key:" + GetAPIKey(ctx)
+	}
+	return ""
 }
 
 // GetOrbNetUserID returns the OrbNet account id the request authenticated

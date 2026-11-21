@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -48,6 +50,32 @@ func RateLimiter(c *cache.RedisCache, cfg config.RateLimitConfig) func(next http
 				return
 			}
 
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// TrustedAddressRateLimit limits one route per client address per minute,
+// using the address the ingress saw, which a client cannot choose. Without
+// Redis configured it does nothing; when Redis fails it refuses.
+func TrustedAddressRateLimit(c *cache.RedisCache, scope string, perMinute int64) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if c == nil {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sum := sha256.Sum256([]byte(ClientSubscriber(r)))
+			allowed, _, resetTime, err := c.CheckRateLimit(r.Context(),
+				scope+":"+hex.EncodeToString(sum[:12]), perMinute, time.Minute)
+			if err != nil {
+				http.Error(w, `{"error":"temporarily unavailable"}`, http.StatusServiceUnavailable)
+				return
+			}
+			if !allowed {
+				w.Header().Set("Retry-After", strconv.FormatInt(int64(time.Until(resetTime).Seconds())+1, 10))
+				http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}

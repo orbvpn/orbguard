@@ -639,26 +639,28 @@ func (d *ScamDetector) analyzePhone(ctx context.Context, req *models.ScamAnalysi
 			Confidence:  rep.Confidence,
 			Evidence:    rep.Number,
 		})
-	} else if rep.IsSpam {
-		// Community reports are unverified: keep the score below the scam
-		// threshold, or finalizeResult would turn them into a scam verdict.
-		result.RiskScore = minFloat(0.6, d.config.ScamThreshold-0.05)
-		result.Severity = models.ScamSeverityMedium
-		result.Indicators = append(result.Indicators, models.ScamIndicator{
-			Type:        "spam_number",
-			Description: "Several users have reported this phone number",
-			Confidence:  0.8,
-		})
-	} else if rep.IsPremiumRate {
-		result.RiskScore = 0.6
-		result.Severity = models.ScamSeverityMedium
-		result.Indicators = append(result.Indicators, models.ScamIndicator{
-			Type:        "premium_rate",
-			Description: "This is a premium rate number - calling may incur charges",
-			Confidence:  0.9,
-		})
 	} else {
-		result.RiskScore = 1 - (rep.ReputationScore / 100)
+		if rep.IsPremiumRate {
+			result.RiskScore = 0.6
+			result.Severity = models.ScamSeverityMedium
+			result.Indicators = append(result.Indicators, models.ScamIndicator{
+				Type:        "premium_rate",
+				Description: "This is a premium rate number - calling may incur charges",
+				Confidence:  0.9,
+			})
+		} else {
+			result.RiskScore = 1 - (rep.ReputationScore / 100)
+		}
+		if rep.IsSpam {
+			// Community reports are unverified: they can raise the score only
+			// up to just below the scam threshold, and never lower it.
+			result.RiskScore = maxFloat(result.RiskScore, minFloat(0.6, d.config.ScamThreshold-0.05))
+			result.Indicators = append(result.Indicators, models.ScamIndicator{
+				Type:        "spam_number",
+				Description: "Several users have reported this phone number",
+				Confidence:  0.8,
+			})
+		}
 	}
 
 	// Add phone metadata to explanation
@@ -873,6 +875,13 @@ func (d *ScamDetector) GetStats() ScamDetectorStats {
 	return stats
 }
 
+// SetPhoneReportStore makes phone report counts shared across replicas.
+func (d *ScamDetector) SetPhoneReportStore(store PhoneReportStore) {
+	if d.phoneReputation != nil {
+		d.phoneReputation.SetReportStore(store)
+	}
+}
+
 // ReportScam reports a scam for improving detection
 func (d *ScamDetector) ReportScam(ctx context.Context, report *models.ScamReport) error {
 	// Add to pattern database if it's a new pattern
@@ -892,7 +901,7 @@ func (d *ScamDetector) ReportScam(ctx context.Context, report *models.ScamReport
 
 	// Add phone number to scam database
 	if d.phoneReputation != nil && report.PhoneNumber != "" {
-		d.phoneReputation.ReportNumber(report.PhoneNumber, "scam", report.ReporterNetwork)
+		d.phoneReputation.ReportNumber(ctx, report.PhoneNumber, "scam", report.ReporterKey, report.ReporterNetwork)
 	}
 
 	d.logger.Info().

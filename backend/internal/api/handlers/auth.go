@@ -340,8 +340,9 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	// Store the API key with the canonical claims shape the auth middleware
 	// validates (auth:apikey:<key> -> {device_id, expires_at}).
 	if err := h.cache.SetJSON(r.Context(), "auth:apikey:"+apiKey, middleware.TokenClaims{
-		DeviceID:  req.DeviceID,
-		ExpiresAt: expiresAt,
+		DeviceID:   req.DeviceID,
+		ExpiresAt:  expiresAt,
+		IssuedFrom: middleware.KeyIssuerTag(r),
 	}, authAPIKeyTTL); err != nil {
 		h.logger.Error().Err(err).Str("device_id", req.DeviceID).Msg("failed to store API key")
 		http.Error(w, `{"error":"failed to register device"}`, http.StatusInternalServerError)
