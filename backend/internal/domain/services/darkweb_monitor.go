@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,13 +32,28 @@ var (
 	// ErrDarkWebStorageUnavailable is returned when the service is running
 	// without a database and a persistence-backed operation is requested.
 	ErrDarkWebStorageUnavailable = errors.New("dark web monitoring storage unavailable: database not connected")
+	// ErrRefreshInProgress is returned, without starting a sweep, while another
+	// refresh is running in this process or on another replica.
+	ErrRefreshInProgress = errors.New("dark web refresh already running")
 )
 
 const (
 	breachCatalogCacheKey = "darkweb:breaches:catalog"
 	breachCatalogTTL      = 24 * time.Hour
 	emailCheckCacheTTL    = 1 * time.Hour
+
+	refreshLockKey = "darkweb:refresh"
+	// refreshLockTTL only matters if a replica dies mid-sweep. It is well above
+	// the longest sweep: the router's 60s request timeout cancels the sweep's
+	// context, and the sweep stops at the next asset.
+	refreshLockTTL = 10 * time.Minute
 )
+
+// refreshLocker is the cross-replica lock a sweep holds (*cache.RedisCache).
+type refreshLocker interface {
+	AcquireLock(ctx context.Context, lockKey string, ttl time.Duration) (bool, error)
+	ReleaseLock(ctx context.Context, lockKey string) error
+}
 
 // DarkWebMonitor provides dark web and breach monitoring services. Monitored
 // assets and breach alerts are persisted in Postgres
@@ -51,6 +67,10 @@ type DarkWebMonitor struct {
 	repo       *repository.DarkWebRepository
 	cache      *cache.RedisCache
 	logger     *logger.Logger
+
+	refreshing  atomic.Bool
+	refreshLock refreshLocker
+	sweep       func(context.Context) error
 }
 
 // NewDarkWebMonitor creates a new dark web monitor. leakCheck and intelX may
@@ -65,7 +85,7 @@ func NewDarkWebMonitor(
 	redisCache *cache.RedisCache,
 	log *logger.Logger,
 ) *DarkWebMonitor {
-	return &DarkWebMonitor{
+	m := &DarkWebMonitor{
 		hibpClient: hibpClient,
 		leakCheck:  leakCheck,
 		intelX:     intelX,
@@ -73,6 +93,11 @@ func NewDarkWebMonitor(
 		cache:      redisCache,
 		logger:     log.WithComponent("darkweb-monitor"),
 	}
+	m.sweep = m.sweepMonitoredAssets
+	if redisCache != nil {
+		m.refreshLock = redisCache
+	}
+	return m
 }
 
 // CheckEmail checks if an email has been breached, aggregating all configured
@@ -507,10 +532,41 @@ func (m *DarkWebMonitor) GetBreachByName(ctx context.Context, name string) (*mod
 	return breach, nil
 }
 
-// RefreshMonitoredAssets re-checks all active monitored assets for new
+// RefreshMonitoredAssets runs one sweep of all monitored assets. Each sweep
+// spends paid provider quota, so at most one runs at a time: a call made while
+// another is running returns ErrRefreshInProgress without starting a sweep.
+func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
+	if !m.refreshing.CompareAndSwap(false, true) {
+		return ErrRefreshInProgress
+	}
+	defer m.refreshing.Store(false)
+
+	if m.refreshLock != nil {
+		acquired, err := m.refreshLock.AcquireLock(ctx, refreshLockKey, refreshLockTTL)
+		if err != nil {
+			return fmt.Errorf("failed to take the refresh lock: %w", err)
+		}
+		if !acquired {
+			return ErrRefreshInProgress
+		}
+		defer func() {
+			// Not ctx: the request may already have timed out, and a lock left
+			// behind would refuse every refresh until its TTL.
+			releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := m.refreshLock.ReleaseLock(releaseCtx, refreshLockKey); err != nil {
+				m.logger.Warn().Err(err).Msg("failed to release the refresh lock")
+			}
+		}()
+	}
+
+	return m.sweep(ctx)
+}
+
+// sweepMonitoredAssets re-checks all active monitored assets for new
 // breaches and stores new alerts. Alert creation is idempotent per
 // (asset, breach name).
-func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
+func (m *DarkWebMonitor) sweepMonitoredAssets(ctx context.Context) error {
 	if m.repo == nil {
 		return ErrDarkWebStorageUnavailable
 	}
@@ -520,6 +576,9 @@ func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
 	}
 
 	for i := range assets {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("refresh stopped: %w", err)
+		}
 		asset := &assets[i]
 		if asset.AssetType != models.BreachTypeEmail {
 			continue

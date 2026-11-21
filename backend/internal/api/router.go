@@ -235,7 +235,7 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats and refresh
 			dw.Get("/stats", r.handlers.DarkWeb.GetStats)
-			dw.Post("/refresh", r.handlers.DarkWeb.RefreshMonitoring)
+			dw.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/refresh", r.handlers.DarkWeb.RefreshMonitoring)
 		})
 
 		// App Security Suite endpoints
@@ -651,16 +651,16 @@ func (r *Router) Setup() http.Handler {
 
 			// Block Rules
 			orbnet.Get("/rules", r.handlers.OrbNet.ListBlockRules)
-			orbnet.Post("/rules", r.handlers.OrbNet.AddBlockRule)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/rules", r.handlers.OrbNet.AddBlockRule)
 			orbnet.Get("/rules/{id}", r.handlers.OrbNet.GetBlockRule)
-			orbnet.Delete("/rules/{id}", r.handlers.OrbNet.RemoveBlockRule)
-			orbnet.Post("/emergency-block", r.handlers.OrbNet.EmergencyBlock)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Delete("/rules/{id}", r.handlers.OrbNet.RemoveBlockRule)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/emergency-block", r.handlers.OrbNet.EmergencyBlock)
 
 			// Servers
 			orbnet.Get("/servers", r.handlers.OrbNet.ListServers)
-			orbnet.Post("/servers", r.handlers.OrbNet.RegisterServer)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/servers", r.handlers.OrbNet.RegisterServer)
 			orbnet.Get("/servers/{id}", r.handlers.OrbNet.GetServer)
-			orbnet.Put("/servers/{id}/status", r.handlers.OrbNet.UpdateServerStatus)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Put("/servers/{id}/status", r.handlers.OrbNet.UpdateServerStatus)
 
 			// Threat Sync
 			orbnet.Post("/sync", r.handlers.OrbNet.SyncThreatData)
@@ -856,7 +856,12 @@ func (r *Router) Setup() http.Handler {
 			taxii.Get("/collections", r.handlers.TAXII.ListCollections)
 			taxii.Get("/collections/{id}", r.handlers.TAXII.GetCollection)
 			taxii.Get("/collections/{id}/objects", r.handlers.TAXII.GetObjects)
-			taxii.Post("/collections/{id}/objects", r.handlers.TAXII.AddObjects)
+			// Outside the /api/v1 group, so the bearer check AdminAuth relies on
+			// is applied here. Reads stay public.
+			taxii.With(
+				apimiddleware.APIKeyAuth(r.config.JWT.Secret),
+				apimiddleware.AdminAuth(r.config.JWT.Secret),
+			).Post("/collections/{id}/objects", r.handlers.TAXII.AddObjects)
 		})
 	}
 

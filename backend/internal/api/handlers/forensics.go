@@ -783,6 +783,15 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 	}
 
 	result, err := h.service.RunFullAnalysis(r.Context(), scanReq)
+	if errors.Is(err, forensics.ErrNothingExamined) {
+		// 422 is not retried by the app and reaches its failure card; the body
+		// has no "anomalies", so it can never be read as a clean result.
+		respondJSON(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": "Nothing was examined, so this is not an all-clear. No log or backup was provided or could be read. Choose a specific analysis and provide a log or backup.",
+			"code":  "nothing_examined",
+		})
+		return
+	}
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to run full analysis")
 		http.Error(w, `{"error":"analysis failed"}`, http.StatusInternalServerError)

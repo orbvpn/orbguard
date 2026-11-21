@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,6 +13,9 @@ import (
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/pkg/logger"
 )
+
+// maxTAXIIEnvelopeBytes caps the body of a TAXII write.
+const maxTAXIIEnvelopeBytes = 10 << 20
 
 // TAXIIHandler handles TAXII 2.1 endpoints
 type TAXIIHandler struct {
@@ -92,16 +96,22 @@ func (h *TAXIIHandler) GetObjects(w http.ResponseWriter, r *http.Request) {
 func (h *TAXIIHandler) AddObjects(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
+	// Enforce the size limit before decoding; a chunked body declares no length.
+	if r.ContentLength > maxTAXIIEnvelopeBytes {
+		h.respondTAXIIError(w, models.ErrTAXIITooLarge)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTAXIIEnvelopeBytes)
+
 	// Parse request body
 	var envelope models.TAXIIEnvelope
 	if err := json.NewDecoder(r.Body).Decode(&envelope); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			h.respondTAXIIError(w, models.ErrTAXIITooLarge)
+			return
+		}
 		h.respondTAXIIError(w, models.ErrTAXIIBadRequest)
-		return
-	}
-
-	// Check content length
-	if r.ContentLength > 10*1024*1024 { // 10MB
-		h.respondTAXIIError(w, models.ErrTAXIITooLarge)
 		return
 	}
 

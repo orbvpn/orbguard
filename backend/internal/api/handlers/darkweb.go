@@ -333,6 +333,10 @@ func (h *DarkWebHandler) GetBreachByName(w http.ResponseWriter, r *http.Request)
 // RefreshMonitoring handles POST /api/v1/darkweb/refresh
 func (h *DarkWebHandler) RefreshMonitoring(w http.ResponseWriter, r *http.Request) {
 	if err := h.monitor.RefreshMonitoredAssets(r.Context()); err != nil {
+		if errors.Is(err, services.ErrRefreshInProgress) {
+			h.respondError(w, http.StatusConflict, "a refresh is already running")
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to refresh monitored assets")
 		h.respondError(w, http.StatusInternalServerError, "failed to refresh")
 		return

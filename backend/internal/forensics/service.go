@@ -2,6 +2,7 @@ package forensics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/pkg/logger"
 )
+
+// ErrNothingExamined means a full analysis performed no scan at all: no
+// artifact was supplied for the platform, or none could be read.
+var ErrNothingExamined = errors.New("no forensic artifact was examined")
 
 // Service provides forensic analysis capabilities
 type Service struct {
@@ -231,6 +236,16 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 				scansPerformed = append(scansPerformed, "logcat")
 			}
 		}
+	}
+
+	// A normal result here would read as an all-clear for a device nobody
+	// examined, so an analysis with no scan behind it is a failure.
+	if len(scansPerformed) == 0 {
+		s.logger.Warn().
+			Str("device_id", req.DeviceID).
+			Str("platform", req.Platform).
+			Msg("full forensic analysis examined nothing")
+		return nil, ErrNothingExamined
 	}
 
 	// Sort and finalize timeline
