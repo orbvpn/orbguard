@@ -153,10 +153,11 @@ class ApiEndpoints {
   /// Body: { "email": "user@example.com" }
   static const String darkwebCheckEmail = '$_v1/darkweb/check/email';
 
-  /// Check password for breaches (k-anonymity)
-  /// POST /api/v1/darkweb/check/password
-  /// Body: { "password_hash_prefix": "5BAA6..." } (only first 5 chars of SHA-1)
-  static const String darkwebCheckPassword = '$_v1/darkweb/check/password';
+  /// Password breach range (k-anonymity)
+  /// POST /api/v1/darkweb/password/range
+  /// Body: { "prefix": "5BAA6" } (first 5 chars of SHA-1). In the body so the
+  /// prefix stays out of access logs. The suffix comparison runs on the device.
+  static const String darkwebPasswordRange = '$_v1/darkweb/password/range';
 
   /// Monitor assets for breaches
   /// POST /api/v1/darkweb/monitor

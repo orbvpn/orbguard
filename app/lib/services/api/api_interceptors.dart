@@ -264,7 +264,9 @@ class LoggingInterceptor extends Interceptor {
       developer.log('┌──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
       developer.log('│ REQUEST: ${options.method} ${options.uri}', name: 'OrbGuard.API');
       developer.log('│ Headers: ${_sanitizeHeaders(options.headers)}', name: 'OrbGuard.API');
-      if (logRequestBody && options.data != null) {
+      if (logRequestBody &&
+          options.data != null &&
+          options.extra['sensitiveBody'] != true) {
         developer.log('│ Body: ${_truncate(options.data.toString(), 500)}', name: 'OrbGuard.API');
       }
       developer.log('└──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
@@ -280,7 +282,9 @@ class LoggingInterceptor extends Interceptor {
       developer.log('│ Duration: ${DateTime.now().difference(
         response.requestOptions.extra['startTime'] ?? DateTime.now()
       ).inMilliseconds}ms', name: 'OrbGuard.API');
-      if (logResponseBody && response.data != null) {
+      if (logResponseBody &&
+          response.data != null &&
+          response.requestOptions.extra['sensitiveBody'] != true) {
         developer.log('│ Body: ${_truncate(response.data.toString(), 500)}', name: 'OrbGuard.API');
       }
       developer.log('└──────────────────────────────────────────────────────────────', name: 'OrbGuard.API');
