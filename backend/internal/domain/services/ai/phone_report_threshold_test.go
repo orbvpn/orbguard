@@ -144,10 +144,17 @@ func TestReportMemoryIsBounded(t *testing.T) {
 	if got := len(store.numbers); got > maxReportedNumbers {
 		t.Fatalf("tracked %d numbers, limit %d", got, maxReportedNumbers)
 	}
-	before := len(store.numbers)
+}
+
+func TestReportOfSomethingNotANumberIsNotTracked(t *testing.T) {
+	s := newReportService()
+	store := newMemPhoneReports()
+	s.SetReportStore(store)
 	reportFrom(s, "not-a-number", 1, 1)
-	if len(store.numbers) > before {
-		t.Fatal("an input that is not a phone number was tracked")
+	reportFrom(s, "+123", 1, 1)
+	reportFrom(s, "+12345678901234567890", 1, 1)
+	if got := len(store.numbers); got != 0 {
+		t.Fatalf("%d inputs that are not phone numbers were tracked", got)
 	}
 }
 

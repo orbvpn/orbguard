@@ -174,21 +174,15 @@ func TestProviderFailureNeverReadsAsNoBreaches(t *testing.T) {
 		},
 		"leakcheck 200 with an error envelope": func(t *testing.T) *quotaRig {
 			leak := &statusTransport{status: http.StatusOK, body: `{"success":false,"error":"Not found"}`}
-			rig := newProviderRig(t, 500, nil, leak, nil)
-			rig.hibp.err = errors.New("dial tcp: i/o timeout")
-			return rig
+			return newProviderRig(t, 500, nil, leak, nil)
 		},
 		"leakcheck 404 that is not its envelope": func(t *testing.T) *quotaRig {
 			leak := &statusTransport{status: http.StatusNotFound, body: `<html>gateway</html>`}
-			rig := newProviderRig(t, 500, nil, leak, nil)
-			rig.hibp.err = errors.New("dial tcp: i/o timeout")
-			return rig
+			return newProviderRig(t, 500, nil, leak, nil)
 		},
 		"intelx lost the search": func(t *testing.T) *quotaRig {
 			intel := &intelXTransport{resultBody: `{"records":[],"status":2}`}
-			rig := newProviderRig(t, 500, nil, nil, intel)
-			rig.hibp.err = errors.New("dial tcp: i/o timeout")
-			return rig
+			return newProviderRig(t, 500, nil, nil, intel)
 		},
 	}
 	for name, arrange := range cases {
@@ -615,5 +609,72 @@ func TestPaidAccountStopsAtItsOwnDailyLimit(t *testing.T) {
 	}
 	if got := rig.hibp.calls.Load(); got != 50 {
 		t.Fatalf("want 50 lookups, got %d", got)
+	}
+}
+
+// Another caller's lookup can answer from the cache, but registering the email
+// still takes a unit, and the cache holds no clear address.
+func TestCachedAnswerChargesARegistrationAndKeepsNoClearEmail(t *testing.T) {
+	redisCache := reviewRedis(t)
+	log := &logger.Logger{Logger: zerolog.Nop()}
+	apimiddleware.ConfigureAuth(quotaTokens{}, "test", log)
+	t.Cleanup(func() { apimiddleware.ConfigureAuth(nil, "", nil) })
+	fake := &fakeHIBP{status: http.StatusNotFound}
+	client := services.NewHIBPClient(services.HIBPConfig{APIKey: "test-key"}, log)
+	client.SetTransportForTest(fake)
+	store := &memQuota{counts: map[string]int64{}, values: map[string]string{}, ttls: map[string]time.Duration{}}
+	cfg := config.Config{}
+	cfg.JWT.OrbNetAccessSecret = quotaJWTSecret
+	// Two replicas on one Redis: checks need no database, and a registration
+	// needs a repository to get as far as its charge.
+	replica := func(repo *repository.DarkWebRepository) *quotaRig {
+		monitor := services.NewDarkWebMonitor(client, nil, nil, repo, redisCache, log)
+		monitor.SetPaidLookupsForTest(store, 500)
+		h := &handlers.Handlers{DarkWeb: handlers.NewDarkWebHandler(monitor, log)}
+		return &quotaRig{h: api.NewRouter(cfg, h, nil, log).Setup(), store: store, hibp: fake}
+	}
+	rig, registering := replica(nil), replica(&repository.DarkWebRepository{})
+
+	const email = "cached.person@example.com"
+	total := func() int64 {
+		for key, count := range store.counts {
+			if strings.HasSuffix(key, ":total") && !strings.Contains(key, ":refund:") {
+				return count
+			}
+		}
+		return 0
+	}
+	if rec := rig.checkOne("old-c1", "198.51.100.90", email); rec.Code != http.StatusOK {
+		t.Fatalf("first lookup: %d", rec.Code)
+	}
+	rec := rig.checkOne("old-c2", "198.51.100.91", email)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), email) {
+		t.Fatalf("cached answer must name the requested address: %d %s", rec.Code, rec.Body)
+	}
+	if got := total(); got != 1 || fake.calls.Load() != 1 {
+		t.Fatalf("a cache hit on a check: %d units, %d calls", got, fake.calls.Load())
+	}
+	// The repository has no pool, so the request ends with a 500 after the
+	// charge; only the charge is under test here.
+	registering.post("/api/v1/darkweb/monitor", "old-c3", "198.51.100.92", "",
+		`{"asset_type":"email","value":"`+email+`"}`)
+	if got := total(); got != 2 || fake.calls.Load() != 1 {
+		t.Fatalf("registering a cached email: %d units, %d calls", got, fake.calls.Load())
+	}
+
+	ctx := context.Background()
+	keys, err := redisCache.Client().Keys(ctx, "*").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range keys {
+		if strings.Contains(key, email) {
+			t.Fatalf("clear email in key %s", key)
+		}
+		if kind, _ := redisCache.Client().Type(ctx, key).Result(); kind == "string" {
+			if value, _ := redisCache.Client().Get(ctx, key).Result(); strings.Contains(value, email) {
+				t.Fatalf("clear email in the value of %s", key)
+			}
+		}
 	}
 }
