@@ -291,6 +291,26 @@ func lockoutAddress(r *http.Request) string {
 	return peer
 }
 
+// ClientAddress is the client's address as the ingress saw it (see
+// lockoutAddress). Unlike RemoteAddr after RealIP, a client cannot choose it.
+func ClientAddress(r *http.Request) string {
+	return lockoutAddress(r)
+}
+
+// ClientNetwork is the client's network (IPv4 /24, IPv6 /48), the unit that
+// counts as one reporter: one host can usually change its address inside it.
+// It is empty when the client address cannot be parsed.
+func ClientNetwork(r *http.Request) string {
+	ip := net.ParseIP(ClientAddress(r))
+	if ip == nil {
+		return ""
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4.Mask(net.CIDRMask(24, 32)).String() + "/24"
+	}
+	return ip.Mask(net.CIDRMask(48, 128)).String() + "/48"
+}
+
 // lockoutKey is the failure-counter key for a client address. An IPv6 client
 // picks the low 64 bits of its own address, so IPv6 is counted per /64, the
 // smallest block a subscriber is handed; per address, one host could spread

@@ -22,7 +22,23 @@ type PhoneReputationService struct {
 	cacheMu       sync.RWMutex
 	cacheExpiry   time.Duration
 	knownScamNumbers map[string]ScamNumberInfo
+
+	// communityReports holds user reports apart from cache, so a report can
+	// never overwrite what a lookup found. Keyed by normalized number.
+	communityReports map[string]map[string]time.Time
+	reportsMu        sync.Mutex
 }
+
+const (
+	// phoneReportThreshold is how many distinct client networks must report a
+	// number before other users see it as reported. Device keys are free, so
+	// the network, not the key, is what counts as one reporter.
+	phoneReportThreshold = 5
+	// phoneReportWindow is how long one network's report keeps counting.
+	phoneReportWindow = 30 * 24 * time.Hour
+	// maxReportedNumbers bounds the memory reports can use.
+	maxReportedNumbers = 20000
+)
 
 // PhoneReputationConfig contains configuration for phone reputation service
 type PhoneReputationConfig struct {
@@ -123,6 +139,7 @@ func NewPhoneReputationService(log *logger.Logger, config PhoneReputationConfig)
 		cache:            make(map[string]*PhoneReputation),
 		cacheExpiry:      config.CacheTTL,
 		knownScamNumbers: make(map[string]ScamNumberInfo),
+		communityReports: make(map[string]map[string]time.Time),
 	}
 
 	if config.CacheTTL == 0 {
@@ -183,7 +200,7 @@ func (s *PhoneReputationService) Lookup(ctx context.Context, phoneNumber string)
 
 	// Check cache first
 	if cached := s.getFromCache(normalized); cached != nil {
-		return cached, nil
+		return s.withCommunityReports(normalized, cached), nil
 	}
 
 	reputation := &PhoneReputation{
@@ -216,7 +233,7 @@ func (s *PhoneReputationService) Lookup(ctx context.Context, phoneNumber string)
 	// Cache the result
 	s.addToCache(normalized, reputation)
 
-	return reputation, nil
+	return s.withCommunityReports(normalized, reputation), nil
 }
 
 // normalizeNumber normalizes a phone number
@@ -510,45 +527,86 @@ func (s *PhoneReputationService) ClearCache() {
 	s.cache = make(map[string]*PhoneReputation)
 }
 
-// ReportNumber reports a phone number as scam/spam
-func (s *PhoneReputationService) ReportNumber(number string, reportType string, description string, scamType string) {
-	normalized := s.normalizeNumber(number)
-
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
-
-	// Get or create reputation entry
-	reputation, exists := s.cache[normalized]
-	if !exists {
-		reputation = &PhoneReputation{
-			Number:        number,
-			NormalizedNum: normalized,
-			CheckedAt:     time.Now(),
-		}
-		s.cache[normalized] = reputation
-	}
-
-	// Add report
-	report := PhoneReport{
-		ReportType:  reportType,
-		Description: description,
-		ScamType:    scamType,
-		ReportedAt:  time.Now(),
-	}
-	reputation.UserReports = append(reputation.UserReports, report)
-
-	// Update counts
+// ReportNumber records one report of a number as scam, fraud or spam. reporter
+// identifies the client's network, as derived by the server; a report without
+// one is not counted. A report changes nothing other users see until
+// phoneReportThreshold distinct networks have reported the number, and even
+// then the number is shown as reported (IsSpam), never as a verified scam.
+func (s *PhoneReputationService) ReportNumber(number, reportType, reporter string) {
 	switch reportType {
-	case "scam", "fraud":
-		reputation.ScamReports++
-		reputation.IsScam = true
-	case "spam":
-		reputation.SpamReports++
-		reputation.IsSpam = true
+	case "scam", "fraud", "spam":
+	default:
+		return
+	}
+	normalized := s.normalizeNumber(number)
+	if reporter == "" || len(normalized) < 10 || len(normalized) > 16 {
+		return
 	}
 
-	// Recalculate reputation
-	s.calculateReputation(reputation)
+	s.reportsMu.Lock()
+	defer s.reportsMu.Unlock()
+
+	now := time.Now()
+	reporters, tracked := s.communityReports[normalized]
+	if !tracked {
+		if len(s.communityReports) >= maxReportedNumbers {
+			s.evictReportedNumber(now)
+		}
+		reporters = make(map[string]time.Time, 1)
+		s.communityReports[normalized] = reporters
+	}
+	pruneReporters(reporters, now)
+	if _, known := reporters[reporter]; known || len(reporters) < phoneReportThreshold {
+		reporters[reporter] = now
+	}
+}
+
+// evictReportedNumber makes room for a new number, preferring one below the
+// threshold, so a flood of invented numbers cannot push out a number many
+// networks have reported. Callers hold reportsMu.
+func (s *PhoneReputationService) evictReportedNumber(now time.Time) {
+	for number, reporters := range s.communityReports {
+		pruneReporters(reporters, now)
+		if len(reporters) < phoneReportThreshold {
+			delete(s.communityReports, number)
+			return
+		}
+	}
+	for number := range s.communityReports {
+		delete(s.communityReports, number)
+		return
+	}
+}
+
+func pruneReporters(reporters map[string]time.Time, now time.Time) {
+	for reporter, at := range reporters {
+		if now.Sub(at) > phoneReportWindow {
+			delete(reporters, reporter)
+		}
+	}
+}
+
+// withCommunityReports returns reputation with the community flag applied when
+// enough distinct networks reported the number. It returns a copy: the cached
+// entry is shared and stays unchanged.
+func (s *PhoneReputationService) withCommunityReports(normalized string, reputation *PhoneReputation) *PhoneReputation {
+	s.reportsMu.Lock()
+	reporters := s.communityReports[normalized]
+	pruneReporters(reporters, time.Now())
+	count := len(reporters)
+	s.reportsMu.Unlock()
+
+	if count < phoneReportThreshold || reputation.IsScam {
+		return reputation
+	}
+	flagged := *reputation
+	flagged.IsSpam = true
+	flagged.DataSources = append(append([]string(nil), reputation.DataSources...), "community_reports")
+	if flagged.RiskLevel != PhoneRiskHigh && flagged.RiskLevel != PhoneRiskDangerous {
+		flagged.RiskLevel = ""
+	}
+	s.calculateReputation(&flagged)
+	return &flagged
 }
 
 // AddKnownScamNumber adds a number to the known scam database

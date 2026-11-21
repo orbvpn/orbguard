@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services/ai"
 	"orbguard-lab/pkg/logger"
@@ -195,6 +196,8 @@ func (h *ScamDetectionHandler) Report(w http.ResponseWriter, r *http.Request) {
 		ScamType:    models.ScamType(req.ScamType),
 		Description: req.Description,
 		ReportedAt:  time.Now(),
+
+		ReporterNetwork: middleware.ClientNetwork(r),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
@@ -290,6 +293,8 @@ func (h *ScamDetectionHandler) ReportPhone(w http.ResponseWriter, r *http.Reques
 		ScamType:    models.ScamType(req.ScamType),
 		Description: req.Description,
 		ReportedAt:  time.Now(),
+
+		ReporterNetwork: middleware.ClientNetwork(r),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {

@@ -890,7 +890,7 @@ func (d *ScamDetector) ReportScam(ctx context.Context, report *models.ScamReport
 
 	// Add phone number to scam database
 	if d.phoneReputation != nil && report.PhoneNumber != "" {
-		d.phoneReputation.ReportNumber(report.PhoneNumber, "scam", report.Description, string(report.ScamType))
+		d.phoneReputation.ReportNumber(report.PhoneNumber, "scam", report.ReporterNetwork)
 	}
 
 	d.logger.Info().

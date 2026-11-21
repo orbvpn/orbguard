@@ -406,6 +406,9 @@ type ScamReport struct {
 	Country     string      `json:"country,omitempty"`
 	Verified    bool        `json:"verified"`
 	ReportedAt  time.Time   `json:"reported_at"`
+
+	// ReporterNetwork is set by the server from the trusted client address.
+	ReporterNetwork string `json:"-"`
 }
 
 // BulkScanRequest represents a request to scan multiple messages
