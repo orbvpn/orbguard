@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -95,6 +96,24 @@ type fetchDeferredError interface {
 func isFetchDeferred(err error) bool {
 	var deferred fetchDeferredError
 	return errors.As(err, &deferred)
+}
+
+// fetchBlockedError is implemented by connector errors meaning the feed cannot
+// work until someone acts (see internal/sources.FetchBlockedError). It always
+// fails the job and is recorded on the source row.
+type fetchBlockedError interface {
+	error
+	IsFetchBlocked() bool
+	RequestSent() bool
+}
+
+// fetchBlockedRowMarker is part of the text of every fetchBlockedError.
+const fetchBlockedRowMarker = " fetch blocked: "
+
+// sourceRowTracker is implemented by connectors that want their source row
+// kept current on the fetch path that has no row at hand.
+type sourceRowTracker interface {
+	TracksSourceRow() bool
 }
 
 // EventPublisher defines the interface for publishing threat events
@@ -323,10 +342,6 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 		} else if len(dueSources) > 0 {
 			a.logger.Info().Int("due_sources", len(dueSources)).Msg("processing due sources from database")
 
-			// A source that only paced itself did no work. If that is all the
-			// due list held, this tick counts as "nothing due" and the
-			// fallback below keeps serving the other connectors as before.
-			onlyDeferred := true
 			for _, source := range dueSources {
 				select {
 				case <-ctx.Done():
@@ -334,16 +349,11 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 				default:
 					conn, ok := a.GetConnector(source.Slug)
 					if ok && conn.IsEnabled() {
-						if err := a.fetchFromSourceWithDB(ctx, conn, source); isFetchDeferred(err) {
-							continue
-						}
+						_ = a.fetchFromSourceWithDB(ctx, conn, source)
 					}
-					onlyDeferred = false
 				}
 			}
-			if !onlyDeferred {
-				return nil
-			}
+			return nil
 		}
 	}
 
@@ -409,6 +419,14 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 		// The connector paced itself: no request, so nothing to record.
 		if isFetchDeferred(err) {
 			log.Debug().Str("reason", err.Error()).Msg("source fetch deferred by connector pacing")
+			return err
+		}
+
+		// The feed cannot work until someone acts: show it on the row.
+		var blocked fetchBlockedError
+		if errors.As(err, &blocked) {
+			a.recordFetchBlocked(ctx, source, blocked)
+			log.Error().Err(err).Msg("source fetch blocked")
 			return err
 		}
 
@@ -573,6 +591,15 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 			return nil
 		}
 
+		// The feed cannot work until someone acts: fail the job and show it
+		// on the row, also while the connector holds off and sends nothing.
+		var blocked fetchBlockedError
+		if errors.As(err, &blocked) {
+			a.recordFetchBlocked(ctx, a.sourceRowBySlug(ctx, conn.Slug()), blocked)
+			log.Error().Err(err).Msg("source fetch blocked")
+			return err
+		}
+
 		// Rate limits and plan limitations are expected operating
 		// conditions, not failures: log appropriately (once per backoff
 		// window) and do not propagate as an error.
@@ -660,7 +687,11 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 
 	// Update source metadata
 	if a.repository != nil {
-		_ = a.repository.UpdateSourceAfterFetch(ctx, fetchResult.SourceID)
+		if tracker, ok := conn.(sourceRowTracker); ok && tracker.TracksSourceRow() {
+			a.recordFetchSuccess(ctx, conn.Slug())
+		} else {
+			_ = a.repository.UpdateSourceAfterFetch(ctx, fetchResult.SourceID)
+		}
 	}
 
 	// Increment sync version for mobile apps
@@ -678,6 +709,57 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("source processing completed")
 
 	return nil
+}
+
+// sourceRowBySlug returns the source row of a connector, or nil if there is
+// none or it cannot be read.
+func (a *Aggregator) sourceRowBySlug(ctx context.Context, slug string) *models.Source {
+	if a.repository == nil {
+		return nil
+	}
+	row, err := a.repository.GetSourceBySlug(ctx, slug)
+	if err != nil {
+		a.logger.Warn().Err(err).Str("source", slug).Msg("could not read source row")
+		return nil
+	}
+	return row
+}
+
+// recordFetchBlocked shows a blocked feed on its source row. A row an operator
+// paused or disabled is left alone. During a hold no request is sent, so a row
+// that already shows the block is not rewritten: its error_count stays honest
+// and next_fetch is not pushed out on every job.
+func (a *Aggregator) recordFetchBlocked(ctx context.Context, row *models.Source, blocked fetchBlockedError) {
+	if a.repository == nil || row == nil {
+		return
+	}
+	switch row.Status {
+	case models.SourceStatusPaused, models.SourceStatusDisabled:
+		return
+	case models.SourceStatusError:
+		if !blocked.RequestSent() && row.LastError != nil && strings.Contains(*row.LastError, fetchBlockedRowMarker) {
+			return
+		}
+	}
+	if err := a.repository.UpdateSourcePlanLimited(ctx, row.ID, blocked.Error()); err != nil {
+		a.logger.Warn().Err(err).Str("source", row.Slug).Msg("could not record blocked fetch on source row")
+	}
+}
+
+// recordFetchSuccess clears a tracked feed's row after a fetch that delivered
+// data, so a feed that recovered returns to the due list. A row an operator
+// paused or disabled is left alone.
+func (a *Aggregator) recordFetchSuccess(ctx context.Context, slug string) {
+	row := a.sourceRowBySlug(ctx, slug)
+	if row == nil {
+		return
+	}
+	if row.Status != models.SourceStatusActive && row.Status != models.SourceStatusError {
+		return
+	}
+	if err := a.repository.UpdateSourceAfterSuccess(ctx, row.ID); err != nil {
+		a.logger.Warn().Err(err).Str("source", slug).Msg("could not record successful fetch on source row")
+	}
 }
 
 // Stats returns aggregator statistics

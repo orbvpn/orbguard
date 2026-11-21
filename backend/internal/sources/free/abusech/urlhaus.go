@@ -26,6 +26,9 @@ const (
 	// The provider regenerates the file every 5 minutes and asks for no more
 	// than one fetch in that time. One an hour stays far inside it.
 	urlhausMinInterval = time.Hour
+
+	// urlhausMaxTags bounds what one row can add to an indicator.
+	urlhausMaxTags = 32
 )
 
 var urlhausColumns = []string{
@@ -34,9 +37,9 @@ var urlhausColumns = []string{
 }
 
 // urlhausSharedHosts are platforms where one malicious file says nothing about
-// the rest of the host. OrbGuard's DNS rule loader turns every URL indicator
-// into a rule for its whole host, so a row on one of these would block the
-// platform for every user. Subdomains match too.
+// the rest of the host. Rows on them are left out. This list is not what keeps
+// a host from being blocked: URLhaus rows become URL indicators only, and the
+// DNS rule loader skips them. Subdomains match too.
 var urlhausSharedHosts = map[string]bool{
 	"github.com": true, "githubusercontent.com": true, "github.io": true,
 	"gitlab.com": true, "gitlab.io": true, "bitbucket.org": true, "sourceforge.net": true,
@@ -108,6 +111,10 @@ func (c *URLhausConnector) Configure(cfg sources.ConnectorConfig) error {
 func (c *URLhausConnector) setFetchGateStore(store FetchGateStore) {
 	c.feed.setFetchGateStore(store)
 }
+
+// TracksSourceRow asks the aggregator to keep this feed's source row current
+// on the paths that have no row at hand.
+func (c *URLhausConnector) TracksSourceRow() bool { return true }
 
 // Fetch retrieves recent malware URLs from the URLhaus export
 func (c *URLhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResult, error) {
@@ -200,9 +207,8 @@ func isSharedHost(host string) bool {
 	}
 }
 
-// rowIndicators builds the URL indicator, plus an IP indicator when the URL
-// is hosted on a bare address. A domain indicator is deliberately not made:
-// the row proves one URL is bad, not the whole domain.
+// rowIndicators builds the one URL indicator of a row. No domain or IP
+// indicator is made: the row proves one URL is bad, not its whole host.
 func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
 	urlValue := row.get("url")
 	threat := row.get("threat")
@@ -219,7 +225,9 @@ func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
 	firstSeen := row.when
 
 	tags := []string{"urlhaus", threat}
-	for _, tag := range strings.Split(row.get("tags"), ",") {
+	for rest := row.get("tags"); rest != "" && len(tags) < 2+urlhausMaxTags; {
+		var tag string
+		tag, rest, _ = strings.Cut(rest, ",")
 		tag = strings.TrimSpace(tag)
 		if tag != "" && !strings.EqualFold(tag, "none") {
 			tags = append(tags, tag)
@@ -227,7 +235,7 @@ func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
 	}
 
 	urlConfidence := 0.85
-	indicators := []models.RawIndicator{{
+	return []models.RawIndicator{{
 		Value:       urlValue,
 		Type:        models.IndicatorTypeURL,
 		Severity:    severity,
@@ -244,24 +252,4 @@ func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
 			"urlhaus_link": row.get("urlhaus_link"),
 		},
 	}}
-
-	host, ok := models.IndicatorURLHost(urlValue)
-	if !ok {
-		return indicators
-	}
-	if net.ParseIP(host) != nil {
-		ipConfidence := 0.80
-		indicators = append(indicators, models.RawIndicator{
-			Value:       host,
-			Type:        models.IndicatorTypeIP,
-			Severity:    severity,
-			Confidence:  &ipConfidence,
-			Description: fmt.Sprintf("IP from URLhaus: %s", threat),
-			Tags:        withTag(tags, "extracted"),
-			FirstSeen:   &firstSeen,
-			SourceID:    c.Slug(),
-			SourceName:  c.Name(),
-		})
-	}
-	return indicators
 }

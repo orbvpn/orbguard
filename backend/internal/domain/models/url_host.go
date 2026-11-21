@@ -11,12 +11,11 @@ const (
 	maxLabelLength = 63
 )
 
-// IndicatorURLHost returns the lower-case host of an http(s) indicator URL.
-// It is the one parser for "which host does this URL block": whatever judges a
-// URL and whatever turns it into a DNS rule must both use it, because feed data
-// is hostile and two parsers can be made to disagree. For example
-// http://https://github.com/x has the authority "https:" to net/url, while
-// stripping scheme prefixes one after another yields github.com.
+// IndicatorURLHost returns the lower-case host of an http(s) URL from a feed
+// whose rows are treated as hostile. It decides which URLhaus rows are usable.
+// It is deliberately strict: for example http://https://github.com/x has the
+// authority "https:" to net/url, while stripping scheme prefixes one after
+// another yields github.com, so that row is refused.
 //
 // ok is false for anything but a plain scheme, a clean authority and a public
 // looking name or IP literal: other schemes, user info, an empty port, control

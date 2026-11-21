@@ -784,7 +784,6 @@ func TestURLhausLeavesOutRowsThatWouldBlockHealthySites(t *testing.T) {
 	want := map[string]models.IndicatorType{
 		"http://bad.example/a.sh":     models.IndicatorTypeURL,
 		"http://203.0.113.9:8080/bin": models.IndicatorTypeURL,
-		"203.0.113.9":                 models.IndicatorTypeIP,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
@@ -1003,8 +1002,8 @@ func TestLargeExportStaysBounded(t *testing.T) {
 	t.Logf("file=%.1f MiB rows=%d indicators=%d normalized=%d live=%.1f MiB peak heap=%.1f MiB",
 		float64(served.Load())/(1<<20), rows, len(result.RawIndicators), len(normalized), liveMiB, peakMiB)
 
-	if len(result.RawIndicators) != 2*urlhausMaxRows {
-		t.Fatalf("got %d indicators, want %d", len(result.RawIndicators), 2*urlhausMaxRows)
+	if len(result.RawIndicators) != urlhausMaxRows {
+		t.Fatalf("got %d indicators, want %d", len(result.RawIndicators), urlhausMaxRows)
 	}
 	if liveMiB > 64 {
 		t.Fatalf("holds %.1f MiB after the fetch", liveMiB)

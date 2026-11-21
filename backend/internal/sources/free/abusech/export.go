@@ -2,10 +2,9 @@ package abusech
 
 import (
 	"bufio"
+	"bytes"
 	"container/heap"
 	"context"
-	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +38,17 @@ const (
 	exportCommentMax     = 64 * 1024
 	exportDateLayout     = "2006-01-02 15:04:05"
 	exportGateKeyPrefix  = "abusech:export-gate:"
+
+	// exportRefusedSuffix names the shared key that records a refusal, so a
+	// replica can tell a dead key from an ordinary pacing window.
+	exportRefusedSuffix = ":refused"
+
+	// Limits applied to a row before anything is split or stored. A compressed
+	// response can expand to the full byte cap inside a single field.
+	exportMaxLineBytes  = 8 << 10
+	exportMaxFieldBytes = 4 << 10
+	exportMaxColumns    = 64
+	exportSniffBytes    = 4 << 10
 )
 
 var (
@@ -135,41 +145,75 @@ func ShareFetchGate(conns []sources.Connector, store FetchGateStore) {
 // across replicas when a shared store is set. With a store that does not
 // answer it allows nothing, so a store outage cannot turn into a burst.
 type exportGate struct {
-	mu        sync.Mutex
-	notBefore time.Time
-	store     FetchGateStore
-	key       string
-	logger    *logger.Logger
+	mu           sync.Mutex
+	notBefore    time.Time
+	refusedUntil time.Time
+	store        FetchGateStore
+	key          string
+	logger       *logger.Logger
 }
 
 // reserve claims the window. It returns zero when the caller may download,
-// otherwise how long to wait.
-func (g *exportGate) reserve(ctx context.Context, pace time.Duration) time.Duration {
+// otherwise how long to wait and whether the wait is a recorded refusal rather
+// than ordinary pacing.
+func (g *exportGate) reserve(ctx context.Context, pace time.Duration) (time.Duration, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	now := time.Now()
+	if left := g.refusedUntil.Sub(now); left > 0 {
+		return left, true
+	}
 	if wait := g.notBefore.Sub(now); wait > 0 {
-		return wait
+		return wait, false
 	}
 	if g.store != nil {
 		claimed, err := g.store.SetNX(ctx, g.key, "1", pace)
 		if err != nil {
 			g.logger.Warn().Msg("shared export gate unavailable, skipping this fetch")
 			g.notBefore = now.Add(exportStoreRetry)
-			return exportStoreRetry
+			return exportStoreRetry, false
 		}
 		if !claimed {
+			if left, err := g.store.TTL(ctx, g.key+exportRefusedSuffix); err == nil && left > 0 {
+				g.refusedUntil = now.Add(left)
+				g.notBefore = g.refusedUntil
+				return left, true
+			}
 			wait, err := g.store.TTL(ctx, g.key)
 			if err != nil || wait <= 0 {
 				wait = exportStoreRetry
 			}
 			g.notBefore = now.Add(wait)
-			return wait
+			return wait, false
 		}
 	}
 	g.notBefore = now.Add(pace)
-	return 0
+	return 0, false
+}
+
+// refuse closes the gate for the refusal hold and records why, here and in the
+// shared store. The refusal key is written first: a replica that sees the long
+// gate must also see the reason.
+func (g *exportGate) refuse(ctx context.Context) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	until := time.Now().Add(exportRefusedHold)
+	g.refusedUntil = until
+	if g.notBefore.Before(until) {
+		g.notBefore = until
+	}
+	if g.store == nil {
+		return
+	}
+	storeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), exportStoreTimeout)
+	defer cancel()
+	for _, key := range []string{g.key + exportRefusedSuffix, g.key} {
+		if err := g.store.Set(storeCtx, key, "1", exportRefusedHold); err != nil {
+			g.logger.Warn().Msg("could not record the refusal in the shared export gate")
+		}
+	}
 }
 
 // hold extends the closed window to at least d, here and in the shared store.
@@ -236,14 +280,17 @@ func (f *exportFeed) exportURL() (string, error) {
 func (f *exportFeed) fetch(ctx context.Context, configured time.Duration) (*exportParse, error) {
 	provider := f.spec.provider
 	if f.apiKey == "" {
-		return nil, &sources.PlanLimitError{
-			Provider: provider,
-			Message:  "no abuse.ch Auth-Key configured, export not requested",
-		}
+		return nil, f.blocked("no abuse.ch Auth-Key configured, export not requested", false)
 	}
 
 	pace := max(configured, f.spec.minInterval)
-	if wait := f.gate.reserve(ctx, pace); wait > 0 {
+	wait, refused := f.gate.reserve(ctx, pace)
+	if refused {
+		return nil, f.blocked(fmt.Sprintf(
+			"provider refused the key or address at the last attempt, no request sent, next attempt in %s",
+			wait.Round(time.Minute)), false)
+	}
+	if wait > 0 {
 		return nil, &sources.FetchDeferredError{Provider: provider, Wait: wait}
 	}
 
@@ -277,15 +324,19 @@ func (f *exportFeed) fetch(ctx context.Context, configured time.Duration) (*expo
 			return nil, redactTransportError(provider, bodyErr.err)
 		}
 		if errors.Is(parseErr, errExportKeyRefused) {
-			f.gate.hold(ctx, exportRefusedHold)
-			return nil, &sources.PlanLimitError{
-				Provider: provider,
-				Message:  "provider refused the abuse.ch Auth-Key (reported in the response body)",
-			}
+			f.gate.refuse(ctx)
+			return nil, f.blocked("provider refused the abuse.ch Auth-Key (reported in the response body)", true)
 		}
 		return nil, fmt.Errorf("%s: %w", provider, parseErr)
 	}
 	return parsed, nil
+}
+
+func (f *exportFeed) blocked(message string, requested bool) error {
+	return &sources.FetchBlockedError{
+		PlanLimitError: sources.PlanLimitError{Provider: f.spec.provider, Message: message},
+		Requested:      requested,
+	}
 }
 
 // checkStatus maps a non-200 response to an error carrying only the status
@@ -297,21 +348,18 @@ func (f *exportFeed) checkStatus(ctx context.Context, resp *http.Response, pace 
 	case code == http.StatusOK:
 		return nil
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:
-		f.gate.hold(ctx, exportRefusedHold)
-		return &sources.PlanLimitError{
-			Provider: provider,
-			Message: fmt.Sprintf("provider refused the abuse.ch Auth-Key (HTTP %d), next attempt in %s",
-				code, exportRefusedHold),
-		}
+		f.gate.refuse(ctx)
+		return f.blocked(fmt.Sprintf("provider refused the abuse.ch Auth-Key (HTTP %d), next attempt in %s",
+			code, exportRefusedHold), true)
 	case code == http.StatusTooManyRequests:
 		// The body is deliberately not passed on: it could echo the address.
 		wait := max(sources.ParseRetryAfter(resp, nil, pace), pace)
 		f.gate.hold(ctx, wait)
 		return &sources.RateLimitError{Provider: provider, Wait: wait}
 	case code == http.StatusNotFound || code == http.StatusGone || (code >= 300 && code < 400):
-		f.gate.hold(ctx, exportRefusedHold)
-		return fmt.Errorf("%s export address not served (HTTP %d), next attempt in %s",
-			provider, code, exportRefusedHold)
+		f.gate.refuse(ctx)
+		return f.blocked(fmt.Sprintf("export address not served (HTTP %d), next attempt in %s",
+			code, exportRefusedHold), true)
 	default:
 		return fmt.Errorf("%s export returned HTTP %d", provider, code)
 	}
@@ -332,7 +380,9 @@ func redactTransportError(provider string, err error) error {
 }
 
 // parseExport streams the CSV, keeping only the newest spec.maxRows usable
-// rows in memory.
+// rows in memory. It reads one line at a time: a line over the limit is
+// discarded without being stored, and a stray quote can damage only its own
+// row, because no field may continue onto the next line.
 func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 	br := bufio.NewReaderSize(r, exportCommentMax)
 	if err := sniffExport(br); err != nil {
@@ -344,33 +394,41 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 		return nil, err
 	}
 
-	cr := csv.NewReader(br)
-	cr.Comment = '#'
-	cr.FieldsPerRecord = -1
-	cr.LazyQuotes = true
-	cr.TrimLeadingSpace = true
-
 	var index map[string]int
+	maxFields := exportMaxColumns
 	if header != nil {
 		index = columnIndex(header)
+		maxFields = len(header)
 	}
 
 	out := &exportParse{}
 	newest := &rowHeap{}
 	for {
-		rec, err := cr.Read()
+		line, oversize, err := readExportLine(br)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			var parseErr *csv.ParseError
-			if !errors.As(err, &parseErr) {
-				return nil, &exportBodyError{err: err}
+			return nil, &exportBodyError{err: err}
+		}
+
+		var rec []string
+		usable := false
+		if !oversize {
+			line = bytes.TrimRight(line, "\r\n")
+			if len(line) == 0 || line[0] == '#' {
+				continue
 			}
+			rec, usable = splitExportLine(string(line), maxFields)
+		}
+		if !usable {
 			if index == nil {
 				return nil, errExportLayout
 			}
 			out.read++
+			if out.read > exportMaxScannedRows {
+				return nil, errExportTooLarge
+			}
 			out.bad++
 			continue
 		}
@@ -381,6 +439,7 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 				return nil, errExportLayout
 			}
 			header, index = cols, columnIndex(cols)
+			maxFields = len(cols)
 			continue
 		}
 		if len(rec) > 0 && normalizeColumn(rec[0]) == header[0] {
@@ -437,6 +496,92 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 	return out, nil
 }
 
+// readExportLine returns the next line. The slice is only valid until the next
+// read. A line longer than exportMaxLineBytes is reported as oversize, and the
+// part beyond the read buffer is dropped without being stored.
+func readExportLine(br *bufio.Reader) ([]byte, bool, error) {
+	line, err := br.ReadSlice('\n')
+	switch {
+	case err == bufio.ErrBufferFull:
+		for err == bufio.ErrBufferFull {
+			_, err = br.ReadSlice('\n')
+		}
+		if err != nil && err != io.EOF {
+			return nil, false, err
+		}
+		return nil, true, nil
+	case err == io.EOF:
+		if len(line) == 0 {
+			return nil, false, io.EOF
+		}
+	case err != nil:
+		return nil, false, err
+	}
+	return line, len(line) > exportMaxLineBytes, nil
+}
+
+// splitExportLine splits one CSV line into at most maxFields fields of at most
+// exportMaxFieldBytes each. ok is false when the line breaks either limit or a
+// quoted field never closes. Leading blanks of a field are dropped, a doubled
+// quote is one quote, and a lone quote inside a quoted field is kept as text.
+func splitExportLine(line string, maxFields int) (fields []string, ok bool) {
+	fields = make([]string, 0, maxFields)
+	for {
+		line = strings.TrimLeft(line, " \t")
+
+		var field string
+		more := false
+		if strings.HasPrefix(line, `"`) {
+			var closed bool
+			field, line, more, closed = readQuotedField(line[1:])
+			if !closed {
+				return nil, false
+			}
+		} else if comma := strings.IndexByte(line, ','); comma >= 0 {
+			field, line, more = line[:comma], line[comma+1:], true
+		} else {
+			field, line = line, ""
+		}
+
+		if len(field) > exportMaxFieldBytes || len(fields) == maxFields {
+			return nil, false
+		}
+		fields = append(fields, field)
+		if !more {
+			return fields, true
+		}
+	}
+}
+
+// readQuotedField reads a field whose opening quote is already consumed. The
+// field ends at a quote followed by a comma or by the end of the line.
+func readQuotedField(s string) (field, rest string, more, closed bool) {
+	var unescaped strings.Builder
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] != '"' {
+			continue
+		}
+		switch {
+		case i+1 == len(s) || s[i+1] == ',':
+			field = s[start:i]
+			if unescaped.Len() > 0 {
+				unescaped.WriteString(field)
+				field = unescaped.String()
+			}
+			if i+1 == len(s) {
+				return field, "", false, true
+			}
+			return field, s[i+2:], true, true
+		case s[i+1] == '"':
+			unescaped.WriteString(s[start : i+1])
+			i++
+			start = i + 1
+		}
+	}
+	return "", "", false, false
+}
+
 // sniffExport rejects bodies that are plainly not a CSV before parsing.
 func sniffExport(br *bufio.Reader) error {
 	head, err := br.Peek(4)
@@ -457,24 +602,64 @@ func sniffExport(br *bufio.Reader) error {
 			return errExportEmpty
 		}
 	}
-	switch {
-	case len(head) == 4 && string(head) == "PK\x03\x04":
+	if len(head) == 4 && string(head) == "PK\x03\x04" {
 		return errExportZipped
-	case head[0] == '<':
-		return errExportLayout
-	case head[0] == '{':
-		var probe struct {
-			QueryStatus string `json:"query_status"`
-		}
-		if json.NewDecoder(io.LimitReader(br, 4096)).Decode(&probe) == nil {
-			status := strings.ToLower(probe.QueryStatus)
-			if strings.Contains(status, "auth") || strings.Contains(status, "key") {
-				return errExportKeyRefused
-			}
-		}
+	}
+
+	sample, err := br.Peek(exportSniffBytes)
+	if err != nil && err != io.EOF {
+		return &exportBodyError{err: err}
+	}
+	if looksLikeCSV(sample) {
+		return nil
+	}
+	if mentionsRefusal(sample) {
+		return errExportKeyRefused
+	}
+	switch first := bytes.TrimLeft(sample, " \t\r\n"); {
+	case len(first) == 0:
+		return errExportEmpty
+	case first[0] == '<', first[0] == '{', first[0] == '[':
 		return errExportLayout
 	}
 	return nil
+}
+
+// looksLikeCSV keeps a file whose columns merely changed from being read as a
+// refusal message just because a column name contains a word like "auth_key".
+func looksLikeCSV(sample []byte) bool {
+	trimmed := bytes.TrimLeft(sample, " \t\r\n")
+	if len(trimmed) == 0 {
+		return false
+	}
+	switch trimmed[0] {
+	case '#', '"':
+		return true
+	case '{', '[', '<':
+		return false
+	}
+	line, _, _ := bytes.Cut(trimmed, []byte{'\n'})
+	return bytes.Count(line, []byte{','}) >= 3
+}
+
+// exportRefusalPhrases are specific on purpose. A bare "auth" would also match
+// the author tag of an ordinary HTML outage page.
+var exportRefusalPhrases = [][]byte{
+	[]byte("auth_key"), []byte("auth-key"), []byte("auth key"), []byte("authkey"),
+	[]byte("api_key"), []byte("api-key"), []byte("api key"), []byte("apikey"),
+	[]byte("invalid_key"), []byte("invalid key"), []byte("unauthori"),
+	[]byte("authentication"), []byte("credentials"), []byte("forbidden"),
+	[]byte("access denied"),
+}
+
+func mentionsRefusal(sample []byte) bool {
+	lower := bytes.ToLower(sample)
+	for _, phrase := range exportRefusalPhrases {
+		if bytes.Contains(lower, phrase) {
+			return true
+		}
+	}
+	return false
 }
 
 // readCommentHeader consumes the leading comment and blank lines and returns
@@ -512,11 +697,8 @@ func readCommentHeader(br *bufio.Reader, required []string) ([]string, error) {
 }
 
 func parseHeaderLine(line string, required []string) []string {
-	cr := csv.NewReader(strings.NewReader(strings.TrimLeft(strings.TrimSpace(line), "# \t")))
-	cr.LazyQuotes = true
-	cr.TrimLeadingSpace = true
-	rec, err := cr.Read()
-	if err != nil {
+	rec, ok := splitExportLine(strings.TrimLeft(strings.TrimSpace(line), "# \t"), exportMaxColumns)
+	if !ok {
 		return nil
 	}
 	cols := normalizeColumns(rec)

@@ -93,7 +93,7 @@ func TestDeferredFetchWritesNothingToTheSourceRow(t *testing.T) {
 	}
 }
 
-func TestDueTickWithOnlyDeferredSourcesStillServesTheFallback(t *testing.T) {
+func TestDueTickWithOnlyDeferredSourcesRunsNothingElse(t *testing.T) {
 	paced := &stubConnector{slug: "paced", err: &sources.FetchDeferredError{Provider: "Paced", Wait: time.Minute}}
 	other := &stubConnector{slug: "other", err: errors.New("provider down")}
 	repo := &deferredRepo{due: []*models.Source{{ID: uuid.New(), Slug: "paced"}}}
@@ -102,8 +102,11 @@ func TestDueTickWithOnlyDeferredSourcesStillServesTheFallback(t *testing.T) {
 	if err := a.runDueSources(context.Background()); err != nil {
 		t.Fatalf("runDueSources: %v", err)
 	}
-	if n := other.calls.Load(); n != 1 {
-		t.Fatalf("the other connector ran %d times, want 1 through the fallback", n)
+	if n := paced.calls.Load(); n != 1 {
+		t.Fatalf("the paced connector ran %d times, want 1", n)
+	}
+	if n := other.calls.Load(); n != 0 {
+		t.Fatalf("a connector that was not due ran %d times", n)
 	}
 }
 
