@@ -96,19 +96,23 @@ func TestEveryPlaybookRouteIsAdminOnly(t *testing.T) {
 	}
 }
 
-func phoneIsSuspicious(t *testing.T, h http.Handler, number string) bool {
+// phoneRisk reads the risk score. is_suspicious cannot tell the states apart:
+// it is already true for any unknown number, whose base risk is 0.5.
+func phoneRisk(t *testing.T, h http.Handler, number string) (risk float64, isScam bool) {
 	t.Helper()
 	rec := do(h, http.MethodGet, "/api/v1/scam/phone/"+number, nil, asDevice())
 	if rec.Code != http.StatusOK {
 		t.Fatalf("phone reputation: want 200, got %d: %s", rec.Code, rec.Body)
 	}
-	return decodeJSON(t, rec.Body.Bytes())["is_suspicious"].(bool)
+	body := decodeJSON(t, rec.Body.Bytes())
+	return body["risk_score"].(float64), body["is_scam"].(bool)
 }
 
 // A forged X-Forwarded-For must not make one client count as many reporters.
 func TestPhoneReportsFromOneClientWithForgedHopsDoNotFlag(t *testing.T) {
 	h := newGfix3Router(t)
 	const number = "+4915112340001"
+	baseline, _ := phoneRisk(t, h, number)
 	for _, route := range []string{"/api/v1/scam/phone/report", "/api/v1/scam/report"} {
 		for i := 0; i < 20; i++ {
 			forged := clientHeader("X-Forwarded-For", fmt.Sprintf("203.0.%d.9", i))
@@ -118,26 +122,26 @@ func TestPhoneReportsFromOneClientWithForgedHopsDoNotFlag(t *testing.T) {
 			}
 		}
 	}
-	if phoneIsSuspicious(t, h, number) {
-		t.Fatal("one client flagged a number for every other user")
+	if risk, isScam := phoneRisk(t, h, number); isScam || risk != baseline {
+		t.Fatalf("one client changed the number for every other user: risk %v (baseline %v), scam %v", risk, baseline, isScam)
 	}
 }
 
 func TestPhoneReportsFromDistinctNetworksFlagAsReportedOnly(t *testing.T) {
 	h := newGfix3Router(t)
 	const number = "+4915112340002"
+	baseline, _ := phoneRisk(t, h, number)
 	for i := 0; i < 5; i++ {
-		if phoneIsSuspicious(t, h, number) {
-			t.Fatalf("flagged after %d networks", i)
+		if risk, isScam := phoneRisk(t, h, number); isScam || risk != baseline {
+			t.Fatalf("changed after %d networks: risk %v (baseline %v), scam %v", i, risk, baseline, isScam)
 		}
 		rec := do(h, http.MethodPost, "/api/v1/scam/phone/report", strings.NewReader(`{"phone_number":"`+number+`"}`), asDevice(), fromIP(fmt.Sprintf("198.51.%d.7", i)))
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("report: want 201, got %d", rec.Code)
 		}
 	}
-	rec := do(h, http.MethodGet, "/api/v1/scam/phone/"+number, nil, asDevice())
-	body := decodeJSON(t, rec.Body.Bytes())
-	if body["is_suspicious"] != true || body["is_scam"] != false {
-		t.Fatalf("after five networks want suspicious and not scam, got %v", body)
+	risk, isScam := phoneRisk(t, h, number)
+	if isScam || risk <= baseline {
+		t.Fatalf("after five networks want a raised risk and no scam verdict: risk %v (baseline %v), scam %v", risk, baseline, isScam)
 	}
 }

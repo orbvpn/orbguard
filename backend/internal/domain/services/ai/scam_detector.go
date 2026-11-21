@@ -640,11 +640,13 @@ func (d *ScamDetector) analyzePhone(ctx context.Context, req *models.ScamAnalysi
 			Evidence:    rep.Number,
 		})
 	} else if rep.IsSpam {
-		result.RiskScore = 0.7
+		// Community reports are unverified: keep the score below the scam
+		// threshold, or finalizeResult would turn them into a scam verdict.
+		result.RiskScore = minFloat(0.6, d.config.ScamThreshold-0.05)
 		result.Severity = models.ScamSeverityMedium
 		result.Indicators = append(result.Indicators, models.ScamIndicator{
 			Type:        "spam_number",
-			Description: "This phone number has been reported for spam",
+			Description: "Several users have reported this phone number",
 			Confidence:  0.8,
 		})
 	} else if rep.IsPremiumRate {
