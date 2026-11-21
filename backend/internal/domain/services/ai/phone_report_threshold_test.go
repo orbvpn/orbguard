@@ -241,6 +241,14 @@ func TestReportStoreDownLeavesTheLookupAsItWas(t *testing.T) {
 
 func testReportRedis(t *testing.T) *cache.RedisCache {
 	t.Helper()
+	redisCache, _ := testReportRedisScoped(t)
+	return redisCache
+}
+
+// testReportRedisScoped also returns the key prefix of this connection, so a
+// scan sees only what this test wrote.
+func testReportRedisScoped(t *testing.T) (*cache.RedisCache, string) {
+	t.Helper()
 	addr := os.Getenv("ORBGUARD_TEST_REDIS_ADDR")
 	if addr == "" {
 		t.Skip("ORBGUARD_TEST_REDIS_ADDR not set; skipping Redis-backed test")
@@ -252,14 +260,15 @@ func testReportRedis(t *testing.T) *cache.RedisCache {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	prefix := fmt.Sprintf("orbguard-test:%d:", time.Now().UnixNano())
 	redisCache, err := cache.NewRedis(ctx, config.RedisConfig{
-		Host: host, Port: port, KeyPrefix: fmt.Sprintf("orbguard-test:%d:", time.Now().UnixNano()),
+		Host: host, Port: port, KeyPrefix: prefix,
 	}, &logger.Logger{Logger: zerolog.Nop()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = redisCache.Close() })
-	return redisCache
+	return redisCache, prefix
 }
 
 func TestReportsAreSharedAcrossReplicasAndRestarts(t *testing.T) {
@@ -287,7 +296,7 @@ func TestReportsAreSharedAcrossReplicasAndRestarts(t *testing.T) {
 }
 
 func TestRedisReportsNeedKeysAndNetworksAndKeepNoClearValue(t *testing.T) {
-	redisCache := testReportRedis(t)
+	redisCache, prefix := testReportRedisScoped(t)
 	s := newReportService()
 	s.SetReportStore(NewRedisPhoneReportStore(redisCache))
 
@@ -304,9 +313,12 @@ func TestRedisReportsNeedKeysAndNetworksAndKeepNoClearValue(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	keys, err := redisCache.Client().Keys(ctx, "*").Result()
+	keys, err := redisCache.Client().Keys(ctx, prefix+"*").Result()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(keys) == 0 {
+		t.Fatal("the scan found none of this test's keys")
 	}
 	digits := strings.TrimPrefix(reportedNumber, "+")
 	for _, key := range keys {
