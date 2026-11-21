@@ -93,7 +93,7 @@ func TestDeviceShutdownLogFormat(t *testing.T) {
 			}
 		})
 		t.Run(route.name+"/a forged marker still encodes", func(t *testing.T) {
-			rec := route.send(t, h, "\t\tremaining client pid: 1 (/usr/libexec/a)\nSIGTERM: [99999999999999]\n")
+			rec := route.send(t, h, strings.Repeat("\t\tremaining client pid: 1 (/usr/libexec/a)\n", 3)+"SIGTERM: [99999999999999]\n")
 			assertExaminedClean(t, rec)
 		})
 		t.Run(route.name+"/a header alone is not a log", func(t *testing.T) {
@@ -302,7 +302,7 @@ func TestOneRecognisedLineDoesNotMakeALogExamined(t *testing.T) {
 			assertPartlyExamined(t, route.send(t, h, junk+iosEntry), "shutdown log lines in an unread format")
 		})
 		t.Run(route.name+"/500 unread lines and one device line", func(t *testing.T) {
-			rec := route.send(t, h, junk+"\t\tremaining client pid: 1 (/usr/libexec/a)\n")
+			rec := route.send(t, h, junk+strings.Repeat("\t\tremaining client pid: 1 (/usr/libexec/a)\n", 3))
 			assertPartlyExamined(t, rec, "shutdown log lines in an unread format")
 		})
 		t.Run(route.name+"/a critical finding stands and lists the skipped lines", func(t *testing.T) {
@@ -316,7 +316,7 @@ func TestOneRecognisedLineDoesNotMakeALogExamined(t *testing.T) {
 			assertPartlyExamined(t, route.send(t, h, junk+logcatThreadtime), "logcat lines in an unread format")
 		})
 		t.Run(route.name+"/a medium finding does not stand", func(t *testing.T) {
-			rec := route.send(t, h, junk+"11-21 08:12:33.123  1234  5678 W Agent: location tracking on\n")
+			rec := route.send(t, h, junk+strings.Repeat("11-21 08:12:33.123  1234  5678 W Agent: location tracking on\n", 3))
 			assertPartlyExamined(t, rec, "logcat lines in an unread format")
 		})
 		t.Run(route.name+"/a critical finding stands and lists the skipped lines", func(t *testing.T) {
@@ -335,7 +335,7 @@ func TestOneRecognisedLineDoesNotMakeALogExamined(t *testing.T) {
 			}
 		})
 		t.Run(route.name+"/named uid column lines are read", func(t *testing.T) {
-			rec := route.send(t, h, "11-21 08:12:33.123 u0_a123  1234  5678 I ActivityManager: Displayed\n")
+			rec := route.send(t, h, strings.Repeat("11-21 08:12:33.123 u0_a123  1234  5678 I ActivityManager: Displayed\n", 3))
 			assertExaminedClean(t, rec)
 		})
 	}
@@ -363,7 +363,7 @@ func TestOneRecognisedLineDoesNotMakeALogExamined(t *testing.T) {
 			assertExaminedClean(t, send(bugreport(strings.Repeat(uidLine, 20))))
 		})
 		t.Run(name+"/an unread log section is not clean", func(t *testing.T) {
-			rec := send(bugreport(uidLine + strings.Repeat("in no format\n", 20)))
+			rec := send(bugreport(strings.Repeat(uidLine, 3) + strings.Repeat("in no format\n", 20)))
 			assertPartlyExamined(t, rec, "logcat lines in an unread format")
 		})
 	}
@@ -379,7 +379,7 @@ func TestOneRecognisedLineDoesNotMakeALogExamined(t *testing.T) {
 		})
 	}
 	t.Run("quick-check/device format is read", func(t *testing.T) {
-		rec := send("ios", "\t\tremaining client pid: 1 (/usr/sbin/cfprefsd)\nSIGTERM: [1763712000]\n")
+		rec := send("ios", strings.Repeat("\t\tremaining client pid: 1 (/usr/sbin/cfprefsd)\n", 3)+"SIGTERM: [1763712000]\n")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d: %s", rec.Code, rec.Body.String())
 		}

@@ -3,6 +3,7 @@ package ios
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"path"
 	"regexp"
 	"strconv"
@@ -136,6 +137,7 @@ var (
 const (
 	shutdownEventClient = "remaining_client"
 	shutdownEventStatus = "status"
+	shutdownEventMarker = "shutdown"
 
 	// maxShutdownLogLines and maxShutdownFindings bound the memory one log can
 	// take. Anything beyond them counts as not examined.
@@ -151,6 +153,32 @@ const (
 // a client still running from one of them at shutdown is the finding.
 var suspiciousClientFolders = []string{"/private/var/db/", "/private/var/tmp/"}
 
+// spywareClientNames are the names in pegasusProcessNames that a device-format
+// client line can be judged on alone. xpcproxy, cfprefsd and agent are left out
+// because ordinary system processes carry them on every device. Matching is
+// exact, so the real CommCenter and MobileMail do not match.
+var spywareClientNames = map[string]bool{
+	"bh":             true,
+	"roleaccountd":   true,
+	"gatekeeperd":    true,
+	"pcsd":           true,
+	"servicemanager": true,
+	"commcenter":     true,
+	"mobilemail":     true,
+	"msf":            true,
+	"implant":        true,
+}
+
+// unreadIndicatorPattern finds a staging folder or one of those names in a
+// line the parser could not read, so such a line is never tolerated as noise.
+var unreadIndicatorPattern = regexp.MustCompile(`/private/var/(?:db|tmp)/|(?:^|[^A-Za-z0-9_.-])(?:bh|roleaccountd|gatekeeperd|pcsd|servicemanager|commcenter|mobilemail|msf|implant)(?:$|[^A-Za-z0-9_.-])`)
+
+// isShutdownEntry reports whether a parsed line is an entry of the log rather
+// than a header or a reboot marker.
+func isShutdownEntry(e models.ShutdownLogEntry) bool {
+	return e.EventType != shutdownEventStatus && e.EventType != shutdownEventMarker
+}
+
 // shutdownClient is one client path across a log's reboots.
 type shutdownClient struct {
 	path      string
@@ -161,6 +189,12 @@ type shutdownClient struct {
 
 // Parse parses shutdown.log data and returns forensic results
 func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
+	return p.parse(context.Background(), data)
+}
+
+// parse is Parse that stops reading lines when ctx ends. The lines it did not
+// reach then count as not examined.
+func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeShutdownLog)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -173,10 +207,11 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 
 	recognised, readLines, totalLines := 0, 0, 0
 	truncated := false
+	unreadIndicator := false
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
-		if lineNum > maxShutdownLogLines {
+		if lineNum > maxShutdownLogLines || (lineNum%1024 == 0 && ctx.Err() != nil) {
 			truncated = true
 			break
 		}
@@ -190,9 +225,11 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 			totalLines++
 			if entry.EventType != "" { // set only when the line format matched
 				readLines++
-				if entry.EventType != shutdownEventStatus {
+				if isShutdownEntry(entry) {
 					recognised++
 				}
+			} else if unreadIndicatorPattern.MatchString(line) {
+				unreadIndicator = true
 			}
 		}
 
@@ -262,12 +299,17 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 				break
 			}
 		}
-		if folder == "" {
+		knownName := spywareClientNames[path.Base(c.path)]
+		if folder == "" && !knownName {
 			continue
 		}
 		if len(result.Anomalies) >= maxShutdownFindings {
 			truncated = true
 			break
+		}
+		description := "Process was still running at shutdown from " + folder + ", a staging location used by mobile spyware"
+		if folder == "" {
+			description = "Process was still running at shutdown under a name used by mobile spyware"
 		}
 		result.AddAnomaly(models.Anomaly{
 			ID:          uuid.New().String(),
@@ -275,7 +317,7 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 			Severity:    models.ForensicSeverityCritical,
 			Confidence:  0.9,
 			Title:       "Suspicious Sticky Process Detected",
-			Description: "Process was still running at shutdown from " + folder + ", a staging location used by mobile spyware",
+			Description: description,
 			ProcessName: path.Base(c.path),
 			ProcessPID:  c.pid,
 			Path:        c.path,
@@ -381,9 +423,12 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 
 	// A log read only in part is never clean. Only a high or critical finding
 	// may stand, and the result then lists what was skipped.
-	notExamined := make([]string, 0, 2)
-	if !models.RecognisedEnough(readLines, totalLines) {
+	notExamined := make([]string, 0, 3)
+	if unreadIndicator || !models.RecognisedEnough(readLines, totalLines) {
 		notExamined = append(notExamined, "shutdown log lines in an unread format")
+	}
+	if recognised < models.MinLogEntries && !result.HasHighFinding() {
+		notExamined = append(notExamined, "too few shutdown log entries to call the log read")
 	}
 	if truncated {
 		notExamined = append(notExamined, "shutdown log beyond the line or findings limit")
@@ -403,6 +448,7 @@ func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
 // and recognised lines make up the share RecognisedEnough asks for.
 func (p *ShutdownLogParser) Recognises(data []byte) bool {
 	recognised, readLines, totalLines := 0, 0, 0
+	unreadIndicator := false
 	for len(data) > 0 {
 		var raw []byte
 		raw, data, _ = bytes.Cut(data, []byte("\n"))
@@ -414,12 +460,14 @@ func (p *ShutdownLogParser) Recognises(data []byte) bool {
 		entry, _ := p.parseLine(line)
 		if entry.EventType != "" {
 			readLines++
-			if entry.EventType != shutdownEventStatus {
+			if isShutdownEntry(entry) {
 				recognised++
 			}
+		} else if unreadIndicatorPattern.MatchString(line) {
+			unreadIndicator = true
 		}
 	}
-	return recognised > 0 && models.RecognisedEnough(readLines, totalLines)
+	return recognised >= models.MinLogEntries && !unreadIndicator && models.RecognisedEnough(readLines, totalLines)
 }
 
 // parseLine parses a single shutdown log line
@@ -472,7 +520,7 @@ func (p *ShutdownLogParser) parseLine(line string) (models.ShutdownLogEntry, err
 		entry.Path = m[2]
 		entry.ProcessName = path.Base(m[2])
 	} else if m := rebootMarkerPattern.FindStringSubmatch(line); m != nil {
-		entry.EventType = "shutdown"
+		entry.EventType = shutdownEventMarker
 		if ts, err := strconv.ParseInt(m[1], 10, 64); err == nil && ts > 0 && ts < maxMarkerUnixTime {
 			entry.Timestamp = time.Unix(ts, 0).UTC()
 		}

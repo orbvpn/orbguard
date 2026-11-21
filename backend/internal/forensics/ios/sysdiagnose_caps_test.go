@@ -20,7 +20,7 @@ func TestStatusLinesAloneAreNotAShutdownLog(t *testing.T) {
 	if p.Recognises([]byte(strings.Repeat(status, 5))) {
 		t.Fatal("status lines alone must not read as a shutdown log")
 	}
-	if !p.Recognises([]byte(status + "\t\tremaining client pid: 1 (/usr/libexec/a)\n")) {
+	if !p.Recognises([]byte(status + strings.Repeat("\t\tremaining client pid: 1 (/usr/libexec/a)\n", 3))) {
 		t.Fatal("a status line and a client line read as a shutdown log")
 	}
 }
@@ -66,7 +66,7 @@ func TestStickyFindingCapIsNotClean(t *testing.T) {
 
 func TestClientPathNamedRebootIsNotARebootEvent(t *testing.T) {
 	p := NewShutdownLogParser(testParserLogger())
-	result, err := p.Parse([]byte("\t\tremaining client pid: 1 (/usr/libexec/rebootd)\nSIGTERM: [1763712000]\n"))
+	result, err := p.Parse([]byte(strings.Repeat("\t\tremaining client pid: 1 (/usr/libexec/rebootd)\n", 3) + "SIGTERM: [1763712000]\n"))
 	if err != nil {
 		t.Fatal(err)
 	}

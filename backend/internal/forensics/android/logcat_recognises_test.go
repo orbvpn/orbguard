@@ -15,7 +15,7 @@ func TestBannersAloneAreNotALogcat(t *testing.T) {
 	if p.Recognises([]byte(strings.Repeat(banner, 5))) {
 		t.Fatal("banners alone must not read as a logcat")
 	}
-	if !p.Recognises([]byte(banner + "11-21 08:12:33.123  1234  5678 I Agent: started\n")) {
+	if !p.Recognises([]byte(banner + strings.Repeat("11-21 08:12:33.123  1234  5678 I Agent: started\n", 3))) {
 		t.Fatal("a banner and an entry read as a logcat")
 	}
 }

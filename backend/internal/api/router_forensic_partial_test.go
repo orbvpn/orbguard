@@ -278,9 +278,9 @@ func TestSysdiagnoseEntryOverTheCapIsNotExamined(t *testing.T) {
 			rec := kind.send(t, h, archiveEntry{huge, content})
 			assertNothingExamined(t, rec.Code, rec.Body.Bytes())
 		})
-		t.Run(kind.name+"/oversized unrelated file does not block a result", func(t *testing.T) {
+		t.Run(kind.name+"/an oversized file at any path is listed", func(t *testing.T) {
 			rec := kind.send(t, h, archiveEntry{"notes.bin", content}, archiveEntry{lockdownEntry, []byte("hello")})
-			assertExaminedClean(t, rec)
+			assertPartlyExamined(t, rec, "notes.bin")
 		})
 	}
 }

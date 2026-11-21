@@ -2,10 +2,10 @@ package ios
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"orbguard-lab/internal/forensics/models"
+	"orbguard-lab/internal/forensics/safezip"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -74,9 +75,11 @@ var sysdiagnoseSuspiciousPatterns = []struct {
 	// Pegasus/Predator specific
 	{"*", regexp.MustCompile(`(?i)/private/var/db/[a-f0-9]{32,}`), "Suspicious path pattern (Pegasus)", 0.9},
 	{"*", regexp.MustCompile(`(?i)/private/var/tmp/[a-f0-9]{32,}`), "Suspicious path pattern (Predator)", 0.9},
-	// bh and pcsd count only as a whole process name: the last path component,
-	// name[pid], or a process field. Short names otherwise occur in binary data.
-	{"*", regexp.MustCompile(`(?im)(?:/[a-z0-9._-]+)+/(?:bh|pcsd)(?:[\s)\]:,]|$)|\b(?:bh|pcsd)\[\d+\]|\bprocess(?:[ _]?name)?\s*[:=]\s*"?(?:bh|pcsd)(?:[\s\[\]():,"]|$)|roleaccount`), "Known spyware process name", 0.95},
+	// bh and pcsd count only as a whole process name: the last path component
+	// (JSON may escape its slashes), name[pid], a process field, a crash report
+	// process field, the last column of a process list, or a launch daemon
+	// file name. Short names otherwise occur in binary data.
+	{"*", regexp.MustCompile(`(?im)(?:\\?/[a-z0-9._-]+)+\\?/(?:bh|pcsd)(?:[\s)\]:,;"'<]|$)|\b(?:bh|pcsd)\[\d+\]|\bprocess(?:[ _]?name)?\s*[:=]\s*"?(?:bh|pcsd)(?:[\s\[\]():,"]|$)|"(?:procname|app_name|parentproc|responsibleproc)"\s*:\s*"(?:bh|pcsd)"|^[ \t]*(?:[a-z_][a-z0-9_-]*[ \t]+)?\d+[ \t]+(?:\S+[ \t]+)*(?:bh|pcsd)[ \t]*\r?$|\\?/launch(?:daemons|agents)\\?/[^\s"'<>]*\b(?:bh|pcsd)\b[^\s"'<>]*|roleaccount`), "Known spyware process name", 0.95},
 
 	// Exploitation indicators
 	{"crashes", regexp.MustCompile(`(?i)SIGABRT|SIGSEGV|EXC_BAD_ACCESS`), "Crash possibly indicating exploit", 0.5},
@@ -98,6 +101,12 @@ var sysdiagnoseSuspiciousPatterns = []struct {
 
 // Parse analyzes a sysdiagnose archive and returns forensic results
 func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, error) {
+	return p.ParseContext(context.Background(), archivePath)
+}
+
+// ParseContext is Parse that stops when ctx ends. What it did not reach then
+// counts as not examined.
+func (p *SysdiagnoseParser) ParseContext(ctx context.Context, archivePath string) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeSysdiagnose)
 
 	p.logger.Info().Str("path", archivePath).Msg("analyzing sysdiagnose archive")
@@ -106,11 +115,15 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 
 	// Each entry is analysed once, as it is read, and its bytes are then
 	// released, so memory follows the largest entry and not the archive.
-	extraction := &sysdiagnoseExtraction{unread: make(map[string]bool)}
+	extraction := &sysdiagnoseExtraction{ctx: ctx, unread: make(map[string]bool)}
 	extraction.visit = func(e sysdiagnoseEntry) bool {
 		p.examineEntry(e, extraction, result, timeline)
+		if extraction.expired() {
+			extraction.stopReading(sysdiagnoseOutOfTime)
+			return false
+		}
 		if len(result.Anomalies) >= maxSysdiagnoseFindings {
-			extraction.skip(sysdiagnoseRestOfArchive)
+			extraction.stopReading(sysdiagnoseRestOfArchive)
 			return false
 		}
 		return true
@@ -125,13 +138,19 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	// Detect coordinated suspicious activity patterns
 	p.detectCoordinatedActivity(result, timeline)
 
-	if !extraction.recognised && len(result.Anomalies) == 0 {
+	// Refused for capacity, so the artifact itself may be fine.
+	if extraction.busy && !result.HasHighFinding() {
+		return nil, models.ErrAnalysisBusy
+	}
+
+	notExamined := extraction.notExamined()
+	if !extraction.stoppedEarly && !extraction.recognised && len(result.Anomalies) == 0 {
 		return nil, models.ErrNothingExamined
 	}
 
 	// Never clean while something supplied went unexamined. Only a high or
 	// critical finding may stand, and the result lists what was skipped.
-	if notExamined := extraction.notExamined(); len(notExamined) > 0 {
+	if len(notExamined) > 0 {
 		if !result.HasHighFinding() {
 			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
 		}
@@ -176,7 +195,13 @@ const (
 	// maxListedNotExamined caps the names echoed back in a response.
 	maxListedNotExamined = 100
 
+	// ruleScanChunk is how much one rule scans before the time budget is
+	// checked. ruleScanOverlap keeps a match that crosses a chunk boundary.
+	ruleScanChunk   = 256 * 1024
+	ruleScanOverlap = 4 * 1024
+
 	sysdiagnoseRestOfArchive = "rest of the archive: over the size, entry or findings limit"
+	sysdiagnoseOutOfTime     = "rest of the archive: over the time limit"
 )
 
 var (
@@ -214,14 +239,45 @@ func (e sysdiagnoseEntry) kindLabel() string {
 
 // sysdiagnoseExtraction tracks one archive as its entries are read.
 type sysdiagnoseExtraction struct {
+	ctx        context.Context
 	visit      func(sysdiagnoseEntry) bool
 	entries    int
 	totalBytes int64
 	// recognised is set once a known artifact or a shutdown log was read.
 	recognised bool
-	// unread holds entries of a known artifact that could not be examined.
+	// busy is set when reading stopped for capacity shared with other uploads.
+	busy bool
+	// stoppedEarly is set when entries were left unread at a limit.
+	stoppedEarly bool
+	// unread holds entries that could not be examined.
 	unread     map[string]bool
 	unreadMore int
+}
+
+// expired reports whether the time budget or the request has ended.
+func (x *sysdiagnoseExtraction) expired() bool {
+	return x.ctx != nil && x.ctx.Err() != nil
+}
+
+// context is the context the analysis of one entry runs under.
+func (x *sysdiagnoseExtraction) context() context.Context {
+	if x.ctx == nil {
+		return context.Background()
+	}
+	return x.ctx
+}
+
+// budgetReader stops decompression when the time budget ends.
+type budgetReader struct {
+	r io.Reader
+	x *sysdiagnoseExtraction
+}
+
+func (b budgetReader) Read(p []byte) (int, error) {
+	if b.x.expired() {
+		return 0, b.x.ctx.Err()
+	}
+	return b.r.Read(p)
 }
 
 // skip records something supplied that was not examined.
@@ -237,6 +293,12 @@ func (x *sysdiagnoseExtraction) skip(name string) {
 		return
 	}
 	x.unread[name] = true
+}
+
+// stopReading records that the rest of the archive was left unread.
+func (x *sysdiagnoseExtraction) stopReading(reason string) {
+	x.stoppedEarly = true
+	x.skip(reason)
 }
 
 // notExamined lists what was skipped, in a stable order.
@@ -255,9 +317,13 @@ func (x *sysdiagnoseExtraction) notExamined() []string {
 // add reads one entry once, under every limit, and hands it to visit. It
 // returns false when reading must stop.
 func (x *sysdiagnoseExtraction) add(name string, size int64, open func() (io.ReadCloser, error)) bool {
+	if x.expired() {
+		x.stopReading(sysdiagnoseOutOfTime)
+		return false
+	}
 	x.entries++
 	if x.entries > maxSysdiagnoseEntries || size > maxSysdiagnoseTotalBytes-x.totalBytes {
-		x.skip(sysdiagnoseRestOfArchive)
+		x.stopReading(sysdiagnoseRestOfArchive)
 		return false
 	}
 	x.totalBytes += size
@@ -269,26 +335,22 @@ func (x *sysdiagnoseExtraction) add(name string, size int64, open func() (io.Rea
 			keys = append(keys, key)
 		}
 	}
-	mustRead := len(keys) > 0 || strings.HasPrefix(basename, "shutdown.log")
 
 	if size > maxSysdiagnoseEntryBytes {
-		if mustRead {
-			x.skip(name)
-		}
+		x.skip(name)
 		return true
 	}
 	if sysdiagnoseInFlight.Add(size) > maxSysdiagnoseInFlightBytes {
 		sysdiagnoseInFlight.Add(-size)
-		x.skip(sysdiagnoseRestOfArchive)
+		x.busy = true
+		x.stopReading(sysdiagnoseRestOfArchive)
 		return false
 	}
 	defer sysdiagnoseInFlight.Add(-size)
 
 	content, err := readSysdiagnoseEntry(size, open)
 	if err != nil {
-		if mustRead {
-			x.skip(name)
-		}
+		x.skip(name)
 		return true
 	}
 	return x.visit(sysdiagnoseEntry{name: name, keys: keys, content: content})
@@ -325,10 +387,13 @@ func (p *SysdiagnoseParser) examineEntry(e sysdiagnoseEntry, x *sysdiagnoseExtra
 		}
 	}
 
-	p.analyzeFile(e, result, timeline)
+	if !p.analyzeFile(x.context(), e, result, timeline) {
+		x.skip(e.name)
+		return
+	}
 
 	if len(e.content) > 0 && strings.HasPrefix(filepath.Base(e.name), "shutdown.log") {
-		shutdownResult, err := p.shutdownLogParser.Parse(e.content)
+		shutdownResult, err := p.shutdownLogParser.parse(x.context(), e.content)
 		if err != nil {
 			x.skip(e.name)
 		} else {
@@ -355,6 +420,11 @@ func (p *SysdiagnoseParser) examineEntry(e sysdiagnoseEntry, x *sysdiagnoseExtra
 				timeline.AddEvent(event)
 			}
 		}
+	}
+
+	if x.expired() {
+		x.skip(e.name)
+		return
 	}
 
 	// Analyze crash logs for exploitation indicators
@@ -408,7 +478,7 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath string, x *sysdiagnoseExtra
 	}
 	defer gzr.Close()
 
-	tr := tar.NewReader(gzr)
+	tr := tar.NewReader(budgetReader{r: gzr, x: x})
 
 	for {
 		header, err := tr.Next()
@@ -416,10 +486,19 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath string, x *sysdiagnoseExtra
 			break
 		}
 		if err != nil {
+			if x.expired() {
+				x.stopReading(sysdiagnoseOutOfTime)
+				return nil
+			}
 			return err
 		}
 
-		if header.Typeflag != tar.TypeReg {
+		switch header.Typeflag {
+		case tar.TypeReg:
+		case tar.TypeDir, tar.TypeSymlink, tar.TypeLink, tar.TypeChar, tar.TypeBlock, tar.TypeFifo, tar.TypeXGlobalHeader:
+			continue // holds no file data of its own
+		default:
+			x.skip(header.Name)
 			continue
 		}
 
@@ -435,7 +514,12 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath string, x *sysdiagnoseExtra
 
 // extractZip extracts a zip archive
 func (p *SysdiagnoseParser) extractZip(archivePath string, x *sysdiagnoseExtraction) error {
-	r, err := zip.OpenReader(archivePath)
+	r, err := safezip.Open(archivePath, safezip.MaxDirectoryBytes)
+	if errors.Is(err, models.ErrAnalysisBusy) || errors.Is(err, safezip.ErrDirectoryTooLarge) {
+		x.busy = errors.Is(err, models.ErrAnalysisBusy)
+		x.stopReading(sysdiagnoseRestOfArchive)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -462,9 +546,12 @@ func (p *SysdiagnoseParser) extractZip(archivePath string, x *sysdiagnoseExtract
 func (p *SysdiagnoseParser) readDirectory(dirPath string, x *sysdiagnoseExtraction) error {
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // Skip errors
+			if path != dirPath {
+				x.skip(filepath.Base(path))
+			}
+			return nil
 		}
-		if info.IsDir() {
+		if !info.Mode().IsRegular() {
 			return nil
 		}
 
@@ -481,8 +568,56 @@ func (p *SysdiagnoseParser) readDirectory(dirPath string, x *sysdiagnoseExtracti
 	})
 }
 
-// analyzeFile analyzes a single file for suspicious patterns
-func (p *SysdiagnoseParser) analyzeFile(e sysdiagnoseEntry, result *models.ForensicResult, timeline *models.Timeline) {
+// findRuleMatches finds up to limit matches one chunk at a time, so a large
+// entry can stop at the time budget. Chunks end at a line where they can and
+// overlap, so a match across a boundary is found once. It returns false if it
+// stopped before the end of content.
+func findRuleMatches(ctx context.Context, re *regexp.Regexp, content []byte, limit int) ([][]int, bool) {
+	var found [][]int
+	floor := 0
+	for start := 0; start < len(content); {
+		if ctx.Err() != nil {
+			return found, false
+		}
+		end := start + ruleScanChunk
+		if end >= len(content) {
+			end = len(content)
+		} else if nl := bytes.LastIndexByte(content[start:end], '\n'); nl >= ruleScanChunk/2 {
+			end = start + nl + 1
+		}
+		for _, m := range re.FindAllIndex(content[start:end], limit) {
+			// At a cut, ^ $ and \b would see a false edge. The next or the
+			// previous chunk holds the same bytes with their real neighbours.
+			if end < len(content) && m[1] == end-start {
+				continue
+			}
+			if m[0] == 0 && start > 0 && content[start-1] != '\n' {
+				continue
+			}
+			if m[0]+start < floor {
+				continue
+			}
+			found = append(found, []int{m[0] + start, m[1] + start})
+			floor = m[1] + start
+			if len(found) == limit {
+				return found, true
+			}
+		}
+		if end == len(content) {
+			break
+		}
+		next := end - ruleScanOverlap
+		if nl := bytes.IndexByte(content[next:end], '\n'); nl >= 0 {
+			next += nl + 1
+		}
+		start = next
+	}
+	return found, true
+}
+
+// analyzeFile analyzes a single file for suspicious patterns. It returns false
+// if ctx ended before every rule had read the whole file.
+func (p *SysdiagnoseParser) analyzeFile(ctx context.Context, e sysdiagnoseEntry, result *models.ForensicResult, timeline *models.Timeline) bool {
 	filename, content := e.name, e.content
 
 	for _, pattern := range sysdiagnoseSuspiciousPatterns {
@@ -491,7 +626,7 @@ func (p *SysdiagnoseParser) analyzeFile(e sysdiagnoseEntry, result *models.Foren
 			continue
 		}
 
-		matches := pattern.Pattern.FindAllIndex(content, maxRuleMatchesPerEntry)
+		matches, complete := findRuleMatches(ctx, pattern.Pattern, content, maxRuleMatchesPerEntry)
 		for _, match := range matches {
 			// Extract context around match
 			start := match[0] - 100
@@ -536,7 +671,11 @@ func (p *SysdiagnoseParser) analyzeFile(e sysdiagnoseEntry, result *models.Foren
 				AnomalyID:    anomaly.ID,
 			})
 		}
+		if !complete {
+			return false
+		}
 	}
+	return true
 }
 
 // analyzeCrashLogs analyzes crash logs for exploitation indicators

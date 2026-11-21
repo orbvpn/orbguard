@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"archive/zip"
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/forensics"
 	fmodels "orbguard-lab/internal/forensics/models"
+	"orbguard-lab/internal/forensics/safezip"
 	"orbguard-lab/pkg/logger"
 )
 
@@ -33,20 +37,62 @@ const (
 	// maxBackupExtractBytes caps the total uncompressed size of an
 	// extracted iOS backup archive (guards against zip bombs).
 	maxBackupExtractBytes = 2 << 30
+
+	// forensicAnalysisBudget is how long a request may spend before it must
+	// answer with what it has. It counts from the handler's start, as the
+	// server's 15 s write timeout does, and leaves 4 s to finish and respond.
+	forensicAnalysisBudget = 11 * time.Second
 )
 
 // ForensicsHandler handles forensic analysis endpoints
 type ForensicsHandler struct {
-	service *forensics.Service
-	logger  *logger.Logger
+	service        *forensics.Service
+	logger         *logger.Logger
+	analysisBudget time.Duration
 }
 
 // NewForensicsHandler creates a new ForensicsHandler
 func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *ForensicsHandler {
 	return &ForensicsHandler{
-		service: service,
-		logger:  log.WithComponent("forensics-handler"),
+		service:        service,
+		logger:         log.WithComponent("forensics-handler"),
+		analysisBudget: forensicAnalysisBudget,
 	}
+}
+
+// analysisContext ends at the analysis budget or when the client goes away.
+func (h *ForensicsHandler) analysisContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), h.analysisBudget)
+}
+
+// readCapped reads at most limit bytes and reports whether r held more.
+func readCapped(r io.Reader, limit int64) ([]byte, bool, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(data)) > limit {
+		return data[:limit], true, nil
+	}
+	return data, false, nil
+}
+
+// withUnreadRest applies the partial rule to a result of a file that was cut
+// at its limit: only a high or critical finding may stand, listing what was cut.
+func withUnreadRest(result *fmodels.ForensicResult, err error, note string) (*fmodels.ForensicResult, error) {
+	if err != nil {
+		var partly *fmodels.PartlyExaminedError
+		if errors.Is(err, forensics.ErrNothingExamined) || errors.As(err, &partly) {
+			return nil, &fmodels.PartlyExaminedError{NotExamined: []string{note}}
+		}
+		return nil, err
+	}
+	if !result.HasHighFinding() {
+		return nil, &fmodels.PartlyExaminedError{NotExamined: []string{note}}
+	}
+	listed, _ := result.RawData["not_examined"].([]string)
+	result.RawData["not_examined"] = append(listed, note)
+	return result, nil
 }
 
 // respondUnexamined answers 422 when an analysis recognised nothing or could
@@ -54,6 +100,14 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 // does not retry a 422 and shows its failure card; the body has no "anomalies",
 // so it can never be read as a clean result.
 func respondUnexamined(w http.ResponseWriter, err error) bool {
+	if errors.Is(err, forensics.ErrAnalysisBusy) {
+		w.Header().Set("Retry-After", "15")
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error": "The analysis service is busy, so this is not an all-clear. Try again in a moment.",
+			"code":  "analysis_busy",
+		})
+		return true
+	}
 	var partly *fmodels.PartlyExaminedError
 	if errors.As(err, &partly) {
 		respondJSON(w, http.StatusUnprocessableEntity, map[string]any{
@@ -171,13 +225,16 @@ func (h *ForensicsHandler) UploadShutdownLog(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 
 	deviceID := r.FormValue("device_id")
-	data, err := io.ReadAll(io.LimitReader(file, maxSmallUploadBytes))
+	data, over, err := readCapped(file, maxSmallUploadBytes)
 	if err != nil {
 		http.Error(w, `{"error":"failed to read uploaded file"}`, http.StatusBadRequest)
 		return
 	}
 
 	result, err := h.service.AnalyzeShutdownLog(r.Context(), data, deviceID)
+	if over {
+		result, err = withUnreadRest(result, err, "shutdown log beyond the upload limit")
+	}
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -259,6 +316,9 @@ func (h *ForensicsHandler) AnalyzeDataUsage(w http.ResponseWriter, r *http.Reque
 // SERVICE-ONLY: archive_path references a file on the server filesystem.
 // Clients upload their archive to /forensics/ios/sysdiagnose/upload.
 func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	if !h.requireServiceCaller(w, r, "/api/v1/forensics/ios/sysdiagnose/upload") {
 		return
 	}
@@ -272,7 +332,7 @@ func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	result, err := h.service.AnalyzeSysdiagnose(r.Context(), req.ArchivePath, req.DeviceID)
+	result, err := h.service.AnalyzeSysdiagnose(ctx, req.ArchivePath, req.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -288,6 +348,9 @@ func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Req
 
 // AnalyzeLogcat handles POST /api/v1/forensics/analyze/logcat
 func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	var req struct {
 		DeviceID string `json:"device_id"`
 		LogData  string `json:"log_data"`
@@ -302,7 +365,7 @@ func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := h.service.AnalyzeLogcat(r.Context(), []byte(req.LogData), req.DeviceID)
+	result, err := h.service.AnalyzeLogcat(ctx, []byte(req.LogData), req.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -318,6 +381,9 @@ func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request)
 
 // UploadLogcat handles POST /api/v1/forensics/android/logcat/upload
 func (h *ForensicsHandler) UploadLogcat(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	if err := r.ParseMultipartForm(maxSmallUploadBytes); err != nil {
 		http.Error(w, `{"error":"failed to parse form data"}`, http.StatusBadRequest)
 		return
@@ -331,13 +397,7 @@ func (h *ForensicsHandler) UploadLogcat(w http.ResponseWriter, r *http.Request) 
 	defer file.Close()
 
 	deviceID := r.FormValue("device_id")
-	data, err := io.ReadAll(io.LimitReader(file, maxSmallUploadBytes))
-	if err != nil {
-		http.Error(w, `{"error":"failed to read uploaded file"}`, http.StatusBadRequest)
-		return
-	}
-
-	result, err := h.service.AnalyzeLogcat(r.Context(), data, deviceID)
+	result, err := h.service.AnalyzeLogcatStream(ctx, file, maxSmallUploadBytes, deviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -524,7 +584,7 @@ func (h *ForensicsHandler) receiveUpload(w http.ResponseWriter, r *http.Request,
 // extractZipArchive extracts src into dest with zip-slip protection and a
 // total uncompressed size cap.
 func extractZipArchive(src, dest string, maxBytes int64) error {
-	zr, err := zip.OpenReader(src)
+	zr, err := safezip.Open(src, safezip.MaxBackupDirectoryBytes)
 	if err != nil {
 		return fmt.Errorf("open zip archive: %w", err)
 	}
@@ -634,6 +694,9 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := extractZipArchive(artifact.Path, extractDir, maxBackupExtractBytes); err != nil {
+		if respondUnexamined(w, err) {
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to extract uploaded iOS backup archive")
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid backup archive: %v", err)})
 		return
@@ -662,6 +725,9 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 // (+ optional device_id field); the existing sysdiagnose parser performs the
 // extraction itself.
 func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	artifact, ok := h.receiveUpload(w, r, map[string]string{
 		".tar.gz": ".tar.gz",
 		".tgz":    ".tar.gz", // normalize so the parser detects gzip+tar
@@ -672,7 +738,7 @@ func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Requ
 	}
 	defer artifact.Cleanup()
 
-	result, err := h.service.AnalyzeSysdiagnose(r.Context(), artifact.Path, artifact.DeviceID)
+	result, err := h.service.AnalyzeSysdiagnose(ctx, artifact.Path, artifact.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -689,15 +755,24 @@ func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, result)
 }
 
-// extractBugreportText pulls the bugreport text out of an Android bugreport
-// zip: the largest entry named bugreport*.txt, falling back to the largest
-// .txt entry. Reads at most maxBytes.
-func extractBugreportText(archivePath string, maxBytes int64) ([]byte, error) {
-	zr, err := zip.OpenReader(archivePath)
+// bugreportText is the open text entry of a bugreport zip.
+type bugreportText struct {
+	io.ReadCloser
+	archive *safezip.Reader
+}
+
+func (b *bugreportText) Close() error {
+	b.ReadCloser.Close()
+	return b.archive.Close()
+}
+
+// openBugreportText opens the bugreport text of an Android bugreport zip: the
+// largest entry named bugreport*.txt, falling back to the largest .txt entry.
+func openBugreportText(archivePath string) (io.ReadCloser, error) {
+	zr, err := safezip.Open(archivePath, safezip.MaxDirectoryBytes)
 	if err != nil {
 		return nil, fmt.Errorf("open bugreport archive: %w", err)
 	}
-	defer zr.Close()
 
 	var best, bestTxt *zip.File
 	for _, f := range zr.File {
@@ -721,20 +796,16 @@ func extractBugreportText(archivePath string, maxBytes int64) ([]byte, error) {
 		best = bestTxt
 	}
 	if best == nil {
+		zr.Close()
 		return nil, errors.New("no .txt bugreport entry found in archive")
 	}
 
 	rc, err := best.Open()
 	if err != nil {
+		zr.Close()
 		return nil, fmt.Errorf("open bugreport entry %s: %w", best.Name, err)
 	}
-	defer rc.Close()
-
-	data, err := io.ReadAll(io.LimitReader(rc, maxBytes))
-	if err != nil {
-		return nil, fmt.Errorf("read bugreport entry %s: %w", best.Name, err)
-	}
-	return data, nil
+	return &bugreportText{ReadCloser: rc, archive: zr}, nil
 }
 
 // UploadBugreport handles POST /api/v1/forensics/android/bugreport/upload.
@@ -742,6 +813,9 @@ func extractBugreportText(archivePath string, maxBytes int64) ([]byte, error) {
 // field) — either the bugreport zip produced by `adb bugreport` or the plain
 // bugreport .txt — and runs the existing logcat/bugreport parser on it.
 func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	artifact, ok := h.receiveUpload(w, r, map[string]string{
 		".zip": ".zip",
 		".txt": ".txt",
@@ -751,11 +825,14 @@ func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Reques
 	}
 	defer artifact.Cleanup()
 
-	var data []byte
+	var text io.ReadCloser
 	if strings.HasSuffix(artifact.Path, ".zip") {
 		var err error
-		data, err = extractBugreportText(artifact.Path, maxBugreportParseBytes)
+		text, err = openBugreportText(artifact.Path)
 		if err != nil {
+			if respondUnexamined(w, err) {
+				return
+			}
 			h.logger.Error().Err(err).Msg("failed to extract uploaded bugreport archive")
 			respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid bugreport archive: %v", err)})
 			return
@@ -767,21 +844,17 @@ func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Reques
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read uploaded file"})
 			return
 		}
-		data, err = io.ReadAll(io.LimitReader(f, maxBugreportParseBytes))
-		f.Close()
-		if err != nil {
-			h.logger.Error().Err(err).Msg("failed to read uploaded bugreport")
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read uploaded file"})
-			return
-		}
+		text = f
 	}
+	defer text.Close()
 
-	if len(data) == 0 {
+	buffered := bufio.NewReader(text)
+	if _, err := buffered.Peek(1); errors.Is(err, io.EOF) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "bugreport contains no text to analyze"})
 		return
 	}
 
-	result, err := h.service.AnalyzeLogcat(r.Context(), data, artifact.DeviceID)
+	result, err := h.service.AnalyzeLogcatStream(ctx, buffered, maxBugreportParseBytes, artifact.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -836,7 +909,10 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 		IncludeTimeline: req.IncludeTimeline,
 	}
 
-	result, err := h.service.RunFullAnalysis(r.Context(), scanReq)
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
+	result, err := h.service.RunFullAnalysis(ctx, scanReq)
 	if respondUnexamined(w, err) {
 		return
 	}

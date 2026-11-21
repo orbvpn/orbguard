@@ -2,6 +2,7 @@ package ios
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -70,7 +71,7 @@ func TestTotalBudgetCountsEntriesItDidNotRead(t *testing.T) {
 	if x.add("notes.bin", maxSysdiagnoseEntryBytes+1, refuse) {
 		t.Fatal("the entry over the budget must stop reading")
 	}
-	if got := x.notExamined(); len(got) != 1 || got[0] != sysdiagnoseRestOfArchive {
+	if got := x.notExamined(); len(got) != 2 || got[0] != "notes.bin" || got[1] != sysdiagnoseRestOfArchive {
 		t.Fatalf("not examined: %v", got)
 	}
 }
@@ -154,8 +155,8 @@ func TestUnreadableEntryIsListed(t *testing.T) {
 	broken := func() (io.ReadCloser, error) { return nil, errors.New("broken") }
 	x.add("logs/lockdownd/a.log", 4, broken)
 	x.add("notes.txt", 4, broken)
-	if got := x.notExamined(); len(got) != 1 || got[0] != "logs/lockdownd/a.log" {
-		t.Fatalf("only the known artifact is listed: %v", got)
+	if got := x.notExamined(); len(got) != 2 || got[0] != "logs/lockdownd/a.log" || got[1] != "notes.txt" {
+		t.Fatalf("every unread entry is listed: %v", got)
 	}
 }
 
@@ -186,7 +187,7 @@ func TestFindingFloodIsBounded(t *testing.T) {
 	}
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeSysdiagnose)
 	x := &sysdiagnoseExtraction{unread: make(map[string]bool)}
-	p.analyzeFile(sysdiagnoseEntry{name: dir + "/a.log", content: hits.Bytes()}, result, models.NewTimeline())
+	p.analyzeFile(context.Background(), sysdiagnoseEntry{name: dir + "/a.log", content: hits.Bytes()}, result, models.NewTimeline())
 	if got := len(result.Anomalies); got != maxRuleMatchesPerEntry {
 		t.Fatalf("one rule in one file: want %d findings, got %d", maxRuleMatchesPerEntry, got)
 	}

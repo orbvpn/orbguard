@@ -1,8 +1,11 @@
 package forensics
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +19,9 @@ import (
 
 // ErrNothingExamined means an analysis recognised nothing in what it was given.
 var ErrNothingExamined = models.ErrNothingExamined
+
+// ErrAnalysisBusy means the server is at its limit for analyses running at once.
+var ErrAnalysisBusy = models.ErrAnalysisBusy
 
 // Service provides forensic analysis capabilities
 type Service struct {
@@ -132,9 +138,15 @@ func (s *Service) AnalyzeDataUsage(ctx context.Context, dbPath, deviceID string)
 
 // AnalyzeLogcat analyzes Android logcat output for forensic indicators
 func (s *Service) AnalyzeLogcat(ctx context.Context, data []byte, deviceID string) (*models.ForensicResult, error) {
+	return s.AnalyzeLogcatStream(ctx, bytes.NewReader(data), 0, deviceID)
+}
+
+// AnalyzeLogcatStream analyzes a log as it is read, up to maxBytes (0 means no
+// limit), and stops when ctx ends.
+func (s *Service) AnalyzeLogcatStream(ctx context.Context, r io.Reader, maxBytes int64, deviceID string) (*models.ForensicResult, error) {
 	s.logger.Info().Str("device_id", deviceID).Msg("analyzing Android logcat")
 
-	result, err := s.logcatParser.Parse(data)
+	result, err := s.logcatParser.ParseStream(ctx, r, maxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse logcat: %w", err)
 	}
@@ -175,6 +187,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 	combinedTimeline := models.NewTimeline()
 	scansPerformed := make([]string, 0)
 	notExamined := make([]string, 0)
+	busy := false
 
 	// iOS Analysis
 	if req.Platform == "ios" {
@@ -219,10 +232,11 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 		// Sysdiagnose archive analysis
 		if req.SysdiagnosePath != "" {
-			result, err := s.sysdiagnoseParser.Parse(req.SysdiagnosePath)
+			result, err := s.sysdiagnoseParser.ParseContext(ctx, req.SysdiagnosePath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("sysdiagnose analysis failed")
 				notExamined = append(notExamined, "sysdiagnose")
+				busy = errors.Is(err, ErrAnalysisBusy)
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "sysdiagnose")
@@ -237,7 +251,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 	if req.Platform == "android" {
 		// Logcat analysis
 		if len(req.LogcatData) > 0 {
-			result, err := s.logcatParser.Parse(req.LogcatData)
+			result, err := s.logcatParser.ParseStream(ctx, bytes.NewReader(req.LogcatData), 0)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("logcat analysis failed")
 				notExamined = append(notExamined, "logcat")
@@ -249,6 +263,10 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 				}
 			}
 		}
+	}
+
+	if busy && !combinedResult.HasHighFinding() {
+		return nil, ErrAnalysisBusy
 	}
 
 	// A normal result here would read as an all-clear for a device nobody
@@ -429,7 +447,7 @@ func (s *Service) AnalyzeSysdiagnose(ctx context.Context, archivePath, deviceID 
 		Str("path", archivePath).
 		Msg("analyzing sysdiagnose archive")
 
-	result, err := s.sysdiagnoseParser.Parse(archivePath)
+	result, err := s.sysdiagnoseParser.ParseContext(ctx, archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sysdiagnose: %w", err)
 	}

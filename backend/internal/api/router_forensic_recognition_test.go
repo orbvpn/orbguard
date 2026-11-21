@@ -21,10 +21,16 @@ import (
 // the formats the parsers declare. The Android threadtime line is the format
 // the app's own capture requests (logcat -d -v threadtime).
 const (
-	iosEntry         = "2024-05-01 10:11:12.123 +0000 101 SpringBoard[101]: client exiting\n"
-	logcatThreadtime = "11-21 08:12:33.123  1234  5678 I ActivityManager: Displayed com.example/.Main\n"
-	logcatBrief      = "I/ActivityManager( 1234): Displayed com.example/.Main\n"
-	logcatTime       = "11-21 08:12:33.123 I/ActivityManager( 1234): Displayed com.example/.Main\n"
+	iosLine         = "2024-05-01 10:11:12.123 +0000 101 SpringBoard[101]: client exiting\n"
+	logcatLine      = "11-21 08:12:33.123  1234  5678 I ActivityManager: Displayed com.example/.Main\n"
+	logcatBriefLine = "I/ActivityManager( 1234): Displayed com.example/.Main\n"
+	logcatTimeLine  = "11-21 08:12:33.123 I/ActivityManager( 1234): Displayed com.example/.Main\n"
+
+	// Three lines: the fewest that count as having read a log.
+	iosEntry         = iosLine + iosLine + iosLine
+	logcatThreadtime = logcatLine + logcatLine + logcatLine
+	logcatBrief      = logcatBriefLine + logcatBriefLine + logcatBriefLine
+	logcatTime       = logcatTimeLine + logcatTimeLine + logcatTimeLine
 )
 
 // Text the parsers do not read, including line shapes other tools produce.
@@ -213,9 +219,9 @@ func TestLogRoutesKeepACleanResultForRecognisedLogs(t *testing.T) {
 	}
 	for _, route := range logcatRoutes() {
 		for name, log := range map[string]string{
-			"threadtime":             logcatThreadtime,
-			"brief":                  logcatBrief,
-			"time":                   logcatTime,
+			"threadtime":                     logcatThreadtime,
+			"brief":                          logcatBrief,
+			"time":                           logcatTime,
 			"threadtime with one noise line": "--------- beginning of main\n" + nineOf(logcatThreadtime) + noise,
 		} {
 			t.Run(route.name+"/"+name, func(t *testing.T) {

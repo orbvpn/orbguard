@@ -9,6 +9,13 @@ import (
 // was given, or was given none. It must never be answered as a clean result.
 var ErrNothingExamined = errors.New("no forensic artifact was examined")
 
+// ErrAnalysisBusy means the server is at its limit for analyses running at
+// once. The artifact may be fine, so sending it again later can succeed.
+var ErrAnalysisBusy = errors.New("forensic analysis capacity is in use")
+
+// MinLogEntries is the fewest entries that count as having read a log.
+const MinLogEntries = 3
+
 // PartlyExaminedError means part of what was supplied could not be examined
 // and nothing was found in the rest, so the result is not an all-clear.
 type PartlyExaminedError struct {

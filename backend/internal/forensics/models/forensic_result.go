@@ -331,7 +331,8 @@ func (r *ForensicResult) generateRecommendations() {
 		)
 	} else {
 		r.Recommendations = append(r.Recommendations,
-			"No significant threats detected",
+			"No significant threats detected in the supplied file",
+			"This covers only the supplied file and does not show that the device is clean",
 			"Continue regular security hygiene practices",
 			"Keep device updated with latest security patches",
 		)

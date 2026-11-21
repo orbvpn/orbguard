@@ -3,6 +3,10 @@ package android
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"errors"
+	"io"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -105,12 +109,36 @@ var (
 	bugreportLogcatSection  = regexp.MustCompile(`^------ .*\blogcat\b.* ------$`)
 )
 
+// maxLogcatFindings bounds the memory a crafted log can take. Reading stops
+// there, and what was not reached counts as not examined.
+const maxLogcatFindings = 1000
+
+// logcatSpywareNames are the names of the known-spyware rules. A line the
+// parser could not read and that holds one is never tolerated as noise.
+var logcatSpywareNames = []string{
+	"pegasus", "chrysaor", "lipizzan", "skygofree", "predator",
+	"cereals", "equus", "monstermind",
+	"mspy", "flexispy", "cerberus", "cocospy", "spyic", "hoverwatch",
+}
+
+func holdsSpywareName(line string) bool {
+	lower := strings.ToLower(line)
+	for _, name := range logcatSpywareNames {
+		if strings.Contains(lower, name) {
+			return true
+		}
+	}
+	return false
+}
+
 // logcatShare counts recognised lines. In a bugreport only the log sections
-// count: its other sections are not logs and would never match.
+// count: its other sections are not logs and would never match. Banners count
+// neither way.
 type logcatShare struct {
 	read, total       int
 	logRead, logTotal int
 	inLog             bool
+	unreadIndicator   bool
 }
 
 func (c *logcatShare) add(line string, parsed bool) {
@@ -121,8 +149,14 @@ func (c *logcatShare) add(line string, parsed bool) {
 		c.inLog = bugreportLogcatSection.MatchString(line)
 		return
 	}
+	if !parsed && logcatBannerPattern.MatchString(line) {
+		return
+	}
+	if !parsed && holdsSpywareName(line) {
+		c.unreadIndicator = true
+	}
 	read := 0
-	if parsed || logcatBannerPattern.MatchString(line) {
+	if parsed {
 		read = 1
 	}
 	c.read += read
@@ -134,6 +168,9 @@ func (c *logcatShare) add(line string, parsed bool) {
 }
 
 func (c *logcatShare) enough() bool {
+	if c.unreadIndicator {
+		return false
+	}
 	if c.logTotal > 0 {
 		return models.RecognisedEnough(c.logRead, c.logTotal)
 	}
@@ -142,15 +179,31 @@ func (c *logcatShare) enough() bool {
 
 // Parse parses logcat data and returns forensic results
 func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
+	return p.ParseStream(context.Background(), bytes.NewReader(data), 0)
+}
+
+// ParseStream parses a log as it is read and keeps only its findings, so memory
+// does not follow the size of the log. It stops when ctx ends and after
+// maxBytes (0 means no limit). What it did not reach counts as not examined.
+func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes int64) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "android", models.ForensicScanTypeLogcat)
 
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	entries := make([]models.LogcatEntry, 0)
+	limited := &io.LimitedReader{R: r, N: math.MaxInt64}
+	if maxBytes > 0 {
+		limited.N = maxBytes + 1
+	}
+	scanner := bufio.NewScanner(limited)
+	entryCount := 0
+	stopped := false
 	timeline := models.NewTimeline()
 	var share logcatShare
 
 	lineNum := 0
 	for scanner.Scan() {
+		if lineNum%1024 == 0 && ctx.Err() != nil {
+			stopped = true
+			break
+		}
 		lineNum++
 		line := scanner.Text()
 
@@ -160,7 +213,7 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 			continue
 		}
 
-		entries = append(entries, entry)
+		entryCount++
 
 		// Analyze for suspicious patterns
 		isSuspicious, score, reason, tags := p.analyzeEntry(entry)
@@ -179,7 +232,7 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 				Timestamp:   &entry.Timestamp,
 				Evidence: map[string]any{
 					"tag":      entry.Tag,
-					"message":  entry.Message,
+					"message":  truncate(entry.Message, 2048),
 					"priority": entry.Priority,
 					"tid":      entry.TID,
 					"tags":     tags,
@@ -208,18 +261,26 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 					"tags":     tags,
 				},
 			})
+
+			if len(result.Anomalies) >= maxLogcatFindings {
+				stopped = true
+				break
+			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		if errors.Is(err, bufio.ErrTooLong) {
+			return nil, err
+		}
+		stopped = true // the stream broke, so the rest was not read
 	}
-	if len(entries) == 0 {
+	if maxBytes > 0 && limited.N <= 0 {
+		stopped = true
+	}
+	if entryCount == 0 && !stopped {
 		return nil, models.ErrNothingExamined
 	}
-
-	// Analyze patterns across entries
-	p.analyzePatterns(entries, result, timeline)
 
 	// Detect threats
 	threats := p.detectThreats(result.Anomalies)
@@ -230,13 +291,23 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 	timeline.Sort()
 	result.Timeline = timeline.ToEvents()
 
-	result.RawData["total_entries"] = len(entries)
+	result.RawData["total_entries"] = entryCount
 	result.RawData["suspicious_entries"] = len(result.Anomalies)
 
 	// A log read only in part is never clean. Only a high or critical finding
 	// may stand, and the result then lists what was skipped.
-	if !share.enough() {
-		notExamined := []string{"logcat lines in an unread format"}
+	notExamined := make([]string, 0, 2)
+	if stopped {
+		notExamined = append(notExamined, "logcat beyond the size, findings or time limit")
+	} else {
+		if !share.enough() {
+			notExamined = append(notExamined, "logcat lines in an unread format")
+		}
+		if entryCount < models.MinLogEntries && !result.HasHighFinding() {
+			notExamined = append(notExamined, "too few logcat entries to call the log read")
+		}
+	}
+	if len(notExamined) > 0 {
 		if !result.HasHighFinding() {
 			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
 		}
@@ -268,7 +339,7 @@ func (p *LogcatParser) Recognises(data []byte) bool {
 		}
 		share.add(line, parsed)
 	}
-	return entries > 0 && share.enough()
+	return entries >= models.MinLogEntries && share.enough()
 }
 
 // parseLine parses a single logcat line
