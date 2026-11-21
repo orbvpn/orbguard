@@ -51,8 +51,8 @@ const (
 
 // refreshLocker is the cross-replica lock a sweep holds (*cache.RedisCache).
 type refreshLocker interface {
-	AcquireLock(ctx context.Context, lockKey string, ttl time.Duration) (bool, error)
-	ReleaseLock(ctx context.Context, lockKey string) error
+	AcquireOwnedLock(ctx context.Context, lockKey string, ttl time.Duration) (string, bool, error)
+	ReleaseOwnedLock(ctx context.Context, lockKey, owner string) (bool, error)
 }
 
 // DarkWebMonitor provides dark web and breach monitoring services. Monitored
@@ -542,7 +542,7 @@ func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
 	defer m.refreshing.Store(false)
 
 	if m.refreshLock != nil {
-		acquired, err := m.refreshLock.AcquireLock(ctx, refreshLockKey, refreshLockTTL)
+		owner, acquired, err := m.refreshLock.AcquireOwnedLock(ctx, refreshLockKey, refreshLockTTL)
 		if err != nil {
 			return fmt.Errorf("failed to take the refresh lock: %w", err)
 		}
@@ -554,8 +554,11 @@ func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
 			// behind would refuse every refresh until its TTL.
 			releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			if err := m.refreshLock.ReleaseLock(releaseCtx, refreshLockKey); err != nil {
+			released, err := m.refreshLock.ReleaseOwnedLock(releaseCtx, refreshLockKey, owner)
+			if err != nil {
 				m.logger.Warn().Err(err).Msg("failed to release the refresh lock")
+			} else if !released {
+				m.logger.Warn().Msg("refresh lock expired during the sweep; left any newer holder's lock in place")
 			}
 		}()
 	}

@@ -2,7 +2,9 @@ package cache
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -265,6 +267,42 @@ func (c *RedisCache) AcquireLock(ctx context.Context, lockKey string, ttl time.D
 // ReleaseLock releases a distributed lock
 func (c *RedisCache) ReleaseLock(ctx context.Context, lockKey string) error {
 	return c.Delete(ctx, KeySchedulerLock+lockKey)
+}
+
+// releaseOwnedLockScript deletes the lock only while it still holds the
+// caller's owner value; GET and DEL as two commands could delete a lock another
+// holder took between them.
+var releaseOwnedLockScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`)
+
+// AcquireOwnedLock takes a distributed lock under a fresh random owner value
+// and returns that value for ReleaseOwnedLock.
+func (c *RedisCache) AcquireOwnedLock(ctx context.Context, lockKey string, ttl time.Duration) (string, bool, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", false, fmt.Errorf("failed to generate lock owner: %w", err)
+	}
+	owner := hex.EncodeToString(raw)
+	acquired, err := c.SetNX(ctx, KeySchedulerLock+lockKey, owner, ttl)
+	if err != nil || !acquired {
+		return "", false, err
+	}
+	return owner, true, nil
+}
+
+// ReleaseOwnedLock releases the lock only if owner still holds it. It reports
+// whether a lock was released: false means the lock expired or has a new holder,
+// whose lock is left in place.
+func (c *RedisCache) ReleaseOwnedLock(ctx context.Context, lockKey, owner string) (bool, error) {
+	deleted, err := releaseOwnedLockScript.Run(ctx, c.client, []string{c.key(KeySchedulerLock + lockKey)}, owner).Int64()
+	if err != nil {
+		return false, err
+	}
+	return deleted == 1, nil
 }
 
 // CheckRateLimit checks and increments the rate limit counter

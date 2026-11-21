@@ -89,3 +89,49 @@ func TestRefreshLockHoldsAcrossReplicasOnRealRedis(t *testing.T) {
 		t.Fatalf("other replica: want 1 sweep after the lock was released, got %d", replicaBSweeps)
 	}
 }
+
+// A sweep that outlives the lock TTL must leave the next holder's lock alone.
+func TestRefreshReleaseKeepsANewerHoldersLock(t *testing.T) {
+	addr := os.Getenv("ORBGUARD_TEST_REDIS_ADDR")
+	if addr == "" {
+		t.Skip("ORBGUARD_TEST_REDIS_ADDR not set; skipping Redis-backed test")
+	}
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("ORBGUARD_TEST_REDIS_ADDR must be host:port, got %q", addr)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("ORBGUARD_TEST_REDIS_ADDR port: %v", err)
+	}
+	log := &logger.Logger{Logger: zerolog.Nop()}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	redisCache, err := cache.NewRedis(ctx, config.RedisConfig{
+		Host:      host,
+		Port:      port,
+		KeyPrefix: fmt.Sprintf("orbguard-test:%d:", time.Now().UnixNano()),
+	}, log)
+	if err != nil {
+		t.Fatalf("connect to test Redis: %v", err)
+	}
+	t.Cleanup(func() { _ = redisCache.Close() })
+
+	lockKey := cache.KeySchedulerLock + "darkweb:refresh"
+	m := services.NewDarkWebMonitor(nil, nil, nil, nil, redisCache, log)
+	m.SetRefreshForTest(func(context.Context) error {
+		// The sweep outlived its TTL and another replica now holds the lock.
+		if err := redisCache.Delete(ctx, lockKey); err != nil {
+			return err
+		}
+		return redisCache.Set(ctx, lockKey, "newer-holder", time.Minute)
+	}, redisCache)
+
+	if err := m.RefreshMonitoredAssets(ctx); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	got, err := redisCache.Get(ctx, lockKey)
+	if err != nil || got != "newer-holder" {
+		t.Fatalf("the newer holder's lock must survive the old holder's release, got %q (err %v)", got, err)
+	}
+}
