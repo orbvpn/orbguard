@@ -49,10 +49,20 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 	}
 }
 
-// respondNothingExamined answers 422 when an analysis recognised nothing, and
-// reports whether it did. The app does not retry a 422 and shows its failure
-// card; the body has no "anomalies", so it can never be read as a clean result.
-func respondNothingExamined(w http.ResponseWriter, err error) bool {
+// respondUnexamined answers 422 when an analysis recognised nothing or could
+// not examine part of what it was given, and reports whether it did. The app
+// does not retry a 422 and shows its failure card; the body has no "anomalies",
+// so it can never be read as a clean result.
+func respondUnexamined(w http.ResponseWriter, err error) bool {
+	var partly *fmodels.PartlyExaminedError
+	if errors.As(err, &partly) {
+		respondJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"error":        "Part of this could not be read, so this is not an all-clear. Nothing was found in the part that was read. Provide a complete, readable copy and try again.",
+			"code":         "partly_examined",
+			"not_examined": partly.NotExamined,
+		})
+		return true
+	}
 	if !errors.Is(err, forensics.ErrNothingExamined) {
 		return false
 	}
@@ -128,7 +138,7 @@ func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Req
 	}
 
 	result, err := h.service.AnalyzeShutdownLog(r.Context(), []byte(req.LogData), req.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -168,7 +178,7 @@ func (h *ForensicsHandler) UploadShutdownLog(w http.ResponseWriter, r *http.Requ
 	}
 
 	result, err := h.service.AnalyzeShutdownLog(r.Context(), data, deviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -200,7 +210,7 @@ func (h *ForensicsHandler) AnalyzeBackup(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.service.AnalyzeBackup(r.Context(), req.BackupPath, req.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -231,7 +241,7 @@ func (h *ForensicsHandler) AnalyzeDataUsage(w http.ResponseWriter, r *http.Reque
 	}
 
 	result, err := h.service.AnalyzeDataUsage(r.Context(), req.DBPath, req.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -263,7 +273,7 @@ func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Req
 	}
 
 	result, err := h.service.AnalyzeSysdiagnose(r.Context(), req.ArchivePath, req.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -293,7 +303,7 @@ func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), []byte(req.LogData), req.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -328,7 +338,7 @@ func (h *ForensicsHandler) UploadLogcat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), data, deviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -631,7 +641,7 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 
 	backupRoot := locateBackupRoot(extractDir)
 	result, err := h.service.AnalyzeBackup(r.Context(), backupRoot, artifact.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -663,7 +673,7 @@ func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Requ
 	defer artifact.Cleanup()
 
 	result, err := h.service.AnalyzeSysdiagnose(r.Context(), artifact.Path, artifact.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -772,7 +782,7 @@ func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Reques
 	}
 
 	result, err := h.service.AnalyzeLogcat(r.Context(), data, artifact.DeviceID)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -827,7 +837,7 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 	}
 
 	result, err := h.service.RunFullAnalysis(r.Context(), scanReq)
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {
@@ -859,7 +869,7 @@ func (h *ForensicsHandler) QuickCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.QuickCheck(r.Context(), req.Platform, []byte(req.LogData))
-	if respondNothingExamined(w, err) {
+	if respondUnexamined(w, err) {
 		return
 	}
 	if err != nil {

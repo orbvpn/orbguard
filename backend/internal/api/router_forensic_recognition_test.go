@@ -336,23 +336,6 @@ func TestSysdiagnoseUploadRecognition(t *testing.T) {
 		})
 	}
 
-	// The tar reader is consumed by the first read, so a file whose name equals
-	// its key reaches analysis empty. That is not an examined file.
-	t.Run("tar.gz/known file whose content is lost", func(t *testing.T) {
-		archive := tarGzOf(t, map[string][]byte{"sysdiagnose_2026/logs/lockdownd/lockdownd": []byte("hello")})
-		rec := upload(h, path, "sysdiagnose.tar.gz", archive, asDevice())
-		assertNothingExamined(t, rec.Code, rec.Body.Bytes())
-	})
-	t.Run("tar.gz/shutdown log whose content is lost", func(t *testing.T) {
-		archive := tarGzOf(t, map[string][]byte{"sysdiagnose_2026/logs/shutdown/shutdown.log": []byte(iosEntry)})
-		rec := upload(h, path, "sysdiagnose.tar.gz", archive, asDevice())
-		assertNothingExamined(t, rec.Code, rec.Body.Bytes())
-	})
-	t.Run("zip/known file named as its key", func(t *testing.T) {
-		archive := zipOf(t, map[string][]byte{"sysdiagnose_2026/logs/lockdownd/lockdownd": []byte("hello")})
-		assertExaminedClean(t, upload(h, path, "sysdiagnose.zip", archive, asDevice()))
-	})
-
 	t.Run("zip/readable shutdown log only", func(t *testing.T) {
 		archive := zipOf(t, map[string][]byte{"sysdiagnose_2026/logs/shutdown/shutdown.log": []byte(iosEntry)})
 		assertExaminedClean(t, upload(h, path, "sysdiagnose.zip", archive, asDevice()))
@@ -455,18 +438,6 @@ func TestFullAnalysisCountsOnlyWhatItRecognised(t *testing.T) {
 	}
 	emptyBackup := t.TempDir()
 
-	t.Run("unrecognised log beside a real backup", func(t *testing.T) {
-		got := scans(t, send(map[string]any{"platform": "ios", "shutdown_log": "this is not a log\n", "backup_path": backup}))
-		if len(got) != 1 || got[0] != "backup" {
-			t.Fatalf("scans_performed: want [backup], got %v", got)
-		}
-	})
-	t.Run("real log beside an empty backup", func(t *testing.T) {
-		got := scans(t, send(map[string]any{"platform": "ios", "shutdown_log": iosEntry, "backup_path": emptyBackup}))
-		if len(got) != 1 || got[0] != "shutdown_log" {
-			t.Fatalf("scans_performed: want [shutdown_log], got %v", got)
-		}
-	})
 	t.Run("both real", func(t *testing.T) {
 		got := scans(t, send(map[string]any{"platform": "ios", "shutdown_log": iosEntry, "backup_path": backup}))
 		if len(got) != 2 {

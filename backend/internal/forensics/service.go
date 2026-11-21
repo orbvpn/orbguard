@@ -174,6 +174,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 	combinedTimeline := models.NewTimeline()
 	scansPerformed := make([]string, 0)
+	notExamined := make([]string, 0)
 
 	// iOS Analysis
 	if req.Platform == "ios" {
@@ -182,6 +183,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.shutdownLogParser.Parse(req.ShutdownLogData)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("shutdown.log analysis failed")
+				notExamined = append(notExamined, "shutdown_log")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "shutdown_log")
@@ -193,6 +195,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.backupParser.Parse(req.BackupPath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("backup analysis failed")
+				notExamined = append(notExamined, "backup")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "backup")
@@ -204,6 +207,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.dataUsageParser.Parse(req.DataUsagePath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("DataUsage.sqlite analysis failed")
+				notExamined = append(notExamined, "data_usage")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "data_usage")
@@ -215,9 +219,13 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.sysdiagnoseParser.Parse(req.SysdiagnosePath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("sysdiagnose analysis failed")
+				notExamined = append(notExamined, "sysdiagnose")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "sysdiagnose")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "sysdiagnose")
+				}
 			}
 		}
 	}
@@ -229,6 +237,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.logcatParser.Parse(req.LogcatData)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("logcat analysis failed")
+				notExamined = append(notExamined, "logcat")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "logcat")
@@ -274,6 +283,19 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 	// Enhance with IOC scanner (Citizen Lab/Amnesty MVT integration)
 	s.iocScanner.EnhanceForensicResult(combinedResult)
+
+	// Never clean while something supplied went unexamined. Findings still
+	// stand, and the result lists what was skipped.
+	if len(notExamined) > 0 {
+		if len(combinedResult.Anomalies) == 0 {
+			s.logger.Warn().
+				Str("device_id", req.DeviceID).
+				Strs("not_examined", notExamined).
+				Msg("full forensic analysis examined only part of what was supplied")
+			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
+		}
+		combinedResult.RawData["not_examined"] = notExamined
+	}
 
 	// Store metadata
 	combinedResult.RawData["scans_performed"] = scansPerformed

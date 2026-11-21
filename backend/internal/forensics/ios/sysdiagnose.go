@@ -6,11 +6,14 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -98,18 +101,18 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	p.logger.Info().Str("path", archivePath).Msg("analyzing sysdiagnose archive")
 
 	// Determine archive type and extract
-	known := make(map[string]bool)
-	extractedFiles, tempDir, err := p.extractArchive(archivePath, known)
+	extraction, tempDir, err := p.extractArchive(archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract archive: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
+	extractedFiles := extraction.files
 
-	// A sysdiagnose file whose content reached analysis counts as examined.
-	// shutdown.log counts only if its parser recognises it, below.
+	// A sysdiagnose file with content counts as examined. shutdown.log counts
+	// only if its parser recognises it, below.
 	recognised := false
-	for key := range known {
-		if key != "shutdown.log" && len(extractedFiles[key]) > 0 {
+	for key := range extraction.known {
+		if key != "shutdown.log" {
 			recognised = true
 			break
 		}
@@ -122,22 +125,35 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 		p.analyzeFile(filename, content, result, timeline)
 	}
 
-	// Look for shutdown.log specifically and run detailed analysis
-	if shutdownLogContent, ok := extractedFiles["shutdown.log"]; ok {
+	// Run detailed analysis on every shutdown log the archive supplied. One
+	// entry can sit in two slots, so identical content is parsed once.
+	parsedLogs := make(map[[sha256.Size]byte]bool)
+	for name, shutdownLogContent := range extractedFiles {
+		if len(shutdownLogContent) == 0 || !strings.HasPrefix(filepath.Base(name), "shutdown.log") {
+			continue
+		}
+		sum := sha256.Sum256(shutdownLogContent)
+		if parsedLogs[sum] {
+			continue
+		}
+		parsedLogs[sum] = true
+
 		shutdownResult, err := p.shutdownLogParser.Parse(shutdownLogContent)
-		if err == nil {
-			recognised = true
-			// Merge shutdown.log results
-			for _, a := range shutdownResult.Anomalies {
-				a.ID = uuid.New().String() // Ensure unique IDs
-				result.AddAnomaly(a)
-			}
-			for _, t := range shutdownResult.DetectedThreats {
-				result.AddThreat(t)
-			}
-			for _, e := range shutdownResult.Timeline {
-				timeline.AddEvent(e)
-			}
+		if err != nil {
+			extraction.unread[name] = true
+			continue
+		}
+		recognised = true
+		// Merge shutdown.log results
+		for _, a := range shutdownResult.Anomalies {
+			a.ID = uuid.New().String() // Ensure unique IDs
+			result.AddAnomaly(a)
+		}
+		for _, t := range shutdownResult.DetectedThreats {
+			result.AddThreat(t)
+		}
+		for _, e := range shutdownResult.Timeline {
+			timeline.AddEvent(e)
 		}
 	}
 
@@ -150,8 +166,24 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	// Detect coordinated suspicious activity patterns
 	p.detectCoordinatedActivity(result, timeline)
 
-	if !recognised && len(result.Anomalies) == 0 {
-		return nil, models.ErrNothingExamined
+	notExamined := make([]string, 0, len(extraction.unread))
+	for name := range extraction.unread {
+		notExamined = append(notExamined, name)
+	}
+	sort.Strings(notExamined)
+
+	// Never clean while something supplied went unexamined. Findings still
+	// stand, and the result lists what was skipped.
+	if len(result.Anomalies) == 0 {
+		if !recognised {
+			return nil, models.ErrNothingExamined
+		}
+		if len(notExamined) > 0 {
+			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
+		}
+	}
+	if len(notExamined) > 0 {
+		result.RawData["not_examined"] = notExamined
 	}
 
 	// Extract device info from sysdiagnose
@@ -174,10 +206,86 @@ func (p *SysdiagnoseParser) Parse(archivePath string) (*models.ForensicResult, e
 	return result, nil
 }
 
-// extractArchive extracts a sysdiagnose archive (tar.gz or zip). known receives
-// the sysdiagnoseFiles keys that were found with content.
-func (p *SysdiagnoseParser) extractArchive(archivePath string, known map[string]bool) (map[string][]byte, string, error) {
-	files := make(map[string][]byte)
+// maxSysdiagnoseEntryBytes caps one archive entry, before it is read.
+const maxSysdiagnoseEntryBytes = 50 * 1024 * 1024
+
+var errSysdiagnoseEntryTooLarge = errors.New("sysdiagnose entry exceeds the size cap")
+
+// sysdiagnoseExtraction holds what an archive supplied.
+type sysdiagnoseExtraction struct {
+	files map[string][]byte
+	// known holds the sysdiagnoseFiles keys found with content.
+	known map[string]bool
+	// unread holds entries of a known artifact that could not be examined.
+	unread map[string]bool
+}
+
+// add reads one entry once, under the cap, and stores it by key and basename.
+func (x *sysdiagnoseExtraction) add(name string, size int64, open func() (io.ReadCloser, error)) {
+	basename := filepath.Base(name)
+	key, isKnown := "", false
+	for k, pattern := range sysdiagnoseFiles {
+		if strings.Contains(name, pattern) || basename == pattern {
+			key, isKnown = k, true
+			break
+		}
+	}
+
+	content, err := readSysdiagnoseEntry(size, open)
+	if err != nil {
+		if isKnown || strings.HasPrefix(basename, "shutdown.log") {
+			x.unread[name] = true
+		}
+		return
+	}
+
+	if isKnown {
+		x.store(key, name, content)
+		if len(content) > 0 {
+			x.known[key] = true
+		}
+	}
+	x.store(basename, name, content)
+}
+
+// store keeps content under slot, or under the entry's full name when slot
+// already holds a different file, so no entry's content is dropped.
+func (x *sysdiagnoseExtraction) store(slot, name string, content []byte) {
+	if prev := x.files[slot]; len(prev) > 0 && !bytes.Equal(prev, content) {
+		slot = name
+	}
+	x.files[slot] = content
+}
+
+// readSysdiagnoseEntry refuses an entry over the cap before reading it, and
+// still bounds the read in case the declared size is wrong.
+func readSysdiagnoseEntry(size int64, open func() (io.ReadCloser, error)) ([]byte, error) {
+	if size > maxSysdiagnoseEntryBytes {
+		return nil, errSysdiagnoseEntryTooLarge
+	}
+	rc, err := open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	content, err := io.ReadAll(io.LimitReader(rc, maxSysdiagnoseEntryBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > maxSysdiagnoseEntryBytes {
+		return nil, errSysdiagnoseEntryTooLarge
+	}
+	return content, nil
+}
+
+// extractArchive extracts a sysdiagnose archive (tar.gz or zip)
+func (p *SysdiagnoseParser) extractArchive(archivePath string) (*sysdiagnoseExtraction, string, error) {
+	x := &sysdiagnoseExtraction{
+		files:  make(map[string][]byte),
+		known:  make(map[string]bool),
+		unread: make(map[string]bool),
+	}
 
 	// Create temp directory
 	tempDir, err := os.MkdirTemp("", "sysdiagnose-*")
@@ -188,12 +296,12 @@ func (p *SysdiagnoseParser) extractArchive(archivePath string, known map[string]
 	// Determine archive type
 	ext := strings.ToLower(filepath.Ext(archivePath))
 	if ext == ".gz" || strings.HasSuffix(archivePath, ".tar.gz") {
-		err = p.extractTarGz(archivePath, tempDir, files, known)
+		err = p.extractTarGz(archivePath, x)
 	} else if ext == ".zip" {
-		err = p.extractZip(archivePath, tempDir, files, known)
+		err = p.extractZip(archivePath, x)
 	} else {
 		// Try reading as directory
-		err = p.readDirectory(archivePath, files, known)
+		err = p.readDirectory(archivePath, x)
 	}
 
 	if err != nil {
@@ -201,11 +309,11 @@ func (p *SysdiagnoseParser) extractArchive(archivePath string, known map[string]
 		return nil, "", err
 	}
 
-	return files, tempDir, nil
+	return x, tempDir, nil
 }
 
 // extractTarGz extracts a tar.gz archive
-func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[string][]byte, known map[string]bool) error {
+func (p *SysdiagnoseParser) extractTarGz(archivePath string, x *sysdiagnoseExtraction) error {
 	f, err := os.Open(archivePath)
 	if err != nil {
 		return err
@@ -233,37 +341,16 @@ func (p *SysdiagnoseParser) extractTarGz(archivePath, tempDir string, files map[
 			continue
 		}
 
-		// Check if this is a file we're interested in
-		basename := filepath.Base(header.Name)
-		for key, pattern := range sysdiagnoseFiles {
-			if strings.Contains(header.Name, pattern) || basename == pattern {
-				content, err := io.ReadAll(tr)
-				if err != nil {
-					continue
-				}
-				files[key] = content
-				if len(content) > 0 {
-					known[key] = true
-				}
-				break
-			}
-		}
-
-		// Also store by basename for pattern matching
-		if header.Size < 50*1024*1024 { // Skip files > 50MB
-			content, err := io.ReadAll(tr)
-			if err != nil {
-				continue
-			}
-			files[basename] = content
-		}
+		x.add(header.Name, header.Size, func() (io.ReadCloser, error) {
+			return io.NopCloser(tr), nil
+		})
 	}
 
 	return nil
 }
 
 // extractZip extracts a zip archive
-func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[string][]byte, known map[string]bool) error {
+func (p *SysdiagnoseParser) extractZip(archivePath string, x *sysdiagnoseExtraction) error {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return err
@@ -275,46 +362,18 @@ func (p *SysdiagnoseParser) extractZip(archivePath, tempDir string, files map[st
 			continue
 		}
 
-		basename := filepath.Base(f.Name)
-		for key, pattern := range sysdiagnoseFiles {
-			if strings.Contains(f.Name, pattern) || basename == pattern {
-				rc, err := f.Open()
-				if err != nil {
-					continue
-				}
-				content, err := io.ReadAll(rc)
-				rc.Close()
-				if err != nil {
-					continue
-				}
-				files[key] = content
-				if len(content) > 0 {
-					known[key] = true
-				}
-				break
-			}
+		size := int64(maxSysdiagnoseEntryBytes + 1)
+		if f.UncompressedSize64 <= maxSysdiagnoseEntryBytes {
+			size = int64(f.UncompressedSize64)
 		}
-
-		// Also store by basename
-		if f.FileInfo().Size() < 50*1024*1024 {
-			rc, err := f.Open()
-			if err != nil {
-				continue
-			}
-			content, err := io.ReadAll(rc)
-			rc.Close()
-			if err != nil {
-				continue
-			}
-			files[basename] = content
-		}
+		x.add(f.Name, size, f.Open)
 	}
 
 	return nil
 }
 
 // readDirectory reads files from an extracted directory
-func (p *SysdiagnoseParser) readDirectory(dirPath string, files map[string][]byte, known map[string]bool) error {
+func (p *SysdiagnoseParser) readDirectory(dirPath string, x *sysdiagnoseExtraction) error {
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip errors
@@ -322,29 +381,14 @@ func (p *SysdiagnoseParser) readDirectory(dirPath string, files map[string][]byt
 		if info.IsDir() {
 			return nil
 		}
-		if info.Size() > 50*1024*1024 {
-			return nil // Skip large files
-		}
 
-		content, err := os.ReadFile(path)
+		relPath, err := filepath.Rel(dirPath, path)
 		if err != nil {
-			return nil
+			relPath = filepath.Base(path)
 		}
-
-		basename := filepath.Base(path)
-		relPath, _ := filepath.Rel(dirPath, path)
-
-		for key, pattern := range sysdiagnoseFiles {
-			if strings.Contains(relPath, pattern) || basename == pattern {
-				files[key] = content
-				if len(content) > 0 {
-					known[key] = true
-				}
-				break
-			}
-		}
-		files[basename] = content
-
+		x.add(relPath, info.Size(), func() (io.ReadCloser, error) {
+			return os.Open(path)
+		})
 		return nil
 	})
 }
