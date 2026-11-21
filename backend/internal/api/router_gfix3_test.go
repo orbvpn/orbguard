@@ -145,3 +145,20 @@ func TestPhoneReportsFromDistinctNetworksFlagAsReportedOnly(t *testing.T) {
 		t.Fatalf("after five networks want a raised risk and no scam verdict: risk %v (baseline %v), scam %v", risk, baseline, isScam)
 	}
 }
+
+// Addresses inside one /24 are one reporter: a host can often change its
+// address within its network.
+func TestPhoneReportsFromOneNetworkDoNotFlag(t *testing.T) {
+	h := newGfix3Router(t)
+	const number = "+4915112340003"
+	baseline, _ := phoneRisk(t, h, number)
+	for i := 1; i <= 20; i++ {
+		rec := do(h, http.MethodPost, "/api/v1/scam/phone/report", strings.NewReader(`{"phone_number":"`+number+`"}`), asDevice(), fromIP(fmt.Sprintf("198.51.100.%d", i)))
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("report: want 201, got %d", rec.Code)
+		}
+	}
+	if risk, isScam := phoneRisk(t, h, number); isScam || risk != baseline {
+		t.Fatalf("one /24 changed the number: risk %v (baseline %v), scam %v", risk, baseline, isScam)
+	}
+}

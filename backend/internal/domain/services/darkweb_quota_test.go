@@ -40,6 +40,16 @@ const (
 type quotaTokens struct{}
 
 func (quotaTokens) GetJSON(_ context.Context, key string, dest any) error {
+	if session, isSession := strings.CutPrefix(key, "auth:token:"); isSession {
+		if !strings.HasPrefix(session, "session-") {
+			return errors.New("not found")
+		}
+		raw, err := json.Marshal(apimiddleware.TokenClaims{DeviceID: "dev-" + session, ExpiresAt: time.Now().Add(time.Hour)})
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(raw, dest)
+	}
 	token, isDeviceKey := strings.CutPrefix(key, "auth:apikey:")
 	if !isDeviceKey {
 		return errors.New("not found")
@@ -224,6 +234,18 @@ func TestFreshKeysCannotSpendTheReserveOfRealUsers(t *testing.T) {
 	}
 	if rec := rig.checkEmail(orbnetJWT(t, 7, true), "203.0.113.2", "", 501); rec.Code != http.StatusOK {
 		t.Fatalf("a paying account after the flood: want 200, got %d", rec.Code)
+	}
+}
+
+// A session token expires soon after it is issued, so its expiry must not be
+// read as the age of a device key.
+func TestSessionTokenDoesNotCountAsAnAgedKey(t *testing.T) {
+	rig := newQuotaRig(t, 100, nil)
+	for i := 0; i < 40; i++ {
+		rig.checkEmail(fmt.Sprintf("new-%d", i), fmt.Sprintf("198.51.100.%d", i+1), "", i)
+	}
+	if rec := rig.checkEmail("session-1", "203.0.113.5", "", 800); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("a session token after the new-key share is spent: want 429, got %d", rec.Code)
 	}
 }
 
