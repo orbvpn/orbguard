@@ -223,6 +223,34 @@ func TestConcurrentRefreshStartsNoSecondSweep(t *testing.T) {
 	}
 }
 
+// Without a shared lock the in-process gate alone must hold.
+func TestConcurrentRefreshWithoutSharedLock(t *testing.T) {
+	var sweeps atomic.Int32
+	started := make(chan struct{})
+	finish := make(chan struct{})
+	m := newRefreshMonitor(nil, nil)
+	m.SetRefreshForTest(func(context.Context) error {
+		sweeps.Add(1)
+		close(started)
+		<-finish
+		return nil
+	}, nil)
+
+	first := make(chan error, 1)
+	go func() { first <- m.RefreshMonitoredAssets(context.Background()) }()
+	<-started
+	if err := m.RefreshMonitoredAssets(context.Background()); !errors.Is(err, services.ErrRefreshInProgress) {
+		t.Fatalf("second call: want ErrRefreshInProgress, got %v", err)
+	}
+	close(finish)
+	if err := <-first; err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+	if n := sweeps.Load(); n != 1 {
+		t.Fatalf("want 1 sweep, got %d", n)
+	}
+}
+
 func TestRefreshRunningOnAnotherReplicaIsRefused(t *testing.T) {
 	var sweeps atomic.Int32
 	lock := &fakeRefreshLock{held: true}
