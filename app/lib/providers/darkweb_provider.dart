@@ -186,6 +186,10 @@ class DarkWebProvider extends ChangeNotifier {
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
   SharedPreferences? _prefs;
 
+  /// Replaces the range request in tests.
+  @visibleForTesting
+  Future<Map<String, int>> Function(String prefix)? passwordRangeForTest;
+
   /// Restores the cached assets and pulls the per-user server state as soon
   /// as the provider is created (the dark web screen reads the provider
   /// without calling [init] itself).
@@ -308,7 +312,8 @@ class DarkWebProvider extends ChangeNotifier {
 
     try {
       final query = PasswordRangeQuery.fromPassword(password);
-      final range = await _api.getPasswordRange(query.prefix);
+      final range =
+          await (passwordRangeForTest ?? _api.getPasswordRange)(query.prefix);
       final result = evaluatePasswordRange(query, range);
       _lastPasswordResult = result;
       _isCheckingPassword = false;
