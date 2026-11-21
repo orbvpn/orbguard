@@ -84,6 +84,19 @@ type planLimitedError interface {
 	IsPlanLimit() bool
 }
 
+// fetchDeferredError is implemented by connector errors meaning the connector
+// paced itself and did not call the provider (see
+// internal/sources.FetchDeferredError). It is neither a failure nor a success.
+type fetchDeferredError interface {
+	error
+	IsFetchDeferred() bool
+}
+
+func isFetchDeferred(err error) bool {
+	var deferred fetchDeferredError
+	return errors.As(err, &deferred)
+}
+
 // EventPublisher defines the interface for publishing threat events
 type EventPublisher interface {
 	// PublishNewThreat publishes an event for a new threat indicator
@@ -310,6 +323,10 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 		} else if len(dueSources) > 0 {
 			a.logger.Info().Int("due_sources", len(dueSources)).Msg("processing due sources from database")
 
+			// A source that only paced itself did no work. If that is all the
+			// due list held, this tick counts as "nothing due" and the
+			// fallback below keeps serving the other connectors as before.
+			onlyDeferred := true
 			for _, source := range dueSources {
 				select {
 				case <-ctx.Done():
@@ -317,11 +334,16 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 				default:
 					conn, ok := a.GetConnector(source.Slug)
 					if ok && conn.IsEnabled() {
-						_ = a.fetchFromSourceWithDB(ctx, conn, source)
+						if err := a.fetchFromSourceWithDB(ctx, conn, source); isFetchDeferred(err) {
+							continue
+						}
 					}
+					onlyDeferred = false
 				}
 			}
-			return nil
+			if !onlyDeferred {
+				return nil
+			}
 		}
 	}
 
@@ -384,6 +406,12 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// The connector paced itself: no request, so nothing to record.
+		if isFetchDeferred(err) {
+			log.Debug().Str("reason", err.Error()).Msg("source fetch deferred by connector pacing")
+			return err
+		}
+
 		// Provider rate limit: persist next_fetch to honor the provider's
 		// Retry-After hint instead of retrying every cycle. This is not a
 		// source failure, so error_count/status are not escalated and we
@@ -539,6 +567,12 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// The connector paced itself: no request, so nothing to record.
+		if isFetchDeferred(err) {
+			log.Debug().Str("reason", err.Error()).Msg("source fetch deferred by connector pacing")
+			return nil
+		}
+
 		// Rate limits and plan limitations are expected operating
 		// conditions, not failures: log appropriately (once per backoff
 		// window) and do not propagate as an error.

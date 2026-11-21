@@ -67,6 +67,23 @@ func (e *PlanLimitError) Error() string {
 // IsPlanLimit marks this error type for duck-typed detection.
 func (e *PlanLimitError) IsPlanLimit() bool { return true }
 
+// FetchDeferredError means the connector chose not to call the provider
+// because its own pacing window is still open. Nothing was requested and
+// nothing failed, so callers must not record a failure, a success or a rate
+// limit for the source.
+type FetchDeferredError struct {
+	Provider string
+	Wait     time.Duration
+}
+
+// Error implements the error interface.
+func (e *FetchDeferredError) Error() string {
+	return fmt.Sprintf("%s fetch deferred, next attempt in %s", e.Provider, e.Wait.Round(time.Second))
+}
+
+// IsFetchDeferred marks this error type for duck-typed detection.
+func (e *FetchDeferredError) IsFetchDeferred() bool { return true }
+
 // AsRateLimit extracts a *RateLimitError from an error chain.
 func AsRateLimit(err error) (*RateLimitError, bool) {
 	var rle *RateLimitError
