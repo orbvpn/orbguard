@@ -201,7 +201,7 @@ func TestRefusalIsHonouredWithoutTheGateKey(t *testing.T) {
 }
 
 func TestExportCommentLineCannotOpenAQuote(t *testing.T) {
-	body := urlhausHeader + limitsRows(20) + "# a note with one \" in it\n" +
+	body := urlhausHeader + limitsRows(20) + "# a note, \"with one quote\n" +
 		strings.ReplaceAll(limitsRows(20), "bad", "later")
 	c := limitsConnector(t, "http://127.0.0.1:1")
 	parsed, err := parseExport(strings.NewReader(body), c.feed.spec)
@@ -235,5 +235,43 @@ func TestRefusalRecordedDuringTheClaimIsReported(t *testing.T) {
 	}
 	if hits.Load() != 0 {
 		t.Fatalf("%d requests sent", hits.Load())
+	}
+}
+
+func TestExportQuotesPastTheReadBufferAreFollowed(t *testing.T) {
+	const second = "http://second.example/a.sh"
+	long := strings.Repeat("9", exportCommentMax+1)
+	for name, tc := range map[string]struct {
+		record string
+		lines  int
+	}{
+		"quote opens past the buffer": {
+			long + `,"a` + "\n" + "42," + limitsWhen + "," + second + ",online," + limitsWhen +
+				`,malware_download,z","https://urlhaus.example/41/","r"` + "\n", 2},
+		"quote closes past the buffer": {
+			`"` + long + `",b` + "\n", 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := urlhausHeader + limitsRows(40) + tc.record + strings.ReplaceAll(limitsRows(40), "bad", "later")
+			c := limitsConnector(t, "http://127.0.0.1:1")
+			parsed, err := parseExport(strings.NewReader(body), c.feed.spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if recordsKept(parsed.rows, "url", second) {
+				t.Fatal("a row was taken from a record over several lines")
+			}
+			if parsed.bad != tc.lines || len(parsed.rows) != 80 {
+				t.Fatalf("bad=%d kept=%d, want %d and 80", parsed.bad, len(parsed.rows), tc.lines)
+			}
+		})
+	}
+}
+
+func TestExportHeaderWithAnOpenQuoteIsRefused(t *testing.T) {
+	body := "# id,dateadded,url,url_status,last_online,threat,tags,urlhaus_link,\"reporter\n" + limitsRows(5)
+	c := limitsConnector(t, "http://127.0.0.1:1")
+	if _, err := parseExport(strings.NewReader(body), c.feed.spec); !errors.Is(err, errExportLayout) {
+		t.Fatalf("err=%v, want %v", err, errExportLayout)
 	}
 }
