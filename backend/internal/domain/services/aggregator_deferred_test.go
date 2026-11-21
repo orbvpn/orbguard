@@ -60,8 +60,8 @@ type stubConnector struct {
 	calls atomic.Int32
 }
 
-func (c *stubConnector) Slug() string                 { return c.slug }
-func (c *stubConnector) IsEnabled() bool              { return true }
+func (c *stubConnector) Slug() string                  { return c.slug }
+func (c *stubConnector) IsEnabled() bool               { return true }
 func (c *stubConnector) UpdateInterval() time.Duration { return time.Hour }
 func (c *stubConnector) Fetch(context.Context) (*models.SourceFetchResult, error) {
 	c.calls.Add(1)
