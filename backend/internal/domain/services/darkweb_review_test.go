@@ -389,6 +389,14 @@ func TestRefreshSweepStopsDuringAProviderOutage(t *testing.T) {
 
 func reviewRedis(t *testing.T) *cache.RedisCache {
 	t.Helper()
+	redisCache, _ := reviewRedisScoped(t)
+	return redisCache
+}
+
+// reviewRedisScoped also returns the key prefix of this test's connection, so
+// a scan sees only what this test wrote.
+func reviewRedisScoped(t *testing.T) (*cache.RedisCache, string) {
+	t.Helper()
 	addr := os.Getenv("ORBGUARD_TEST_REDIS_ADDR")
 	if addr == "" {
 		t.Skip("ORBGUARD_TEST_REDIS_ADDR not set; skipping Redis-backed test")
@@ -396,14 +404,15 @@ func reviewRedis(t *testing.T) *cache.RedisCache {
 	host, port := splitTestRedisAddr(t, addr)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	prefix := fmt.Sprintf("orbguard-test:%d:", time.Now().UnixNano())
 	redisCache, err := cache.NewRedis(ctx, config.RedisConfig{
-		Host: host, Port: port, KeyPrefix: fmt.Sprintf("orbguard-test:%d:", time.Now().UnixNano()),
+		Host: host, Port: port, KeyPrefix: prefix,
 	}, &logger.Logger{Logger: zerolog.Nop()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = redisCache.Close() })
-	return redisCache
+	return redisCache, prefix
 }
 
 func TestReleaseQuotaGivesBackOneUnitAndNeverGoesNegative(t *testing.T) {
@@ -615,7 +624,7 @@ func TestPaidAccountStopsAtItsOwnDailyLimit(t *testing.T) {
 // Another caller's lookup can answer from the cache, but registering the email
 // still takes a unit, and the cache holds no clear address.
 func TestCachedAnswerChargesARegistrationAndKeepsNoClearEmail(t *testing.T) {
-	redisCache := reviewRedis(t)
+	redisCache, prefix := reviewRedisScoped(t)
 	log := &logger.Logger{Logger: zerolog.Nop()}
 	apimiddleware.ConfigureAuth(quotaTokens{}, "test", log)
 	t.Cleanup(func() { apimiddleware.ConfigureAuth(nil, "", nil) })
@@ -663,9 +672,12 @@ func TestCachedAnswerChargesARegistrationAndKeepsNoClearEmail(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	keys, err := redisCache.Client().Keys(ctx, "*").Result()
+	keys, err := redisCache.Client().Keys(ctx, prefix+"*").Result()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(keys) == 0 {
+		t.Fatal("the scan found none of this test's keys")
 	}
 	for _, key := range keys {
 		if strings.Contains(key, email) {
