@@ -709,17 +709,18 @@ func (s *OrbNetService) categoryToSeverity(category string) models.Severity {
 	}
 }
 
+// extractDomainFromURL returns the host a URL indicator may block, or "" when
+// the URL has no trustworthy host. It uses the same parser that feeds use to
+// judge a URL, so the two can never disagree about which host is meant.
 func extractDomainFromURL(urlStr string) string {
-	// Simple domain extraction
-	urlStr = strings.TrimPrefix(urlStr, "http://")
-	urlStr = strings.TrimPrefix(urlStr, "https://")
-	parts := strings.Split(urlStr, "/")
-	if len(parts) > 0 {
-		// Remove port if present
-		hostParts := strings.Split(parts[0], ":")
-		return strings.ToLower(hostParts[0])
+	if i := strings.Index(urlStr, "://"); i < 0 || strings.Contains(urlStr[:i], "/") {
+		urlStr = "http://" + urlStr
 	}
-	return ""
+	host, ok := models.IndicatorURLHost(urlStr)
+	if !ok {
+		return ""
+	}
+	return host
 }
 
 func generateSyncID() string {

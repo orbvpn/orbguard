@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"strings"
 	"time"
 
@@ -157,24 +156,21 @@ func (c *URLhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResult
 
 // checkURLhausRow keeps online http(s) URLs whose host can safely carry a
 // block. Anything else is left out rather than risk blocking a healthy site.
+// A URL that fails the host parser is third-party input to ignore, so it is
+// skipped: a handful of crafted rows must not be able to fail the whole feed.
 func checkURLhausRow(row exportRow) rowVerdict {
-	parsed, err := url.Parse(row.get("url"))
-	if err != nil || parsed.Hostname() == "" {
+	raw := row.get("url")
+	if raw == "" {
 		return rowBad
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+	host, ok := models.IndicatorURLHost(raw)
+	if !ok {
 		return rowSkip
 	}
 	if !strings.EqualFold(row.get("url_status"), "online") {
 		return rowSkip
 	}
-	// With user info the DNS rule loader would read the part before "@" as
-	// the host: http://good.example:80@bad.example/ must not block good.example.
-	if parsed.User != nil {
-		return rowSkip
-	}
 
-	host := urlHost(parsed)
 	if ip := net.ParseIP(host); ip != nil {
 		if !isPublicIP(ip) {
 			return rowSkip
@@ -185,10 +181,6 @@ func checkURLhausRow(row exportRow) rowVerdict {
 		return rowSkip
 	}
 	return rowUse
-}
-
-func urlHost(parsed *url.URL) string {
-	return strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
 }
 
 func isPublicIP(ip net.IP) bool {
@@ -253,11 +245,10 @@ func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
 		},
 	}}
 
-	parsed, err := url.Parse(urlValue)
-	if err != nil {
+	host, ok := models.IndicatorURLHost(urlValue)
+	if !ok {
 		return indicators
 	}
-	host := urlHost(parsed)
 	if net.ParseIP(host) != nil {
 		ipConfidence := 0.80
 		indicators = append(indicators, models.RawIndicator{

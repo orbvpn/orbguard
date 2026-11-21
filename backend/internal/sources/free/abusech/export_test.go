@@ -796,6 +796,33 @@ func TestURLhausLeavesOutRowsThatWouldBlockHealthySites(t *testing.T) {
 	}
 }
 
+func TestURLhausCraftedRowsCannotFailTheFeed(t *testing.T) {
+	const when = "2026-11-20 10:00:00"
+	var b strings.Builder
+	b.WriteString(urlhausHeader)
+	b.WriteString(urlhausRow(1, when, "http://bad.example/a.sh", "online"))
+	for i := 0; i < 40; i++ {
+		b.WriteString(urlhausRow(100+i, when, fmt.Sprintf("http://https://github.com/%d", i), "online"))
+		b.WriteString(urlhausRow(200+i, when, fmt.Sprintf("http://bad%d.example:bad/x", i), "online"))
+	}
+	body := b.String()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+
+	c := NewURLhausConnector(testLogger(io.Discard))
+	c.feed.spec.base = srv.URL
+	_ = c.Configure(sources.ConnectorConfig{Enabled: true, APIKey: markerKey})
+	result, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("crafted rows failed the feed: %v", err)
+	}
+	if len(result.RawIndicators) != 1 || result.RawIndicators[0].Value != "http://bad.example/a.sh" {
+		t.Fatalf("got %+v", result.RawIndicators)
+	}
+}
+
 func TestURLhausFileWithNothingUsableIsAFailure(t *testing.T) {
 	body := urlhausHeader + urlhausRow(1, "2026-11-20 10:00:00", "http://x.example/a", "offline")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
