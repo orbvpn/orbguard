@@ -55,6 +55,10 @@ func TestIndicatorURLHostRejects(t *testing.T) {
 		"http://0177.0.0.1/x",
 		"http://1.2.3/x",
 		"http://[fe80::1%25en0]/x",
+		"https://80:::1",
+		"https://::ffff:192.0.2.1:804430",
+		"http://2001:db8::1/x",
+		"http://2001:db8::1:80/x",
 		"http://" + strings.Repeat("a", 64) + ".example/x",
 		"http://" + strings.Repeat("a.", 130) + "example/x",
 	} {

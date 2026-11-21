@@ -158,6 +158,8 @@ type feedRowRepo struct {
 	afterError   int
 	lookups      int
 	stored       int
+	failStores   int // how many stores fail, from the first; negative means all
+	lastErrorMsg string
 }
 
 func (r *feedRowRepo) GetDueSources(context.Context) ([]*models.Source, error) { return r.due, nil }
@@ -176,6 +178,12 @@ func (r *feedRowRepo) GetSourceBySlug(_ context.Context, slug string) (*models.S
 func (r *feedRowRepo) UpsertIndicator(_ context.Context, i *models.Indicator) (*models.Indicator, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.failStores != 0 {
+		if r.failStores > 0 {
+			r.failStores--
+		}
+		return nil, fmt.Errorf("store unavailable")
+	}
 	r.stored++
 	return i, nil
 }
@@ -199,10 +207,15 @@ func (r *feedRowRepo) UpdateSourceAfterSuccess(_ context.Context, id uuid.UUID) 
 	return nil
 }
 
-func (r *feedRowRepo) UpdateSourceAfterError(context.Context, uuid.UUID, string) error {
+func (r *feedRowRepo) UpdateSourceAfterError(_ context.Context, id uuid.UUID, msg string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.afterError++
+	r.lastErrorMsg = msg
+	if r.row != nil && r.row.ID == id {
+		r.row.LastError = &msg
+		r.row.ErrorCount++
+	}
 	return nil
 }
 
@@ -377,6 +390,99 @@ func TestWorkingFeedLeavesAPausedRowPaused(t *testing.T) {
 			t.Fatalf("%s: afterSuccess=%d status=%s", status, len(repo.afterSuccess), repo.row.Status)
 		}
 	}
+}
+
+func TestFetchThatStoredNothingIsAFailedFetch(t *testing.T) {
+	two := feedRowCSV + `"2","2026-11-20 10:00:01","http://evil.example/b","online","2026-11-20 10:00:01","malware_download","elf","https://urlhaus.example/2/","r"` + "\n"
+	check := func(t *testing.T, repo *feedRowRepo, errText string) {
+		t.Helper()
+		if errText == "" {
+			t.Fatal("a fetch that stored nothing reported success")
+		}
+		if strings.Contains(errText, feedRowKey) || strings.Contains(repo.lastErrorMsg, feedRowKey) {
+			t.Fatal("the key reached an error value")
+		}
+		if len(repo.afterSuccess) != 0 || repo.afterError != 1 {
+			t.Fatalf("afterSuccess=%d afterError=%d", len(repo.afterSuccess), repo.afterError)
+		}
+		if repo.row.LastError == nil || *repo.row.LastError != repo.lastErrorMsg || !strings.Contains(repo.lastErrorMsg, "stored none") {
+			t.Fatalf("row error=%v", repo.row.LastError)
+		}
+		if repo.row.Status != models.SourceStatusError {
+			t.Fatalf("row left at %s", repo.row.Status)
+		}
+	}
+
+	t.Run("job", func(t *testing.T) {
+		tr := &feedRowTransport{code: http.StatusOK, body: two}
+		repo := &feedRowRepo{row: feedRow(models.SourceStatusError), failStores: -1}
+		rc := feedRowRedis(t)
+		agg := feedRowAggregator(t, repo, tr, rc)
+		s := NewScheduler(agg, rc, feedRowLog())
+		job := s.ScheduleNow("urlhaus")
+		s.executeJob(context.Background(), job)
+		if job.Result.Success {
+			t.Fatal("the job reported success")
+		}
+		check(t, repo, job.Result.Error)
+	})
+
+	t.Run("due tick", func(t *testing.T) {
+		tr := &feedRowTransport{code: http.StatusOK, body: two}
+		row := feedRow(models.SourceStatusError)
+		repo := &feedRowRepo{row: row, failStores: -1}
+		agg := feedRowAggregator(t, repo, tr, feedRowRedis(t))
+		conn, ok := agg.connectors["urlhaus"]
+		if !ok {
+			t.Fatal("no connector")
+		}
+		err := agg.fetchFromSourceWithDB(context.Background(), conn, row)
+		if err == nil {
+			t.Fatal("a fetch that stored nothing reported success")
+		}
+		check(t, repo, err.Error())
+	})
+
+	t.Run("one stored is a success", func(t *testing.T) {
+		tr := &feedRowTransport{code: http.StatusOK, body: two}
+		repo := &feedRowRepo{row: feedRow(models.SourceStatusError), failStores: 1}
+		agg := feedRowAggregator(t, repo, tr, feedRowRedis(t))
+		if err := agg.RunSource(context.Background(), "urlhaus"); err != nil {
+			t.Fatal(err)
+		}
+		if repo.stored != 1 || len(repo.afterSuccess) != 1 || repo.afterError != 0 {
+			t.Fatalf("stored=%d afterSuccess=%d afterError=%d", repo.stored, len(repo.afterSuccess), repo.afterError)
+		}
+	})
+
+	t.Run("paused row stays paused", func(t *testing.T) {
+		for _, status := range []models.SourceStatus{models.SourceStatusPaused, models.SourceStatusDisabled} {
+			tr := &feedRowTransport{code: http.StatusOK, body: two}
+			repo := &feedRowRepo{row: feedRow(status), failStores: -1}
+			agg := feedRowAggregator(t, repo, tr, feedRowRedis(t))
+			if err := agg.RunSource(context.Background(), "urlhaus"); err == nil {
+				t.Fatalf("%s: reported success", status)
+			}
+			if repo.afterError != 0 || len(repo.afterSuccess) != 0 || repo.row.Status != status {
+				t.Fatalf("%s: afterError=%d afterSuccess=%d status=%s", status, repo.afterError, len(repo.afterSuccess), repo.row.Status)
+			}
+		}
+	})
+
+	t.Run("other connectors unchanged", func(t *testing.T) {
+		rc := feedRowRedis(t)
+		log := feedRowLog()
+		repo := &feedRowRepo{failStores: -1}
+		agg := NewAggregator(config.AggregationConfig{}, repo, NewNormalizer(log),
+			NewDeduplicator(rc, log), NewScorer(config.ScoringConfig{}, log), rc, log)
+		agg.RegisterConnector(plainFeed{})
+		if err := agg.RunSource(context.Background(), "plain"); err != nil {
+			t.Fatal(err)
+		}
+		if len(repo.afterFetch) != 1 || repo.afterError != 0 {
+			t.Fatalf("afterFetch=%d afterError=%d", len(repo.afterFetch), repo.afterError)
+		}
+	})
 }
 
 // plainFeed is any connector that does not opt in to source-row tracking.

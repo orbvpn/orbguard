@@ -520,12 +520,14 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 		Msg("deduplication completed")
 
 	// Score and store new indicators
+	storeFailures := 0
 	for _, indicator := range dedupResult.NewIndicators {
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
 		if a.repository != nil {
 			_, err := a.repository.UpsertIndicator(ctx, indicator)
 			if err != nil {
 				log.Warn().Err(err).Str("value", indicator.Value).Msg("failed to store indicator")
+				storeFailures++
 				continue
 			}
 		}
@@ -539,6 +541,16 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
+	}
+
+	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
+		a.recordStoreFailure(ctx, source, err)
+		log.Error().Err(err).Msg("source fetch stored nothing")
+		fetchResult.Success = false
+		fetchResult.Error = err
+		fetchResult.Duration = time.Since(start)
+		_ = a.repository.RecordFetchHistory(ctx, fetchResult)
+		return err
 	}
 
 	// Update source after successful fetch
@@ -653,6 +665,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("deduplication completed")
 
 	// Score and store new indicators
+	storeFailures := 0
 	for _, indicator := range dedupResult.NewIndicators {
 		// Score the indicator
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
@@ -662,6 +675,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 			_, err := a.repository.UpsertIndicator(ctx, indicator)
 			if err != nil {
 				log.Warn().Err(err).Str("value", indicator.Value).Msg("failed to store indicator")
+				storeFailures++
 				continue
 			}
 		}
@@ -675,6 +689,12 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
+	}
+
+	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
+		a.recordStoreFailure(ctx, a.sourceRowBySlug(ctx, conn.Slug()), err)
+		log.Error().Err(err).Msg("source fetch stored nothing")
+		return err
 	}
 
 	// Update existing indicators
@@ -754,11 +774,36 @@ func (a *Aggregator) recordFetchSuccess(ctx context.Context, slug string) {
 	if row == nil {
 		return
 	}
-	if row.Status != models.SourceStatusActive && row.Status != models.SourceStatusError {
+	if !rowTakesFetchResult(row) {
 		return
 	}
 	if err := a.repository.UpdateSourceAfterSuccess(ctx, row.ID); err != nil {
 		a.logger.Warn().Err(err).Str("source", slug).Msg("could not record successful fetch on source row")
+	}
+}
+
+// rowTakesFetchResult is false for a row an operator paused or disabled.
+func rowTakesFetchResult(row *models.Source) bool {
+	return row.Status == models.SourceStatusActive || row.Status == models.SourceStatusError
+}
+
+// storedNothing returns an error when a tracked feed had new indicators and
+// every store failed. Other connectors keep their behaviour.
+func storedNothing(conn SourceConnector, attempted, failed int) error {
+	tracker, ok := conn.(sourceRowTracker)
+	if !ok || !tracker.TracksSourceRow() || attempted == 0 || failed < attempted {
+		return nil
+	}
+	return fmt.Errorf("%s: stored none of %d new indicators", conn.Slug(), attempted)
+}
+
+// recordStoreFailure shows a fetch that stored nothing on its source row.
+func (a *Aggregator) recordStoreFailure(ctx context.Context, row *models.Source, cause error) {
+	if row == nil || !rowTakesFetchResult(row) {
+		return
+	}
+	if err := a.repository.UpdateSourceAfterError(ctx, row.ID, cause.Error()); err != nil {
+		a.logger.Warn().Err(err).Str("source", row.Slug).Msg("could not record failed store on source row")
 	}
 }
 

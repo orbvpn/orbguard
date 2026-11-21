@@ -47,6 +47,10 @@ func IndicatorURLHost(raw string) (host string, ok bool) {
 	if strings.ContainsAny(authority, "[]") && !validBracketHost(authority) {
 		return "", false
 	}
+	// An IPv6 address in a URL must be in brackets.
+	if !strings.Contains(authority, "[") && strings.Count(authority, ":") > 1 {
+		return "", false
+	}
 
 	name := parsed.Hostname()
 	if ip := net.ParseIP(name); ip != nil {

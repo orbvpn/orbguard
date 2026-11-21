@@ -168,6 +168,9 @@ func (g *exportGate) reserve(ctx context.Context, pace time.Duration) (time.Dura
 		return wait, false
 	}
 	if g.store != nil {
+		if left, ok := g.sharedRefusal(ctx, now); ok {
+			return left, true
+		}
 		claimed, err := g.store.SetNX(ctx, g.key, "1", pace)
 		if err != nil {
 			g.logger.Warn().Msg("shared export gate unavailable, skipping this fetch")
@@ -175,9 +178,7 @@ func (g *exportGate) reserve(ctx context.Context, pace time.Duration) (time.Dura
 			return exportStoreRetry, false
 		}
 		if !claimed {
-			if left, err := g.store.TTL(ctx, g.key+exportRefusedSuffix); err == nil && left > 0 {
-				g.refusedUntil = now.Add(left)
-				g.notBefore = g.refusedUntil
+			if left, ok := g.sharedRefusal(ctx, now); ok {
 				return left, true
 			}
 			wait, err := g.store.TTL(ctx, g.key)
@@ -190,6 +191,17 @@ func (g *exportGate) reserve(ctx context.Context, pace time.Duration) (time.Dura
 	}
 	g.notBefore = now.Add(pace)
 	return 0, false
+}
+
+// sharedRefusal adopts a refusal recorded in the shared store, if there is one.
+func (g *exportGate) sharedRefusal(ctx context.Context, now time.Time) (time.Duration, bool) {
+	left, err := g.store.TTL(ctx, g.key+exportRefusedSuffix)
+	if err != nil || left <= 0 {
+		return 0, false
+	}
+	g.refusedUntil = now.Add(left)
+	g.notBefore = g.refusedUntil
+	return left, true
 }
 
 // refuse closes the gate for the refusal hold and records why, here and in the
@@ -380,9 +392,9 @@ func redactTransportError(provider string, err error) error {
 }
 
 // parseExport streams the CSV, keeping only the newest spec.maxRows usable
-// rows in memory. It reads one line at a time: a line over the limit is
-// discarded without being stored, and a stray quote can damage only its own
-// row, because no field may continue onto the next line.
+// rows in memory. A line over the limit is discarded without being stored. A
+// record whose quoted field continues onto another line is not used, and each
+// line it covers counts as a bad row.
 func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 	br := bufio.NewReaderSize(r, exportCommentMax)
 	if err := sniffExport(br); err != nil {
@@ -404,7 +416,7 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 	out := &exportParse{}
 	newest := &rowHeap{}
 	for {
-		line, oversize, err := readExportLine(br)
+		line, lines, usable, err := readExportRecord(br)
 		if err == io.EOF {
 			break
 		}
@@ -413,8 +425,7 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 		}
 
 		var rec []string
-		usable := false
-		if !oversize {
+		if usable {
 			line = bytes.TrimRight(line, "\r\n")
 			if len(line) == 0 || line[0] == '#' {
 				continue
@@ -425,11 +436,11 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 			if index == nil {
 				return nil, errExportLayout
 			}
-			out.read++
+			out.read += lines
 			if out.read > exportMaxScannedRows {
 				return nil, errExportTooLarge
 			}
-			out.bad++
+			out.bad += lines
 			continue
 		}
 
@@ -496,28 +507,104 @@ func parseExport(r io.Reader, spec exportSpec) (*exportParse, error) {
 	return out, nil
 }
 
-// readExportLine returns the next line. The slice is only valid until the next
-// read. A line longer than exportMaxLineBytes is reported as oversize, and the
-// part beyond the read buffer is dropped without being stored.
-func readExportLine(br *bufio.Reader) ([]byte, bool, error) {
-	line, err := br.ReadSlice('\n')
-	switch {
-	case err == bufio.ErrBufferFull:
+// exportQuoteState follows CSV quoting byte by byte, with the rules of
+// splitExportLine, so record ends are found without storing the record.
+type exportQuoteState uint8
+
+const (
+	quoteFieldStart exportQuoteState = iota
+	quoteBareField
+	quoteInside
+	quoteAfterQuote   // just after a quote inside a quoted field
+	quoteAfterQuoteCR // carriage returns after that quote
+)
+
+func (s exportQuoteState) next(chunk []byte) exportQuoteState {
+	for _, c := range chunk {
+		switch s {
+		case quoteFieldStart:
+			switch c {
+			case ' ', '\t', ',', '\n':
+			case '"':
+				s = quoteInside
+			default:
+				s = quoteBareField
+			}
+		case quoteBareField:
+			if c == ',' || c == '\n' {
+				s = quoteFieldStart
+			}
+		case quoteInside:
+			if c == '"' {
+				s = quoteAfterQuote
+			}
+		case quoteAfterQuote, quoteAfterQuoteCR:
+			switch c {
+			case ',', '\n':
+				s = quoteFieldStart
+			case '\r':
+				s = quoteAfterQuoteCR
+			case '"':
+				if s == quoteAfterQuote {
+					s = quoteInside
+				} else {
+					s = quoteAfterQuote
+				}
+			default:
+				s = quoteInside
+			}
+		}
+	}
+	return s
+}
+
+// readExportRecord reads one CSV record and returns how many lines it covers.
+// usable is true only for a record on a single line within exportMaxLineBytes;
+// its slice is valid until the next read. Anything else is consumed without
+// being stored. A line starting with # outside a quoted field is a comment.
+func readExportRecord(br *bufio.Reader) (line []byte, lines int, usable bool, err error) {
+	line, err = br.ReadSlice('\n')
+	if err == io.EOF && len(line) == 0 {
+		return nil, 0, false, io.EOF
+	}
+	comment := len(line) > 0 && line[0] == '#'
+	state := quoteFieldStart
+	if !comment {
+		state = state.next(line)
+	}
+	usable = err != bufio.ErrBufferFull && len(line) <= exportMaxLineBytes
+	lines = 1
+
+	for {
 		for err == bufio.ErrBufferFull {
-			_, err = br.ReadSlice('\n')
+			var chunk []byte
+			chunk, err = br.ReadSlice('\n')
+			if !comment {
+				state = state.next(chunk)
+			}
 		}
 		if err != nil && err != io.EOF {
-			return nil, false, err
+			return nil, 0, false, err
 		}
-		return nil, true, nil
-	case err == io.EOF:
-		if len(line) == 0 {
-			return nil, false, io.EOF
+		if state != quoteInside {
+			if !usable {
+				return nil, lines, false, nil
+			}
+			return line, lines, true, nil
 		}
-	case err != nil:
-		return nil, false, err
+
+		usable = false
+		if err == io.EOF {
+			return nil, lines, false, nil
+		}
+		var chunk []byte
+		chunk, err = br.ReadSlice('\n')
+		if err == io.EOF && len(chunk) == 0 {
+			return nil, lines, false, nil
+		}
+		lines++
+		state = state.next(chunk)
 	}
-	return line, len(line) > exportMaxLineBytes, nil
 }
 
 // splitExportLine splits one CSV line into at most maxFields fields of at most
