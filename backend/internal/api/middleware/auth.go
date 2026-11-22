@@ -50,6 +50,8 @@ const (
 	ContextKeyPayingAccount ContextKey = "paying_account"
 	// ContextKeyDeviceKeyIssuer holds the IssuedFrom tag of that key.
 	ContextKeyDeviceKeyIssuer ContextKey = "device_key_issuer"
+	// ContextKeyDeviceKeySince holds the KeySince of that key, when it has one.
+	ContextKeyDeviceKeySince ContextKey = "device_key_since"
 )
 
 const (
@@ -112,6 +114,10 @@ type TokenClaims struct {
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
 	// IssuedFrom tags the client network a device key was issued on.
 	IssuedFrom string `json:"issued_from,omitempty"`
+	// KeySince is when this device's first key was issued. A re-registration
+	// by the holder of a key or session keeps it. Keys issued before this
+	// field existed have none: their age comes from ExpiresAt.
+	KeySince time.Time `json:"key_since,omitempty"`
 }
 
 // TokenStore is the read interface the auth middleware needs to validate
@@ -551,6 +557,9 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 			if deviceKey && claims.IssuedFrom != "" {
 				ctx = context.WithValue(ctx, ContextKeyDeviceKeyIssuer, claims.IssuedFrom)
 			}
+			if deviceKey && !claims.KeySince.IsZero() {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeySince, claims.KeySince)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -694,6 +703,13 @@ func GetDeviceID(ctx context.Context) string {
 func GetDeviceKeyExpiry(ctx context.Context) (time.Time, bool) {
 	expiry, ok := ctx.Value(ContextKeyDeviceKeyExpiry).(time.Time)
 	return expiry, ok
+}
+
+// GetDeviceKeySince returns when the device's first key was issued, if the key
+// the request authenticated with records it.
+func GetDeviceKeySince(ctx context.Context) (time.Time, bool) {
+	since, ok := ctx.Value(ContextKeyDeviceKeySince).(time.Time)
+	return since, ok
 }
 
 // IsPayingAccount reports whether the request carries a verified OrbNet JWT

@@ -314,7 +314,7 @@ func (h *URLHandler) ReportURL(w http.ResponseWriter, r *http.Request) {
 
 	report, err := h.urlService.ReportURL(r.Context(), userID, deviceID, req.URL, req.ReportType, req.Comment)
 	if err != nil {
-		h.logger.Error().Err(err).Str("url", req.URL).Msg("failed to persist URL report")
+		h.logger.Error().Err(err).Str("report_type", req.ReportType).Msg("failed to persist URL report")
 		h.respondListError(w, err, "failed to submit report")
 		return
 	}

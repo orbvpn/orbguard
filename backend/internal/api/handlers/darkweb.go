@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -76,6 +77,16 @@ const passwordRangeBodyLimit = 256
 
 var passwordHashPrefix = regexp.MustCompile(`^[0-9A-Fa-f]{5}$`)
 
+// deviceKeyIssuedAt is when the device's first key was issued. Keys from before
+// that was recorded count from their own issue time.
+func deviceKeyIssuedAt(ctx context.Context) (time.Time, bool) {
+	if since, ok := middleware.GetDeviceKeySince(ctx); ok {
+		return since, true
+	}
+	expiry, ok := middleware.GetDeviceKeyExpiry(ctx)
+	return expiry.Add(-authAPIKeyTTL), ok
+}
+
 // paidLookupCaller decides who a paid lookup is charged to, from the
 // authenticated context and the trusted client address only.
 //
@@ -97,8 +108,7 @@ func paidLookupCaller(r *http.Request) services.PaidLookupCaller {
 		caller.Tier = services.PaidLookupPaid
 		return caller
 	}
-	if expiry, ok := middleware.GetDeviceKeyExpiry(ctx); ok &&
-		time.Since(expiry.Add(-authAPIKeyTTL)) >= establishedDeviceKeyAge {
+	if issued, ok := deviceKeyIssuedAt(ctx); ok && time.Since(issued) >= establishedDeviceKeyAge {
 		caller.Tier = services.PaidLookupEstablished
 		caller.Issuer = middleware.GetDeviceKeyIssuer(ctx)
 		if caller.Issuer == "" {

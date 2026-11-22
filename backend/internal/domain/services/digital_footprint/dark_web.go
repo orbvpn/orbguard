@@ -5,9 +5,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -52,7 +54,7 @@ func (s *DarkWebScanner) Scan(ctx context.Context, email, phone string) ([]model
 	if email != "" {
 		hibpBreaches, err := s.checkHIBP(ctx, email)
 		if err != nil {
-			s.logger.Warn().Err(err).Str("email", maskEmail(email)).Msg("HIBP check failed")
+			s.logger.Warn().Str("reason", lookupFailure(err)).Str("email", maskEmail(email)).Msg("HIBP check failed")
 		} else {
 			breaches = append(breaches, hibpBreaches...)
 
@@ -82,13 +84,28 @@ func (s *DarkWebScanner) Scan(ctx context.Context, email, phone string) ([]model
 	if email != "" {
 		pasteExposures, err := s.checkPasteSites(ctx, email)
 		if err != nil {
-			s.logger.Warn().Err(err).Msg("paste site check failed")
+			s.logger.Warn().Str("reason", lookupFailure(err)).Msg("paste site check failed")
 		} else {
 			exposures = append(exposures, pasteExposures...)
 		}
 	}
 
 	return breaches, exposures, nil
+}
+
+// lookupFailure names why an outside lookup failed. It never returns the error
+// text: a url.Error quotes the request URL, which holds what was searched for.
+func lookupFailure(err error) string {
+	var urlErr *neturl.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.As(err, &urlErr):
+		return "unreachable"
+	}
+	return "failed"
 }
 
 // HIBPBreach represents a breach from Have I Been Pwned
