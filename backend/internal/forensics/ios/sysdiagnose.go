@@ -118,10 +118,6 @@ func (p *SysdiagnoseParser) ParseContext(ctx context.Context, archivePath string
 	extraction := &sysdiagnoseExtraction{ctx: ctx, unread: make(map[string]bool)}
 	extraction.visit = func(e sysdiagnoseEntry) bool {
 		p.examineEntry(e, extraction, result, timeline)
-		if extraction.expired() {
-			extraction.stopReading(sysdiagnoseOutOfTime)
-			return false
-		}
 		if len(result.Anomalies) >= maxSysdiagnoseFindings {
 			extraction.stopReading(sysdiagnoseRestOfArchive)
 			return false
@@ -387,7 +383,8 @@ func (p *SysdiagnoseParser) examineEntry(e sysdiagnoseEntry, x *sysdiagnoseExtra
 		}
 	}
 
-	if !p.analyzeFile(x.context(), e, result, timeline) {
+	p.analyzeFile(x.context(), e, result, timeline)
+	if x.expired() {
 		x.skip(e.name)
 		return
 	}
@@ -420,11 +417,6 @@ func (p *SysdiagnoseParser) examineEntry(e sysdiagnoseEntry, x *sysdiagnoseExtra
 				timeline.AddEvent(event)
 			}
 		}
-	}
-
-	if x.expired() {
-		x.skip(e.name)
-		return
 	}
 
 	// Analyze crash logs for exploitation indicators
@@ -570,14 +562,13 @@ func (p *SysdiagnoseParser) readDirectory(dirPath string, x *sysdiagnoseExtracti
 
 // findRuleMatches finds up to limit matches one chunk at a time, so a large
 // entry can stop at the time budget. Chunks end at a line where they can and
-// overlap, so a match across a boundary is found once. It returns false if it
-// stopped before the end of content.
-func findRuleMatches(ctx context.Context, re *regexp.Regexp, content []byte, limit int) ([][]int, bool) {
+// overlap, so a match across a boundary is found once. It stops when ctx ends.
+func findRuleMatches(ctx context.Context, re *regexp.Regexp, content []byte, limit int) [][]int {
 	var found [][]int
 	floor := 0
 	for start := 0; start < len(content); {
 		if ctx.Err() != nil {
-			return found, false
+			return found
 		}
 		end := start + ruleScanChunk
 		if end >= len(content) {
@@ -600,7 +591,7 @@ func findRuleMatches(ctx context.Context, re *regexp.Regexp, content []byte, lim
 			found = append(found, []int{m[0] + start, m[1] + start})
 			floor = m[1] + start
 			if len(found) == limit {
-				return found, true
+				return found
 			}
 		}
 		if end == len(content) {
@@ -612,12 +603,11 @@ func findRuleMatches(ctx context.Context, re *regexp.Regexp, content []byte, lim
 		}
 		start = next
 	}
-	return found, true
+	return found
 }
 
-// analyzeFile analyzes a single file for suspicious patterns. It returns false
-// if ctx ended before every rule had read the whole file.
-func (p *SysdiagnoseParser) analyzeFile(ctx context.Context, e sysdiagnoseEntry, result *models.ForensicResult, timeline *models.Timeline) bool {
+// analyzeFile analyzes a single file for suspicious patterns until ctx ends.
+func (p *SysdiagnoseParser) analyzeFile(ctx context.Context, e sysdiagnoseEntry, result *models.ForensicResult, timeline *models.Timeline) {
 	filename, content := e.name, e.content
 
 	for _, pattern := range sysdiagnoseSuspiciousPatterns {
@@ -626,7 +616,7 @@ func (p *SysdiagnoseParser) analyzeFile(ctx context.Context, e sysdiagnoseEntry,
 			continue
 		}
 
-		matches, complete := findRuleMatches(ctx, pattern.Pattern, content, maxRuleMatchesPerEntry)
+		matches := findRuleMatches(ctx, pattern.Pattern, content, maxRuleMatchesPerEntry)
 		for _, match := range matches {
 			// Extract context around match
 			start := match[0] - 100
@@ -671,11 +661,7 @@ func (p *SysdiagnoseParser) analyzeFile(ctx context.Context, e sysdiagnoseEntry,
 				AnomalyID:    anomaly.ID,
 			})
 		}
-		if !complete {
-			return false
-		}
 	}
-	return true
 }
 
 // analyzeCrashLogs analyzes crash logs for exploitation indicators

@@ -130,10 +130,6 @@ func TestTimeBudgetStopsInsideALargeEntry(t *testing.T) {
 	p := NewSysdiagnoseParser(testParserLogger())
 	content := bytes.Repeat([]byte("ordinary log line\n"), 3*ruleScanChunk/18)
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeSysdiagnose)
-	if p.analyzeFile(&endsAfter{Context: context.Background(), n: 1}, sysdiagnoseEntry{name: "a.log", content: content}, result, models.NewTimeline()) {
-		t.Fatal("the scan must report that it stopped")
-	}
-
 	x := &sysdiagnoseExtraction{ctx: &endsAfter{Context: context.Background(), n: 1}, unread: make(map[string]bool)}
 	p.examineEntry(sysdiagnoseEntry{name: "logs/lockdownd/big.log", content: content}, x, result, models.NewTimeline())
 	if got := x.notExamined(); len(got) != 1 || got[0] != "logs/lockdownd/big.log" {
@@ -174,11 +170,7 @@ func TestRuleScanAcrossChunks(t *testing.T) {
 	re := regexp.MustCompile(`(?m)\bneedle\b|^start`)
 	find := func(content []byte) [][]int {
 		t.Helper()
-		found, complete := findRuleMatches(context.Background(), re, content, 20)
-		if !complete {
-			t.Fatal("the scan must finish")
-		}
-		return found
+		return findRuleMatches(context.Background(), re, content, 20)
 	}
 	filler := func(n int) []byte { return bytes.Repeat([]byte("x"), n) }
 
@@ -221,7 +213,7 @@ func TestRuleScanAcrossChunks(t *testing.T) {
 	t.Run("hits on both sides of a cut", func(t *testing.T) {
 		line := []byte("a needle b\n")
 		content := bytes.Repeat(line, 2*ruleScanChunk/len(line))
-		found, _ := findRuleMatches(context.Background(), re, content, len(content))
+		found := findRuleMatches(context.Background(), re, content, len(content))
 		if len(found) != len(content)/len(line) {
 			t.Fatalf("want %d hits, got %d", len(content)/len(line), len(found))
 		}
@@ -237,8 +229,8 @@ func TestRuleScanAcrossChunks(t *testing.T) {
 		}
 	})
 	t.Run("an ended context stops the scan", func(t *testing.T) {
-		if _, complete := findRuleMatches(canceledContext(), re, []byte("needle"), 20); complete {
-			t.Fatal("must report that it stopped")
+		if got := findRuleMatches(canceledContext(), re, []byte("needle"), 20); len(got) != 0 {
+			t.Fatalf("got %v", got)
 		}
 	})
 }
