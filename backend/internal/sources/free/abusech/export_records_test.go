@@ -67,7 +67,7 @@ func TestExportRecordOverSeveralLinesGivesNoRow(t *testing.T) {
 func TestExportBazaarRecordOverSeveralLinesGivesNoRow(t *testing.T) {
 	second := strings.Repeat("1", 64)
 	tail := limitsWhen + "," + second + "," + strings.Repeat("2", 32) + "," + strings.Repeat("3", 40) +
-		",rep,x,elf,application/octet-stream,Mirai,n/a,n/a,n/a,n/a,n/a"
+		",rep,x"
 	var body strings.Builder
 	body.WriteString(bazaarHeader)
 	for i := 0; i < 40; i++ {
