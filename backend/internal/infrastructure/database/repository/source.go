@@ -18,10 +18,16 @@ import (
 // INTERVAL, but production's sources table returns it as text (OID 25): every
 // read there failed with "cannot scan text (OID 25) in text format into
 // *time.Duration", and NOW() + update_interval has no operator for text.
-// The cast is a no-op on an INTERVAL column and parses a TEXT one ('15
-// minutes', '01:00:00', '4h', '15m0s' and '900' all parse). A NULL, which a
-// hand-made table may allow, reads as the migration's default of one hour.
-const updateIntervalSQL = `COALESCE(update_interval::interval, interval '1 hour')`
+// Going through text works for both types: an INTERVAL column round-trips,
+// and a TEXT one is parsed ('15 minutes', '01:00:00', '4h', '15m0s' and '900'
+// all parse). A NULL or a blank string, which a hand-made table may hold,
+// reads as the migration's default of one hour instead of failing the whole
+// query.
+const updateIntervalSQL = `COALESCE(NULLIF(btrim(update_interval::text), '')::interval, interval '1 hour')`
+
+// fetchResultStatuses guards every write of a fetch outcome: a row an
+// operator paused or disabled after the fetch read it keeps that status.
+const fetchResultStatuses = `status IN ('active', 'error')`
 
 // sourceColumns is the column list every source read scans with scanSource
 // and scanSourceFromRows, in their order.
@@ -221,7 +227,7 @@ func (r *SourceRepository) UpdateAfterFetch(ctx context.Context, id uuid.UUID, i
 			indicator_count = indicator_count + $2,
 			status = 'active',
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
 	_, err := r.pool.Exec(ctx, query, id, indicatorCount)
 	if err != nil {
@@ -241,9 +247,9 @@ func (r *SourceRepository) UpdateAfterError(ctx context.Context, id uuid.UUID, e
 			error_count = error_count + 1,
 			status = CASE WHEN error_count >= 3 THEN 'error' ELSE status END,
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
-	_, err := r.pool.Exec(ctx, query, id, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to update source after error: %w", err)
 	}
@@ -264,7 +270,7 @@ func (r *SourceRepository) UpdateAfterRateLimit(ctx context.Context, id uuid.UUI
 			updated_at = NOW()
 		WHERE id = $1`
 
-	_, err := r.pool.Exec(ctx, query, id, nextFetch, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, nextFetch, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to update source after rate limit: %w", err)
 	}
@@ -286,9 +292,9 @@ func (r *SourceRepository) MarkPlanLimited(ctx context.Context, id uuid.UUID, er
 			error_count = error_count + 1,
 			status = 'error',
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
-	_, err := r.pool.Exec(ctx, query, id, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to mark source plan limited: %w", err)
 	}

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -295,5 +296,186 @@ func TestErrorRowReturnsToTheTickAfterASchedulerSuccess(t *testing.T) {
 				t.Fatalf("after a Scheduler success next_fetch is %.0fs away, want 900", s)
 			}
 		})
+	}
+}
+
+// A NULL or blank interval, which a hand-made table may hold, reads as one
+// hour and does not fail the query for the other rows.
+func TestNullOrBlankUpdateIntervalReadsAsOneHour(t *testing.T) {
+	for _, ct := range intervalColumnTypes {
+		t.Run(ct.name, func(t *testing.T) {
+			pool := intervalTestDB(t, ct.alter)
+			ctx := context.Background()
+			if _, err := pool.Exec(ctx, `ALTER TABLE orbguard_lab.sources ALTER COLUMN update_interval DROP NOT NULL`); err != nil {
+				t.Fatal(err)
+			}
+			values := map[string]string{"nullrow": "NULL"}
+			if ct.alter != "" {
+				values["empty"] = "''"
+				values["blank"] = "'   '"
+			}
+			ids := map[string]uuid.UUID{}
+			for slug, v := range values {
+				ids[slug] = insertSourceRow(t, pool, slug, v, "NULL")
+			}
+			insertSourceRow(t, pool, "normal", "'15 minutes'", "NULL")
+
+			repo := repository.NewSourceRepository(pool)
+			due, err := repo.ListDue(ctx)
+			if err != nil || len(due) != len(values)+1 {
+				t.Fatalf("ListDue: %d rows, %v", len(due), err)
+			}
+			for _, s := range due {
+				want := time.Hour
+				if s.Slug == "normal" {
+					want = 15 * time.Minute
+				}
+				if s.UpdateInterval != want {
+					t.Errorf("%s: interval %v, want %v", s.Slug, s.UpdateInterval, want)
+				}
+			}
+			for slug, id := range ids {
+				if err := repo.UpdateAfterFetch(ctx, id, 0); err != nil {
+					t.Fatalf("UpdateAfterFetch %s: %v", slug, err)
+				}
+				if s := secondsUntilNextFetch(t, pool, id); !near(s, time.Hour) {
+					t.Errorf("%s: next fetch %.0fs away, want 3600", slug, s)
+				}
+			}
+		})
+	}
+}
+
+// Each failure in a row pushes the next fetch out by one more interval, up to
+// four; the fourth puts the row in error and the fifth still backs off.
+func TestErrorBackoffGrowsToFourIntervals(t *testing.T) {
+	for _, ct := range intervalColumnTypes {
+		t.Run(ct.name, func(t *testing.T) {
+			pool := intervalTestDB(t, ct.alter)
+			ctx := context.Background()
+			id := insertSourceRow(t, pool, "flaky", "'1 hour'", "NULL")
+			repo := repository.NewSourceRepository(pool)
+			for i, want := range []time.Duration{time.Hour, 2 * time.Hour, 3 * time.Hour, 4 * time.Hour, 4 * time.Hour} {
+				if err := repo.UpdateAfterError(ctx, id, "provider down"); err != nil {
+					t.Fatal(err)
+				}
+				if s := secondsUntilNextFetch(t, pool, id); !near(s, want) {
+					t.Errorf("failure %d: next fetch %.0fs away, want %.0f", i+1, s, want.Seconds())
+				}
+				var status string
+				if err := pool.QueryRow(ctx, `SELECT status::text FROM sources WHERE id = $1`, id).Scan(&status); err != nil {
+					t.Fatal(err)
+				}
+				if wantStatus := map[bool]string{true: "error", false: "active"}[i >= 3]; status != wantStatus {
+					t.Errorf("failure %d: status %s, want %s", i+1, status, wantStatus)
+				}
+			}
+		})
+	}
+}
+
+// pausingRepo pauses the row right after the aggregator has read it: an
+// operator's PATCH landing between recordFetchSuccess's read and its write.
+type pausingRepo struct {
+	IndicatorRepository
+	pool *pgxpool.Pool
+}
+
+func (r *pausingRepo) GetSourceBySlug(ctx context.Context, slug string) (*models.Source, error) {
+	row, err := r.IndicatorRepository.GetSourceBySlug(ctx, slug)
+	if err == nil {
+		_, err = r.pool.Exec(ctx, `UPDATE sources SET status = 'paused' WHERE slug = $1`, slug)
+	}
+	return row, err
+}
+
+// A fetch outcome never undoes an operator's pause or disable.
+func TestFetchOutcomeLeavesAPausedRowAlone(t *testing.T) {
+	pool := intervalTestDB(t, intervalColumnTypes[1].alter)
+	ctx := context.Background()
+	status := func(id uuid.UUID) string {
+		var s string
+		if err := pool.QueryRow(ctx, `SELECT status::text FROM sources WHERE id = $1`, id).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	// The race: the row is active when read and paused before the write.
+	id := insertSourceRow(t, pool, "raced", "'15 minutes'", "NULL")
+	conn := &stubConnector{slug: "raced"}
+	agg := NewAggregator(config.AggregationConfig{}, &pausingRepo{repository.NewRepositories(pool).AggregatorAdapter, pool},
+		nil, nil, nil, nil, logger.NewDefault())
+	agg.RegisterConnector(conn)
+	if err := agg.RunSource(ctx, "raced"); err != nil {
+		t.Fatal(err)
+	}
+	if got := status(id); got != "paused" {
+		t.Fatalf("a success turned a pause landing mid-fetch into %s", got)
+	}
+
+	// Every outcome writer, on rows already paused or disabled.
+	repo := repository.NewSourceRepository(pool)
+	for _, st := range []string{"paused", "disabled"} {
+		id := insertSourceRow(t, pool, "held-"+st, "'15 minutes'", "NULL")
+		if _, err := pool.Exec(ctx, `UPDATE sources SET status = $2 WHERE id = $1`, id, st); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 4; i++ {
+			if err := repo.UpdateAfterError(ctx, id, "down"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := repo.MarkPlanLimited(ctx, id, "plan"); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.UpdateAfterFetch(ctx, id, 0); err != nil {
+			t.Fatal(err)
+		}
+		if got := status(id); got != st {
+			t.Errorf("a %s row became %s", st, got)
+		}
+	}
+}
+
+// timedFailConnector fails like a real connector does: its result carries the
+// fetch time, which update_history needs (started_at is NOT NULL).
+type timedFailConnector struct{ stubConnector }
+
+func (c *timedFailConnector) Fetch(context.Context) (*models.SourceFetchResult, error) {
+	c.calls.Add(1)
+	return &models.SourceFetchResult{SourceSlug: c.slug, FetchedAt: time.Now(), Error: c.err}, c.err
+}
+
+// A credential in a fetch error never reaches last_error or update_history.
+func TestSecretInAFetchErrorIsNotStored(t *testing.T) {
+	pool := intervalTestDB(t, intervalColumnTypes[1].alter)
+	ctx := context.Background()
+	id := insertSourceRow(t, pool, "leaky", "'15 minutes'", "NULL")
+	conn := &timedFailConnector{stubConnector{slug: "leaky", err: errors.New(
+		`failed to fetch threat lists: Post "https://safebrowsing.googleapis.com/v4/threatListUpdates:fetch?key=SECRETKEY": dial tcp: i/o timeout`)}}
+	agg := NewAggregator(config.AggregationConfig{}, repository.NewRepositories(pool).AggregatorAdapter,
+		nil, nil, nil, nil, logger.NewDefault())
+	agg.RegisterConnector(conn)
+	if err := agg.runDueSources(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if conn.calls.Load() != 1 {
+		t.Fatalf("the source was fetched %d times", conn.calls.Load())
+	}
+	var lastError, historyError string
+	if err := pool.QueryRow(ctx, `SELECT COALESCE(last_error, '') FROM sources WHERE id = $1`, id).Scan(&lastError); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT COALESCE(string_agg(error, ' | '), '') FROM update_history WHERE source_id = $1`, id).Scan(&historyError); err != nil {
+		t.Fatal(err)
+	}
+	for where, text := range map[string]string{"last_error": lastError, "update_history.error": historyError} {
+		if !strings.Contains(text, "dial tcp: i/o timeout") || !strings.Contains(text, "[redacted]") {
+			t.Errorf("%s = %q, want the cleaned error", where, text)
+		}
+		if strings.Contains(text, "SECRETKEY") {
+			t.Errorf("%s holds the key: %q", where, text)
+		}
 	}
 }
