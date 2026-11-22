@@ -107,16 +107,10 @@ func (h *AnalyticsHandler) GetSourceHealth(w http.ResponseWriter, r *http.Reques
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	if !middleware.IsAdmin(r.Context()) && result != nil {
+	if !middleware.IsAdmin(r.Context()) {
 		// A source's last error is for operators: it can quote a provider's
-		// URL or answer. The report is copied, never changed in place.
-		public := *result
-		public.Sources = make([]models.SourceHealthEntry, len(result.Sources))
-		for i, s := range result.Sources {
-			s.LastError = ""
-			public.Sources[i] = s
-		}
-		result = &public
+		// URL or answer.
+		result = result.WithoutLastErrors()
 	}
 	respondJSON(w, http.StatusOK, result)
 }

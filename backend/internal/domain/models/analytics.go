@@ -308,6 +308,22 @@ type SourceHealthEntry struct {
 	NextScheduled   time.Time `json:"next_scheduled,omitempty"`
 }
 
+// WithoutLastErrors returns a copy of the report with every source's last
+// error removed. A last error is for operators: it can quote a provider's URL
+// or answer. The receiver is not changed.
+func (r *SourceHealthReport) WithoutLastErrors() *SourceHealthReport {
+	if r == nil {
+		return nil
+	}
+	public := *r
+	public.Sources = make([]SourceHealthEntry, len(r.Sources))
+	for i, s := range r.Sources {
+		s.LastError = ""
+		public.Sources[i] = s
+	}
+	return &public
+}
+
 // AlertMetrics contains alert-related metrics
 type AlertMetrics struct {
 	TimeRange         AnalyticsTimeRange `json:"time_range"`
