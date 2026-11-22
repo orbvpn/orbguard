@@ -674,6 +674,22 @@ func AdminAuth(_ string) func(next http.Handler) http.Handler {
 	}
 }
 
+// OptionalAdmin lets a read route serve more to an admin without closing it
+// to everyone else. A request that carries X-Admin-Token goes through
+// AdminAuth in full (lockout, 403 on a wrong token, audit line) and reaches
+// the handler with IsAdmin set; a request without the header reaches the
+// handler as before, with IsAdmin false.
+func OptionalAdmin(next http.Handler) http.Handler {
+	withAdmin := AdminAuth("")(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(adminTokenHeader) != "" {
+			withAdmin.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // GetAPIKey returns the API key from context
 func GetAPIKey(ctx context.Context) string {
 	if key, ok := ctx.Value(ContextKeyAPIKey).(string); ok {

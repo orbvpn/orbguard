@@ -147,9 +147,10 @@ func (r *Router) Setup() http.Handler {
 
 		// Sources endpoints
 		api.Route("/sources", func(sources chi.Router) {
-			sources.Get("/", r.handlers.Sources.List)
+			// last_error is served to admins only (OptionalAdmin).
+			sources.With(apimiddleware.OptionalAdmin).Get("/", r.handlers.Sources.List)
 			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/", r.handlers.Sources.Create)
-			sources.Get("/{slug}", r.handlers.Sources.Get)
+			sources.With(apimiddleware.OptionalAdmin).Get("/{slug}", r.handlers.Sources.Get)
 			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/{slug}", r.handlers.Sources.Update)
 		})
 
@@ -189,8 +190,8 @@ func (r *Router) Setup() http.Handler {
 		api.Get("/indicators/{id}", r.handlers.Indicators.GetByID)
 
 		// Path aliases: /api/v1/intel/sources -> /api/v1/sources (Flutter compatibility)
-		api.Get("/intel/sources", r.handlers.Sources.List)
-		api.Get("/intel/sources/{slug}", r.handlers.Sources.Get)
+		api.With(apimiddleware.OptionalAdmin).Get("/intel/sources", r.handlers.Sources.List)
+		api.With(apimiddleware.OptionalAdmin).Get("/intel/sources/{slug}", r.handlers.Sources.Get)
 		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/intel/sources", r.handlers.Sources.Create)
 		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
 
@@ -785,7 +786,7 @@ func (r *Router) Setup() http.Handler {
 			an.Get("/threats", r.handlers.Analytics.GetThreatAnalytics)
 			an.Get("/alerts", r.handlers.Analytics.GetAlertMetrics)
 			an.Get("/detections", r.handlers.Analytics.GetDetectionMetrics)
-			an.Get("/sources", r.handlers.Analytics.GetSourceHealth)
+			an.With(apimiddleware.OptionalAdmin).Get("/sources", r.handlers.Analytics.GetSourceHealth)
 			an.Get("/geo", r.handlers.Analytics.GetGeoDistribution)
 			an.Get("/dashboard", r.handlers.Analytics.GetDashboard)
 			an.Get("/reports", r.handlers.Analytics.ListReports)
