@@ -339,7 +339,16 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 		dueSources, err := a.repository.GetDueSources(ctx)
 		if err != nil {
 			a.logger.Warn().Err(err).Msg("failed to get due sources from database, falling back to all sources")
-		} else if len(dueSources) > 0 {
+		} else {
+			// The database answered: it alone decides what is due. When no
+			// source is due this tick does nothing; falling through to the
+			// all-sources run here would fetch every source every 15
+			// minutes whatever its interval. Connectors without an active
+			// source row are run by the Scheduler at their own interval.
+			if len(dueSources) == 0 {
+				a.logger.Debug().Msg("no source due")
+				return nil
+			}
 			a.logger.Info().Int("due_sources", len(dueSources)).Msg("processing due sources from database")
 
 			for _, source := range dueSources {
