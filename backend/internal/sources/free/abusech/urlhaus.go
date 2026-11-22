@@ -1,11 +1,10 @@
 package abusech
 
 import (
-	"bufio"
 	"context"
-	"encoding/csv"
+	"errors"
 	"fmt"
-	"net/http"
+	"net"
 	"strings"
 	"time"
 
@@ -16,15 +15,69 @@ import (
 	"orbguard-lab/pkg/logger"
 )
 
-// URLhausConnector fetches data from Abuse.ch URLhaus
+const (
+	urlhausExportBase = "https://urlhaus-api.abuse.ch"
+
+	// recent.csv covers 30 days. The cap keeps the newest rows, which is what
+	// a first ingest after a gap and every later hourly fetch both need.
+	urlhausMaxBytes int64 = 64 << 20
+	urlhausMaxRows        = 5000
+
+	// The provider regenerates the file every 5 minutes and asks for no more
+	// than one fetch in that time. One an hour stays far inside it.
+	urlhausMinInterval = time.Hour
+
+	// urlhausMaxTags bounds what one row can add to an indicator.
+	urlhausMaxTags = 32
+)
+
+var urlhausColumns = []string{
+	"id", "dateadded", "url", "url_status", "last_online",
+	"threat", "tags", "urlhaus_link", "reporter",
+}
+
+// urlhausSharedHosts are platforms where one malicious file says nothing about
+// the rest of the host. Rows on them are left out. This list is not what keeps
+// a host from being blocked: URLhaus rows become URL indicators only, and the
+// DNS rule loader skips them. Subdomains match too.
+var urlhausSharedHosts = map[string]bool{
+	"github.com": true, "githubusercontent.com": true, "github.io": true,
+	"gitlab.com": true, "gitlab.io": true, "bitbucket.org": true, "sourceforge.net": true,
+	"google.com": true, "googleapis.com": true, "googleusercontent.com": true,
+	"gstatic.com": true, "goo.gl": true, "youtube.com": true, "web.app": true,
+	"firebaseapp.com": true, "firebasestorage.app": true, "appspot.com": true,
+	"microsoft.com": true, "live.com": true, "office.com": true, "office365.com": true,
+	"outlook.com": true, "sharepoint.com": true, "1drv.ms": true, "windows.net": true,
+	"azureedge.net": true, "azurewebsites.net": true, "azurefd.net": true,
+	"amazon.com": true, "amazonaws.com": true, "cloudfront.net": true,
+	"cloudflare.com": true, "r2.dev": true, "pages.dev": true, "workers.dev": true,
+	"trycloudflare.com": true, "apple.com": true, "icloud.com": true,
+	"discord.com": true, "discordapp.com": true, "discordapp.net": true,
+	"telegram.org": true, "t.me": true, "whatsapp.net": true, "whatsapp.com": true,
+	"facebook.com": true, "fbcdn.net": true, "instagram.com": true,
+	"twitter.com": true, "x.com": true, "twimg.com": true, "linkedin.com": true,
+	"dropbox.com": true, "dropboxusercontent.com": true, "box.com": true,
+	"mediafire.com": true, "mega.nz": true, "mega.co.nz": true, "wetransfer.com": true,
+	"transfer.sh": true, "catbox.moe": true, "litter.catbox.moe": true,
+	"pastebin.com": true, "paste.ee": true, "hastebin.com": true, "archive.org": true,
+	"wikipedia.org": true, "wikimedia.org": true, "ngrok.io": true, "ngrok.app": true,
+	"ngrok-free.app": true, "vercel.app": true, "netlify.app": true, "herokuapp.com": true,
+	"onrender.com": true, "fly.dev": true, "railway.app": true, "wordpress.com": true,
+	"blogspot.com": true, "blogger.com": true, "weebly.com": true, "wixsite.com": true,
+	"yandex.ru": true, "yandex.net": true, "vk.com": true, "userapi.com": true,
+	"baidu.com": true, "qq.com": true, "aliyuncs.com": true, "myqcloud.com": true,
+}
+
+// URLhausConnector fetches data from the Abuse.ch URLhaus file export
 type URLhausConnector struct {
 	*sources.BaseConnector
-	client *http.Client
+	feed   *exportFeed
 	logger *logger.Logger
 }
 
 // NewURLhausConnector creates a new URLhaus connector
 func NewURLhausConnector(log *logger.Logger) *URLhausConnector {
+	componentLog := log.WithComponent("urlhaus")
 	return &URLhausConnector{
 		BaseConnector: sources.NewBaseConnector(
 			"urlhaus",
@@ -32,14 +85,38 @@ func NewURLhausConnector(log *logger.Logger) *URLhausConnector {
 			models.SourceCategoryAbuseCH,
 			models.SourceTypeAPI,
 		),
-		client: &http.Client{
-			Timeout: 60 * time.Second,
-		},
-		logger: log.WithComponent("urlhaus"),
+		feed: newExportFeed(exportSpec{
+			provider:    "URLhaus",
+			slug:        "urlhaus",
+			base:        urlhausExportBase,
+			columns:     urlhausColumns,
+			dateColumn:  "dateadded",
+			maxBytes:    urlhausMaxBytes,
+			maxRows:     urlhausMaxRows,
+			minInterval: urlhausMinInterval,
+			check:       checkURLhausRow,
+		}, componentLog),
+		logger: componentLog,
 	}
 }
 
-// Fetch retrieves URLs from URLhaus CSV feed (public, no auth required)
+// Configure keeps the key inside the export client, out of the general
+// connector config that other code can read.
+func (c *URLhausConnector) Configure(cfg sources.ConnectorConfig) error {
+	c.feed.apiKey = cfg.APIKey
+	cfg.APIKey = ""
+	return c.BaseConnector.Configure(cfg)
+}
+
+func (c *URLhausConnector) setFetchGateStore(store FetchGateStore) {
+	c.feed.setFetchGateStore(store)
+}
+
+// TracksSourceRow asks the aggregator to keep this feed's source row current
+// on the paths that have no row at hand.
+func (c *URLhausConnector) TracksSourceRow() bool { return true }
+
+// Fetch retrieves recent malware URLs from the URLhaus export
 func (c *URLhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResult, error) {
 	start := time.Now()
 
@@ -50,147 +127,21 @@ func (c *URLhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResult
 		RawIndicators: make([]models.RawIndicator, 0),
 	}
 
-	// Use public CSV feed (no auth required)
-	csvURL := "https://urlhaus.abuse.ch/downloads/csv_recent/"
-
-	req, err := http.NewRequestWithContext(ctx, "GET", csvURL, nil)
+	parsed, err := c.feed.fetch(ctx, c.UpdateInterval())
 	if err != nil {
 		result.Error = err
-		return result, err
-	}
-
-	c.logger.Info().Str("url", csvURL).Msg("fetching URLhaus CSV feed")
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		result.Error = err
-		return result, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-		result.Error = err
-		return result, err
-	}
-
-	// Parse CSV (skip comment lines starting with #)
-	scanner := bufio.NewScanner(resp.Body)
-	var csvLines []string
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "#") && len(line) > 0 {
-			csvLines = append(csvLines, line)
-		}
-	}
-
-	if len(csvLines) == 0 {
-		c.logger.Warn().Msg("no data in URLhaus feed")
-		result.Success = true
 		result.Duration = time.Since(start)
-		return result, nil
-	}
-
-	// Parse CSV data
-	// Format: id,dateadded,url,url_status,last_online,threat,tags,urlhaus_link,reporter
-	reader := csv.NewReader(strings.NewReader(strings.Join(csvLines, "\n")))
-	records, err := reader.ReadAll()
-	if err != nil {
-		result.Error = err
 		return result, err
 	}
 
-	c.logger.Info().Int("records", len(records)).Msg("parsing URLhaus CSV")
-
-	for _, record := range records {
-		if len(record) < 9 {
-			continue
-		}
-
-		// Parse fields
-		// id, dateadded, url, url_status, last_online, threat, tags, urlhaus_link, reporter
-		urlID := record[0]
-		dateAdded := record[1]
-		urlValue := record[2]
-		urlStatus := record[3]
-		threat := record[5]
-		tagsStr := record[6]
-		urlhausLink := record[7]
-		reporter := record[8]
-
-		// Determine severity based on threat type
-		severity := models.SeverityMedium
-		switch strings.ToLower(threat) {
-		case "malware_download":
-			severity = models.SeverityHigh
-		case "phishing":
-			severity = models.SeverityMedium
-		}
-
-		// Parse date
-		var firstSeen *time.Time
-		if t, err := time.Parse("2006-01-02 15:04:05", dateAdded); err == nil {
-			firstSeen = &t
-		}
-
-		// Parse tags
-		tags := []string{"urlhaus", threat}
-		if tagsStr != "" {
-			for _, tag := range strings.Split(tagsStr, ",") {
-				tags = append(tags, strings.TrimSpace(tag))
-			}
-		}
-
-		// Add URL indicator
-		urlConfidence := 0.85
-		result.RawIndicators = append(result.RawIndicators, models.RawIndicator{
-			Value:       urlValue,
-			Type:        models.IndicatorTypeURL,
-			Severity:    severity,
-			Confidence:  &urlConfidence,
-			Description: fmt.Sprintf("URLhaus: %s - %s", threat, urlStatus),
-			Tags:        tags,
-			FirstSeen:   firstSeen,
-			SourceID:    c.Slug(),
-			SourceName:  c.Name(),
-			RawData: map[string]any{
-				"urlhaus_id":   urlID,
-				"url_status":   urlStatus,
-				"reporter":     reporter,
-				"urlhaus_link": urlhausLink,
-			},
-		})
-
-		// Extract domain/IP from URL for additional indicator
-		host := extractDomain(urlValue)
-		if host != "" {
-			extractedConfidence := 0.80
-			if isIPAddress(host) {
-				result.RawIndicators = append(result.RawIndicators, models.RawIndicator{
-					Value:       host,
-					Type:        models.IndicatorTypeIP,
-					Severity:    severity,
-					Confidence:  &extractedConfidence,
-					Description: fmt.Sprintf("IP from URLhaus: %s", threat),
-					Tags:        append(tags, "extracted"),
-					FirstSeen:   firstSeen,
-					SourceID:    c.Slug(),
-					SourceName:  c.Name(),
-				})
-			} else {
-				result.RawIndicators = append(result.RawIndicators, models.RawIndicator{
-					Value:       host,
-					Type:        models.IndicatorTypeDomain,
-					Severity:    severity,
-					Confidence:  &extractedConfidence,
-					Description: fmt.Sprintf("Domain from URLhaus: %s", threat),
-					Tags:        append(tags, "extracted"),
-					FirstSeen:   firstSeen,
-					SourceID:    c.Slug(),
-					SourceName:  c.Name(),
-				})
-			}
-		}
+	for _, row := range parsed.rows {
+		result.RawIndicators = append(result.RawIndicators, c.rowIndicators(row)...)
+	}
+	if len(result.RawIndicators) == 0 {
+		err := errors.New("URLhaus: export produced no indicators")
+		result.Error = err
+		result.Duration = time.Since(start)
+		return result, err
 	}
 
 	result.Success = true
@@ -198,50 +149,107 @@ func (c *URLhausConnector) Fetch(ctx context.Context) (*models.SourceFetchResult
 	result.Duration = time.Since(start)
 
 	c.logger.Info().
-		Int("records", len(records)).
+		Int("rows_read", parsed.read).
+		Int("rows_used", len(parsed.rows)).
+		Int("rows_skipped", parsed.skipped).
+		Int("rows_bad", parsed.bad).
+		Bool("rows_capped", parsed.capped).
 		Int("indicators", len(result.RawIndicators)).
 		Dur("duration", result.Duration).
-		Msg("fetch completed")
+		Msg("URLhaus export fetch completed")
 
 	return result, nil
 }
 
-// extractDomain extracts the domain/IP from a URL
-func extractDomain(rawURL string) string {
-	// Remove protocol
-	url := rawURL
-	if idx := strings.Index(url, "://"); idx != -1 {
-		url = url[idx+3:]
+// checkURLhausRow keeps online http(s) URLs whose host can safely carry a
+// block. Anything else is left out rather than risk blocking a healthy site.
+// A URL that fails the host parser is third-party input to ignore, so it is
+// skipped: a handful of crafted rows must not be able to fail the whole feed.
+func checkURLhausRow(row exportRow) rowVerdict {
+	raw := row.get("url")
+	if raw == "" {
+		return rowBad
+	}
+	host, ok := models.IndicatorURLHost(raw)
+	if !ok {
+		return rowSkip
+	}
+	if !strings.EqualFold(row.get("url_status"), "online") {
+		return rowSkip
 	}
 
-	// Remove path
-	if idx := strings.Index(url, "/"); idx != -1 {
-		url = url[:idx]
+	if ip := net.ParseIP(host); ip != nil {
+		if !isPublicIP(ip) {
+			return rowSkip
+		}
+		return rowUse
 	}
-
-	// Remove port
-	if idx := strings.Index(url, ":"); idx != -1 {
-		url = url[:idx]
+	if isSharedHost(host) {
+		return rowSkip
 	}
-
-	return strings.ToLower(url)
+	return rowUse
 }
 
-// isIPAddress checks if a string looks like an IP address
-func isIPAddress(s string) bool {
-	parts := strings.Split(s, ".")
-	if len(parts) != 4 {
-		return false
-	}
-	for _, p := range parts {
-		if p == "" {
+func isPublicIP(ip net.IP) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate()
+}
+
+func isSharedHost(host string) bool {
+	for {
+		if urlhausSharedHosts[host] {
+			return true
+		}
+		dot := strings.IndexByte(host, '.')
+		if dot < 0 {
 			return false
 		}
-		for _, c := range p {
-			if c < '0' || c > '9' {
-				return false
-			}
+		host = host[dot+1:]
+	}
+}
+
+// rowIndicators builds the one URL indicator of a row. No domain or IP
+// indicator is made: the row proves one URL is bad, not its whole host.
+func (c *URLhausConnector) rowIndicators(row exportRow) []models.RawIndicator {
+	urlValue := row.get("url")
+	threat := row.get("threat")
+	urlStatus := row.get("url_status")
+
+	severity := models.SeverityMedium
+	switch strings.ToLower(threat) {
+	case "malware_download":
+		severity = models.SeverityHigh
+	case "phishing":
+		severity = models.SeverityMedium
+	}
+
+	firstSeen := row.when
+
+	tags := []string{"urlhaus", threat}
+	for rest := row.get("tags"); rest != "" && len(tags) < 2+urlhausMaxTags; {
+		var tag string
+		tag, rest, _ = strings.Cut(rest, ",")
+		tag = strings.TrimSpace(tag)
+		if tag != "" && !strings.EqualFold(tag, "none") {
+			tags = append(tags, tag)
 		}
 	}
-	return true
+
+	urlConfidence := 0.85
+	return []models.RawIndicator{{
+		Value:       urlValue,
+		Type:        models.IndicatorTypeURL,
+		Severity:    severity,
+		Confidence:  &urlConfidence,
+		Description: fmt.Sprintf("URLhaus: %s - %s", threat, urlStatus),
+		Tags:        withTag(tags, "url"),
+		FirstSeen:   &firstSeen,
+		SourceID:    c.Slug(),
+		SourceName:  c.Name(),
+		RawData: map[string]any{
+			"urlhaus_id":   row.get("id"),
+			"url_status":   urlStatus,
+			"reporter":     row.get("reporter"),
+			"urlhaus_link": row.get("urlhaus_link"),
+		},
+	}}
 }
