@@ -254,7 +254,8 @@ func TestSysdiagnoseOverTheTotalBudgetIsNeverClean(t *testing.T) {
 func TestSpywareNameRulesDoNotFireOnJunk(t *testing.T) {
 	h := newGuardRouter(t)
 
-	random := make([]byte, 8<<20)
+	// 2 MiB keeps the race build inside the router's 60 s request timeout.
+	random := make([]byte, 2<<20)
 	rand.New(rand.NewSource(20261121)).Read(random)
 
 	quiet := map[string][]byte{
