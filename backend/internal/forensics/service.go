@@ -74,7 +74,7 @@ func NewServiceWithCache(cache *cache.RedisCache, log *logger.Logger) *Service {
 func (s *Service) AnalyzeShutdownLog(ctx context.Context, data []byte, deviceID string) (*models.ForensicResult, error) {
 	s.logger.Info().Str("device_id", deviceID).Msg("analyzing shutdown.log")
 
-	result, err := s.shutdownLogParser.Parse(data)
+	result, err := s.shutdownLogParser.ParseContext(ctx, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shutdown.log: %w", err)
 	}
@@ -193,7 +193,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 	if req.Platform == "ios" {
 		// Shutdown.log analysis
 		if len(req.ShutdownLogData) > 0 {
-			result, err := s.shutdownLogParser.Parse(req.ShutdownLogData)
+			result, err := s.shutdownLogParser.ParseContext(ctx, req.ShutdownLogData)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("shutdown.log analysis failed")
 				notExamined = append(notExamined, "shutdown_log")
@@ -540,7 +540,10 @@ func (s *Service) QuickCheck(ctx context.Context, platform string, data []byte) 
 
 	if result.IndicatorsFound > 0 {
 		result.RecommendFullScan = true
-	} else if !s.recognisesLog(platform, data) {
+	} else if !s.recognisesLog(ctx, platform, data) {
+		if ctx.Err() != nil {
+			return nil, &models.PartlyExaminedError{NotExamined: []string{"log beyond the time limit"}}
+		}
 		// No indicator in text that is not a log of this platform says
 		// nothing about the device.
 		return nil, ErrNothingExamined
@@ -550,12 +553,12 @@ func (s *Service) QuickCheck(ctx context.Context, platform string, data []byte) 
 }
 
 // recognisesLog reports whether data holds a line the platform's parser reads.
-func (s *Service) recognisesLog(platform string, data []byte) bool {
+func (s *Service) recognisesLog(ctx context.Context, platform string, data []byte) bool {
 	switch platform {
 	case "ios":
-		return s.shutdownLogParser.Recognises(data)
+		return s.shutdownLogParser.RecognisesContext(ctx, data)
 	case "android":
-		return s.logcatParser.Recognises(data)
+		return s.logcatParser.RecognisesContext(ctx, data)
 	}
 	return false
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -40,11 +41,14 @@ func newGuardRouter(t *testing.T) http.Handler {
 	cfg.STIX.Enabled = true
 	cfg.STIX.TAXIIServer.Enabled = true
 
+	// Results here must not depend on how busy the test machine is.
+	forensicsHandler := handlers.NewForensicsHandler(forensics.NewService(log), log)
+	forensicsHandler.AnalysisBudget = time.Hour
 	h := &handlers.Handlers{
 		DarkWeb:   handlers.NewDarkWebHandler(services.NewDarkWebMonitor(nil, nil, nil, nil, nil, log), log),
 		OrbNet:    handlers.NewOrbNetHandler(services.NewOrbNetService(nil, nil, log), log),
 		TAXII:     handlers.NewTAXIIHandler(services.NewSTIXTAXIIService(nil, nil, log), log),
-		Forensics: handlers.NewForensicsHandler(forensics.NewService(log), log),
+		Forensics: forensicsHandler,
 	}
 	return NewRouter(cfg, h, nil, log).Setup()
 }

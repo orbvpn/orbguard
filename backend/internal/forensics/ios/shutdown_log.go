@@ -189,12 +189,12 @@ type shutdownClient struct {
 
 // Parse parses shutdown.log data and returns forensic results
 func (p *ShutdownLogParser) Parse(data []byte) (*models.ForensicResult, error) {
-	return p.parse(context.Background(), data)
+	return p.ParseContext(context.Background(), data)
 }
 
-// parse is Parse that stops reading lines when ctx ends. The lines it did not
+// ParseContext is Parse that stops reading lines when ctx ends. The lines it did not
 // reach then count as not examined.
-func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.ForensicResult, error) {
+func (p *ShutdownLogParser) ParseContext(ctx context.Context, data []byte) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "ios", models.ForensicScanTypeShutdownLog)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -211,7 +211,7 @@ func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.For
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
-		if lineNum > maxShutdownLogLines || (lineNum%1024 == 0 && ctx.Err() != nil) {
+		if lineNum > maxShutdownLogLines || ctx.Err() != nil {
 			truncated = true
 			break
 		}
@@ -282,7 +282,7 @@ func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.For
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	if recognised == 0 {
+	if recognised == 0 && !truncated {
 		return nil, models.ErrNothingExamined
 	}
 
@@ -423,15 +423,16 @@ func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.For
 
 	// A log read only in part is never clean. Only a high or critical finding
 	// may stand, and the result then lists what was skipped.
-	notExamined := make([]string, 0, 3)
-	if unreadIndicator || !models.RecognisedEnough(readLines, totalLines) {
-		notExamined = append(notExamined, "shutdown log lines in an unread format")
-	}
-	if recognised < models.MinLogEntries && !result.HasHighFinding() {
-		notExamined = append(notExamined, "too few shutdown log entries to call the log read")
-	}
+	notExamined := make([]string, 0, 2)
 	if truncated {
-		notExamined = append(notExamined, "shutdown log beyond the line or findings limit")
+		notExamined = append(notExamined, "shutdown log beyond the line, findings or time limit")
+	} else {
+		if unreadIndicator || !models.RecognisedEnough(readLines, totalLines) {
+			notExamined = append(notExamined, "shutdown log lines in an unread format")
+		}
+		if recognised < models.MinLogEntries && !result.HasHighFinding() {
+			notExamined = append(notExamined, "too few shutdown log entries to call the log read")
+		}
 	}
 	if len(notExamined) > 0 {
 		if !result.HasHighFinding() {
@@ -447,9 +448,17 @@ func (p *ShutdownLogParser) parse(ctx context.Context, data []byte) (*models.For
 // Recognises reports whether data reads as a shutdown log: at least one entry,
 // and recognised lines make up the share RecognisedEnough asks for.
 func (p *ShutdownLogParser) Recognises(data []byte) bool {
+	return p.RecognisesContext(context.Background(), data)
+}
+
+// RecognisesContext is Recognises that answers false once ctx has ended.
+func (p *ShutdownLogParser) RecognisesContext(ctx context.Context, data []byte) bool {
 	recognised, readLines, totalLines := 0, 0, 0
 	unreadIndicator := false
 	for len(data) > 0 {
+		if ctx.Err() != nil {
+			return false
+		}
 		var raw []byte
 		raw, data, _ = bytes.Cut(data, []byte("\n"))
 		line := string(bytes.TrimSuffix(raw, []byte("\r")))

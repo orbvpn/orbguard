@@ -12,7 +12,7 @@ import (
 	"orbguard-lab/internal/forensics/models"
 )
 
-const shutdownLimitNote = "shutdown log beyond the line or findings limit"
+const shutdownLimitNote = "shutdown log beyond the line, findings or time limit"
 
 func TestStatusLinesAloneAreNotAShutdownLog(t *testing.T) {
 	p := NewShutdownLogParser(testParserLogger())

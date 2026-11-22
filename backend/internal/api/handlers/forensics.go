@@ -46,9 +46,11 @@ const (
 
 // ForensicsHandler handles forensic analysis endpoints
 type ForensicsHandler struct {
-	service        *forensics.Service
-	logger         *logger.Logger
-	analysisBudget time.Duration
+	service *forensics.Service
+	logger  *logger.Logger
+	// AnalysisBudget is how long one request may spend before it answers with
+	// what it has.
+	AnalysisBudget time.Duration
 }
 
 // NewForensicsHandler creates a new ForensicsHandler
@@ -56,13 +58,13 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 	return &ForensicsHandler{
 		service:        service,
 		logger:         log.WithComponent("forensics-handler"),
-		analysisBudget: forensicAnalysisBudget,
+		AnalysisBudget: forensicAnalysisBudget,
 	}
 }
 
 // analysisContext ends at the analysis budget or when the client goes away.
 func (h *ForensicsHandler) analysisContext(r *http.Request) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(r.Context(), h.analysisBudget)
+	return context.WithTimeout(r.Context(), h.AnalysisBudget)
 }
 
 // readCapped reads at most limit bytes and reports whether r held more.
@@ -177,6 +179,9 @@ func (h *ForensicsHandler) requireServiceCaller(w http.ResponseWriter, r *http.R
 
 // AnalyzeShutdownLog handles POST /api/v1/forensics/analyze/shutdown-log
 func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	var req struct {
 		DeviceID string `json:"device_id"`
 		LogData  string `json:"log_data"`
@@ -191,7 +196,7 @@ func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	result, err := h.service.AnalyzeShutdownLog(r.Context(), []byte(req.LogData), req.DeviceID)
+	result, err := h.service.AnalyzeShutdownLog(ctx, []byte(req.LogData), req.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}
@@ -212,6 +217,9 @@ func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Req
 
 // UploadShutdownLog handles POST /api/v1/forensics/ios/shutdown-log/upload
 func (h *ForensicsHandler) UploadShutdownLog(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	if err := r.ParseMultipartForm(maxSmallUploadBytes); err != nil {
 		http.Error(w, `{"error":"failed to parse form data"}`, http.StatusBadRequest)
 		return
@@ -231,7 +239,7 @@ func (h *ForensicsHandler) UploadShutdownLog(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	result, err := h.service.AnalyzeShutdownLog(r.Context(), data, deviceID)
+	result, err := h.service.AnalyzeShutdownLog(ctx, data, deviceID)
 	if over {
 		result, err = withUnreadRest(result, err, "shutdown log beyond the upload limit")
 	}
@@ -935,6 +943,9 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 
 // QuickCheck handles POST /api/v1/forensics/quick-check
 func (h *ForensicsHandler) QuickCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := h.analysisContext(r)
+	defer cancel()
+
 	var req struct {
 		Platform string `json:"platform"`
 		LogData  string `json:"log_data"`
@@ -944,7 +955,7 @@ func (h *ForensicsHandler) QuickCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.QuickCheck(r.Context(), req.Platform, []byte(req.LogData))
+	result, err := h.service.QuickCheck(ctx, req.Platform, []byte(req.LogData))
 	if respondUnexamined(w, err) {
 		return
 	}

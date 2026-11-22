@@ -160,12 +160,12 @@ func TestTimeBudgetStopsAfterTheRules(t *testing.T) {
 func TestShutdownParseStopsAtTheBudget(t *testing.T) {
 	p := NewShutdownLogParser(testParserLogger())
 	log := bytes.Repeat([]byte("\t\tremaining client pid: 1 (/usr/libexec/a)\n"), 3000)
-	_, err := p.parse(canceledContext(), log)
+	_, err := p.ParseContext(canceledContext(), log)
 	var partly *models.PartlyExaminedError
 	if !errors.As(err, &partly) {
 		t.Fatalf("want a partial answer, got %v", err)
 	}
-	if _, err := p.parse(context.Background(), log); err != nil {
+	if _, err := p.ParseContext(context.Background(), log); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -290,6 +290,9 @@ func TestDirectoryListsWhatItCouldNotRead(t *testing.T) {
 	if err := os.Symlink(filepath.Join(known, "a.log"), filepath.Join(dir, "link")); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Symlink(filepath.Join(dir, "absent"), filepath.Join(dir, "dangling")); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := p.Parse(dir); err != nil {
 		t.Fatalf("a symlink holds no data of its own: %v", err)
 	}
@@ -327,5 +330,27 @@ func TestOversizedDirectoryInAZipIsNotExamined(t *testing.T) {
 	var partly *models.PartlyExaminedError
 	if !errors.As(err, &partly) || !slices.Contains(partly.NotExamined, sysdiagnoseRestOfArchive) {
 		t.Fatalf("want a partial answer, got %v", err)
+	}
+}
+
+func TestShutdownParseChecksTheBudgetOnLongLines(t *testing.T) {
+	p := NewShutdownLogParser(testParserLogger())
+	line := "\t\tremaining client pid: 1 (/usr/libexec/" + strings.Repeat("a", 60*1024) + ")\n"
+	_, err := p.ParseContext(&endsAfter{Context: context.Background(), n: 0}, []byte(strings.Repeat(line, 30)))
+	var partly *models.PartlyExaminedError
+	if !errors.As(err, &partly) {
+		t.Fatalf("want a partial answer, got %v", err)
+	}
+}
+
+func TestDecompressionStopsAtTheBudget(t *testing.T) {
+	x := &sysdiagnoseExtraction{ctx: canceledContext(), unread: make(map[string]bool)}
+	n, err := budgetReader{r: strings.NewReader("data"), x: x}.Read(make([]byte, 4))
+	if n != 0 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("read %d bytes, err %v", n, err)
+	}
+	live := &sysdiagnoseExtraction{ctx: context.Background(), unread: make(map[string]bool)}
+	if n, err := (budgetReader{r: strings.NewReader("data"), x: live}).Read(make([]byte, 4)); n != 4 || err != nil {
+		t.Fatalf("read %d bytes, err %v", n, err)
 	}
 }

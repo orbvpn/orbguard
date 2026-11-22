@@ -113,6 +113,15 @@ var (
 // there, and what was not reached counts as not examined.
 const maxLogcatFindings = 1000
 
+// maxFindingTagBytes bounds the log tag a finding keeps.
+const maxFindingTagBytes = 256
+
+// findingText copies at most n bytes, so a kept finding does not hold on to
+// the whole line it came from.
+func findingText(s string, n int) string {
+	return strings.Clone(truncate(s, n))
+}
+
 // logcatSpywareNames are the names of the known-spyware rules. A line the
 // parser could not read and that holds one is never tolerated as noise.
 var logcatSpywareNames = []string{
@@ -200,7 +209,7 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 
 	lineNum := 0
 	for scanner.Scan() {
-		if lineNum%1024 == 0 && ctx.Err() != nil {
+		if ctx.Err() != nil {
 			stopped = true
 			break
 		}
@@ -220,6 +229,7 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 		if isSuspicious {
 			entry.IsSuspicious = true
 			entry.Reason = reason
+			timestamp := entry.Timestamp
 
 			anomaly := models.Anomaly{
 				ID:          uuid.New().String(),
@@ -229,10 +239,10 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 				Title:       "Suspicious Logcat Entry",
 				Description: reason,
 				ProcessPID:  entry.PID,
-				Timestamp:   &entry.Timestamp,
+				Timestamp:   &timestamp,
 				Evidence: map[string]any{
-					"tag":      entry.Tag,
-					"message":  truncate(entry.Message, 2048),
+					"tag":      findingText(entry.Tag, maxFindingTagBytes),
+					"message":  findingText(entry.Message, 2048),
 					"priority": entry.Priority,
 					"tid":      entry.TID,
 					"tags":     tags,
@@ -250,7 +260,7 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 				Timestamp:    entry.Timestamp,
 				Type:         models.TimelineEventTypeAnomaly,
 				Source:       "logcat",
-				Title:        entry.Tag + ": " + truncate(entry.Message, 50),
+				Title:        truncate(entry.Tag, maxFindingTagBytes) + ": " + truncate(entry.Message, 50),
 				Description:  reason,
 				PID:          entry.PID,
 				IsSuspicious: true,
@@ -321,9 +331,17 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 // Recognises reports whether data reads as a logcat: at least one entry, and
 // recognised lines make up the share RecognisedEnough asks for.
 func (p *LogcatParser) Recognises(data []byte) bool {
+	return p.RecognisesContext(context.Background(), data)
+}
+
+// RecognisesContext is Recognises that answers false once ctx has ended.
+func (p *LogcatParser) RecognisesContext(ctx context.Context, data []byte) bool {
 	var share logcatShare
 	entries := 0
 	for len(data) > 0 {
+		if ctx.Err() != nil {
+			return false
+		}
 		var raw []byte
 		raw, data, _ = bytes.Cut(data, []byte("\n"))
 		line := strings.TrimSuffix(string(raw), "\r")

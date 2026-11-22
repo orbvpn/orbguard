@@ -393,7 +393,7 @@ func (p *SysdiagnoseParser) examineEntry(e sysdiagnoseEntry, x *sysdiagnoseExtra
 	}
 
 	if len(e.content) > 0 && strings.HasPrefix(filepath.Base(e.name), "shutdown.log") {
-		shutdownResult, err := p.shutdownLogParser.parse(x.context(), e.content)
+		shutdownResult, err := p.shutdownLogParser.ParseContext(x.context(), e.content)
 		if err != nil {
 			x.skip(e.name)
 		} else {

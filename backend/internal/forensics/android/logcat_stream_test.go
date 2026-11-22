@@ -100,3 +100,51 @@ func TestStreamFindingEvidenceIsBounded(t *testing.T) {
 		t.Fatalf("evidence holds %d bytes", len(message))
 	}
 }
+
+// cancelAfterBytes ends the context once limit bytes were read.
+type cancelAfterBytes struct {
+	r      io.Reader
+	cancel context.CancelFunc
+	limit  int64
+	read   int64
+}
+
+func (c *cancelAfterBytes) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.read += int64(n)
+	if c.read >= c.limit {
+		c.cancel()
+	}
+	return n, err
+}
+
+func TestStreamChecksTheBudgetOnLongLines(t *testing.T) {
+	line := "11-21 08:12:33.123  1234  5678 I Agent: " + strings.Repeat("y", 60*1024) + "\n"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r := &cancelAfterBytes{r: strings.NewReader(strings.Repeat(line, 300)), cancel: cancel, limit: 1 << 20}
+	_, err := streamParser().ParseStream(ctx, r, 0)
+	assertStreamPartial(t, err)
+	if r.read > 3<<20 {
+		t.Fatalf("read %d bytes after the budget ended at 1 MiB", r.read)
+	}
+}
+
+func TestStreamFindingKeepsNoLongFields(t *testing.T) {
+	tag := strings.Repeat("T", 40*1024)
+	line := "11-21 08:12:33.123  1234  5678 W " + tag + ": pegasus started\n"
+	result, err := streamParser().ParseStream(context.Background(), strings.NewReader(line), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Anomalies) != 1 {
+		t.Fatalf("anomalies: %d", len(result.Anomalies))
+	}
+	got, _ := result.Anomalies[0].Evidence["tag"].(string)
+	if len(got) > 256+3 {
+		t.Fatalf("evidence tag holds %d bytes", len(got))
+	}
+	if len(result.Timeline) != 1 || len(result.Timeline[0].Title) > 256+3+2+50+3 {
+		t.Fatalf("timeline title is unbounded")
+	}
+}
