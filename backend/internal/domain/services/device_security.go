@@ -428,7 +428,7 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 
 		// Upsert refreshes last_seen/is_active and preserves first_seen.
 		if err := s.repo.UpsertSIM(ctx, newSIM); err != nil {
-			return fmt.Errorf("persist SIM %s: %w", newSIM.ICCID, err)
+			return fmt.Errorf("persist SIM: %w", err)
 		}
 
 		if isNew {
@@ -452,7 +452,6 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 
 				s.logger.Warn().
 					Str("device_id", deviceID).
-					Str("iccid", newSIM.ICCID).
 					Str("carrier", newSIM.Carrier).
 					Str("risk", string(event.RiskLevel)).
 					Msg("SIM change alert")
@@ -480,7 +479,7 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 		wasActive := oldSIM.IsActive
 
 		if err := s.repo.MarkSIMAbsent(ctx, deviceID, oldSIM.ICCID); err != nil {
-			return fmt.Errorf("mark SIM absent %s: %w", oldSIM.ICCID, err)
+			return fmt.Errorf("mark SIM absent: %w", err)
 		}
 
 		if wasActive {
@@ -501,7 +500,6 @@ func (s *DeviceSecurityService) ReportSIMInfo(ctx context.Context, deviceID stri
 
 			s.logger.Warn().
 				Str("device_id", deviceID).
-				Str("iccid", oldSIM.ICCID).
 				Msg("SIM removed alert")
 		}
 	}
