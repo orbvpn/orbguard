@@ -521,6 +521,7 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 
 	// Score and store new indicators
 	storeFailures := 0
+	events := newThreatEventCap(conn)
 	for _, indicator := range dedupResult.NewIndicators {
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
 		if a.repository != nil {
@@ -536,12 +537,14 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 		a.deduplicator.MarkSeen(ctx, indicator.ValueHash)
 
 		// Publish real-time event for new threat
-		if a.publisher != nil {
+		if a.publisher != nil && events.allow() {
 			if err := a.publisher.PublishNewThreat(ctx, indicator, source.Slug, source.Name); err != nil {
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
 	}
+
+	events.logSuppressed(log)
 
 	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
 		a.recordStoreFailure(ctx, source, err)
@@ -666,6 +669,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 
 	// Score and store new indicators
 	storeFailures := 0
+	events := newThreatEventCap(conn)
 	for _, indicator := range dedupResult.NewIndicators {
 		// Score the indicator
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
@@ -684,12 +688,14 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		a.deduplicator.MarkSeen(ctx, indicator.ValueHash)
 
 		// Publish real-time event for new threat
-		if a.publisher != nil {
+		if a.publisher != nil && events.allow() {
 			if err := a.publisher.PublishNewThreat(ctx, indicator, conn.Slug(), conn.Slug()); err != nil {
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
 	}
+
+	events.logSuppressed(log)
 
 	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
 		a.recordStoreFailure(ctx, a.sourceRowBySlug(ctx, conn.Slug()), err)
@@ -785,6 +791,42 @@ func (a *Aggregator) recordFetchSuccess(ctx context.Context, slug string) {
 // rowTakesFetchResult is false for a row an operator paused or disabled.
 func rowTakesFetchResult(row *models.Source) bool {
 	return row.Status == models.SourceStatusActive || row.Status == models.SourceStatusError
+}
+
+// maxTrackedFeedThreatEvents limits the live new-threat events of one fetch of
+// a feed that tracks its source row. Every row is still stored.
+const maxTrackedFeedThreatEvents = 100
+
+// threatEventCap counts the live new-threat events of one fetch.
+type threatEventCap struct {
+	limited    bool
+	published  int
+	suppressed int
+}
+
+func newThreatEventCap(conn SourceConnector) *threatEventCap {
+	tracker, ok := conn.(sourceRowTracker)
+	return &threatEventCap{limited: ok && tracker.TracksSourceRow()}
+}
+
+// allow reports whether the next stored indicator may be announced.
+func (c *threatEventCap) allow() bool {
+	if c.limited && c.published >= maxTrackedFeedThreatEvents {
+		c.suppressed++
+		return false
+	}
+	c.published++
+	return true
+}
+
+func (c *threatEventCap) logSuppressed(log *logger.Logger) {
+	if c.suppressed == 0 {
+		return
+	}
+	log.Info().
+		Int("published", c.published).
+		Int("suppressed", c.suppressed).
+		Msg("new threat events capped for this fetch")
 }
 
 // storedNothing returns an error when a tracked feed had new indicators and
