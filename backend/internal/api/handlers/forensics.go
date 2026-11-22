@@ -30,6 +30,11 @@ const (
 	// maxSmallUploadBytes caps small text uploads (shutdown.log, logcat).
 	maxSmallUploadBytes = 10 << 20
 
+	// maxForensicJSONBytes caps a JSON analysis request. The app sends at most
+	// a pasted log or 2000 captured logcat lines (well under 1 MiB); this is the
+	// same 10 MiB the log upload routes accept.
+	maxForensicJSONBytes = 10 << 20
+
 	// maxBugreportParseBytes caps how much bugreport/logcat text is handed
 	// to the parser (which operates on an in-memory byte slice).
 	maxBugreportParseBytes = 256 << 20
@@ -186,8 +191,7 @@ func (h *ForensicsHandler) AnalyzeShutdownLog(w http.ResponseWriter, r *http.Req
 		DeviceID string `json:"device_id"`
 		LogData  string `json:"log_data"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -269,8 +273,7 @@ func (h *ForensicsHandler) AnalyzeBackup(w http.ResponseWriter, r *http.Request)
 		DeviceID   string `json:"device_id"`
 		BackupPath string `json:"backup_path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -300,8 +303,7 @@ func (h *ForensicsHandler) AnalyzeDataUsage(w http.ResponseWriter, r *http.Reque
 		DeviceID string `json:"device_id"`
 		DBPath   string `json:"db_path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -335,8 +337,7 @@ func (h *ForensicsHandler) AnalyzeSysdiagnose(w http.ResponseWriter, r *http.Req
 		DeviceID    string `json:"device_id"`
 		ArchivePath string `json:"archive_path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -363,8 +364,7 @@ func (h *ForensicsHandler) AnalyzeLogcat(w http.ResponseWriter, r *http.Request)
 		DeviceID string `json:"device_id"`
 		LogData  string `json:"log_data"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -891,8 +891,7 @@ func (h *ForensicsHandler) FullAnalysis(w http.ResponseWriter, r *http.Request) 
 		SysdiagnosePath string `json:"sysdiagnose_path,omitempty"`
 		IncludeTimeline bool   `json:"include_timeline"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
@@ -950,8 +949,7 @@ func (h *ForensicsHandler) QuickCheck(w http.ResponseWriter, r *http.Request) {
 		Platform string `json:"platform"`
 		LogData  string `json:"log_data"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+	if !readJSONBody(w, r, maxForensicJSONBytes, &req) {
 		return
 	}
 
