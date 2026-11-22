@@ -346,3 +346,14 @@ func TestDecompressionStopsAtTheBudget(t *testing.T) {
 		t.Fatalf("read %d bytes, err %v", n, err)
 	}
 }
+
+func TestShutdownRecognisesNeedsThreeEntries(t *testing.T) {
+	p := NewShutdownLogParser(testParserLogger())
+	line := "\t\tremaining client pid: 1 (/usr/libexec/a)\n"
+	if p.Recognises([]byte(strings.Repeat(line, models.MinLogEntries-1))) {
+		t.Fatal("too few entries must not count as a log")
+	}
+	if !p.Recognises([]byte(strings.Repeat(line, models.MinLogEntries))) {
+		t.Fatal("the minimum number of entries must count as a log")
+	}
+}

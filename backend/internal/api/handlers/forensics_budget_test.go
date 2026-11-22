@@ -129,6 +129,7 @@ func TestEveryAnalysisRouteStopsAtTheBudget(t *testing.T) {
 		"shutdown text":      {h.AnalyzeShutdownLog, jsonReq("/a", map[string]any{"log_data": budgetShutdown}), shutdownStopNote},
 		"shutdown upload":    {h.UploadShutdownLog, uploadReq("/us", "shutdown.log", []byte(budgetShutdown)), shutdownStopNote},
 		"quick check":        {h.QuickCheck, jsonReq("/q", map[string]any{"platform": "android", "log_data": budgetLogcat}), quickStopNote},
+		"quick check of ios": {h.QuickCheck, jsonReq("/qi", map[string]any{"platform": "ios", "log_data": budgetShutdown}), quickStopNote},
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
