@@ -479,8 +479,10 @@ func TestFetchThatStoredNothingIsAFailedFetch(t *testing.T) {
 		if err := agg.RunSource(context.Background(), "plain"); err != nil {
 			t.Fatal(err)
 		}
-		if len(repo.afterFetch) != 1 || repo.afterError != 0 {
-			t.Fatalf("afterFetch=%d afterError=%d", len(repo.afterFetch), repo.afterError)
+		// All stores failing is no failure for a connector that does not
+		// track its row; with no row there is nothing to write.
+		if len(repo.afterSuccess) != 0 || repo.afterError != 0 {
+			t.Fatalf("afterSuccess=%d afterError=%d", len(repo.afterSuccess), repo.afterError)
 		}
 	})
 }
@@ -511,11 +513,12 @@ func TestOtherConnectorsKeepTheirSourceRowBehaviour(t *testing.T) {
 		return agg
 	}
 
+	// No row: the success is looked up and nothing is written.
 	repo := &feedRowRepo{}
 	if err := newAgg(repo, plainFeed{}).RunSource(context.Background(), "plain"); err != nil {
 		t.Fatal(err)
 	}
-	if repo.lookups != 0 || len(repo.afterSuccess) != 0 || len(repo.afterFetch) != 1 || repo.afterFetch[0] != uuid.Nil {
+	if repo.lookups != 1 || len(repo.afterSuccess) != 0 || len(repo.afterFetch) != 0 {
 		t.Fatalf("lookups=%d afterSuccess=%d afterFetch=%v", repo.lookups, len(repo.afterSuccess), repo.afterFetch)
 	}
 
@@ -527,6 +530,40 @@ func TestOtherConnectorsKeepTheirSourceRowBehaviour(t *testing.T) {
 	}
 	if repo.planLimited != 0 || repo.lookups != 0 {
 		t.Fatalf("planLimited=%d lookups=%d", repo.planLimited, repo.lookups)
+	}
+}
+
+// A row the due tick left in status error (four failed ticks) is cleared by a
+// later success on the Scheduler path, for a connector that does not track its
+// row too; otherwise the tick, which skips error rows, would never fetch it
+// again. A paused or disabled row is left alone.
+func TestSchedulerSuccessClearsAnErrorRowOfAnyConnector(t *testing.T) {
+	rc := feedRowRedis(t)
+	log := feedRowLog()
+	for _, status := range []models.SourceStatus{models.SourceStatusError, models.SourceStatusPaused, models.SourceStatusDisabled} {
+		old := "provider down"
+		row := &models.Source{ID: uuid.New(), Slug: "plain", Name: "Plain", Status: status, LastError: &old, ErrorCount: 4}
+		repo := &feedRowRepo{row: row}
+		agg := NewAggregator(config.AggregationConfig{}, repo, NewNormalizer(log),
+			NewDeduplicator(rc, log), NewScorer(config.ScoringConfig{}, log), rc, log)
+		agg.RegisterConnector(plainFeed{})
+		s := NewScheduler(agg, rc, log)
+
+		job := s.ScheduleNow("plain")
+		s.executeJob(context.Background(), job)
+		if !job.Result.Success {
+			t.Fatalf("%s: job failed: %+v", status, job.Result)
+		}
+		if status == models.SourceStatusError {
+			if len(repo.afterSuccess) != 1 || repo.afterSuccess[0] != row.ID ||
+				repo.row.Status != models.SourceStatusActive || repo.row.ErrorCount != 0 || repo.row.LastError != nil {
+				t.Fatalf("error row not cleared: writes=%v status=%s errors=%d", repo.afterSuccess, repo.row.Status, repo.row.ErrorCount)
+			}
+			continue
+		}
+		if len(repo.afterSuccess) != 0 || repo.row.Status != status {
+			t.Fatalf("%s row was rewritten: writes=%v status=%s", status, repo.afterSuccess, repo.row.Status)
+		}
 	}
 }
 

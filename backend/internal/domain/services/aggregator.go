@@ -110,8 +110,10 @@ type fetchBlockedError interface {
 // fetchBlockedRowMarker is part of the text of every fetchBlockedError.
 const fetchBlockedRowMarker = " fetch blocked: "
 
-// sourceRowTracker is implemented by connectors that want their source row
-// kept current on the fetch path that has no row at hand.
+// sourceRowTracker is implemented by connectors that want failures recorded on
+// their source row on the fetch path that has no row at hand (a blocked feed,
+// a fetch that stored nothing), and their live events capped. A success is
+// recorded on every connector's row (recordFetchSuccess).
 type sourceRowTracker interface {
 	TracksSourceRow() bool
 }
@@ -652,6 +654,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("fetch completed")
 
 	if len(fetchResult.RawIndicators) == 0 {
+		a.recordFetchSuccess(ctx, conn.Slug())
 		return nil
 	}
 
@@ -720,14 +723,13 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		}
 	}
 
-	// Update source metadata
-	if a.repository != nil {
-		if tracker, ok := conn.(sourceRowTracker); ok && tracker.TracksSourceRow() {
-			a.recordFetchSuccess(ctx, conn.Slug())
-		} else {
-			_ = a.repository.UpdateSourceAfterFetch(ctx, fetchResult.SourceID)
-		}
-	}
+	// Update source metadata. Every connector's row takes the success: the
+	// due tick skips a row in status error, so without this a source that
+	// failed four ticks in a row would never leave error, however often the
+	// Scheduler fetched it. (The old call for connectors that do not track
+	// their row passed fetchResult.SourceID, which is never set, and so
+	// updated no row.)
+	a.recordFetchSuccess(ctx, conn.Slug())
 
 	// Increment sync version for mobile apps
 	_, _ = a.cache.IncrementSyncVersion(ctx)
@@ -781,9 +783,12 @@ func (a *Aggregator) recordFetchBlocked(ctx context.Context, row *models.Source,
 	}
 }
 
-// recordFetchSuccess clears a tracked feed's row after a fetch that delivered
-// data, so a feed that recovered returns to the due list. A row an operator
-// paused or disabled is left alone.
+// recordFetchSuccess clears a connector's row after a successful fetch on the
+// path that has no row at hand (Scheduler, manual run, boot run): status
+// active, error_count 0, next_fetch one interval on. A feed that recovered
+// returns to the due list, and the due tick does not fetch it again within
+// the interval. A row an operator paused or disabled is left alone; a
+// connector with no row writes nothing.
 func (a *Aggregator) recordFetchSuccess(ctx context.Context, slug string) {
 	row := a.sourceRowBySlug(ctx, slug)
 	if row == nil {

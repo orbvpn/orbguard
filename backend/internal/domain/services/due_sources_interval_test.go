@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -236,6 +237,62 @@ func TestDueTickFetchesOnlyTheSourcesTheDatabaseSaysAreDue(t *testing.T) {
 			}
 			if got := calls(); got["fast"] != 1 || got["slow"] != 1 || got["later"] != 0 || got["norow"] != 0 {
 				t.Fatalf("second tick with nothing due fetched %v", got)
+			}
+		})
+	}
+}
+
+// A source that fails four due ticks goes to status error and leaves the
+// tick. A later success on the Scheduler path must bring the row back.
+func TestErrorRowReturnsToTheTickAfterASchedulerSuccess(t *testing.T) {
+	for _, ct := range intervalColumnTypes {
+		t.Run(ct.name, func(t *testing.T) {
+			pool := intervalTestDB(t, ct.alter)
+			ctx := context.Background()
+			id := insertSourceRow(t, pool, "flaky", "'15 minutes'", "NULL")
+			conn := &stubConnector{slug: "flaky", err: errors.New("stream error: stream ID 1; INTERNAL_ERROR; received from peer")}
+			agg := NewAggregator(config.AggregationConfig{}, repository.NewRepositories(pool).AggregatorAdapter,
+				nil, nil, nil, nil, logger.NewDefault())
+			agg.RegisterConnector(conn)
+
+			row := func() (string, int) {
+				var status string
+				var errs int
+				if err := pool.QueryRow(ctx, `SELECT status::text, error_count FROM sources WHERE id = $1`, id).Scan(&status, &errs); err != nil {
+					t.Fatal(err)
+				}
+				return status, errs
+			}
+			for i := 1; i <= 4; i++ {
+				if _, err := pool.Exec(ctx, `UPDATE sources SET next_fetch = now() - interval '1 minute' WHERE id = $1`, id); err != nil {
+					t.Fatal(err)
+				}
+				if err := agg.runDueSources(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if status, errs := row(); status != "error" || errs != 4 {
+				t.Fatalf("after four failed ticks: status=%s error_count=%d", status, errs)
+			}
+			if _, err := pool.Exec(ctx, `UPDATE sources SET next_fetch = now() - interval '1 minute' WHERE id = $1`, id); err != nil {
+				t.Fatal(err)
+			}
+			if err := agg.runDueSources(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if n := conn.calls.Load(); n != 4 {
+				t.Fatalf("the tick fetched an error row: %d calls", n)
+			}
+
+			conn.err = nil
+			if err := agg.RunSource(ctx, "flaky"); err != nil {
+				t.Fatalf("Scheduler-path fetch: %v", err)
+			}
+			if status, errs := row(); status != "active" || errs != 0 {
+				t.Fatalf("after a Scheduler success: status=%s error_count=%d", status, errs)
+			}
+			if s := secondsUntilNextFetch(t, pool, id); !near(s, 15*time.Minute) {
+				t.Fatalf("after a Scheduler success next_fetch is %.0fs away, want 900", s)
 			}
 		})
 	}
