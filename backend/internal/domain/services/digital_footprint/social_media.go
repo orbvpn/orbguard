@@ -81,7 +81,7 @@ func (s *SocialMediaScanner) Scan(ctx context.Context, req SocialScanRequest) ([
 				finding, err := s.checkPlatform(ctx, platform, profile, req)
 				if err != nil {
 					s.logger.Debug().
-						Err(err).
+						Str("reason", lookupFailure(err)).
 						Str("platform", platform.Name).
 						Msg("platform check failed")
 					continue

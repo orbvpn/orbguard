@@ -2,15 +2,18 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"orbguard-lab/internal/api/middleware"
+	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
@@ -20,6 +23,10 @@ const (
 	authAPIKeyTTL       = 365 * 24 * time.Hour
 	authSessionTokenTTL = 24 * time.Hour
 	authRefreshTokenTTL = 30 * 24 * time.Hour
+
+	// deviceRegistrationsPerDay limits new credentials per client address and
+	// UTC day. IPv6 counts per /48, the range one site can rotate through.
+	deviceRegistrationsPerDay = 30
 )
 
 // refreshClaims is the payload stored under auth:refresh:<token>. It tracks
@@ -30,6 +37,17 @@ type refreshClaims struct {
 	DeviceID  string    `json:"device_id,omitempty"`
 	Token     string    `json:"token,omitempty"`
 	ExpiresAt time.Time `json:"expires_at"`
+	// KeySince and IssuedFrom carry the origin of the device's key across a
+	// refresh.
+	KeySince   time.Time `json:"key_since,omitempty"`
+	IssuedFrom string    `json:"issued_from,omitempty"`
+}
+
+// credentialOrigin is when a device's first key was issued and the network tag
+// it was issued on. It stays with one device id.
+type credentialOrigin struct {
+	since  time.Time
+	issuer string
 }
 
 // AuthHandler handles authentication endpoints
@@ -87,25 +105,29 @@ func authGenerateToken(length int) string {
 // issueSession creates a session token + refresh token pair for the given
 // identity and stores both in Redis with the canonical TokenClaims shape the
 // auth middleware validates against.
-func (h *AuthHandler) issueSession(r *http.Request, userID, deviceID string) (token, refreshToken string, tokenExpiresAt time.Time, err error) {
+func (h *AuthHandler) issueSession(r *http.Request, userID, deviceID string, origin credentialOrigin) (token, refreshToken string, tokenExpiresAt time.Time, err error) {
 	token = authGenerateToken(32)
 	refreshToken = authGenerateToken(48)
 	now := time.Now().UTC()
 	tokenExpiresAt = now.Add(authSessionTokenTTL)
 
 	if err = h.cache.SetJSON(r.Context(), "auth:token:"+token, middleware.TokenClaims{
-		UserID:    userID,
-		DeviceID:  deviceID,
-		ExpiresAt: tokenExpiresAt,
+		UserID:     userID,
+		DeviceID:   deviceID,
+		ExpiresAt:  tokenExpiresAt,
+		KeySince:   origin.since,
+		IssuedFrom: origin.issuer,
 	}, authSessionTokenTTL); err != nil {
 		return "", "", time.Time{}, err
 	}
 
 	if err = h.cache.SetJSON(r.Context(), "auth:refresh:"+refreshToken, refreshClaims{
-		UserID:    userID,
-		DeviceID:  deviceID,
-		Token:     token,
-		ExpiresAt: now.Add(authRefreshTokenTTL),
+		UserID:     userID,
+		DeviceID:   deviceID,
+		Token:      token,
+		ExpiresAt:  now.Add(authRefreshTokenTTL),
+		KeySince:   origin.since,
+		IssuedFrom: origin.issuer,
 	}, authRefreshTokenTTL); err != nil {
 		return "", "", time.Time{}, err
 	}
@@ -187,7 +209,8 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn().Err(err).Msg("failed to delete used refresh token")
 	}
 
-	newToken, newRefreshToken, _, err := h.issueSession(r, claims.UserID, claims.DeviceID)
+	newToken, newRefreshToken, _, err := h.issueSession(r, claims.UserID, claims.DeviceID,
+		credentialOrigin{since: claims.KeySince, issuer: claims.IssuedFrom})
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to store rotated session tokens")
 		http.Error(w, `{"error":"failed to refresh token"}`, http.StatusInternalServerError)
@@ -242,6 +265,66 @@ func (h *AuthHandler) callerHoldsDeviceKey(r *http.Request, deviceID string) boo
 	return claims.DeviceID != "" && claims.DeviceID == deviceID
 }
 
+// heldCredentialOrigin reports whether the request presents a live API key or
+// session token of this device id, and returns that credential's origin. The
+// service secret is not a credential of a device. If Redis cannot answer, the
+// caller is not proven and takes the charged path.
+//
+// A session from before origins were recorded proves the device but has a
+// zero origin.
+func (h *AuthHandler) heldCredentialOrigin(r *http.Request, deviceID string) (credentialOrigin, bool) {
+	parts := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") || parts[1] == "" || h.cache == nil {
+		return credentialOrigin{}, false
+	}
+	for _, prefix := range []string{"auth:apikey:", "auth:token:"} {
+		var claims middleware.TokenClaims
+		if err := h.cache.GetJSON(r.Context(), prefix+parts[1], &claims); err != nil {
+			continue
+		}
+		if claims.DeviceID == "" || claims.DeviceID != deviceID {
+			continue
+		}
+		if !claims.ExpiresAt.IsZero() && time.Now().UTC().After(claims.ExpiresAt) {
+			continue
+		}
+		origin := credentialOrigin{since: claims.KeySince, issuer: claims.IssuedFrom}
+		if origin.since.IsZero() && prefix == "auth:apikey:" && !claims.ExpiresAt.IsZero() {
+			origin.since = claims.ExpiresAt.Add(-authAPIKeyTTL)
+		}
+		return origin, true
+	}
+	return credentialOrigin{}, false
+}
+
+// refuseRegistration takes one unit of the address's daily allowance. It
+// answers the request and returns true when none is left or the count cannot
+// be read; a refused request takes nothing. Registration stores its credential
+// in Redis, so without Redis it could not complete in any case.
+func (h *AuthHandler) refuseRegistration(w http.ResponseWriter, r *http.Request) bool {
+	now := time.Now().UTC()
+	sum := sha256.Sum256([]byte(middleware.ClientSite(r)))
+	key := "auth:device-registrations:{" + now.Format("20060102") + "}:" + hex.EncodeToString(sum[:12])
+	exhausted, err := h.cache.ReserveQuota(r.Context(), []string{key}, []int64{deviceRegistrationsPerDay}, 48*time.Hour)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("device registration limit could not be read")
+		writeRegistrationRefusal(w, http.StatusServiceUnavailable, "device registration is temporarily unavailable")
+		return true
+	}
+	if exhausted != 0 {
+		w.Header().Set("Retry-After", strconv.FormatInt(int64(services.PaidLookupRetryAfter(now)/time.Second)+1, 10))
+		writeRegistrationRefusal(w, http.StatusTooManyRequests, "too many device registrations from this network today, please try again tomorrow")
+		return true
+	}
+	return false
+}
+
+func writeRegistrationRefusal(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
 // RegisterDevice handles POST /api/v1/auth/device
 func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -292,6 +375,14 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	origin, holder := h.heldCredentialOrigin(r, req.DeviceID)
+	if !holder && h.refuseRegistration(w, r) {
+		return
+	}
+	if origin.since.IsZero() {
+		origin = credentialOrigin{since: time.Now().UTC(), issuer: middleware.KeyIssuerTag(r)}
+	}
+
 	apiKey := authGenerateToken(32)
 	expiresAt := time.Now().UTC().Add(authAPIKeyTTL)
 
@@ -340,8 +431,10 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	// Store the API key with the canonical claims shape the auth middleware
 	// validates (auth:apikey:<key> -> {device_id, expires_at}).
 	if err := h.cache.SetJSON(r.Context(), "auth:apikey:"+apiKey, middleware.TokenClaims{
-		DeviceID:  req.DeviceID,
-		ExpiresAt: expiresAt,
+		DeviceID:   req.DeviceID,
+		ExpiresAt:  expiresAt,
+		IssuedFrom: origin.issuer,
+		KeySince:   origin.since,
 	}, authAPIKeyTTL); err != nil {
 		h.logger.Error().Err(err).Str("device_id", req.DeviceID).Msg("failed to store API key")
 		http.Error(w, `{"error":"failed to register device"}`, http.StatusInternalServerError)
@@ -350,7 +443,7 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 
 	// Also issue a short-lived session token + refresh token so the full
 	// token lifecycle (refresh rotation) is available to device clients.
-	token, refreshToken, _, err := h.issueSession(r, "", req.DeviceID)
+	token, refreshToken, _, err := h.issueSession(r, "", req.DeviceID, origin)
 	if err != nil {
 		h.logger.Error().Err(err).Str("device_id", req.DeviceID).Msg("failed to store session tokens")
 		http.Error(w, `{"error":"failed to register device"}`, http.StatusInternalServerError)

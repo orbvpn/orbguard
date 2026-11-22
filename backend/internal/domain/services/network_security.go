@@ -840,7 +840,7 @@ func (s *NetworkSecurityService) verifyClientCanaryResolutions(ctx context.Conte
 		for _, raw := range res.ResolvedIPs {
 			ip := net.ParseIP(strings.TrimSpace(raw))
 			if ip == nil {
-				s.logger.Warn().Str("canary", canary).Str("value", raw).Msg("client submitted unparseable canary answer; skipping")
+				s.logger.Warn().Str("canary", canary).Int("value_len", len(raw)).Msg("client submitted unparseable canary answer; skipping")
 				continue
 			}
 			if known[ip.String()] {

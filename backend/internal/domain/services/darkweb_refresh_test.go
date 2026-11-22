@@ -64,27 +64,27 @@ type fakeRefreshLock struct {
 	releaseCtxErr error
 }
 
-func (l *fakeRefreshLock) AcquireLock(context.Context, string, time.Duration) (bool, error) {
+func (l *fakeRefreshLock) AcquireOwnedLock(context.Context, string, time.Duration) (string, bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.acquires++
 	if l.acquireErr != nil {
-		return false, l.acquireErr
+		return "", false, l.acquireErr
 	}
 	if l.held {
-		return false, nil
+		return "", false, nil
 	}
 	l.held = true
-	return true, nil
+	return "fake-owner", true, nil
 }
 
-func (l *fakeRefreshLock) ReleaseLock(ctx context.Context, _ string) error {
+func (l *fakeRefreshLock) ReleaseOwnedLock(ctx context.Context, _, _ string) (bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.releases++
 	l.releaseCtxErr = ctx.Err()
 	l.held = false
-	return nil
+	return true, nil
 }
 
 func (l *fakeRefreshLock) snapshot() (held bool, releases int) {

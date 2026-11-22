@@ -5,9 +5,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -52,7 +54,7 @@ func (s *DarkWebScanner) Scan(ctx context.Context, email, phone string) ([]model
 	if email != "" {
 		hibpBreaches, err := s.checkHIBP(ctx, email)
 		if err != nil {
-			s.logger.Warn().Err(err).Str("email", maskEmail(email)).Msg("HIBP check failed")
+			s.logger.Warn().Str("reason", lookupFailure(err)).Str("email", maskEmail(email)).Msg("HIBP check failed")
 		} else {
 			breaches = append(breaches, hibpBreaches...)
 
@@ -78,39 +80,32 @@ func (s *DarkWebScanner) Scan(ctx context.Context, email, phone string) ([]model
 		}
 	}
 
-	// Check for password exposure using k-anonymity
-	if email != "" {
-		pwned, count, err := s.checkPasswordPwned(ctx, email)
-		if err != nil {
-			s.logger.Warn().Err(err).Msg("password pwned check failed")
-		} else if pwned {
-			exposures = append(exposures, models.DataExposure{
-				ID:           uuid.New(),
-				Type:         models.ExposureTypePassword,
-				Severity:     models.ExposureSeverityCritical,
-				Source:       models.ExposureSourceBreach,
-				SourceName:   "Password Breach Database",
-				ExposedValue: "********",
-				Context:      fmt.Sprintf("Password appeared in %d breaches", count),
-				FirstSeen:    time.Now().AddDate(-1, 0, 0), // Approximate
-				LastSeen:     time.Now(),
-				CanAutoRemove: false,
-				CreatedAt:    time.Now(),
-			})
-		}
-	}
-
 	// Check paste sites
 	if email != "" {
 		pasteExposures, err := s.checkPasteSites(ctx, email)
 		if err != nil {
-			s.logger.Warn().Err(err).Msg("paste site check failed")
+			s.logger.Warn().Str("reason", lookupFailure(err)).Msg("paste site check failed")
 		} else {
 			exposures = append(exposures, pasteExposures...)
 		}
 	}
 
 	return breaches, exposures, nil
+}
+
+// lookupFailure names why an outside lookup failed. It never returns the error
+// text: a url.Error quotes the request URL, which holds what was searched for.
+func lookupFailure(err error) string {
+	var urlErr *neturl.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.As(err, &urlErr):
+		return "unreachable"
+	}
+	return "failed"
 }
 
 // HIBPBreach represents a breach from Have I Been Pwned
@@ -206,51 +201,6 @@ func (s *DarkWebScanner) checkHIBP(ctx context.Context, email string) ([]models.
 	}
 
 	return breaches, nil
-}
-
-// checkPasswordPwned checks if a password hash appears in breaches
-func (s *DarkWebScanner) checkPasswordPwned(ctx context.Context, password string) (bool, int, error) {
-	// Use k-anonymity model - only send first 5 chars of SHA1 hash
-	hash := sha1.Sum([]byte(password))
-	hashStr := strings.ToUpper(hex.EncodeToString(hash[:]))
-	prefix := hashStr[:5]
-	suffix := hashStr[5:]
-
-	url := fmt.Sprintf("https://api.pwnedpasswords.com/range/%s", prefix)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return false, 0, err
-	}
-
-	req.Header.Set("User-Agent", "OrbGuard-Security-Scanner")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return false, 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return false, 0, fmt.Errorf("pwnedpasswords API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, 0, err
-	}
-
-	// Search for our suffix in the response
-	lines := strings.Split(string(body), "\n")
-	for _, line := range lines {
-		parts := strings.Split(strings.TrimSpace(line), ":")
-		if len(parts) == 2 && parts[0] == suffix {
-			var count int
-			fmt.Sscanf(parts[1], "%d", &count)
-			return true, count, nil
-		}
-	}
-
-	return false, 0, nil
 }
 
 // checkPasteSites checks paste sites for exposed data

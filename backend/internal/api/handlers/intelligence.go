@@ -684,7 +684,6 @@ func (h *IntelligenceHandler) Report(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.logger.Error().Err(err).
-			Str("value", req.IndicatorValue).
 			Str("type", string(req.IndicatorType)).
 			Msg("failed to store threat report")
 		h.respondError(w, http.StatusInternalServerError, "failed to store report")
@@ -693,7 +692,6 @@ func (h *IntelligenceHandler) Report(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info().
 		Str("report_id", report.ID.String()).
-		Str("value", req.IndicatorValue).
 		Str("type", string(req.IndicatorType)).
 		Msg("stored threat report")
 

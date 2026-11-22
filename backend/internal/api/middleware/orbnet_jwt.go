@@ -42,6 +42,10 @@ type OrbNetClaims struct {
 	UserID            int64  `json:"user_id"`
 	Role              string `json:"role"`
 	SubscriptionValid bool   `json:"subscription_valid"`
+	// IsAdSupported marks the free plan.
+	IsAdSupported bool `json:"is_ad_supported,omitempty"`
+	// PaymentGateway is how the subscription was obtained.
+	PaymentGateway string `json:"payment_gateway,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -79,4 +83,28 @@ func verifyOrbNetJWT(tokenStr string) (*OrbNetClaims, bool) {
 		return nil, false
 	}
 	return claims, true
+}
+
+// paidGateways are the OrbNet gateways where a person paid real money. Free,
+// gift, manual, reseller and token grants are absent on purpose, and so is an
+// empty value: several grant paths leave the gateway unset.
+var paidGateways = map[string]bool{
+	"STRIPE":         true,
+	"APPLE_STORE":    true,
+	"GOOGLE_PLAY":    true,
+	"AMAZON_STORE":   true,
+	"PAYPAL":         true,
+	"COINBASE":       true,
+	"PARSPAL":        true,
+	"COIN_PAYMENT":   true,
+	"NOW_PAYMENT":    true,
+	"YANDEX_PAY":     true,
+	"TELEGRAM_STARS": true,
+	"CARD_TRANSFER":  true,
+}
+
+// IsPaying reports whether the token shows a valid plan paid for with money.
+// subscription_valid alone does not: free plans are valid subscriptions.
+func (c OrbNetClaims) IsPaying() bool {
+	return c.SubscriptionValid && !c.IsAdSupported && paidGateways[c.PaymentGateway]
 }

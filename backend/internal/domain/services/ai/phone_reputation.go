@@ -3,8 +3,8 @@ package ai
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -22,6 +22,10 @@ type PhoneReputationService struct {
 	cacheMu       sync.RWMutex
 	cacheExpiry   time.Duration
 	knownScamNumbers map[string]ScamNumberInfo
+
+	// reports holds user reports apart from cache, so a report can never
+	// overwrite what a lookup found.
+	reports PhoneReportStore
 }
 
 // PhoneReputationConfig contains configuration for phone reputation service
@@ -77,6 +81,8 @@ type PhoneReputation struct {
 	// Metadata
 	CheckedAt       time.Time        `json:"checked_at"`
 	DataSources     []string         `json:"data_sources,omitempty"`
+	// UnavailableSources names lookups that could not answer this time.
+	UnavailableSources []string `json:"unavailable_sources,omitempty"`
 	Confidence      float64          `json:"confidence"`
 }
 
@@ -123,6 +129,7 @@ func NewPhoneReputationService(log *logger.Logger, config PhoneReputationConfig)
 		cache:            make(map[string]*PhoneReputation),
 		cacheExpiry:      config.CacheTTL,
 		knownScamNumbers: make(map[string]ScamNumberInfo),
+		reports:          newMemPhoneReports(),
 	}
 
 	if config.CacheTTL == 0 {
@@ -183,7 +190,7 @@ func (s *PhoneReputationService) Lookup(ctx context.Context, phoneNumber string)
 
 	// Check cache first
 	if cached := s.getFromCache(normalized); cached != nil {
-		return cached, nil
+		return s.withCommunityReports(ctx, normalized, cached), nil
 	}
 
 	reputation := &PhoneReputation{
@@ -216,7 +223,7 @@ func (s *PhoneReputationService) Lookup(ctx context.Context, phoneNumber string)
 	// Cache the result
 	s.addToCache(normalized, reputation)
 
-	return reputation, nil
+	return s.withCommunityReports(ctx, normalized, reputation), nil
 }
 
 // normalizeNumber normalizes a phone number
@@ -271,6 +278,14 @@ func (s *PhoneReputationService) checkLocalDatabase(number string, reputation *P
 			return
 		}
 	}
+}
+
+// CountryCodeOf is the country code of a number from its prefix, with no
+// outside lookup. It is empty when the number is not recognised.
+func (s *PhoneReputationService) CountryCodeOf(number string) string {
+	var reputation PhoneReputation
+	s.validateNumber(s.normalizeNumber(number), &reputation)
+	return reputation.CountryCode
 }
 
 // validateNumber validates the phone number format
@@ -370,29 +385,48 @@ func (s *PhoneReputationService) checkVoIP(number string, reputation *PhoneReput
 	}
 }
 
-// queryNumverify queries the Numverify API
+// queryNumverify queries the Numverify API over HTTPS only. The request URL
+// holds the key and the number, and Go's url.Error prints the whole URL, so no
+// error from this call is ever logged or returned. A failed lookup leaves the
+// local result as it was and names the source as unavailable.
 func (s *PhoneReputationService) queryNumverify(ctx context.Context, number string, reputation *PhoneReputation) {
+	unavailable := func(reason string) {
+		s.logger.Warn().Str("reason", reason).Msg("Numverify lookup unavailable")
+		reputation.UnavailableSources = append(reputation.UnavailableSources, "numverify")
+	}
+
 	// Remove + for Numverify API
-	cleanNumber := strings.TrimPrefix(number, "+")
-
-	url := fmt.Sprintf("http://apilayer.net/api/validate?access_key=%s&number=%s&format=1",
-		s.config.NumverifyAPIKey, cleanNumber)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	query := url.Values{
+		"access_key": {s.config.NumverifyAPIKey},
+		"number":     {strings.TrimPrefix(number, "+")},
+		"format":     {"1"},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://apilayer.net/api/validate?"+query.Encode(), nil)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to create Numverify request")
+		unavailable("request")
 		return
 	}
 
-	resp, err := s.httpClient.Do(req)
+	// A redirect could lead to plain HTTP with the key in the URL.
+	client := *s.httpClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := client.Do(req)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("Numverify API request failed")
+		unavailable("transport")
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		unavailable("status")
+		return
+	}
 
 	var result struct {
-		Valid         bool   `json:"valid"`
+		Success       *bool  `json:"success"`
+		Valid         *bool  `json:"valid"`
 		CountryCode   string `json:"country_code"`
 		CountryName   string `json:"country_name"`
 		Carrier       string `json:"carrier"`
@@ -401,11 +435,17 @@ func (s *PhoneReputationService) queryNumverify(ctx context.Context, number stri
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to decode Numverify response")
+		unavailable("response")
+		return
+	}
+	// A refusal arrives as 200 with success=false, for example on a plan
+	// without HTTPS.
+	if (result.Success != nil && !*result.Success) || result.Valid == nil {
+		unavailable("refused")
 		return
 	}
 
-	reputation.IsValid = result.Valid
+	reputation.IsValid = *result.Valid
 	if result.CountryCode != "" {
 		reputation.CountryCode = result.CountryCode
 		reputation.CountryName = result.CountryName
@@ -510,45 +550,62 @@ func (s *PhoneReputationService) ClearCache() {
 	s.cache = make(map[string]*PhoneReputation)
 }
 
-// ReportNumber reports a phone number as scam/spam
-func (s *PhoneReputationService) ReportNumber(number string, reportType string, description string, scamType string) {
-	normalized := s.normalizeNumber(number)
+// SetReportStore replaces the in-process report store with a shared one.
+func (s *PhoneReputationService) SetReportStore(store PhoneReportStore) {
+	s.reports = store
+}
 
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
-
-	// Get or create reputation entry
-	reputation, exists := s.cache[normalized]
-	if !exists {
-		reputation = &PhoneReputation{
-			Number:        number,
-			NormalizedNum: normalized,
-			CheckedAt:     time.Now(),
-		}
-		s.cache[normalized] = reputation
-	}
-
-	// Add report
-	report := PhoneReport{
-		ReportType:  reportType,
-		Description: description,
-		ScamType:    scamType,
-		ReportedAt:  time.Now(),
-	}
-	reputation.UserReports = append(reputation.UserReports, report)
-
-	// Update counts
+// ReportNumber records one report of a number as scam, fraud or spam.
+// reporterKey names the credential and reporterNetwork the client's network,
+// both derived by the server; a report without either is not counted. A report
+// changes nothing other users see until phoneReportThreshold distinct keys and
+// as many distinct networks have reported the number, and even then the number
+// is shown as reported (IsSpam), never as a verified scam.
+func (s *PhoneReputationService) ReportNumber(ctx context.Context, number, reportType, reporterKey, reporterNetwork string) {
 	switch reportType {
-	case "scam", "fraud":
-		reputation.ScamReports++
-		reputation.IsScam = true
-	case "spam":
-		reputation.SpamReports++
-		reputation.IsSpam = true
+	case "scam", "fraud", "spam":
+	default:
+		return
 	}
+	normalized := s.normalizeNumber(number)
+	if reporterKey == "" || reporterNetwork == "" || len(normalized) < 10 || len(normalized) > 16 {
+		return
+	}
+	writeCtx, cancel := context.WithTimeout(ctx, phoneReportReadLimit)
+	defer cancel()
+	if err := s.reports.RecordPhoneReport(writeCtx, hashReportValue(normalized),
+		hashReportValue(reporterKey), hashReportValue(reporterNetwork), time.Now()); err != nil {
+		s.logger.Warn().Err(err).Msg("failed to record phone report")
+	}
+}
 
-	// Recalculate reputation
-	s.calculateReputation(reputation)
+// withCommunityReports returns reputation with the community flag applied when
+// enough independent clients reported the number. It returns a copy: the
+// cached entry is shared and stays unchanged. The flag can only add to what
+// the lookup found. When the counts cannot be read the lookup stands as it is.
+func (s *PhoneReputationService) withCommunityReports(ctx context.Context, normalized string, reputation *PhoneReputation) *PhoneReputation {
+	if reputation.IsScam {
+		return reputation
+	}
+	readCtx, cancel := context.WithTimeout(ctx, phoneReportReadLimit)
+	defer cancel()
+	keys, networks, err := s.reports.PhoneReporterCounts(readCtx, hashReportValue(normalized), time.Now())
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("failed to read phone report counts")
+		return reputation
+	}
+	if keys < phoneReportThreshold || networks < phoneReportThreshold {
+		return reputation
+	}
+	flagged := *reputation
+	flagged.IsSpam = true
+	flagged.DataSources = append(append([]string(nil), reputation.DataSources...), "community_reports")
+	switch flagged.RiskLevel {
+	case PhoneRiskHigh, PhoneRiskDangerous, PhoneRiskMedium:
+	default:
+		flagged.RiskLevel = PhoneRiskMedium
+	}
+	return &flagged
 }
 
 // AddKnownScamNumber adds a number to the known scam database
@@ -570,7 +627,7 @@ func (s *PhoneReputationService) LookupBatch(ctx context.Context, numbers []stri
 
 		reputation, err := s.Lookup(ctx, number)
 		if err != nil {
-			s.logger.Warn().Err(err).Str("number", number).Msg("Failed to lookup number")
+			s.logger.Warn().Err(err).Msg("Failed to lookup number")
 			continue
 		}
 		results[number] = reputation

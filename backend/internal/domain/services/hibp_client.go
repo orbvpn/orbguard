@@ -21,6 +21,14 @@ import (
 // ErrBreachNotFound is returned when a breach lookup by name finds nothing.
 var ErrBreachNotFound = errors.New("breach not found")
 
+// errHIBPNotBreached is the provider's own 404: the account is in no breach.
+var errHIBPNotBreached = errors.New("hibp: account not found")
+
+// ErrPasswordRangeUnavailable means no usable range answer was obtained. It
+// deliberately carries no cause: a transport error holds the request URL, and
+// with it the hash prefix, which must not reach a log.
+var ErrPasswordRangeUnavailable = errors.New("password range lookup unavailable")
+
 // HIBPClient provides access to Have I Been Pwned API
 type HIBPClient struct {
 	apiKey     string
@@ -75,8 +83,8 @@ func (c *HIBPClient) CheckEmail(ctx context.Context, email string) (*models.Brea
 	// Get breaches for this email
 	breaches, err := c.getBreachedAccount(ctx, email)
 	if err != nil {
-		// 404 means not breached
-		if strings.Contains(err.Error(), "404") {
+		// Only the provider's 404 status means not breached.
+		if errors.Is(err, errHIBPNotBreached) {
 			response.RiskLevel = models.BreachSeverityLow
 			response.Recommendations = []string{"No breaches found. Continue using strong, unique passwords."}
 			return response, nil
@@ -274,7 +282,7 @@ func (c *HIBPClient) getBreachedAccount(ctx context.Context, email string) ([]mo
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("404 not found")
+		return nil, errHIBPNotBreached
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
@@ -300,6 +308,40 @@ func (c *HIBPClient) getBreachedAccount(ctx context.Context, email string) ([]mo
 	}
 
 	return breaches, nil
+}
+
+// PasswordRange fetches the suffixes for a validated hash prefix. Padding
+// entries (count 0) are kept so the answer's size says nothing about the prefix.
+func (c *HIBPClient) PasswordRange(ctx context.Context, prefix string) ([]models.PasswordRangeEntry, error) {
+	body, err := c.queryPasswordRange(ctx, prefix)
+	if err != nil {
+		return nil, ErrPasswordRangeUnavailable
+	}
+	var entries []models.PasswordRangeEntry
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		suffix, rawCount, found := strings.Cut(line, ":")
+		count, err := strconv.Atoi(rawCount)
+		if !found || err != nil || count < 0 || !isPasswordHashSuffix(suffix) {
+			return nil, ErrPasswordRangeUnavailable
+		}
+		entries = append(entries, models.PasswordRangeEntry{Suffix: strings.ToUpper(suffix), Count: count})
+	}
+	if len(entries) == 0 {
+		return nil, ErrPasswordRangeUnavailable
+	}
+	return entries, nil
+}
+
+func isPasswordHashSuffix(value string) bool {
+	if len(value) != 35 {
+		return false
+	}
+	_, err := hex.DecodeString("0" + value)
+	return err == nil
 }
 
 // queryPasswordRange queries the password range API (k-anonymity)

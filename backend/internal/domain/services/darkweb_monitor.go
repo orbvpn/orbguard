@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,12 @@ var (
 	// ErrNoBreachProviders is returned when no breach data provider (HIBP,
 	// LeakCheck, IntelX) is configured.
 	ErrNoBreachProviders = errors.New("no breach data providers configured")
+	// ErrBreachProvidersFailed means a check could not be completed. It holds
+	// no provider error text, which can contain the address that was checked.
+	ErrBreachProvidersFailed = errors.New("breach providers failed")
+	// errBreachCheckPartial is ErrBreachProvidersFailed when at least one
+	// provider did answer, so the lookup was a real one.
+	errBreachCheckPartial = fmt.Errorf("check incomplete: %w", ErrBreachProvidersFailed)
 	// ErrDarkWebStorageUnavailable is returned when the service is running
 	// without a database and a persistence-backed operation is requested.
 	ErrDarkWebStorageUnavailable = errors.New("dark web monitoring storage unavailable: database not connected")
@@ -43,6 +50,8 @@ const (
 	emailCheckCacheTTL    = 1 * time.Hour
 
 	refreshLockKey = "darkweb:refresh"
+	// sweepMaxConsecutiveFailures stops a refresh during a provider outage.
+	sweepMaxConsecutiveFailures = 3
 	// refreshLockTTL only matters if a replica dies mid-sweep. It is well above
 	// the longest sweep: the router's 60s request timeout cancels the sweep's
 	// context, and the sweep stops at the next asset.
@@ -51,8 +60,8 @@ const (
 
 // refreshLocker is the cross-replica lock a sweep holds (*cache.RedisCache).
 type refreshLocker interface {
-	AcquireLock(ctx context.Context, lockKey string, ttl time.Duration) (bool, error)
-	ReleaseLock(ctx context.Context, lockKey string) error
+	AcquireOwnedLock(ctx context.Context, lockKey string, ttl time.Duration) (string, bool, error)
+	ReleaseOwnedLock(ctx context.Context, lockKey, owner string) (bool, error)
 }
 
 // DarkWebMonitor provides dark web and breach monitoring services. Monitored
@@ -71,6 +80,9 @@ type DarkWebMonitor struct {
 	refreshing  atomic.Bool
 	refreshLock refreshLocker
 	sweep       func(context.Context) error
+
+	paidLookups       paidLookupStore
+	paidLookupsPerDay int64
 }
 
 // NewDarkWebMonitor creates a new dark web monitor. leakCheck and intelX may
@@ -92,26 +104,73 @@ func NewDarkWebMonitor(
 		repo:       repo,
 		cache:      redisCache,
 		logger:     log.WithComponent("darkweb-monitor"),
+
+		paidLookupsPerDay: paidLookupsPerDay(),
 	}
 	m.sweep = m.sweepMonitoredAssets
 	if redisCache != nil {
 		m.refreshLock = redisCache
+		m.paidLookups = redisCache
 	}
 	return m
 }
 
 // CheckEmail checks if an email has been breached, aggregating all configured
-// breach providers. Results are cached for one hour.
+// breach providers. Results are cached for one hour. A cache miss spends paid
+// provider quota and is refused with ErrPaidLookupLimited or
+// ErrPaidLookupUnavailable when the caller's budget does not allow it.
 func (m *DarkWebMonitor) CheckEmail(ctx context.Context, req *models.BreachCheckRequest) (*models.BreachCheckResponse, error) {
-	// Check cache first
-	cacheKey := m.getCacheKey("email", req.Email)
-	var cachedResult models.BreachCheckResponse
-	if err := m.cache.GetJSON(ctx, cacheKey, &cachedResult); err == nil {
-		return &cachedResult, nil
+	return m.paidEmailLookup(ctx, req.Email, false)
+}
+
+// cachedEmailResult returns the cached result for email, if any.
+func (m *DarkWebMonitor) cachedEmailResult(ctx context.Context, email string) *models.BreachCheckResponse {
+	if m.cache == nil {
+		return nil
+	}
+	var cached models.BreachCheckResponse
+	if err := m.cache.GetJSON(ctx, m.getCacheKey("email", email), &cached); err != nil {
+		return nil
+	}
+	cached.Email = email
+	return &cached
+}
+
+// cacheEmailResult stores a result without the address it belongs to.
+func (m *DarkWebMonitor) cacheEmailResult(ctx context.Context, email string, result *models.BreachCheckResponse) {
+	if m.cache != nil {
+		_ = m.cache.SetJSON(ctx, m.getCacheKey("email", email), breachResultWithoutEmail(result), emailCheckCacheTTL)
+	}
+}
+
+// paidEmailLookup answers from this caller's recent answer, then the cache,
+// then the providers. With chargeCacheHit a cache hit also takes one unit.
+func (m *DarkWebMonitor) paidEmailLookup(ctx context.Context, email string, chargeCacheHit bool) (*models.BreachCheckResponse, error) {
+	if result, found, err := m.recallPaidLookup(ctx, email); found {
+		return result, err
 	}
 
-	result, err := m.checkEmailProviders(ctx, req.Email)
+	cached := m.cachedEmailResult(ctx, email)
+	if cached != nil && !chargeCacheHit {
+		return cached, nil
+	}
+
+	reservation, err := m.reservePaidLookup(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if cached != nil {
+		m.rememberPaidLookup(ctx, email, cached)
+		return cached, nil
+	}
+
+	result, err := m.checkEmailProviders(ctx, email)
+	if err != nil {
+		m.settleFailedLookup(ctx, reservation, err)
+		// A request the client abandoned says nothing about the providers.
+		if errors.Is(err, ErrBreachProvidersFailed) && ctx.Err() == nil {
+			m.rememberPaidLookup(ctx, email, nil)
+		}
 		return nil, err
 	}
 
@@ -122,17 +181,16 @@ func (m *DarkWebMonitor) CheckEmail(ctx context.Context, req *models.BreachCheck
 		}
 	}
 
-	// Cache result for 1 hour
-	_ = m.cache.SetJSON(ctx, cacheKey, result, emailCheckCacheTTL)
-
+	m.cacheEmailResult(ctx, email, result)
+	m.rememberPaidLookup(ctx, email, result)
 	return result, nil
 }
 
 // checkEmailProviders queries every configured breach provider and merges the
 // results (deduplicated by breach name). Each provider fails independently:
-// a failure is logged and the remaining providers are still consulted. An
-// error is returned only when no provider is configured or every configured
-// provider failed (so a false "not breached" is never reported).
+// a failure is logged and the remaining providers are still consulted.
+// Breaches a working provider found are returned even if another failed, but
+// "no breaches" is only returned when every configured provider answered.
 func (m *DarkWebMonitor) checkEmailProviders(ctx context.Context, email string) (*models.BreachCheckResponse, error) {
 	type providerResult struct {
 		name     string
@@ -167,16 +225,16 @@ func (m *DarkWebMonitor) checkEmailProviders(ctx context.Context, email string) 
 
 	merged := []models.Breach{}
 	seen := make(map[string]bool)
-	succeeded := 0
-	var lastErr error
+	failed := 0
 
 	for _, pr := range results {
 		if pr.err != nil {
-			lastErr = pr.err
-			m.logger.Warn().Err(pr.err).Str("provider", pr.name).Msg("breach provider lookup failed, continuing with remaining providers")
+			failed++
+			// The error text can hold the request URL, and with it the address.
+			m.logger.Warn().Str("provider", pr.name).Str("reason", breachProviderFailureReason(pr.err)).
+				Msg("breach provider lookup failed, continuing with remaining providers")
 			continue
 		}
-		succeeded++
 		for _, breach := range pr.breaches {
 			key := strings.ToLower(strings.TrimSpace(breach.Name))
 			if key == "" || seen[key] {
@@ -187,11 +245,32 @@ func (m *DarkWebMonitor) checkEmailProviders(ctx context.Context, email string) 
 		}
 	}
 
-	if succeeded == 0 {
-		return nil, fmt.Errorf("all breach providers failed: %w", lastErr)
+	if failed > 0 && len(merged) == 0 {
+		if failed < len(results) {
+			return nil, errBreachCheckPartial
+		}
+		return nil, ErrBreachProvidersFailed
 	}
 
 	return buildBreachCheckResponse(email, merged), nil
+}
+
+// breachProviderFailureReason names a failure without any of its text.
+func breachProviderFailureReason(err error) string {
+	var urlErr *url.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.As(err, &urlErr):
+		if urlErr.Timeout() {
+			return "timeout"
+		}
+		return "transport"
+	default:
+		return "upstream"
+	}
 }
 
 // buildBreachCheckResponse computes the aggregate response fields (exposed
@@ -268,6 +347,16 @@ func (m *DarkWebMonitor) CheckPassword(ctx context.Context, req *models.Password
 	return result, nil
 }
 
+// PasswordRange returns every known hash suffix for a five character SHA-1
+// prefix, for the client to compare on its own device. The prefix is neither
+// logged nor stored.
+func (m *DarkWebMonitor) PasswordRange(ctx context.Context, prefix string) ([]models.PasswordRangeEntry, error) {
+	if m.hibpClient == nil {
+		return nil, ErrPasswordRangeUnavailable
+	}
+	return m.hibpClient.PasswordRange(ctx, prefix)
+}
+
 // AddMonitoredAsset adds an asset for continuous monitoring. Re-adding an
 // asset the user already monitors re-activates the existing record.
 func (m *DarkWebMonitor) AddMonitoredAsset(ctx context.Context, userID, deviceID string, assetType models.BreachType, value string) (*models.MonitoredAsset, error) {
@@ -288,22 +377,21 @@ func (m *DarkWebMonitor) AddMonitoredAsset(ctx context.Context, userID, deviceID
 		IsActive:    true,
 	}
 
-	// Perform initial check (best effort — the asset is still stored when
-	// providers are unavailable; the refresh job retries later).
+	// Check before storing. Every registration of an email takes one unit of
+	// the budget, even on a cache hit, because each stored row is looked up
+	// again by every refresh sweep. An email that could not be checked is not
+	// stored: clients show a stored asset with no breaches as safe.
 	var initialBreaches []models.Breach
 	if assetType == models.BreachTypeEmail {
-		result, err := m.CheckEmail(ctx, &models.BreachCheckRequest{
-			Email:    value,
-			DeviceID: deviceID,
-		})
+		result, err := m.paidEmailLookup(ctx, value, true)
 		if err != nil {
-			m.logger.Warn().Err(err).Str("display", asset.DisplayName).Msg("initial breach check failed; asset will be checked by refresh job")
-		} else {
-			asset.BreachCount = result.BreachCount
-			now := time.Now()
-			asset.LastChecked = &now
-			initialBreaches = result.Breaches
+			m.logger.Warn().Err(err).Str("display", asset.DisplayName).Msg("initial breach check failed; asset not stored")
+			return nil, fmt.Errorf("initial breach check failed: %w", err)
 		}
+		asset.BreachCount = result.BreachCount
+		now := time.Now()
+		asset.LastChecked = &now
+		initialBreaches = result.Breaches
 	}
 
 	if err := m.repo.UpsertAsset(ctx, asset); err != nil {
@@ -542,7 +630,7 @@ func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
 	defer m.refreshing.Store(false)
 
 	if m.refreshLock != nil {
-		acquired, err := m.refreshLock.AcquireLock(ctx, refreshLockKey, refreshLockTTL)
+		owner, acquired, err := m.refreshLock.AcquireOwnedLock(ctx, refreshLockKey, refreshLockTTL)
 		if err != nil {
 			return fmt.Errorf("failed to take the refresh lock: %w", err)
 		}
@@ -554,8 +642,11 @@ func (m *DarkWebMonitor) RefreshMonitoredAssets(ctx context.Context) error {
 			// behind would refuse every refresh until its TTL.
 			releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			if err := m.refreshLock.ReleaseLock(releaseCtx, refreshLockKey); err != nil {
+			released, err := m.refreshLock.ReleaseOwnedLock(releaseCtx, refreshLockKey, owner)
+			if err != nil {
 				m.logger.Warn().Err(err).Msg("failed to release the refresh lock")
+			} else if !released {
+				m.logger.Warn().Msg("refresh lock expired during the sweep; left any newer holder's lock in place")
 			}
 		}()
 	}
@@ -575,6 +666,15 @@ func (m *DarkWebMonitor) sweepMonitoredAssets(ctx context.Context) error {
 		return fmt.Errorf("failed to list active assets: %w", err)
 	}
 
+	ctx = WithPaidLookupCaller(ctx, PaidLookupCaller{Tier: PaidLookupSweep, Identity: paidLookupSweepIdentity})
+	return m.sweepAssets(ctx, assets, m.storeSweepResult)
+}
+
+// sweepAssets re-checks each email from the shared daily budget. It stops when
+// the budget refuses or the providers keep failing, leaving the remaining
+// assets as they were.
+func (m *DarkWebMonitor) sweepAssets(ctx context.Context, assets []models.MonitoredAsset, store func(context.Context, *models.MonitoredAsset, *models.BreachCheckResponse)) error {
+	consecutiveFailures := 0
 	for i := range assets {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("refresh stopped: %w", err)
@@ -584,38 +684,52 @@ func (m *DarkWebMonitor) sweepMonitoredAssets(ctx context.Context) error {
 			continue
 		}
 
+		reservation, err := m.reservePaidLookup(ctx)
+		if err != nil {
+			return fmt.Errorf("refresh stopped: %w", err)
+		}
+
 		// Query providers directly (bypassing the cache) so refresh always
 		// sees fresh data, then update the cache for subsequent reads.
 		result, err := m.checkEmailProviders(ctx, asset.AssetValue)
 		if err != nil {
+			m.settleFailedLookup(ctx, reservation, err)
 			m.logger.Warn().Err(err).Str("asset_id", asset.ID.String()).Msg("failed to refresh asset")
+			if consecutiveFailures++; consecutiveFailures >= sweepMaxConsecutiveFailures {
+				return fmt.Errorf("refresh stopped: %w", err)
+			}
 			continue
 		}
-		_ = m.cache.SetJSON(ctx, m.getCacheKey("email", asset.AssetValue), result, emailCheckCacheTTL)
-
-		for j := range result.Breaches {
-			breach := &result.Breaches[j]
-			alert := m.createAlertForBreach(asset.ID, breach)
-			inserted, err := m.repo.InsertAlert(ctx, asset.UserID, alert, breach.Domain)
-			if err != nil {
-				m.logger.Warn().Err(err).Str("breach", breach.Name).Msg("failed to store breach alert")
-				continue
-			}
-			if inserted {
-				m.logger.Warn().
-					Str("asset_id", asset.ID.String()).
-					Str("breach", breach.Name).
-					Msg("new breach detected for monitored asset")
-			}
-		}
-
-		now := time.Now()
-		if err := m.repo.UpdateAssetCheckResult(ctx, asset.ID, result.BreachCount, now); err != nil {
-			m.logger.Warn().Err(err).Str("asset_id", asset.ID.String()).Msg("failed to update asset check result")
-		}
+		consecutiveFailures = 0
+		m.cacheEmailResult(ctx, asset.AssetValue, result)
+		store(ctx, asset, result)
 	}
 
 	return nil
+}
+
+// storeSweepResult records the alerts and check result of one refreshed asset.
+func (m *DarkWebMonitor) storeSweepResult(ctx context.Context, asset *models.MonitoredAsset, result *models.BreachCheckResponse) {
+	for j := range result.Breaches {
+		breach := &result.Breaches[j]
+		alert := m.createAlertForBreach(asset.ID, breach)
+		inserted, err := m.repo.InsertAlert(ctx, asset.UserID, alert, breach.Domain)
+		if err != nil {
+			m.logger.Warn().Err(err).Str("breach", breach.Name).Msg("failed to store breach alert")
+			continue
+		}
+		if inserted {
+			m.logger.Warn().
+				Str("asset_id", asset.ID.String()).
+				Str("breach", breach.Name).
+				Msg("new breach detected for monitored asset")
+		}
+	}
+
+	now := time.Now()
+	if err := m.repo.UpdateAssetCheckResult(ctx, asset.ID, result.BreachCount, now); err != nil {
+		m.logger.Warn().Err(err).Str("asset_id", asset.ID.String()).Msg("failed to update asset check result")
+	}
 }
 
 // Helper functions

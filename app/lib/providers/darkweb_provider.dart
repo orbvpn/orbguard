@@ -3,13 +3,13 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../presentation/theme/colors.dart';
 
 import '../services/api/api_config.dart';
 import '../services/api/orbguard_api_client.dart';
+import '../services/security/password_k_anonymity.dart';
 import '../models/api/sms_analysis.dart';
 import '../models/api/threat_indicator.dart';
 
@@ -186,6 +186,10 @@ class DarkWebProvider extends ChangeNotifier {
   final OrbGuardApiClient _api = OrbGuardApiClient.instance;
   SharedPreferences? _prefs;
 
+  /// Replaces the range request in tests.
+  @visibleForTesting
+  Future<Map<String, int>> Function(String prefix)? passwordRangeForTest;
+
   /// Restores the cached assets and pulls the per-user server state as soon
   /// as the provider is created (the dark web screen reads the provider
   /// without calling [init] itself).
@@ -219,6 +223,7 @@ class DarkWebProvider extends ChangeNotifier {
   bool _isCheckingEmail = false;
   bool _isCheckingPassword = false;
   String? _error;
+  String? _passwordError;
 
   // Getters
   List<MonitoredAsset> get assets => List.unmodifiable(_assets);
@@ -234,6 +239,7 @@ class DarkWebProvider extends ChangeNotifier {
   bool get isCheckingEmail => _isCheckingEmail;
   bool get isCheckingPassword => _isCheckingPassword;
   String? get error => _error;
+  String? get passwordError => _passwordError;
 
   /// Unread alerts (excludes ids in the locally-persisted read set).
   List<BreachAlert> get unreadAlerts =>
@@ -291,27 +297,32 @@ class DarkWebProvider extends ChangeNotifier {
     }
   }
 
-  /// Check password for breaches (k-anonymity)
+  /// Check password for breaches (k-anonymity). The password and its full
+  /// hash stay on this device; only a five character prefix is sent. An
+  /// earlier result is cleared first so a failed check can never leave a
+  /// "not found" card on screen for a different password.
   Future<PasswordBreachResult?> checkPassword(String password) async {
     if (password.isEmpty) return null;
 
     _isCheckingPassword = true;
+    _lastPasswordResult = null;
+    _passwordError = null;
     _error = null;
     notifyListeners();
 
     try {
-      // Hash password with SHA-1 and get first 5 characters
-      final bytes = utf8.encode(password);
-      final digest = sha1.convert(bytes);
-      final hashPrefix = digest.toString().substring(0, 5).toUpperCase();
-
-      final result = await _api.checkPasswordBreaches(hashPrefix);
+      final query = PasswordRangeQuery.fromPassword(password);
+      final range =
+          await (passwordRangeForTest ?? _api.getPasswordRange)(query.prefix);
+      final result = evaluatePasswordRange(query, range);
       _lastPasswordResult = result;
       _isCheckingPassword = false;
       notifyListeners();
       return result;
     } catch (e) {
       _isCheckingPassword = false;
+      _passwordError =
+          'The password check could not be completed. Nothing was checked; please try again.';
       _error = 'Failed to check password: $e';
       notifyListeners();
       return null;
@@ -724,6 +735,7 @@ class DarkWebProvider extends ChangeNotifier {
   void clearLastResult() {
     _lastCheckResult = null;
     _lastPasswordResult = null;
+    _passwordError = null;
     notifyListeners();
   }
 

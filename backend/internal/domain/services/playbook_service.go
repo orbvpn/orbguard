@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,6 +15,10 @@ import (
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/pkg/logger"
 )
+
+// ErrPlaybookActionNotImplemented marks an action that was not performed
+// because no real implementation exists for its type.
+var ErrPlaybookActionNotImplemented = errors.New("playbook action not implemented")
 
 // PlaybookService manages playbook registration and execution
 type PlaybookService struct {
@@ -92,30 +97,30 @@ func NewPlaybookService(webhookSvc *WebhookService, cache *cache.RedisCache, log
 
 // registerDefaultHandlers registers the default action handlers
 func (s *PlaybookService) registerDefaultHandlers() {
-	// Notification actions
-	s.actionHandlers[models.ActionTypeSendWebhook] = s.handleSendWebhook
-	s.actionHandlers[models.ActionTypeSendSlack] = s.handleSendSlack
-	s.actionHandlers[models.ActionTypeSendTeams] = s.handleSendTeams
-	s.actionHandlers[models.ActionTypeSendEmail] = s.handleSendEmail
-	s.actionHandlers[models.ActionTypeSendPagerDuty] = s.handleSendPagerDuty
-	s.actionHandlers[models.ActionTypeSendSMS] = s.handleSendSMS
-
-	// Blocking actions
-	s.actionHandlers[models.ActionTypeBlockIP] = s.handleBlockIP
-	s.actionHandlers[models.ActionTypeBlockDomain] = s.handleBlockDomain
-	s.actionHandlers[models.ActionTypeBlockHash] = s.handleBlockHash
-	s.actionHandlers[models.ActionTypeBlockURL] = s.handleBlockURL
-
-	// Data actions
-	s.actionHandlers[models.ActionTypeAddTag] = s.handleAddTag
-	s.actionHandlers[models.ActionTypeRemoveTag] = s.handleRemoveTag
-	s.actionHandlers[models.ActionTypeUpdateSeverity] = s.handleUpdateSeverity
-	s.actionHandlers[models.ActionTypeCreateAlert] = s.handleCreateAlert
-	s.actionHandlers[models.ActionTypeEnrichIndicator] = s.handleEnrichIndicator
-
-	// Integration actions
-	s.actionHandlers[models.ActionTypeCallAPI] = s.handleCallAPI
-	s.actionHandlers[models.ActionTypeTriggerPlaybook] = s.handleTriggerPlaybook
+	// No action type has a real implementation yet. Each stays registered so
+	// stored playbooks keep validating, and each run reports the action as
+	// failed instead of claiming it happened.
+	for _, actionType := range []models.ActionType{
+		models.ActionTypeSendWebhook,
+		models.ActionTypeSendSlack,
+		models.ActionTypeSendTeams,
+		models.ActionTypeSendEmail,
+		models.ActionTypeSendPagerDuty,
+		models.ActionTypeSendSMS,
+		models.ActionTypeBlockIP,
+		models.ActionTypeBlockDomain,
+		models.ActionTypeBlockHash,
+		models.ActionTypeBlockURL,
+		models.ActionTypeAddTag,
+		models.ActionTypeRemoveTag,
+		models.ActionTypeUpdateSeverity,
+		models.ActionTypeCreateAlert,
+		models.ActionTypeEnrichIndicator,
+		models.ActionTypeCallAPI,
+		models.ActionTypeTriggerPlaybook,
+	} {
+		s.actionHandlers[actionType] = s.handleNotImplemented
+	}
 }
 
 // startWorkers starts the execution worker goroutines
@@ -622,6 +627,18 @@ func (s *PlaybookService) executePlaybook(ctx context.Context, job *executionJob
 		}
 	}
 
+	// A run in which any action failed is a failed run, also when the playbook
+	// continues past failures.
+	if executionErr == nil {
+		for _, actionResult := range execution.ActionResults {
+			if actionResult.Status == models.ExecutionStatusFailed {
+				executionErr = fmt.Errorf("action %s failed: %s", actionResult.ActionID, actionResult.Error)
+				execution.ErrorAction = actionResult.ActionID
+				break
+			}
+		}
+	}
+
 	// Update execution status
 	completedAt := time.Now()
 	execution.CompletedAt = &completedAt
@@ -876,92 +893,10 @@ func (s *PlaybookService) CreateFromTemplate(ctx context.Context, templateID str
 	return playbook, nil
 }
 
-// Action handlers (simplified implementations)
-
-func (s *PlaybookService) handleSendWebhook(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_webhook action")
-	return map[string]interface{}{"webhook_sent": true}, nil
-}
-
-func (s *PlaybookService) handleSendSlack(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_slack action")
-	return map[string]interface{}{"slack_sent": true}, nil
-}
-
-func (s *PlaybookService) handleSendTeams(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_teams action")
-	return map[string]interface{}{"teams_sent": true}, nil
-}
-
-func (s *PlaybookService) handleSendEmail(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_email action")
-	return map[string]interface{}{"email_sent": true}, nil
-}
-
-func (s *PlaybookService) handleSendPagerDuty(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_pagerduty action")
-	return map[string]interface{}{"pagerduty_sent": true}, nil
-}
-
-func (s *PlaybookService) handleSendSMS(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing send_sms action")
-	return map[string]interface{}{"sms_sent": true}, nil
-}
-
-func (s *PlaybookService) handleBlockIP(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing block_ip action")
-	return map[string]interface{}{"ip_blocked": true}, nil
-}
-
-func (s *PlaybookService) handleBlockDomain(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing block_domain action")
-	return map[string]interface{}{"domain_blocked": true}, nil
-}
-
-func (s *PlaybookService) handleBlockHash(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing block_hash action")
-	return map[string]interface{}{"hash_blocked": true}, nil
-}
-
-func (s *PlaybookService) handleBlockURL(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing block_url action")
-	return map[string]interface{}{"url_blocked": true}, nil
-}
-
-func (s *PlaybookService) handleAddTag(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing add_tag action")
-	return map[string]interface{}{"tags_added": true}, nil
-}
-
-func (s *PlaybookService) handleRemoveTag(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing remove_tag action")
-	return map[string]interface{}{"tags_removed": true}, nil
-}
-
-func (s *PlaybookService) handleUpdateSeverity(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing update_severity action")
-	return map[string]interface{}{"severity_updated": true}, nil
-}
-
-func (s *PlaybookService) handleCreateAlert(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing create_alert action")
-	alertID := uuid.New().String()
-	return map[string]interface{}{"alert_created": true, "alert_id": alertID}, nil
-}
-
-func (s *PlaybookService) handleEnrichIndicator(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing enrich_indicator action")
-	return map[string]interface{}{"enriched": true}, nil
-}
-
-func (s *PlaybookService) handleCallAPI(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing call_api action")
-	return map[string]interface{}{"api_called": true}, nil
-}
-
-func (s *PlaybookService) handleTriggerPlaybook(ctx context.Context, action *models.PlaybookAction, data map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Info().Str("action", action.ID).Msg("executing trigger_playbook action")
-	return map[string]interface{}{"playbook_triggered": true}, nil
+// handleNotImplemented reports that the action was not performed.
+func (s *PlaybookService) handleNotImplemented(_ context.Context, action *models.PlaybookAction, _ map[string]interface{}) (map[string]interface{}, error) {
+	s.logger.Warn().Str("action", action.ID).Str("type", string(action.Type)).Msg("playbook action is not implemented")
+	return nil, fmt.Errorf("%w: %s", ErrPlaybookActionNotImplemented, action.Type)
 }
 
 // Helper functions
