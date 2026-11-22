@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,18 @@ const (
 	threatFoxAPIURL     = "https://threatfox-api.abuse.ch/api/v1/"
 	threatFoxSlug       = "threatfox"
 	threatFoxMaxRecords = 1000
+
+	// threatFoxFullWindowDays is the largest window get_iocs allows. It is
+	// asked for on the first fetch after start and after a long outage.
+	threatFoxFullWindowDays = 7
+	// threatFoxShortWindowDays is asked for while the last success is
+	// recent. ThreatFox is fetched several times an hour, so one day
+	// overlaps the previous fetch many times over; the aggregator drops the
+	// repeats (Deduplicator, then ON CONFLICT (value_hash) on indicators).
+	threatFoxShortWindowDays = 1
+	// threatFoxShortWindowMaxAge is the oldest last success that still
+	// allows the short window: four hours inside its 24.
+	threatFoxShortWindowMaxAge = 20 * time.Hour
 )
 
 // ThreatFoxConnector implements the source connector for ThreatFox
@@ -31,6 +44,15 @@ type ThreatFoxConnector struct {
 	interval time.Duration
 	sourceID uuid.UUID
 	apiKey   string
+	apiURL   string
+	now      func() time.Time
+
+	// lastSuccess is when the last fetch that returned a parsed answer was
+	// sent. It is kept in memory only: nothing persistent records a
+	// ThreatFox success apart from update_history, which the connector
+	// cannot read. After a restart the first fetch asks for the full window.
+	mu          sync.Mutex
+	lastSuccess time.Time
 }
 
 // NewThreatFoxConnector creates a new ThreatFox connector
@@ -42,6 +64,8 @@ func NewThreatFoxConnector(log *logger.Logger) *ThreatFoxConnector {
 		logger:   log.WithComponent("threatfox"),
 		enabled:  true,
 		interval: 15 * time.Minute,
+		apiURL:   threatFoxAPIURL,
+		now:      time.Now,
 	}
 }
 
@@ -101,16 +125,19 @@ func (c *ThreatFoxConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 		FetchedAt:  start,
 	}
 
-	c.logger.Info().Msg("fetching from ThreatFox API")
+	sentAt := c.now()
+	days := c.windowDays(sentAt)
+	c.logger.Info().Int("days", days).Msg("fetching from ThreatFox API")
 
-	// Fetch recent IOCs (last 7 days)
-	indicators, err := c.fetchRecentIOCs(ctx, 7)
+	indicators, err := c.fetchRecentIOCs(ctx, days)
 	if err != nil {
 		result.Error = err
 		result.Success = false
 		result.Duration = time.Since(start)
 		return result, err
 	}
+
+	c.markSuccess(sentAt)
 
 	result.RawIndicators = indicators
 	result.TotalFetched = len(indicators)
@@ -125,6 +152,27 @@ func (c *ThreatFoxConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 	return result, nil
 }
 
+// windowDays chooses the get_iocs window: one day while the last success is
+// under threatFoxShortWindowMaxAge old, else the full seven days (first fetch
+// after start, or after an outage). A failed fetch never shortens it.
+func (c *ThreatFoxConnector) windowDays(now time.Time) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.lastSuccess.IsZero() && now.Sub(c.lastSuccess) < threatFoxShortWindowMaxAge {
+		return threatFoxShortWindowDays
+	}
+	return threatFoxFullWindowDays
+}
+
+// markSuccess records the send time of a fetch that returned a parsed answer.
+func (c *ThreatFoxConnector) markSuccess(sentAt time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if sentAt.After(c.lastSuccess) {
+		c.lastSuccess = sentAt
+	}
+}
+
 // fetchRecentIOCs fetches IOCs from the last N days
 func (c *ThreatFoxConnector) fetchRecentIOCs(ctx context.Context, days int) ([]models.RawIndicator, error) {
 	payload := map[string]interface{}{
@@ -137,7 +185,7 @@ func (c *ThreatFoxConnector) fetchRecentIOCs(ctx context.Context, days int) ([]m
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", threatFoxAPIURL, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.apiURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
