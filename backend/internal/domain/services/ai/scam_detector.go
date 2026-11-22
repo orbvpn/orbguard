@@ -205,7 +205,7 @@ func (d *ScamDetector) Analyze(ctx context.Context, req *models.ScamAnalysisRequ
 	}
 
 	if err != nil {
-		d.logger.Error().Err(err).Str("content_type", string(req.ContentType)).Msg("Analysis failed")
+		d.logger.Error().Err(err).Str("content_type", req.ContentType.LogLabel()).Msg("Analysis failed")
 		return nil, err
 	}
 
@@ -613,6 +613,7 @@ func (d *ScamDetector) analyzePhone(ctx context.Context, req *models.ScamAnalysi
 	if err != nil {
 		return err
 	}
+	result.UnavailableSources = rep.UnavailableSources
 
 	result.Entities = &models.ExtractedEntities{
 		PhoneNumbers: []models.PhoneEntity{{
@@ -904,11 +905,14 @@ func (d *ScamDetector) ReportScam(ctx context.Context, report *models.ScamReport
 		d.phoneReputation.ReportNumber(ctx, report.PhoneNumber, "scam", report.ReporterKey, report.ReporterNetwork)
 	}
 
-	d.logger.Info().
-		Str("type", string(report.ScamType)).
-		Str("phone", report.PhoneNumber).
-		Str("description", report.Description).
-		Msg("Scam reported")
+	event := d.logger.Info().
+		Str("type", report.ScamType.LogLabel()).
+		Bool("has_phone", report.PhoneNumber != "").
+		Int("description_length", len(report.Description))
+	if d.phoneReputation != nil && report.PhoneNumber != "" {
+		event = event.Str("country_code", d.phoneReputation.CountryCodeOf(report.PhoneNumber))
+	}
+	event.Msg("Scam reported")
 
 	return nil
 }

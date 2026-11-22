@@ -35,6 +35,21 @@ const (
 	ScamTypeNone           ScamType = "none"              // Not a scam
 )
 
+// LogLabel is the scam type for a log line. The value can come from a client,
+// so anything outside the known types is logged as "other".
+func (t ScamType) LogLabel() string {
+	switch t {
+	case ScamTypePhishing, ScamTypeAdvanceFee, ScamTypeRomance, ScamTypeTechSupport,
+		ScamTypeInvestment, ScamTypeImpersonation, ScamTypeJobOffer, ScamTypeJobScam,
+		ScamTypeShipping, ScamTypeTaxRefund, ScamTypePrizeWinning, ScamTypeLottery,
+		ScamTypeSocialMedia, ScamTypeSubscription, ScamTypeBanking, ScamTypeCrypto,
+		ScamTypeSextortion, ScamTypeExtortion, ScamTypeCharityFraud, ScamTypeRentalScam,
+		ScamTypeSMSPremium, ScamTypeNone, "irs_scam", "premium_rate", "suspicious":
+		return string(t)
+	}
+	return string(ScamTypeOther)
+}
+
 // ScamSeverity represents the severity level of a scam
 type ScamSeverity string
 
@@ -59,6 +74,17 @@ const (
 	ContentTypePhone      ContentType = "phone"      // Phone number
 	ContentTypeSocialPost ContentType = "social"     // Social media post
 )
+
+// LogLabel is the content type for a log line. The value can come from a
+// client, so anything outside the known types is logged as "other".
+func (c ContentType) LogLabel() string {
+	switch c {
+	case ContentTypeText, ContentTypeURL, ContentTypeImage, ContentTypeVoice,
+		ContentTypeEmail, ContentTypeSMS, ContentTypePhone, ContentTypeSocialPost:
+		return string(c)
+	}
+	return "other"
+}
 
 // ScamAnalysisRequest represents a request to analyze content for scams
 type ScamAnalysisRequest struct {
@@ -114,6 +140,9 @@ type ScamAnalysisResult struct {
 	PhoneAnalysis   *PhoneAnalysis        `json:"phone_analysis,omitempty"`
 	ImageAnalysis   *ImageAnalysis        `json:"image_analysis,omitempty"`
 	VoiceAnalysis   *VoiceAnalysis        `json:"voice_analysis,omitempty"`
+
+	// UnavailableSources names lookups that could not answer this time.
+	UnavailableSources []string `json:"unavailable_sources,omitempty"`
 
 	// AI explanation
 	Explanation     string          `json:"explanation"`

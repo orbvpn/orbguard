@@ -516,7 +516,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				if env == "development" {
 					if log != nil {
 						log.WithComponent("auth-middleware").Warn().
-							Str("path", r.URL.Path).
+							Str("path", logPath(r)).
 							Msg("token store not configured; accepting token in development mode only")
 					}
 					ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
@@ -525,7 +525,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				}
 				if log != nil {
 					log.WithComponent("auth-middleware").Error().
-						Str("path", r.URL.Path).
+						Str("path", logPath(r)).
 						Msg("token store not configured; rejecting request")
 				}
 				http.Error(w, `{"error":"authentication unavailable"}`, http.StatusServiceUnavailable)

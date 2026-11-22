@@ -3,8 +3,8 @@ package ai
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -81,6 +81,8 @@ type PhoneReputation struct {
 	// Metadata
 	CheckedAt       time.Time        `json:"checked_at"`
 	DataSources     []string         `json:"data_sources,omitempty"`
+	// UnavailableSources names lookups that could not answer this time.
+	UnavailableSources []string `json:"unavailable_sources,omitempty"`
 	Confidence      float64          `json:"confidence"`
 }
 
@@ -278,6 +280,14 @@ func (s *PhoneReputationService) checkLocalDatabase(number string, reputation *P
 	}
 }
 
+// CountryCodeOf is the country code of a number from its prefix, with no
+// outside lookup. It is empty when the number is not recognised.
+func (s *PhoneReputationService) CountryCodeOf(number string) string {
+	var reputation PhoneReputation
+	s.validateNumber(s.normalizeNumber(number), &reputation)
+	return reputation.CountryCode
+}
+
 // validateNumber validates the phone number format
 func (s *PhoneReputationService) validateNumber(number string, reputation *PhoneReputation) {
 	// Basic validation
@@ -375,29 +385,48 @@ func (s *PhoneReputationService) checkVoIP(number string, reputation *PhoneReput
 	}
 }
 
-// queryNumverify queries the Numverify API
+// queryNumverify queries the Numverify API over HTTPS only. The request URL
+// holds the key and the number, and Go's url.Error prints the whole URL, so no
+// error from this call is ever logged or returned. A failed lookup leaves the
+// local result as it was and names the source as unavailable.
 func (s *PhoneReputationService) queryNumverify(ctx context.Context, number string, reputation *PhoneReputation) {
+	unavailable := func(reason string) {
+		s.logger.Warn().Str("reason", reason).Msg("Numverify lookup unavailable")
+		reputation.UnavailableSources = append(reputation.UnavailableSources, "numverify")
+	}
+
 	// Remove + for Numverify API
-	cleanNumber := strings.TrimPrefix(number, "+")
-
-	url := fmt.Sprintf("http://apilayer.net/api/validate?access_key=%s&number=%s&format=1",
-		s.config.NumverifyAPIKey, cleanNumber)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	query := url.Values{
+		"access_key": {s.config.NumverifyAPIKey},
+		"number":     {strings.TrimPrefix(number, "+")},
+		"format":     {"1"},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://apilayer.net/api/validate?"+query.Encode(), nil)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to create Numverify request")
+		unavailable("request")
 		return
 	}
 
-	resp, err := s.httpClient.Do(req)
+	// A redirect could lead to plain HTTP with the key in the URL.
+	client := *s.httpClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := client.Do(req)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("Numverify API request failed")
+		unavailable("transport")
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		unavailable("status")
+		return
+	}
 
 	var result struct {
-		Valid         bool   `json:"valid"`
+		Success       *bool  `json:"success"`
+		Valid         *bool  `json:"valid"`
 		CountryCode   string `json:"country_code"`
 		CountryName   string `json:"country_name"`
 		Carrier       string `json:"carrier"`
@@ -406,11 +435,17 @@ func (s *PhoneReputationService) queryNumverify(ctx context.Context, number stri
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to decode Numverify response")
+		unavailable("response")
+		return
+	}
+	// A refusal arrives as 200 with success=false, for example on a plan
+	// without HTTPS.
+	if (result.Success != nil && !*result.Success) || result.Valid == nil {
+		unavailable("refused")
 		return
 	}
 
-	reputation.IsValid = result.Valid
+	reputation.IsValid = *result.Valid
 	if result.CountryCode != "" {
 		reputation.CountryCode = result.CountryCode
 		reputation.CountryName = result.CountryName
@@ -592,7 +627,7 @@ func (s *PhoneReputationService) LookupBatch(ctx context.Context, numbers []stri
 
 		reputation, err := s.Lookup(ctx, number)
 		if err != nil {
-			s.logger.Warn().Err(err).Str("number", number).Msg("Failed to lookup number")
+			s.logger.Warn().Err(err).Msg("Failed to lookup number")
 			continue
 		}
 		results[number] = reputation

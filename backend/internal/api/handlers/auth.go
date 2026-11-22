@@ -2,15 +2,18 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"orbguard-lab/internal/api/middleware"
+	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/internal/infrastructure/database/repository"
 	"orbguard-lab/pkg/logger"
@@ -20,6 +23,10 @@ const (
 	authAPIKeyTTL       = 365 * 24 * time.Hour
 	authSessionTokenTTL = 24 * time.Hour
 	authRefreshTokenTTL = 30 * 24 * time.Hour
+
+	// deviceRegistrationsPerDay limits new credentials per client address and
+	// UTC day. IPv6 counts per /48, the range one site can rotate through.
+	deviceRegistrationsPerDay = 30
 )
 
 // refreshClaims is the payload stored under auth:refresh:<token>. It tracks
@@ -242,6 +249,34 @@ func (h *AuthHandler) callerHoldsDeviceKey(r *http.Request, deviceID string) boo
 	return claims.DeviceID != "" && claims.DeviceID == deviceID
 }
 
+// refuseRegistration takes one unit of the address's daily allowance. It
+// answers the request and returns true when none is left or the count cannot
+// be read; a refused request takes nothing. Registration stores its credential
+// in Redis, so without Redis it could not complete in any case.
+func (h *AuthHandler) refuseRegistration(w http.ResponseWriter, r *http.Request) bool {
+	now := time.Now().UTC()
+	sum := sha256.Sum256([]byte(middleware.ClientSite(r)))
+	key := "auth:device-registrations:{" + now.Format("20060102") + "}:" + hex.EncodeToString(sum[:12])
+	exhausted, err := h.cache.ReserveQuota(r.Context(), []string{key}, []int64{deviceRegistrationsPerDay}, 48*time.Hour)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("device registration limit could not be read")
+		writeRegistrationRefusal(w, http.StatusServiceUnavailable, "device registration is temporarily unavailable")
+		return true
+	}
+	if exhausted != 0 {
+		w.Header().Set("Retry-After", strconv.FormatInt(int64(services.PaidLookupRetryAfter(now)/time.Second)+1, 10))
+		writeRegistrationRefusal(w, http.StatusTooManyRequests, "too many device registrations from this network today, please try again tomorrow")
+		return true
+	}
+	return false
+}
+
+func writeRegistrationRefusal(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
 // RegisterDevice handles POST /api/v1/auth/device
 func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -290,6 +325,10 @@ func (h *AuthHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"device not found"}`, http.StatusNotFound)
 			return
 		}
+	}
+
+	if h.refuseRegistration(w, r) {
+		return
 	}
 
 	apiKey := authGenerateToken(32)

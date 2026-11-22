@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -88,14 +89,16 @@ func getClientID(r *http.Request) string {
 		return fmt.Sprintf("key:%s", apiKey)
 	}
 
-	// Fall back to IP address
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip = r.Header.Get("X-Real-IP")
-	}
-	if ip == "" {
-		ip = r.RemoteAddr
+	// The address the ingress saw. Headers a client sends cannot change it.
+	if ip := net.ParseIP(ClientAddress(r)); ip != nil && !infrastructureAddr(ip) {
+		return fmt.Sprintf("ip:%s", ClientSubscriber(r))
 	}
 
-	return fmt.Sprintf("ip:%s", ip)
+	// No public client on this request: a health probe or an internal caller.
+	// Each connection keeps its own count, so they never share one bucket.
+	peer := r.RemoteAddr
+	if recorded, ok := r.Context().Value(ContextKeyPeerAddr).(string); ok && recorded != "" {
+		peer = recorded
+	}
+	return fmt.Sprintf("ip:%s", peer)
 }

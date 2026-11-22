@@ -144,7 +144,7 @@ func (h *SMSHandler) persistAnalysis(r *http.Request, msg *models.SMSMessage, re
 func (h *SMSHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	var req AnalyzeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Debug().Err(err).Msg("invalid request body")
+		h.logger.Debug().Msg("invalid request body")
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -192,7 +192,7 @@ func (h *SMSHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 func (h *SMSHandler) AnalyzeBatch(w http.ResponseWriter, r *http.Request) {
 	var req AnalyzeBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Debug().Err(err).Msg("invalid request body")
+		h.logger.Debug().Msg("invalid request body")
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}

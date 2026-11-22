@@ -468,6 +468,34 @@ func TestPasswordRangeLimitUsesTheTrustedAddress(t *testing.T) {
 	}
 }
 
+// With the global limiter off, the route's own limit has to hold by itself.
+func TestPasswordRangeRouteLimitHoldsOnItsOwn(t *testing.T) {
+	redisCache := reviewRedis(t)
+	log := &logger.Logger{Logger: zerolog.Nop()}
+	apimiddleware.ConfigureAuth(quotaTokens{}, "test", log)
+	t.Cleanup(func() { apimiddleware.ConfigureAuth(nil, "", nil) })
+	fake := &fakeHIBP{status: http.StatusOK, body: strings.Repeat("A", 35) + ":1\r\n"}
+	client := services.NewHIBPClient(services.HIBPConfig{APIKey: "test-key"}, log)
+	client.SetTransportForTest(fake)
+	monitor := services.NewDarkWebMonitor(client, nil, nil, nil, nil, log)
+	rig := &quotaRig{h: api.NewRouter(config.Config{}, &handlers.Handlers{DarkWeb: handlers.NewDarkWebHandler(monitor, log)}, redisCache, log).Setup()}
+
+	if s := time.Now().Second(); s >= 55 {
+		time.Sleep(time.Duration(61-s) * time.Second)
+	}
+	var last *httptest.ResponseRecorder
+	for i := 0; i < 35; i++ {
+		last = rig.post("/api/v1/darkweb/password/range", "old-range", "198.51.100.77",
+			fmt.Sprintf("203.0.113.%d", i), `{"prefix":"ABCDE"}`)
+	}
+	if got := fake.calls.Load(); got != 30 {
+		t.Fatalf("rotating a forged hop reached upstream %d times, route limit 30", got)
+	}
+	if last.Code != http.StatusTooManyRequests || last.Header().Get("Retry-After") == "" {
+		t.Fatalf("want 429 with Retry-After, got %d", last.Code)
+	}
+}
+
 func TestNewDeviceKeyCarriesAHashedIssuer(t *testing.T) {
 	redisCache := reviewRedis(t)
 	log := &logger.Logger{Logger: zerolog.Nop()}
