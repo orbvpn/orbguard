@@ -53,6 +53,11 @@ type ThreatFoxConnector struct {
 	// cannot read. After a restart the first fetch asks for the full window.
 	mu          sync.Mutex
 	lastSuccess time.Time
+	// fullFailedAt is when the last full-window request was sent that
+	// failed. Once one has failed since the last success, the connector
+	// asks for the short window until something succeeds again: a 7-day
+	// export that keeps failing is not asked for again and again.
+	fullFailedAt time.Time
 }
 
 // NewThreatFoxConnector creates a new ThreatFox connector
@@ -131,6 +136,9 @@ func (c *ThreatFoxConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 
 	indicators, err := c.fetchRecentIOCs(ctx, days)
 	if err != nil {
+		if days == threatFoxFullWindowDays {
+			c.markFullWindowFailed(sentAt)
+		}
 		result.Error = err
 		result.Success = false
 		result.Duration = time.Since(start)
@@ -152,16 +160,31 @@ func (c *ThreatFoxConnector) Fetch(ctx context.Context) (*models.SourceFetchResu
 	return result, nil
 }
 
-// windowDays chooses the get_iocs window: one day while the last success is
-// under threatFoxShortWindowMaxAge old, else the full seven days (first fetch
-// after start, or after an outage). A failed fetch never shortens it.
+// windowDays chooses the get_iocs window. One day while the last success is
+// under threatFoxShortWindowMaxAge old. Otherwise the full seven days (the
+// first fetch of a process, or the first after an outage), but only once:
+// when a full-window request has failed since the last success, one day until
+// a fetch succeeds. Only a success moves the 20-hour clock.
 func (c *ThreatFoxConnector) windowDays(now time.Time) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.lastSuccess.IsZero() && now.Sub(c.lastSuccess) < threatFoxShortWindowMaxAge {
 		return threatFoxShortWindowDays
 	}
+	if c.fullFailedAt.After(c.lastSuccess) {
+		return threatFoxShortWindowDays
+	}
 	return threatFoxFullWindowDays
+}
+
+// markFullWindowFailed records the send time of a full-window request that
+// failed.
+func (c *ThreatFoxConnector) markFullWindowFailed(sentAt time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if sentAt.After(c.fullFailedAt) {
+		c.fullFailedAt = sentAt
+	}
 }
 
 // markSuccess records the send time of a fetch that returned a parsed answer.

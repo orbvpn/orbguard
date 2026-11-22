@@ -133,3 +133,46 @@ func TestThreatFoxWindowFollowsTheLastSuccess(t *testing.T) {
 		t.Fatalf("requests: %v", stub.days)
 	}
 }
+
+// A fresh process whose 7-day request keeps failing must not ask for 7 days
+// again and again: after one failed full-window request it asks for one day
+// until a fetch succeeds, and only a success restarts the 20-hour rule.
+func TestThreatFoxDoesNotRepeatAFailedFullWindow(t *testing.T) {
+	stub := &threatFoxStub{reset: true}
+	srv := httptest.NewUnstartedServer(stub)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	clock := time.Date(2026, 11, 22, 6, 0, 0, 0, time.UTC)
+	c := NewThreatFoxConnector(testLogger(io.Discard))
+	c.client = srv.Client()
+	c.apiURL = srv.URL + "/api/v1/"
+	c.now = func() time.Time { return clock }
+
+	ask := func(step string, after time.Duration, wantDays int, wantOK bool) {
+		t.Helper()
+		clock = clock.Add(after)
+		_, err := c.Fetch(context.Background())
+		if got := stub.lastDays(); got != wantDays {
+			t.Fatalf("%s: asked for %d days, want %d", step, got, wantDays)
+		}
+		if (err == nil) != wantOK {
+			t.Fatalf("%s: err=%v, want ok=%v", step, err, wantOK)
+		}
+	}
+
+	ask("first fetch of the process, reset", 0, 7, false)
+	ask("15 minutes later, reset", 15*time.Minute, 1, false)
+	ask("30 minutes later, reset", 15*time.Minute, 1, false)
+	ask("a day later, still no success", 24*time.Hour, 1, false)
+	stub.set(false, threatFoxOK)
+	ask("the provider answers again", 15*time.Minute, 1, true)
+	ask("15 minutes after the success", 15*time.Minute, 1, true)
+
+	// The ordinary rule again: 20 hours without a success gives one
+	// full-window attempt, and its failure falls back to one day.
+	stub.set(true, "")
+	ask("20 hours after the last success, reset", 20*time.Hour, 7, false)
+	ask("15 minutes later", 15*time.Minute, 1, false)
+}
