@@ -132,6 +132,9 @@ func main() {
 	registry := sources.NewRegistry(log)
 	registerConnectors(registry, log)
 	registry.ConfigureFromSourcesConfig(cfg.Sources)
+	if redisCache != nil {
+		abusech.ShareFetchGate(registry.List(), redisCache)
+	}
 
 	// Register connectors with aggregator
 	for _, conn := range registry.List() {
@@ -307,6 +310,9 @@ func main() {
 	// Initialize AI-powered scam detection service
 	scamConfig := buildScamDetectorConfig(cfg, log)
 	scamDetector := ai.NewScamDetector(log, scamConfig)
+	if redisCache != nil {
+		scamDetector.SetPhoneReportStore(ai.NewRedisPhoneReportStore(redisCache))
+	}
 	speechProvider := "disabled"
 	if scamConfig.EnableSpeech {
 		if scamConfig.AzureOpenAIEndpoint != "" && scamConfig.AzureOpenAIKey != "" && scamConfig.AzureOpenAITranscribeDeployment != "" {

@@ -34,6 +34,9 @@ type IndicatorFilter struct {
 	Value          string
 	Limit          int
 	Offset         int
+
+	// ExcludeSourceIDs leaves out rows whose first reporting source is listed.
+	ExcludeSourceIDs []string
 }
 
 // IndicatorStats holds aggregate statistics
@@ -411,6 +414,12 @@ func (r *IndicatorRepository) listWithComplexFilter(ctx context.Context, filter 
 
 	if filter.CriticalOnly {
 		conditions = append(conditions, "severity = 'critical'")
+	}
+
+	if len(filter.ExcludeSourceIDs) > 0 {
+		conditions = append(conditions, fmt.Sprintf("COALESCE(source_id, '') <> ALL($%d::text[])", argNum))
+		args = append(args, filter.ExcludeSourceIDs)
+		argNum++
 	}
 
 	if filter.Value != "" {

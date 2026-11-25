@@ -3,6 +3,10 @@ package android
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"errors"
+	"io"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -94,33 +98,138 @@ var logcatPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^([VDIWEF])/([^(]+)\(\s*(\d+)\):\s*(.*)$`),
 	// time format: MM-DD HH:MM:SS.mmm PRIORITY/TAG(PID): MESSAGE
 	regexp.MustCompile(`^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])/([^(]+)\(\s*(\d+)\):\s*(.*)$`),
+	// threadtime with -v uid: MM-DD HH:MM:SS.mmm UID PID TID PRIORITY TAG: MESSAGE
+	regexp.MustCompile(`^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(\S+)\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+([^:]+):\s*(.*)$`),
+}
+
+// Lines that are not log entries but belong to a log or a bugreport.
+var (
+	logcatBannerPattern     = regexp.MustCompile(`^-{9} (?:beginning of|switch to) `)
+	bugreportSectionPattern = regexp.MustCompile(`^------ .* ------$`)
+	bugreportLogcatSection  = regexp.MustCompile(`^------ .*\blogcat\b.* ------$`)
+)
+
+// maxLogcatFindings bounds the memory a crafted log can take. Reading stops
+// there, and what was not reached counts as not examined.
+const maxLogcatFindings = 1000
+
+// maxFindingTagBytes bounds the log tag a finding keeps.
+const maxFindingTagBytes = 256
+
+// findingText copies at most n bytes, so a kept finding does not hold on to
+// the whole line it came from.
+func findingText(s string, n int) string {
+	return strings.Clone(truncate(s, n))
+}
+
+// logcatSpywareNames are the names of the known-spyware rules. A line the
+// parser could not read and that holds one is never tolerated as noise.
+var logcatSpywareNames = []string{
+	"pegasus", "chrysaor", "lipizzan", "skygofree", "predator",
+	"cereals", "equus", "monstermind",
+	"mspy", "flexispy", "cerberus", "cocospy", "spyic", "hoverwatch",
+}
+
+func holdsSpywareName(line string) bool {
+	lower := strings.ToLower(line)
+	for _, name := range logcatSpywareNames {
+		if strings.Contains(lower, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// logcatShare counts recognised lines. In a bugreport only the log sections
+// count: its other sections are not logs and would never match. Banners count
+// neither way.
+type logcatShare struct {
+	read, total       int
+	logRead, logTotal int
+	inLog             bool
+	unreadIndicator   bool
+}
+
+func (c *logcatShare) add(line string, parsed bool) {
+	if strings.TrimSpace(line) == "" {
+		return
+	}
+	if strings.HasPrefix(line, "------ ") && bugreportSectionPattern.MatchString(line) {
+		c.inLog = bugreportLogcatSection.MatchString(line)
+		return
+	}
+	if !parsed && logcatBannerPattern.MatchString(line) {
+		return
+	}
+	if !parsed && holdsSpywareName(line) {
+		c.unreadIndicator = true
+	}
+	read := 0
+	if parsed {
+		read = 1
+	}
+	c.read += read
+	c.total++
+	if c.inLog {
+		c.logRead += read
+		c.logTotal++
+	}
+}
+
+func (c *logcatShare) enough() bool {
+	if c.unreadIndicator {
+		return false
+	}
+	if c.logTotal > 0 {
+		return models.RecognisedEnough(c.logRead, c.logTotal)
+	}
+	return models.RecognisedEnough(c.read, c.total)
 }
 
 // Parse parses logcat data and returns forensic results
 func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
+	return p.ParseStream(context.Background(), bytes.NewReader(data), 0)
+}
+
+// ParseStream parses a log as it is read and keeps only its findings, so memory
+// does not follow the size of the log. It stops when ctx ends and after
+// maxBytes (0 means no limit). What it did not reach counts as not examined.
+func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes int64) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "android", models.ForensicScanTypeLogcat)
 
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	entries := make([]models.LogcatEntry, 0)
+	limited := &io.LimitedReader{R: r, N: math.MaxInt64}
+	if maxBytes > 0 {
+		limited.N = maxBytes + 1
+	}
+	scanner := bufio.NewScanner(limited)
+	entryCount := 0
+	stopped := false
 	timeline := models.NewTimeline()
+	var share logcatShare
 
 	lineNum := 0
 	for scanner.Scan() {
+		if ctx.Err() != nil {
+			stopped = true
+			break
+		}
 		lineNum++
 		line := scanner.Text()
 
 		entry, ok := p.parseLine(line, lineNum)
+		share.add(line, ok)
 		if !ok {
 			continue
 		}
 
-		entries = append(entries, entry)
+		entryCount++
 
 		// Analyze for suspicious patterns
 		isSuspicious, score, reason, tags := p.analyzeEntry(entry)
 		if isSuspicious {
 			entry.IsSuspicious = true
 			entry.Reason = reason
+			timestamp := entry.Timestamp
 
 			anomaly := models.Anomaly{
 				ID:          uuid.New().String(),
@@ -130,10 +239,10 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 				Title:       "Suspicious Logcat Entry",
 				Description: reason,
 				ProcessPID:  entry.PID,
-				Timestamp:   &entry.Timestamp,
+				Timestamp:   &timestamp,
 				Evidence: map[string]any{
-					"tag":      entry.Tag,
-					"message":  entry.Message,
+					"tag":      findingText(entry.Tag, maxFindingTagBytes),
+					"message":  findingText(entry.Message, 2048),
 					"priority": entry.Priority,
 					"tid":      entry.TID,
 					"tags":     tags,
@@ -151,7 +260,7 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 				Timestamp:    entry.Timestamp,
 				Type:         models.TimelineEventTypeAnomaly,
 				Source:       "logcat",
-				Title:        entry.Tag + ": " + truncate(entry.Message, 50),
+				Title:        truncate(entry.Tag, maxFindingTagBytes) + ": " + truncate(entry.Message, 50),
 				Description:  reason,
 				PID:          entry.PID,
 				IsSuspicious: true,
@@ -162,15 +271,26 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 					"tags":     tags,
 				},
 			})
+
+			if len(result.Anomalies) >= maxLogcatFindings {
+				stopped = true
+				break
+			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		if errors.Is(err, bufio.ErrTooLong) {
+			return nil, err
+		}
+		stopped = true // the stream broke, so the rest was not read
 	}
-
-	// Analyze patterns across entries
-	p.analyzePatterns(entries, result, timeline)
+	if maxBytes > 0 && limited.N <= 0 {
+		stopped = true
+	}
+	if entryCount == 0 && !stopped {
+		return nil, models.ErrNothingExamined
+	}
 
 	// Detect threats
 	threats := p.detectThreats(result.Anomalies)
@@ -181,11 +301,63 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 	timeline.Sort()
 	result.Timeline = timeline.ToEvents()
 
-	result.RawData["total_entries"] = len(entries)
+	result.RawData["total_entries"] = entryCount
 	result.RawData["suspicious_entries"] = len(result.Anomalies)
+
+	// A log read only in part is never clean. Only a high or critical finding
+	// may stand, and the result then lists what was skipped.
+	notExamined := make([]string, 0, 2)
+	if stopped {
+		notExamined = append(notExamined, "logcat beyond the size, findings or time limit")
+	} else {
+		if !share.enough() {
+			notExamined = append(notExamined, "logcat lines in an unread format")
+		}
+		if entryCount < models.MinLogEntries && !result.HasHighFinding() {
+			notExamined = append(notExamined, "too few logcat entries to call the log read")
+		}
+	}
+	if len(notExamined) > 0 {
+		if !result.HasHighFinding() {
+			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
+		}
+		result.RawData["not_examined"] = notExamined
+	}
 
 	result.Complete()
 	return result, nil
+}
+
+// Recognises reports whether data reads as a logcat: at least one entry, and
+// recognised lines make up the share RecognisedEnough asks for.
+func (p *LogcatParser) Recognises(data []byte) bool {
+	return p.RecognisesContext(context.Background(), data)
+}
+
+// RecognisesContext is Recognises that answers false once ctx has ended.
+func (p *LogcatParser) RecognisesContext(ctx context.Context, data []byte) bool {
+	var share logcatShare
+	entries := 0
+	for len(data) > 0 {
+		if ctx.Err() != nil {
+			return false
+		}
+		var raw []byte
+		raw, data, _ = bytes.Cut(data, []byte("\n"))
+		line := strings.TrimSuffix(string(raw), "\r")
+		parsed := false
+		for _, pattern := range logcatPatterns {
+			if pattern.MatchString(line) {
+				parsed = true
+				break
+			}
+		}
+		if parsed {
+			entries++
+		}
+		share.add(line, parsed)
+	}
+	return entries >= models.MinLogEntries && share.enough()
 }
 
 // parseLine parses a single logcat line
@@ -225,6 +397,17 @@ func (p *LogcatParser) parseLine(line string, lineNum int) (models.LogcatEntry, 
 				entry.Tag = strings.TrimSpace(matches[3])
 				entry.PID, _ = strconv.Atoi(matches[4])
 				entry.Message = matches[5]
+				return entry, true
+
+			case 8: // threadtime with a UID column
+				ts, _ := time.Parse("01-02 15:04:05.000", matches[1])
+				entry.Timestamp = time.Date(time.Now().Year(), ts.Month(), ts.Day(),
+					ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
+				entry.PID, _ = strconv.Atoi(matches[3])
+				entry.TID, _ = strconv.Atoi(matches[4])
+				entry.Priority = matches[5]
+				entry.Tag = strings.TrimSpace(matches[6])
+				entry.Message = matches[7]
 				return entry, true
 			}
 		}

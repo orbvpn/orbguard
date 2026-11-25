@@ -863,7 +863,11 @@ func (s *AnalyticsService) buildReportPayload(ctx context.Context, report *model
 		if err != nil {
 			return nil, err
 		}
-		payload.Sources = sources
+		// Never in a report: the report is built in the background with no
+		// caller, and its file is served later to whoever may read the
+		// report, which includes every caller for a report without an owner.
+		// Admins read last errors live from GET /analytics/sources.
+		payload.Sources = sources.WithoutLastErrors()
 	case models.ReportTypeCampaignAnalysis:
 		campaigns, err := s.buildCampaignInsights(ctx, report.TimeRange)
 		if err != nil {
@@ -1000,14 +1004,13 @@ func renderReportCSV(payload *reportPayload) ([]byte, error) {
 
 	if src := payload.Sources; src != nil {
 		write("sources")
-		write("slug", "name", "status", "indicator_count", "new_today", "success_rate", "avg_latency_ms", "last_error")
+		write("slug", "name", "status", "indicator_count", "new_today", "success_rate", "avg_latency_ms")
 		for _, e := range src.Sources {
 			write(e.Slug, e.Name, e.Status,
 				strconv.FormatInt(e.IndicatorCount, 10),
 				strconv.FormatInt(e.NewToday, 10),
 				strconv.FormatFloat(e.SuccessRate, 'f', 1, 64),
-				strconv.FormatInt(e.AverageLatency, 10),
-				e.LastError)
+				strconv.FormatInt(e.AverageLatency, 10))
 		}
 		write()
 	}

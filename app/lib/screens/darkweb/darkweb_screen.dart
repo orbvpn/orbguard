@@ -182,6 +182,13 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
             const SizedBox(height: 24),
             PasswordCheckResultCard(result: provider.lastPasswordResult!),
           ],
+          if (provider.passwordError != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              provider.passwordError!,
+              style: TextStyle(color: AppColors.errorInk, fontSize: 14),
+            ),
+          ],
           // Info section
           const SizedBox(height: 24),
           GlassCard(

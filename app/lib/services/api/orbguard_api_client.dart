@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 import 'api_interceptors.dart';
+import '../security/password_k_anonymity.dart';
 import '../../models/api/threat_indicator.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../models/api/url_reputation.dart';
@@ -1204,18 +1205,16 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Check password for breaches (k-anonymity)
-  Future<PasswordBreachResult> checkPasswordBreaches(
-    String passwordHashPrefix,
-  ) async {
+  /// Known hash suffixes for a five character SHA-1 prefix (k-anonymity).
+  /// The caller compares its own suffix on the device.
+  Future<Map<String, int>> getPasswordRange(String prefix) async {
     try {
       final response = await _dio.post(
-        ApiEndpoints.darkwebCheckPassword,
-        data: {'password_hash_prefix': passwordHashPrefix},
+        ApiEndpoints.darkwebPasswordRange,
+        data: {'prefix': prefix},
+        options: Options(extra: {'sensitiveBody': true}),
       );
-      return PasswordBreachResult.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      return parsePasswordRange(response.data);
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }

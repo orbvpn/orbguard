@@ -271,7 +271,6 @@ func (h *AdminHandler) ApproveReport(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error().Err(err).
 			Str("report_id", report.ID.String()).
-			Str("indicator_value", report.IndicatorValue).
 			Msg("failed to upsert indicator from approved report")
 		h.respondError(w, http.StatusInternalServerError, "failed to create indicator from report")
 		return

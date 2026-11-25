@@ -91,6 +91,12 @@ type PasswordCheckResponse struct {
 	CheckedAt    time.Time `json:"checked_at"`
 }
 
+// PasswordRangeEntry is one known hash suffix for a k-anonymity prefix.
+type PasswordRangeEntry struct {
+	Suffix string `json:"suffix"`
+	Count  int    `json:"count"`
+}
+
 // MonitoredAsset represents an asset being monitored on the dark web
 type MonitoredAsset struct {
 	ID          uuid.UUID      `json:"id"`

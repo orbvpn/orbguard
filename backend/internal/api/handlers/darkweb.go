@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -63,6 +68,100 @@ func (h *DarkWebHandler) authorizedIdentity(w http.ResponseWriter, r *http.Reque
 	return identity, true
 }
 
+// establishedDeviceKeyAge is how old a device key must be before it may reach
+// the larger share of the paid lookup budget.
+const establishedDeviceKeyAge = 24 * time.Hour
+
+// passwordRangeBodyLimit bounds the password range request body.
+const passwordRangeBodyLimit = 256
+
+var passwordHashPrefix = regexp.MustCompile(`^[0-9A-Fa-f]{5}$`)
+
+// deviceKeyIssuedAt is when the device's first key was issued. Keys from before
+// that was recorded count from their own issue time.
+func deviceKeyIssuedAt(ctx context.Context) (time.Time, bool) {
+	if since, ok := middleware.GetDeviceKeySince(ctx); ok {
+		return since, true
+	}
+	expiry, ok := middleware.GetDeviceKeyExpiry(ctx)
+	return expiry.Add(-authAPIKeyTTL), ok
+}
+
+// paidLookupCaller decides who a paid lookup is charged to, from the
+// authenticated context and the trusted client address only.
+//
+// The released app authenticates with a self-issued device key, so its users
+// cannot be told from strangers by plan. An OrbNet account counts as paying
+// only when its token shows a plan paid for with money; any other account gets
+// the budget of a new device.
+func paidLookupCaller(r *http.Request) services.PaidLookupCaller {
+	ctx := r.Context()
+	if middleware.IsServiceRequest(ctx) {
+		return services.PaidLookupCaller{Tier: services.PaidLookupService, Identity: services.PaidLookupServiceIdentity}
+	}
+	caller := services.PaidLookupCaller{
+		Tier:     services.PaidLookupNewDevice,
+		Identity: middleware.CallerIdentity(ctx),
+		Address:  middleware.ClientSubscriber(r),
+	}
+	if middleware.IsPayingAccount(ctx) {
+		caller.Tier = services.PaidLookupPaid
+		return caller
+	}
+	if issued, ok := deviceKeyIssuedAt(ctx); ok && time.Since(issued) >= establishedDeviceKeyAge {
+		caller.Tier = services.PaidLookupEstablished
+		caller.Issuer = middleware.GetDeviceKeyIssuer(ctx)
+		if caller.Issuer == "" {
+			caller.Address = middleware.ClientSite(r)
+		}
+	}
+	return caller
+}
+
+// respondPaidLookupError answers a refused paid lookup and reports whether err
+// was one. Both answers are failures, so no client can read them as "no breach".
+func (h *DarkWebHandler) respondPaidLookupError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, services.ErrPaidLookupLimited):
+		w.Header().Set("Retry-After", strconv.FormatInt(int64(services.PaidLookupRetryAfter(time.Now())/time.Second), 10))
+		h.respondError(w, http.StatusTooManyRequests, "daily breach check limit reached, please try again tomorrow")
+	case errors.Is(err, services.ErrPaidLookupUnavailable), errors.Is(err, services.ErrBreachProvidersFailed):
+		h.respondError(w, http.StatusServiceUnavailable, "breach checking is temporarily unavailable")
+	case errors.Is(err, services.ErrNoBreachProviders):
+		h.respondError(w, http.StatusServiceUnavailable, "breach checking is not available: no breach data providers configured")
+	default:
+		return false
+	}
+	return true
+}
+
+// PasswordRange handles POST /api/v1/darkweb/password/range. It takes only a
+// five character SHA-1 prefix, in the body so that it stays out of access
+// logs, and returns the known suffixes. The client compares on the device.
+func (h *DarkWebHandler) PasswordRange(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Prefix string `json:"prefix"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, passwordRangeBodyLimit)).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !passwordHashPrefix.MatchString(req.Prefix) {
+		h.respondError(w, http.StatusBadRequest, "prefix must be exactly 5 hex characters")
+		return
+	}
+
+	entries, err := h.monitor.PasswordRange(r.Context(), strings.ToUpper(req.Prefix))
+	if err != nil {
+		h.logger.Warn().Msg("password range lookup failed")
+		h.respondError(w, http.StatusBadGateway, "password check is temporarily unavailable")
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{"suffixes": entries})
+}
+
 // CheckEmail handles POST /api/v1/darkweb/check/email
 func (h *DarkWebHandler) CheckEmail(w http.ResponseWriter, r *http.Request) {
 	var req models.BreachCheckRequest
@@ -76,10 +175,10 @@ func (h *DarkWebHandler) CheckEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.monitor.CheckEmail(r.Context(), &req)
+	ctx := services.WithPaidLookupCaller(r.Context(), paidLookupCaller(r))
+	result, err := h.monitor.CheckEmail(ctx, &req)
 	if err != nil {
-		if errors.Is(err, services.ErrNoBreachProviders) {
-			h.respondError(w, http.StatusServiceUnavailable, "breach checking is not available: no breach data providers configured")
+		if h.respondPaidLookupError(w, err) {
 			return
 		}
 		h.logger.Error().Err(err).Msg("failed to check email")
@@ -90,27 +189,11 @@ func (h *DarkWebHandler) CheckEmail(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, result)
 }
 
-// CheckPassword handles POST /api/v1/darkweb/check/password
+// CheckPassword handles POST /api/v1/darkweb/check/password. The route is
+// closed: a password must not reach the server. It reads nothing and keeps the
+// answer released apps already get. Clients use /darkweb/password/range.
 func (h *DarkWebHandler) CheckPassword(w http.ResponseWriter, r *http.Request) {
-	var req models.PasswordCheckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if req.Password == "" {
-		h.respondError(w, http.StatusBadRequest, "password is required")
-		return
-	}
-
-	result, err := h.monitor.CheckPassword(r.Context(), &req)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to check password")
-		h.respondError(w, http.StatusInternalServerError, "failed to check password")
-		return
-	}
-
-	h.respondJSON(w, http.StatusOK, result)
+	h.respondError(w, http.StatusBadRequest, "password is required")
 }
 
 // AddMonitoredAsset handles POST /api/v1/darkweb/monitor
@@ -146,8 +229,12 @@ func (h *DarkWebHandler) AddMonitoredAsset(w http.ResponseWriter, r *http.Reques
 		deviceID = req.DeviceID
 	}
 
-	asset, err := h.monitor.AddMonitoredAsset(r.Context(), identity, deviceID, assetType, req.Value)
+	ctx := services.WithPaidLookupCaller(r.Context(), paidLookupCaller(r))
+	asset, err := h.monitor.AddMonitoredAsset(ctx, identity, deviceID, assetType, req.Value)
 	if err != nil {
+		if h.respondPaidLookupError(w, err) {
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to add monitored asset")
 		h.respondError(w, http.StatusInternalServerError, "failed to add monitored asset")
 		return
@@ -333,6 +420,13 @@ func (h *DarkWebHandler) GetBreachByName(w http.ResponseWriter, r *http.Request)
 // RefreshMonitoring handles POST /api/v1/darkweb/refresh
 func (h *DarkWebHandler) RefreshMonitoring(w http.ResponseWriter, r *http.Request) {
 	if err := h.monitor.RefreshMonitoredAssets(r.Context()); err != nil {
+		if errors.Is(err, services.ErrRefreshInProgress) {
+			h.respondError(w, http.StatusConflict, "a refresh is already running")
+			return
+		}
+		if h.respondPaidLookupError(w, err) {
+			return
+		}
 		h.logger.Error().Err(err).Msg("failed to refresh monitored assets")
 		h.respondError(w, http.StatusInternalServerError, "failed to refresh")
 		return

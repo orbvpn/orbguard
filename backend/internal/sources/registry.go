@@ -130,10 +130,18 @@ func (r *Registry) Configure(slug string, cfg ConnectorConfig) error {
 
 // ConfigureFromSourcesConfig applies configuration from config file
 func (r *Registry) ConfigureFromSourcesConfig(cfg config.SourcesConfig) {
+	// abuse.ch Auth-Keys belong to an account, not to one platform. The one key
+	// this service holds is configured under ThreatFox; the two file exports
+	// use it too, so there is no second secret to manage.
+	urlhausCfg := cfg.URLhaus
+	urlhausCfg.APIKey = cfg.ThreatFox.APIKey
+	malwareBazaarCfg := cfg.MalwareBazaar
+	malwareBazaarCfg.APIKey = cfg.ThreatFox.APIKey
+
 	configs := map[string]config.SourceConfig{
-		"urlhaus":             cfg.URLhaus,
+		"urlhaus":             urlhausCfg,
 		"threatfox":           cfg.ThreatFox,
-		"malwarebazaar":       cfg.MalwareBazaar,
+		"malwarebazaar":       malwareBazaarCfg,
 		"feodotracker":        cfg.FeodoTracker,
 		"sslblacklist":        cfg.SSLBlacklist,
 		"openphish":           cfg.OpenPhish,

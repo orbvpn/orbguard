@@ -328,7 +328,6 @@ func (s *Server) ReportNetworkThreat(ctx context.Context, req *NetworkThreatRepo
 	}
 
 	s.logger.Info().
-		Str("value", req.IndicatorValue).
 		Str("type", req.IndicatorType.String()).
 		Str("server_id", req.ServerId).
 		Msg("received network threat report")
@@ -372,7 +371,7 @@ func (s *Server) ReportNetworkThreat(ctx context.Context, req *NetworkThreatRepo
 
 		created, err := s.repos.Indicators.Upsert(ctx, indicator)
 		if err != nil {
-			s.logger.Error().Err(err).Str("value", req.IndicatorValue).Msg("failed to store network threat report")
+			s.logger.Error().Err(err).Str("type", req.IndicatorType.String()).Msg("failed to store network threat report")
 			return &ReportResponse{
 				Success:  false,
 				Message:  "Failed to store report",

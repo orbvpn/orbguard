@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -282,8 +281,7 @@ func (s *SpeechAnalyzer) transcribeWithAzureOpenAI(ctx context.Context, audioDat
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", "", 0, fmt.Errorf("Azure OpenAI transcription error: %s - %s", resp.Status, string(body))
+		return "", "", 0, fmt.Errorf("Azure OpenAI transcription error: %s", resp.Status)
 	}
 
 	var result struct {
@@ -358,8 +356,7 @@ func (s *SpeechAnalyzer) transcribeWithOpenAI(ctx context.Context, audioData []b
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", "", 0, fmt.Errorf("OpenAI API error: %s - %s", resp.Status, string(body))
+		return "", "", 0, fmt.Errorf("OpenAI API error: %s", resp.Status)
 	}
 
 	var result struct {

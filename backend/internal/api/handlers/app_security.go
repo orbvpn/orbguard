@@ -287,13 +287,12 @@ func (h *AppSecurityHandler) ReportApp(w http.ResponseWriter, r *http.Request) {
 			h.respondError(w, http.StatusServiceUnavailable, "app reports unavailable: persistence not configured")
 			return
 		}
-		h.logger.Error().Err(err).Str("package", req.PackageName).Msg("failed to save app report")
+		h.logger.Error().Err(err).Str("type", req.ReportType).Msg("failed to save app report")
 		h.respondError(w, http.StatusInternalServerError, "failed to save app report")
 		return
 	}
 
 	h.logger.Info().
-		Str("package", req.PackageName).
 		Str("type", req.ReportType).
 		Str("report_id", saved.ID.String()).
 		Msg("app report received")

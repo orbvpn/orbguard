@@ -797,7 +797,6 @@ func (s *URLReputationService) ReportURL(ctx context.Context, userID, deviceID, 
 	}
 
 	s.logger.Info().
-		Str("url", reportURL).
 		Str("report_type", reportType).
 		Str("user_id", userID).
 		Str("device_id", deviceID).

@@ -67,6 +67,48 @@ func (e *PlanLimitError) Error() string {
 // IsPlanLimit marks this error type for duck-typed detection.
 func (e *PlanLimitError) IsPlanLimit() bool { return true }
 
+// FetchDeferredError means the connector chose not to call the provider
+// because its own pacing window is still open. Nothing was requested and
+// nothing failed, so callers must not record a failure, a success or a rate
+// limit for the source.
+type FetchDeferredError struct {
+	Provider string
+	Wait     time.Duration
+}
+
+// Error implements the error interface.
+func (e *FetchDeferredError) Error() string {
+	return fmt.Sprintf("%s fetch deferred, next attempt in %s", e.Provider, e.Wait.Round(time.Second))
+}
+
+// IsFetchDeferred marks this error type for duck-typed detection.
+func (e *FetchDeferredError) IsFetchDeferred() bool { return true }
+
+// FetchBlockedError means a feed cannot work until someone acts: the provider
+// refused the key or no longer serves the address, or no key is configured.
+// Unlike a deferral it is a failure and must reach the job and the source row,
+// also while the connector holds off and sends no request. It unwraps to its
+// PlanLimitError so existing plan-limit checks still recognise it.
+type FetchBlockedError struct {
+	PlanLimitError
+	// Requested is true when this attempt reached the provider.
+	Requested bool
+}
+
+// Error implements the error interface.
+func (e *FetchBlockedError) Error() string {
+	return fmt.Sprintf("%s fetch blocked: %s", e.Provider, e.Message)
+}
+
+// Unwrap exposes the underlying plan-limit error.
+func (e *FetchBlockedError) Unwrap() error { return &e.PlanLimitError }
+
+// IsFetchBlocked marks this error type for duck-typed detection.
+func (e *FetchBlockedError) IsFetchBlocked() bool { return true }
+
+// RequestSent reports whether this attempt reached the provider.
+func (e *FetchBlockedError) RequestSent() bool { return e.Requested }
+
 // AsRateLimit extracts a *RateLimitError from an error chain.
 func AsRateLimit(err error) (*RateLimitError, bool) {
 	var rle *RateLimitError

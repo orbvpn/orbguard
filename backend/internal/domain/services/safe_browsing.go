@@ -80,14 +80,17 @@ func (c *GoogleSafeBrowsingClient) CheckURLs(ctx context.Context, urls []string)
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	// The key goes in the X-Goog-Api-Key header, not ?key=: a URL is quoted
+	// in full by every transport error, and so in the logs.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		fmt.Sprintf("https://safebrowsing.googleapis.com/v4/threatMatches:find?key=%s", c.apiKey),
+		"https://safebrowsing.googleapis.com/v4/threatMatches:find",
 		bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

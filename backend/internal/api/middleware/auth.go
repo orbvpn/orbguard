@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"strconv"
@@ -41,6 +43,15 @@ const (
 	// listener saw it, recorded by PeerAddress before RealIP rewrites
 	// RemoteAddr from client-supplied headers.
 	ContextKeyPeerAddr ContextKey = "peer_addr"
+	// ContextKeyDeviceKeyExpiry holds the expiry of the device API key the
+	// request authenticated with. Absent for every other credential.
+	ContextKeyDeviceKeyExpiry ContextKey = "device_key_expiry"
+	// ContextKeyPayingAccount is true for an OrbNet JWT that shows a paid plan.
+	ContextKeyPayingAccount ContextKey = "paying_account"
+	// ContextKeyDeviceKeyIssuer holds the IssuedFrom tag of that key.
+	ContextKeyDeviceKeyIssuer ContextKey = "device_key_issuer"
+	// ContextKeyDeviceKeySince holds the KeySince of that key, when it has one.
+	ContextKeyDeviceKeySince ContextKey = "device_key_since"
 )
 
 const (
@@ -101,6 +112,12 @@ type TokenClaims struct {
 	UserID    string    `json:"user_id,omitempty"`
 	DeviceID  string    `json:"device_id,omitempty"`
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	// IssuedFrom tags the client network a device key was issued on.
+	IssuedFrom string `json:"issued_from,omitempty"`
+	// KeySince is when this device's first key was issued. A re-registration
+	// by the holder of a key or session keeps it. Keys issued before this
+	// field existed have none: their age comes from ExpiresAt.
+	KeySince time.Time `json:"key_since,omitempty"`
 }
 
 // TokenStore is the read interface the auth middleware needs to validate
@@ -291,6 +308,57 @@ func lockoutAddress(r *http.Request) string {
 	return peer
 }
 
+// ClientAddress is the client's address as the ingress saw it (see
+// lockoutAddress). Unlike RemoteAddr after RealIP, a client cannot choose it.
+func ClientAddress(r *http.Request) string {
+	return lockoutAddress(r)
+}
+
+// ClientSubscriber is the client address reduced to what one subscriber
+// controls: the IPv4 address, or the IPv6 /64.
+func ClientSubscriber(r *http.Request) string {
+	addr := ClientAddress(r)
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+		return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+	}
+	return addr
+}
+
+// ClientSite is the client address for a limit shared by keys that cannot be
+// told apart otherwise: the IPv4 address, or the IPv6 /48.
+func ClientSite(r *http.Request) string {
+	addr := ClientAddress(r)
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+		return ClientNetwork(r)
+	}
+	return addr
+}
+
+// KeyIssuerTag is the value stored on a new device key: a hash of the client
+// network it was issued on, so the stored key holds no address.
+func KeyIssuerTag(r *http.Request) string {
+	network := ClientNetwork(r)
+	if network == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(network))
+	return hex.EncodeToString(sum[:8])
+}
+
+// ClientNetwork is the client's network (IPv4 /24, IPv6 /48), the unit that
+// counts as one reporter: one host can usually change its address inside it.
+// It is empty when the client address cannot be parsed.
+func ClientNetwork(r *http.Request) string {
+	ip := net.ParseIP(ClientAddress(r))
+	if ip == nil {
+		return ""
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4.Mask(net.CIDRMask(24, 32)).String() + "/24"
+	}
+	return ip.Mask(net.CIDRMask(48, 128)).String() + "/48"
+}
+
 // lockoutKey is the failure-counter key for a client address. An IPv6 client
 // picks the low 64 bits of its own address, so IPv6 is counted per /64, the
 // smallest block a subscriber is handed; per address, one host could spread
@@ -374,20 +442,21 @@ func writeAdminLocked(w http.ResponseWriter, retryAfter time.Duration) {
 }
 
 // lookupToken resolves a presented bearer token against the token store.
-// It checks session tokens first, then device API keys. Expiry is enforced
-// both by the Redis TTL (a missing key) and the explicit expires_at field.
-func lookupToken(ctx context.Context, store TokenStore, token string) (TokenClaims, bool) {
+// It checks session tokens first, then device API keys, and reports whether a
+// device API key matched. Expiry is enforced both by the Redis TTL (a missing
+// key) and the explicit expires_at field.
+func lookupToken(ctx context.Context, store TokenStore, token string) (claims TokenClaims, deviceKey, ok bool) {
 	for _, key := range []string{"auth:token:" + token, "auth:apikey:" + token} {
-		var claims TokenClaims
-		if err := store.GetJSON(ctx, key, &claims); err != nil {
+		var found TokenClaims
+		if err := store.GetJSON(ctx, key, &found); err != nil {
 			continue
 		}
-		if !claims.ExpiresAt.IsZero() && time.Now().After(claims.ExpiresAt) {
+		if !found.ExpiresAt.IsZero() && time.Now().After(found.ExpiresAt) {
 			continue
 		}
-		return claims, true
+		return found, strings.HasPrefix(key, "auth:apikey:"), true
 	}
-	return TokenClaims{}, false
+	return TokenClaims{}, false, false
 }
 
 // APIKeyAuth returns middleware that validates bearer token authentication.
@@ -441,6 +510,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
 				ctx = context.WithValue(ctx, ContextKeyOrbNetUserID, claims.UserID)
 				ctx = context.WithValue(ctx, ContextKeySubscriptionValid, claims.SubscriptionValid)
+				ctx = context.WithValue(ctx, ContextKeyPayingAccount, claims.IsPaying())
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -452,7 +522,7 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				if env == "development" {
 					if log != nil {
 						log.WithComponent("auth-middleware").Warn().
-							Str("path", r.URL.Path).
+							Str("path", logPath(r)).
 							Msg("token store not configured; accepting token in development mode only")
 					}
 					ctx := context.WithValue(r.Context(), ContextKeyAPIKey, token)
@@ -461,14 +531,14 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 				}
 				if log != nil {
 					log.WithComponent("auth-middleware").Error().
-						Str("path", r.URL.Path).
+						Str("path", logPath(r)).
 						Msg("token store not configured; rejecting request")
 				}
 				http.Error(w, `{"error":"authentication unavailable"}`, http.StatusServiceUnavailable)
 				return
 			}
 
-			claims, ok := lookupToken(r.Context(), store, token)
+			claims, deviceKey, ok := lookupToken(r.Context(), store, token)
 			if !ok {
 				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
 				return
@@ -480,6 +550,15 @@ func APIKeyAuth(secret string) func(next http.Handler) http.Handler {
 			}
 			if claims.DeviceID != "" {
 				ctx = context.WithValue(ctx, ContextKeyDeviceID, claims.DeviceID)
+			}
+			if deviceKey && !claims.ExpiresAt.IsZero() {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeyExpiry, claims.ExpiresAt)
+			}
+			if deviceKey && claims.IssuedFrom != "" {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeyIssuer, claims.IssuedFrom)
+			}
+			if deviceKey && !claims.KeySince.IsZero() {
+				ctx = context.WithValue(ctx, ContextKeyDeviceKeySince, claims.KeySince)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -595,6 +674,22 @@ func AdminAuth(_ string) func(next http.Handler) http.Handler {
 	}
 }
 
+// OptionalAdmin lets a read route serve more to an admin without closing it
+// to everyone else. A request that carries X-Admin-Token goes through
+// AdminAuth in full (lockout, 403 on a wrong token, audit line) and reaches
+// the handler with IsAdmin set; a request without the header reaches the
+// handler as before, with IsAdmin false.
+func OptionalAdmin(next http.Handler) http.Handler {
+	withAdmin := AdminAuth("")(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(adminTokenHeader) != "" {
+			withAdmin.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // GetAPIKey returns the API key from context
 func GetAPIKey(ctx context.Context) string {
 	if key, ok := ctx.Value(ContextKeyAPIKey).(string); ok {
@@ -615,6 +710,52 @@ func GetUserID(ctx context.Context) string {
 func GetDeviceID(ctx context.Context) string {
 	if id, ok := ctx.Value(ContextKeyDeviceID).(string); ok {
 		return id
+	}
+	return ""
+}
+
+// GetDeviceKeyExpiry returns the expiry of the device API key the request
+// authenticated with.
+func GetDeviceKeyExpiry(ctx context.Context) (time.Time, bool) {
+	expiry, ok := ctx.Value(ContextKeyDeviceKeyExpiry).(time.Time)
+	return expiry, ok
+}
+
+// GetDeviceKeySince returns when the device's first key was issued, if the key
+// the request authenticated with records it.
+func GetDeviceKeySince(ctx context.Context) (time.Time, bool) {
+	since, ok := ctx.Value(ContextKeyDeviceKeySince).(time.Time)
+	return since, ok
+}
+
+// IsPayingAccount reports whether the request carries a verified OrbNet JWT
+// that shows a paid plan.
+func IsPayingAccount(ctx context.Context) bool {
+	paying, _ := ctx.Value(ContextKeyPayingAccount).(bool)
+	return paying
+}
+
+// GetDeviceKeyIssuer returns the IssuedFrom tag of the device API key the
+// request authenticated with, or "" when it has none.
+func GetDeviceKeyIssuer(ctx context.Context) string {
+	issuer, _ := ctx.Value(ContextKeyDeviceKeyIssuer).(string)
+	return issuer
+}
+
+// CallerIdentity names the authenticated credential: one name for all keys of
+// one device.
+func CallerIdentity(ctx context.Context) string {
+	switch {
+	case IsServiceRequest(ctx):
+		return "service"
+	case GetOrbNetUserID(ctx) > 0:
+		return "account:" + strconv.FormatInt(GetOrbNetUserID(ctx), 10)
+	case GetDeviceID(ctx) != "":
+		return "device:" + GetDeviceID(ctx)
+	case GetUserID(ctx) != "":
+		return "user:" + GetUserID(ctx)
+	case GetAPIKey(ctx) != "":
+		return "key:" + GetAPIKey(ctx)
 	}
 	return ""
 }

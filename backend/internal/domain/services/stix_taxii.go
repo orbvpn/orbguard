@@ -91,6 +91,11 @@ func (s *STIXTAXIIService) GetAPIRoot() *models.TAXIIAPIRoot {
 	}
 }
 
+// publicCanWrite is what the collection views report as can_write. TAXII
+// defines it per requester, and these views are served to anonymous readers,
+// who cannot write; the admin write path checks the collection's own CanWrite.
+const publicCanWrite = false
+
 // GetCollections returns all collections
 func (s *STIXTAXIIService) GetCollections() *models.TAXIICollections {
 	s.mu.RLock()
@@ -110,7 +115,7 @@ func (s *STIXTAXIIService) GetCollections() *models.TAXIICollections {
 			Description: col.Description,
 			Alias:       col.Alias,
 			CanRead:     col.CanRead,
-			CanWrite:    col.CanWrite,
+			CanWrite:    publicCanWrite,
 			MediaTypes:  col.MediaTypes,
 		})
 	}
@@ -134,7 +139,7 @@ func (s *STIXTAXIIService) GetCollection(collectionID string) (*models.TAXIIColl
 		Description: col.Description,
 		Alias:       col.Alias,
 		CanRead:     col.CanRead,
-		CanWrite:    col.CanWrite,
+		CanWrite:    publicCanWrite,
 		MediaTypes:  col.MediaTypes,
 	}, nil
 }

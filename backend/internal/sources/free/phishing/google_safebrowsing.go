@@ -61,6 +61,14 @@ type SafeBrowsingConnector struct {
 	sourceID uuid.UUID
 }
 
+// setSafeBrowsingKey sends the API key in the X-Goog-Api-Key header, which the
+// v4 API accepts in place of ?key=. A key in the URL ends up in every
+// transport error (Go's *url.Error quotes the URL), and from there in logs and
+// in sources.last_error.
+func setSafeBrowsingKey(req *http.Request, key string) {
+	req.Header.Set("X-Goog-Api-Key", key)
+}
+
 // NewSafeBrowsingConnector creates a new Google Safe Browsing connector
 func NewSafeBrowsingConnector(log *logger.Logger) *SafeBrowsingConnector {
 	return &SafeBrowsingConnector{
@@ -330,12 +338,13 @@ func (c *SafeBrowsingConnector) fetchThreatListUpdates(ctx context.Context) ([]m
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/threatListUpdates:fetch?key=%s", safeBrowsingAPIURL, c.apiKey)
+	url := safeBrowsingAPIURL + "/threatListUpdates:fetch"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setSafeBrowsingKey(req, c.apiKey)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -532,12 +541,13 @@ func (c *SafeBrowsingConnector) LookupURLs(ctx context.Context, urls []string) (
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/threatMatches:find?key=%s", safeBrowsingAPIURL, c.apiKey)
+	url := safeBrowsingAPIURL + "/threatMatches:find"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setSafeBrowsingKey(req, c.apiKey)
 
 	resp, err := c.client.Do(req)
 	if err != nil {

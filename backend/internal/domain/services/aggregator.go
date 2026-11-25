@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,6 +83,39 @@ type rateLimitedError interface {
 type planLimitedError interface {
 	error
 	IsPlanLimit() bool
+}
+
+// fetchDeferredError is implemented by connector errors meaning the connector
+// paced itself and did not call the provider (see
+// internal/sources.FetchDeferredError). It is neither a failure nor a success.
+type fetchDeferredError interface {
+	error
+	IsFetchDeferred() bool
+}
+
+func isFetchDeferred(err error) bool {
+	var deferred fetchDeferredError
+	return errors.As(err, &deferred)
+}
+
+// fetchBlockedError is implemented by connector errors meaning the feed cannot
+// work until someone acts (see internal/sources.FetchBlockedError). It always
+// fails the job and is recorded on the source row.
+type fetchBlockedError interface {
+	error
+	IsFetchBlocked() bool
+	RequestSent() bool
+}
+
+// fetchBlockedRowMarker is part of the text of every fetchBlockedError.
+const fetchBlockedRowMarker = " fetch blocked: "
+
+// sourceRowTracker is implemented by connectors that want failures recorded on
+// their source row on the fetch path that has no row at hand (a blocked feed,
+// a fetch that stored nothing), and their live events capped. A success is
+// recorded on every connector's row (recordFetchSuccess).
+type sourceRowTracker interface {
+	TracksSourceRow() bool
 }
 
 // EventPublisher defines the interface for publishing threat events
@@ -307,7 +341,16 @@ func (a *Aggregator) runDueSources(ctx context.Context) error {
 		dueSources, err := a.repository.GetDueSources(ctx)
 		if err != nil {
 			a.logger.Warn().Err(err).Msg("failed to get due sources from database, falling back to all sources")
-		} else if len(dueSources) > 0 {
+		} else {
+			// The database answered: it alone decides what is due. When no
+			// source is due this tick does nothing; falling through to the
+			// all-sources run here would fetch every source every 15
+			// minutes whatever its interval. Connectors without an active
+			// source row are run by the Scheduler at their own interval.
+			if len(dueSources) == 0 {
+				a.logger.Debug().Msg("no source due")
+				return nil
+			}
 			a.logger.Info().Int("due_sources", len(dueSources)).Msg("processing due sources from database")
 
 			for _, source := range dueSources {
@@ -384,6 +427,20 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// The connector paced itself: no request, so nothing to record.
+		if isFetchDeferred(err) {
+			log.Debug().Str("reason", err.Error()).Msg("source fetch deferred by connector pacing")
+			return err
+		}
+
+		// The feed cannot work until someone acts: show it on the row.
+		var blocked fetchBlockedError
+		if errors.As(err, &blocked) {
+			a.recordFetchBlocked(ctx, source, blocked)
+			log.Error().Err(err).Msg("source fetch blocked")
+			return err
+		}
+
 		// Provider rate limit: persist next_fetch to honor the provider's
 		// Retry-After hint instead of retrying every cycle. This is not a
 		// source failure, so error_count/status are not escalated and we
@@ -474,12 +531,15 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 		Msg("deduplication completed")
 
 	// Score and store new indicators
+	storeFailures := 0
+	events := newThreatEventCap(conn)
 	for _, indicator := range dedupResult.NewIndicators {
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
 		if a.repository != nil {
 			_, err := a.repository.UpsertIndicator(ctx, indicator)
 			if err != nil {
 				log.Warn().Err(err).Str("value", indicator.Value).Msg("failed to store indicator")
+				storeFailures++
 				continue
 			}
 		}
@@ -488,11 +548,23 @@ func (a *Aggregator) fetchFromSourceWithDB(ctx context.Context, conn SourceConne
 		a.deduplicator.MarkSeen(ctx, indicator.ValueHash)
 
 		// Publish real-time event for new threat
-		if a.publisher != nil {
+		if a.publisher != nil && events.allow() {
 			if err := a.publisher.PublishNewThreat(ctx, indicator, source.Slug, source.Name); err != nil {
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
+	}
+
+	events.logSuppressed(log)
+
+	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
+		a.recordStoreFailure(ctx, source, err)
+		log.Error().Err(err).Msg("source fetch stored nothing")
+		fetchResult.Success = false
+		fetchResult.Error = err
+		fetchResult.Duration = time.Since(start)
+		_ = a.repository.RecordFetchHistory(ctx, fetchResult)
+		return err
 	}
 
 	// Update source after successful fetch
@@ -539,6 +611,21 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 	// Fetch raw indicators
 	fetchResult, err := conn.Fetch(ctx)
 	if err != nil {
+		// The connector paced itself: no request, so nothing to record.
+		if isFetchDeferred(err) {
+			log.Debug().Str("reason", err.Error()).Msg("source fetch deferred by connector pacing")
+			return nil
+		}
+
+		// The feed cannot work until someone acts: fail the job and show it
+		// on the row, also while the connector holds off and sends nothing.
+		var blocked fetchBlockedError
+		if errors.As(err, &blocked) {
+			a.recordFetchBlocked(ctx, a.sourceRowBySlug(ctx, conn.Slug()), blocked)
+			log.Error().Err(err).Msg("source fetch blocked")
+			return err
+		}
+
 		// Rate limits and plan limitations are expected operating
 		// conditions, not failures: log appropriately (once per backoff
 		// window) and do not propagate as an error.
@@ -567,6 +654,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("fetch completed")
 
 	if len(fetchResult.RawIndicators) == 0 {
+		a.recordFetchSuccess(ctx, conn.Slug())
 		return nil
 	}
 
@@ -592,6 +680,8 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("deduplication completed")
 
 	// Score and store new indicators
+	storeFailures := 0
+	events := newThreatEventCap(conn)
 	for _, indicator := range dedupResult.NewIndicators {
 		// Score the indicator
 		indicator.Confidence = a.scorer.ScoreIndicator(indicator, nil)
@@ -601,6 +691,7 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 			_, err := a.repository.UpsertIndicator(ctx, indicator)
 			if err != nil {
 				log.Warn().Err(err).Str("value", indicator.Value).Msg("failed to store indicator")
+				storeFailures++
 				continue
 			}
 		}
@@ -609,11 +700,19 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		a.deduplicator.MarkSeen(ctx, indicator.ValueHash)
 
 		// Publish real-time event for new threat
-		if a.publisher != nil {
+		if a.publisher != nil && events.allow() {
 			if err := a.publisher.PublishNewThreat(ctx, indicator, conn.Slug(), conn.Slug()); err != nil {
 				log.Debug().Err(err).Str("value", indicator.Value).Msg("failed to publish threat event")
 			}
 		}
+	}
+
+	events.logSuppressed(log)
+
+	if err := storedNothing(conn, len(dedupResult.NewIndicators), storeFailures); err != nil {
+		a.recordStoreFailure(ctx, a.sourceRowBySlug(ctx, conn.Slug()), err)
+		log.Error().Err(err).Msg("source fetch stored nothing")
+		return err
 	}
 
 	// Update existing indicators
@@ -624,10 +723,13 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		}
 	}
 
-	// Update source metadata
-	if a.repository != nil {
-		_ = a.repository.UpdateSourceAfterFetch(ctx, fetchResult.SourceID)
-	}
+	// Update source metadata. Every connector's row takes the success: the
+	// due tick skips a row in status error, so without this a source that
+	// failed four ticks in a row would never leave error, however often the
+	// Scheduler fetched it. (The old call for connectors that do not track
+	// their row passed fetchResult.SourceID, which is never set, and so
+	// updated no row.)
+	a.recordFetchSuccess(ctx, conn.Slug())
 
 	// Increment sync version for mobile apps
 	_, _ = a.cache.IncrementSyncVersion(ctx)
@@ -644,6 +746,121 @@ func (a *Aggregator) fetchFromSource(ctx context.Context, conn SourceConnector) 
 		Msg("source processing completed")
 
 	return nil
+}
+
+// sourceRowBySlug returns the source row of a connector, or nil if there is
+// none or it cannot be read.
+func (a *Aggregator) sourceRowBySlug(ctx context.Context, slug string) *models.Source {
+	if a.repository == nil {
+		return nil
+	}
+	row, err := a.repository.GetSourceBySlug(ctx, slug)
+	if err != nil {
+		a.logger.Warn().Err(err).Str("source", slug).Msg("could not read source row")
+		return nil
+	}
+	return row
+}
+
+// recordFetchBlocked shows a blocked feed on its source row. A row an operator
+// paused or disabled is left alone. During a hold no request is sent, so a row
+// that already shows the block is not rewritten: its error_count stays honest
+// and next_fetch is not pushed out on every job.
+func (a *Aggregator) recordFetchBlocked(ctx context.Context, row *models.Source, blocked fetchBlockedError) {
+	if a.repository == nil || row == nil {
+		return
+	}
+	switch row.Status {
+	case models.SourceStatusPaused, models.SourceStatusDisabled:
+		return
+	case models.SourceStatusError:
+		if !blocked.RequestSent() && row.LastError != nil && strings.Contains(*row.LastError, fetchBlockedRowMarker) {
+			return
+		}
+	}
+	if err := a.repository.UpdateSourcePlanLimited(ctx, row.ID, blocked.Error()); err != nil {
+		a.logger.Warn().Err(err).Str("source", row.Slug).Msg("could not record blocked fetch on source row")
+	}
+}
+
+// recordFetchSuccess clears a connector's row after a successful fetch on the
+// path that has no row at hand (Scheduler, manual run, boot run): status
+// active, error_count 0, next_fetch one interval on. A feed that recovered
+// returns to the due list, and the due tick does not fetch it again within
+// the interval. A row an operator paused or disabled is left alone; a
+// connector with no row writes nothing.
+func (a *Aggregator) recordFetchSuccess(ctx context.Context, slug string) {
+	row := a.sourceRowBySlug(ctx, slug)
+	if row == nil {
+		return
+	}
+	if !rowTakesFetchResult(row) {
+		return
+	}
+	if err := a.repository.UpdateSourceAfterSuccess(ctx, row.ID); err != nil {
+		a.logger.Warn().Err(err).Str("source", slug).Msg("could not record successful fetch on source row")
+	}
+}
+
+// rowTakesFetchResult is false for a row an operator paused or disabled.
+func rowTakesFetchResult(row *models.Source) bool {
+	return row.Status == models.SourceStatusActive || row.Status == models.SourceStatusError
+}
+
+// maxTrackedFeedThreatEvents limits the live new-threat events of one fetch of
+// a feed that tracks its source row. Every row is still stored.
+const maxTrackedFeedThreatEvents = 100
+
+// threatEventCap counts the live new-threat events of one fetch.
+type threatEventCap struct {
+	limited    bool
+	published  int
+	suppressed int
+}
+
+func newThreatEventCap(conn SourceConnector) *threatEventCap {
+	tracker, ok := conn.(sourceRowTracker)
+	return &threatEventCap{limited: ok && tracker.TracksSourceRow()}
+}
+
+// allow reports whether the next stored indicator may be announced.
+func (c *threatEventCap) allow() bool {
+	if c.limited && c.published >= maxTrackedFeedThreatEvents {
+		c.suppressed++
+		return false
+	}
+	c.published++
+	return true
+}
+
+func (c *threatEventCap) logSuppressed(log *logger.Logger) {
+	if c.suppressed == 0 {
+		return
+	}
+	log.Info().
+		Int("published", c.published).
+		Int("suppressed", c.suppressed).
+		Msg("new threat events capped for this fetch")
+}
+
+// storedNothing returns an error when a tracked feed had new indicators and
+// every store failed. Other connectors keep their behaviour.
+func storedNothing(conn SourceConnector, attempted, failed int) error {
+	tracker, ok := conn.(sourceRowTracker)
+	if !ok || !tracker.TracksSourceRow() || attempted == 0 || failed < attempted {
+		return nil
+	}
+	return fmt.Errorf("%s: stored none of %d new indicators", conn.Slug(), attempted)
+}
+
+// recordStoreFailure shows a fetch that stored nothing on its source row.
+func (a *Aggregator) recordStoreFailure(ctx context.Context, row *models.Source, cause error) {
+	if row == nil || !rowTakesFetchResult(row) {
+		return
+	}
+	if err := a.repository.UpdateSourceAfterError(ctx, row.ID, cause.Error()); err != nil {
+		a.logger.Warn().Err(err).Str("source", row.Slug).Msg("could not record failed store on source row")
+	}
 }
 
 // Stats returns aggregator statistics

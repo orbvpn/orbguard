@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services"
 	"orbguard-lab/internal/infrastructure/database/repository"
@@ -53,11 +54,28 @@ func (h *SourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for i, s := range sources {
+		sources[i] = forCaller(r, s)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"data":  sources,
 		"total": len(sources),
 	})
+}
+
+// forCaller drops last_error for a caller that is not an admin. The sources
+// reads are open to every device key, and a source's last error is for
+// operators: it can quote a provider's URL or answer. Admins send
+// X-Admin-Token (OptionalAdmin) to see it.
+func forCaller(r *http.Request, s *models.Source) *models.Source {
+	if s == nil || s.LastError == nil || middleware.IsAdmin(r.Context()) {
+		return s
+	}
+	public := *s
+	public.LastError = nil
+	return &public
 }
 
 // Get handles GET /api/v1/sources/{slug}
@@ -68,7 +86,7 @@ func (h *SourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 		source, err := h.repos.Sources.GetBySlug(r.Context(), slug)
 		if err == nil && source != nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(source)
+			json.NewEncoder(w).Encode(forCaller(r, source))
 			return
 		}
 	}
