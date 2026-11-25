@@ -59,7 +59,7 @@ class _ApkScanScreenState extends State<ApkScanScreen> {
         children: [
           Text(
             'Downloaded an app outside Google Play? Pick the .apk file and '
-            'OrbGuard will inspect it — without installing it — for spyware-style '
+            'OrbGuard will inspect it, without installing it, for spyware-style '
             'permissions, a debug signature, or an app pretending to be one you '
             'already have.',
             style: BrandText.body(

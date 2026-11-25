@@ -11,7 +11,7 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/account_provider.dart';
 import '../../services/iap/iap_service.dart';
 import '../../utils/platform_info.dart';
-import '../account/login_screen.dart';
+import '../../widgets/sale/login_sheet.dart';
 import '../legal/legal_screen.dart';
 
 /// Whether digital goods can be sold in-app on this platform.
@@ -123,7 +123,7 @@ class _PricingScreenState extends State<PricingScreen> {
       yearlyId: OrbGuardProductIds.premiumYearly,
       inheritsFrom: 'Guard',
       features: [
-        'Full scam shield — texts, links & QR codes',
+        'Full scam shield: texts, links & QR codes',
         'Secure call check before sensitive calls',
         'Cover more of your devices',
       ],
@@ -168,7 +168,7 @@ class _PricingScreenState extends State<PricingScreen> {
     if (!mounted) return;
     switch (result.outcome) {
       case IapOutcome.success:
-        _snack("You're subscribed — premium features are unlocked.");
+        _snack("You're subscribed. Premium features are unlocked.");
         widget.onPurchased?.call();
         break;
       case IapOutcome.failed:
@@ -178,7 +178,7 @@ class _PricingScreenState extends State<PricingScreen> {
         // Silent — the user chose to back out.
         break;
       case IapOutcome.pending:
-        _snack('Purchase pending — we\'ll finish it as soon as it clears.');
+        _snack('Purchase pending. We\'ll finish it as soon as it clears.');
         break;
     }
   }
@@ -198,9 +198,7 @@ class _PricingScreenState extends State<PricingScreen> {
     // subscription), so a sign-in must happen first. Send the user to sign in,
     // then continue the purchase if they completed it.
     if (!account.isLoggedIn) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      await showLoginSheet(context);
       if (!mounted || !account.isLoggedIn) return;
     }
     await iap.buy(productId);
@@ -419,14 +417,12 @@ class _AccountStateBanner extends StatelessWidget {
         title: Text('Sign in to subscribe',
             style: BrandText.title(color: cs.onSurface, size: 14.5)),
         subtitle: Text(
-            'Use your OrbVPN account — one subscription unlocks OrbGuard, '
+            'Use your OrbVPN account: one subscription unlocks OrbGuard, '
             'OrbVPN & OrbBrowser',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5)),
         trailing: DuotoneIcon('alt_arrow_right',
             size: 20, color: cs.onSurfaceVariant),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        ),
+        onTap: () => showLoginSheet(context),
       ),
     );
   }

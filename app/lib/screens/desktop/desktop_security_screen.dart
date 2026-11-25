@@ -32,7 +32,8 @@ class DesktopSecurityScreen extends StatefulWidget {
 
 class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
-  bool _isLoading = false;
+  // True from the first frame: the first load starts right after it.
+  bool _isLoading = true;
   bool _isScanning = false;
   String? _error;
   final List<PersistenceItem> _persistenceItems = [];
@@ -54,7 +55,11 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // After the first frame: loading tells the provider's listeners, and
+    // they cannot be told while this page is still being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadData();
+    });
     if (_isDesktopPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
@@ -155,7 +160,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       _browserScanResult = browserData.isNotEmpty ? browserData : null;
       _error = errors.isEmpty
           ? null
-          : 'Failed to load desktop security data — ${errors.join('; ')}';
+          : 'Failed to load desktop security data: ${errors.join('; ')}';
       _isLoading = false;
     });
   }
@@ -862,7 +867,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             'Stealth Mode',
             PlatformInfo.isMacOS
                 ? 'Do not respond to probes (socketfilterfw stealth mode)'
-                : 'No separate stealth toggle on this OS — enabled firewalls already drop probes',
+                : 'No separate stealth toggle on this OS. Enabled firewalls already drop probes',
             () => _runQuickFirewallAction('stealth'),
           ),
           _buildQuickAction(
@@ -1147,7 +1152,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             'OrbGuard will install OS firewall rules that drop all traffic to '
             'and from the critical malicious IP addresses in your threat '
             'intelligence feed. This modifies the system firewall and requires '
-            'administrator privileges — you will be asked to authorize it.',
+            'administrator privileges, so you will be asked to authorize it.',
             style: TextStyle(color: context.colors.onSurfaceVariant),
           ),
           actions: [
@@ -1591,8 +1596,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Text(
                   errors.isEmpty
-                      ? 'No connections collected yet — tap refresh'
-                      : 'Collection failed — see notes above',
+                      ? 'No connections collected yet. Tap refresh'
+                      : 'Collection failed. See notes above',
                   style: TextStyle(color: context.colors.onSurfaceVariant),
                 ),
               ),
@@ -2099,7 +2104,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 else
                   Tooltip(
                     message: item.isRegistry
-                        ? 'No registry backup exists for this item — it must be restored manually'
+                        ? 'No registry backup exists for this item. It must be restored manually'
                         : 'Cannot auto-restore',
                     child: IconButton(
                       icon: DuotoneIcon('refresh', color: context.colors.outline, size: 20),

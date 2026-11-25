@@ -21,6 +21,7 @@ import 'package:flutter/services.dart';
 
 import '../../detection/advanced_detection_modules.dart';
 import 'app_malware_scanner.dart';
+import 'vpn_proxy_detector.dart';
 
 /// Thrown when the scan engine cannot run at all on this build.
 class DeviceScanUnavailableException implements Exception {
@@ -93,6 +94,13 @@ class DeviceScanService {
   /// Same channel `lib/main.dart` uses for its scan flow.
   static const _channel = MethodChannel('com.orb.guard/system');
 
+  /// What [DeviceScanProgress.stageError] says when the device does not let
+  /// any app run the stage, and when this build has no code for it. Either
+  /// way the stage could not run here at all, which is different from a
+  /// stage that ran and broke.
+  static const String notSupported = 'not supported on this device';
+  static const String notInBuild = 'unavailable on this build';
+
   final AdvancedDetectionManager _detection = AdvancedDetectionManager();
 
   /// Run a full device scan, mirroring `_performScan` in `lib/main.dart`.
@@ -122,7 +130,15 @@ class DeviceScanService {
     }
 
     final stages = <_ScanStage>[
-      _ScanStage('Network connections', () => native('scanNetwork'),
+      // An active tunnel or system proxy is reroute state, owned by
+      // VpnWatch (the Hidden VPN & proxy shield). It is never a finding of
+      // the device check, or one thing would count twice. The stage's other
+      // findings stay, and the stage still counts as having run.
+      _ScanStage(
+          'Network connections',
+          () async => (await native('scanNetwork'))
+              .where((t) => !VpnProxyDetector.isRerouteFinding(t))
+              .toList(),
           isNative: true),
       _ScanStage('Running processes', () => native('scanProcesses'),
           isNative: true),
@@ -180,22 +196,27 @@ class DeviceScanService {
 
       String? stageError;
       if (stage.isNative && !nativeChannelAvailable) {
-        stageError = 'unavailable on this build';
+        stageError = notInBuild;
       } else {
         try {
           final threats = await stage.run();
-          allThreats.addAll(threats);
+          // Each finding says which check found it, so it can be shown under
+          // the shield that check belongs to. Copied, because a detector may
+          // hand back a map that cannot be written to.
+          for (final threat in threats) {
+            allThreats.add({...threat, 'stage': stage.name});
+          }
           anyStageSucceeded = true;
         } on DetectionUnsupportedException catch (e) {
           // The capability doesn't exist on this platform (e.g. iOS can't
           // enumerate installed apps / certs / a11y services / keyboards).
           // Report it honestly rather than as a fake "clean, 0 findings".
-          stageError = 'not supported on this device';
+          stageError = notSupported;
           debugPrint('DeviceScanService: stage "${stage.name}" not supported '
               'on this platform: ${e.message}');
         } on MissingPluginException {
           if (stage.isNative) nativeChannelAvailable = false;
-          stageError = 'unavailable on this build';
+          stageError = notInBuild;
           debugPrint(
               'DeviceScanService: stage "${stage.name}" has no native handler');
         } catch (e) {

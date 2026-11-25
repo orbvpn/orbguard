@@ -685,7 +685,7 @@ class NotificationService {
 
   /// Apply the "Hide notification content" privacy setting to a title/body.
   (String, String) _privatize(String title, String body) => _hideContent
-      ? ('OrbGuard', 'New security alert — tap to view')
+      ? ('OrbGuard', 'New security alert. Tap to view')
       : (title, body);
 
   /// Enable/disable critical alerts

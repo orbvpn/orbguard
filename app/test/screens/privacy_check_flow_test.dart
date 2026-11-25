@@ -88,6 +88,28 @@ void main() {
     expect(fixAllCalls, 1);
   });
 
+  testWidgets('one finding is spoken of as one', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: FindingsScreen(
+        threats: const [
+          {
+            'name': 'Screen recording app found',
+            'severity': 'HIGH',
+            'description': 'An app on this device can capture your screen.',
+          },
+        ],
+        checksRun: 11,
+        onFixAll: () {},
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text('Your check found 1 thing'), findsOneWidget);
+    expect(find.text('Here is how to fix it.'), findsOneWidget);
+    expect(find.text('Fix this'), findsOneWidget);
+    expect(find.text('Fix these'), findsNothing);
+  });
+
   testWidgets('all clear proves what ran and reports unavailable separately',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
@@ -144,8 +166,8 @@ void main() {
                           stageName: stages[i],
                           stageCompleted: true,
                           threatsFound: 1,
-                          // Second stage couldn't run — still a COMPLETED
-                          // stage, mirroring ScanningScreen's counter.
+                          // Second stage couldn't run: it finished, but it
+                          // checked nothing, so it is not counted.
                           stageError:
                               i == 1 ? 'not supported on this device' : null,
                         ));
@@ -171,8 +193,10 @@ void main() {
     // Real threats passed through untouched…
     expect(popped!.threats, hasLength(1));
     expect(popped!.threats.single['name'], 'Test finding');
-    // …and itemsScanned = stages that completed (same as ScanningScreen,
-    // including the stage that reported it couldn't run).
-    expect(popped!.itemsScanned, 2);
+    // …and itemsScanned counts only the stage that ran. The one that could
+    // not run is named, never counted as checked.
+    expect(popped!.itemsScanned, 1);
+    expect(popped!.checksUnavailable, 1);
+    expect(popped!.stagesNotPossible, ['File system']);
   });
 }

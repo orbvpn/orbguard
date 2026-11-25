@@ -296,7 +296,7 @@ void main() {
       () async {
     final provider = _providerWithSocial(
       _FakeSocialAuthService(
-          error: "Couldn't sign in with Google — try email instead."),
+          error: "Couldn't sign in with Google. Try email instead."),
     );
     await provider.init();
 
@@ -305,8 +305,8 @@ void main() {
     expect(ok, isFalse);
     expect(provider.isLoggedIn, isFalse);
     expect(provider.user, isNull);
-    expect(provider.lastError,
-        "Couldn't sign in with Google — try email instead.");
+    expect(
+        provider.lastError, "Couldn't sign in with Google. Try email instead.");
 
     provider.dispose();
   });

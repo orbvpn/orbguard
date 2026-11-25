@@ -1455,7 +1455,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
         return const FirewallActionResult(
           success: false,
           cancelled: true,
-          message: 'You cancelled the administrator password prompt — no changes were made.',
+          message:
+              'You cancelled the administrator password prompt. No changes were made.',
         );
       }
       return FirewallActionResult(
@@ -1508,7 +1509,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
         return const FirewallActionResult(
           success: false,
           cancelled: true,
-          message: 'You declined the User Account Control prompt — no changes were made.',
+          message:
+              'You declined the User Account Control prompt. No changes were made.',
         );
       }
       return FirewallActionResult(
@@ -1542,7 +1544,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
         return const FirewallActionResult(
           success: false,
           cancelled: true,
-          message: 'You dismissed the authentication prompt — no changes were made.',
+          message:
+              'You dismissed the authentication prompt. No changes were made.',
         );
       }
       if (result.exitCode == 127) {
@@ -1746,7 +1749,7 @@ class DesktopSecurityProvider extends ChangeNotifier {
           unsupported: true,
           message:
               'The macOS Application Firewall only supports per-application '
-              'rules — provide an application path. Port/address rules need '
+              'rules. Provide an application path. Port/address rules need '
               'PF, which OrbGuard does not modify.',
         );
       }

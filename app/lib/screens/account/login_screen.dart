@@ -612,9 +612,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_magicSent) ...[
           const SizedBox(height: 16),
           Text(
-            'Check your email — we sent a sign-in link to '
+            'Check your email. We sent a sign-in link to '
             '${_emailController.text.trim()}.\n'
-            'Tap the link on this device — or copy that link and paste it '
+            'Tap the link on this device, or copy that link and paste it '
             'below.',
             style: BrandText.body(
                 color: context.colors.onSurfaceVariant, size: 13),

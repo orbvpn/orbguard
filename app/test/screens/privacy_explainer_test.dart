@@ -41,7 +41,7 @@ void main() {
       (tester) async {
     await pumpTallScreen(tester);
 
-    expect(find.text('On-device · Private'), findsOneWidget);
+    expect(find.text('Private, on your device'), findsOneWidget);
   });
 
   testWidgets('OnDeviceTrustBadge shows its label standalone', (tester) async {
@@ -50,6 +50,6 @@ void main() {
     );
 
     expect(find.byType(OnDeviceTrustBadge), findsOneWidget);
-    expect(find.text('On-device · Private'), findsOneWidget);
+    expect(find.text('Private, on your device'), findsOneWidget);
   });
 }

@@ -21,8 +21,8 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/sheet_panel.dart';
 import '../../providers/account_provider.dart';
-import '../../screens/account/login_screen.dart';
-import '../../screens/pricing/pricing_screen.dart';
+import '../sale/login_sheet.dart';
+import '../sale/plans_sheet.dart';
 
 /// Namespace for the app's premium gate. Not instantiable — use the statics.
 class PremiumGate {
@@ -34,9 +34,9 @@ class PremiumGate {
   /// action when this returns false.
   ///
   /// The sheet's primary action depends on why access is denied:
-  ///  • logged out                     → opens the sign-in screen (an OrbVPN
+  ///  • logged out                     → opens the sign-in sheet (an OrbVPN
   ///    subscription rides on the account, so signing in comes first);
-  ///  • signed in, no live subscription → opens the pricing screen.
+  ///  • signed in, no live subscription → opens the plans sheet.
   static bool ensure(
     BuildContext context,
     AccountProvider account, {
@@ -71,21 +71,21 @@ class PremiumGate {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$what is part of OrbGuard premium. A subscription unlocks it — '
+              '$what is part of OrbGuard premium. A subscription unlocks it, '
               'along with everything else.',
               style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
             ),
             const SizedBox(height: 16),
-            const _Benefit('Ad-free — no watching ads for credits'),
+            const _Benefit('Ad-free: no watching ads for credits'),
             const _Benefit(
-              'Expert (Pro) console — threat intel & enterprise tools',
+              'Expert (Pro) console: threat intel & enterprise tools',
             ),
             const _Benefit('Deeper, unlimited scans'),
             const _Benefit('Remote control & camera for a lost device'),
             const SizedBox(height: 12),
             Text(
               loggedIn
-                  ? "You're signed in — choose a plan to subscribe."
+                  ? "You're signed in. Choose a plan to subscribe."
                   : 'Sign in with your OrbVPN account to subscribe.',
               style: BrandText.body(color: cs.onSurfaceVariant, size: 13),
             ),
@@ -94,12 +94,12 @@ class PremiumGate {
         secondaryLabel: 'Not now',
         primaryLabel: loggedIn ? 'See plans' : 'Sign in',
         onPrimary: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  loggedIn ? const PricingScreen() : const LoginScreen(),
-            ),
-          );
+          if (!context.mounted) return;
+          if (loggedIn) {
+            showPlansSheet(context);
+          } else {
+            showLoginSheet(context);
+          }
         },
       ),
     );

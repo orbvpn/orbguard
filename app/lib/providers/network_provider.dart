@@ -563,7 +563,7 @@ class NetworkProvider extends ChangeNotifier {
       // DNS-server hint are unavailable, so the check cannot measure
       // anything real on web.
       _dnsCheckError =
-          'The DNS hijack/leak check requires the mobile or desktop app — '
+          'The DNS hijack/leak check requires the mobile or desktop app, '
           'browsers do not expose the local resolver.';
       notifyListeners();
       return;

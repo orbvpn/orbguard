@@ -69,7 +69,7 @@ class GuardStatusController extends ChangeNotifier {
           id: 'unknown',
           name: 'Protection check',
           state: GuardState.actionNeeded,
-          detail: "Couldn't verify — tap to check",
+          detail: "Couldn't verify. Tap to check",
         );
       }
     }));
@@ -247,9 +247,21 @@ class GuardProbes {
         );
       };
 
-  /// Hidden-VPN watch: reflects the latest real check.
-  static GuardProbe hiddenVpn({required Future<bool?> Function() unknownVpnActive}) =>
+  /// Hidden-VPN watch: reflects the latest real check. [supported] is false
+  /// where the app has no way to see a VPN or proxy (a desktop build today).
+  static GuardProbe hiddenVpn({
+    required Future<bool?> Function() unknownVpnActive,
+    bool supported = true,
+  }) =>
       () async {
+        if (!supported) {
+          return const GuardStatus(
+            id: 'hidden_vpn',
+            name: 'Hidden VPN watch',
+            state: GuardState.unavailable,
+            detail: 'Not available on this device',
+          );
+        }
         final active = await unknownVpnActive();
         if (active == null) {
           return const GuardStatus(
@@ -263,7 +275,12 @@ class GuardProbes {
           id: 'hidden_vpn',
           name: 'Hidden VPN watch',
           state: GuardState.active,
-          detail: active ? 'Unknown VPN detected — review it' : 'Traffic looks clean',
+          // Only what is known: false means nothing unknown that THIS device
+          // can see (Android cannot read proxies; iPhone sees only a plain
+          // HTTP proxy), and an active one may well be the person's own.
+          detail: active
+              ? 'A VPN or proxy is active. Is it yours?'
+              : 'No unknown VPN or proxy seen',
         );
       };
 }

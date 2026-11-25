@@ -178,6 +178,7 @@ class DarkWebStats {
 class DarkWebProvider extends ChangeNotifier {
   static const _prefsAssetsKey = 'darkweb_monitored_assets';
   static const _prefsReadAlertsKey = 'darkweb_read_alert_ids';
+  static const _prefsHandledKey = 'darkweb_handled_breaches';
 
   static final String _monitorPath = '${ApiConfig.apiVersion}/darkweb/monitor';
   static String _monitorAssetPath(String id) =>
@@ -189,8 +190,11 @@ class DarkWebProvider extends ChangeNotifier {
   /// Restores the cached assets and pulls the per-user server state as soon
   /// as the provider is created (the dark web screen reads the provider
   /// without calling [init] itself).
-  DarkWebProvider() {
-    unawaited(init());
+  ///
+  /// [autoInit] false skips that start, so a test can load known state
+  /// through [debugLoad] without any network call.
+  DarkWebProvider({@visibleForTesting bool autoInit = true}) {
+    if (autoInit) unawaited(init());
   }
 
   /// True once the asset list reflects the backend monitor state.
@@ -211,6 +215,10 @@ class DarkWebProvider extends ChangeNotifier {
   final Set<String> _readAlertIds = {};
 
   final Map<String, BreachCheckResult> _checkResults = {};
+
+  /// Addresses the person said they dealt with, by asset id. Persisted under
+  /// [_prefsHandledKey]; see [markBreachHandled].
+  final Map<String, _HandledBreach> _handled = {};
   DarkWebStats _stats = DarkWebStats();
   BreachCheckResult? _lastCheckResult;
   PasswordBreachResult? _lastPasswordResult;
@@ -253,8 +261,299 @@ class DarkWebProvider extends ChangeNotifier {
   Future<void> init() async {
     await loadAssets();
     await _loadReadAlerts();
+    await _loadHandled();
     await refreshAlerts();
     _updateStats();
+  }
+
+  /// Replaces the in-memory state with known values and restores the
+  /// persisted read and handled sets, exactly as [init] would after a sync.
+  @visibleForTesting
+  Future<void> debugLoad({
+    List<MonitoredAsset> assets = const [],
+    List<BreachAlert> alerts = const [],
+    Map<String, BreachCheckResult> checkResults = const {},
+  }) async {
+    _assets
+      ..clear()
+      ..addAll(assets);
+    _alerts
+      ..clear()
+      ..addAll(alerts);
+    _checkResults
+      ..clear()
+      ..addAll(checkResults);
+    await _loadReadAlerts();
+    await _loadHandled();
+    _updateStats();
+    notifyListeners();
+  }
+
+  // ── Open breaches: the signal Home reads ─────────────────────────────────
+  //
+  // Two real sources say an address is in a breach, and they can disagree:
+  //
+  //  * `breachCount` on the asset, the size of the provider result from the
+  //    latest check. It can go DOWN while the breach is still real: a re-add
+  //    whose check fails stores 0 (the backend upsert overwrites it), and a
+  //    refresh where one of several providers fails merges fewer breaches.
+  //  * the alert feed. The backend writes one alert per (asset, breach name)
+  //    and never deletes it, so an alert can name a breach the count no
+  //    longer includes. The reverse also happens: alerts are skipped when the
+  //    Dark Web toggle is off or the feed fails to load.
+  //
+  // So the evidence for an address is the union: every breach name seen in
+  // its alerts or in a check result held in memory, and a count that is the
+  // largest of breachCount, the check result's count and those names.
+
+  /// Watched email addresses.
+  Iterable<MonitoredAsset> get _emailAssets =>
+      _assets.where((a) => a.type == AssetType.email);
+
+  /// Alerts that belong to [asset]. The live payload links by `asset_id`; an
+  /// alert without one is matched by its address when the payload has it.
+  List<BreachAlert> _alertsFor(MonitoredAsset asset) => _alerts.where((a) {
+        if (a.assetId.isNotEmpty) return a.assetId == asset.id;
+        return a.assetValue.isNotEmpty &&
+            a.assetValue.toLowerCase() == asset.value.toLowerCase();
+      }).toList();
+
+  static String _breachKey(String name) => name.trim().toLowerCase();
+
+  /// Every breach name known for [asset], normalised.
+  Set<String> _breachNamesFor(MonitoredAsset asset) {
+    final names = <String>{};
+    for (final a in _alertsFor(asset)) {
+      final k = _breachKey(a.breach.name);
+      if (k.isNotEmpty) names.add(k);
+    }
+    for (final b
+        in _checkResults[asset.value]?.breaches ?? const <BreachInfo>[]) {
+      final k = _breachKey(b.name);
+      if (k.isNotEmpty) names.add(k);
+    }
+    return names;
+  }
+
+  int _evidenceCount(MonitoredAsset asset) {
+    final counts = [
+      asset.breachCount,
+      _checkResults[asset.value]?.breachCount ?? 0,
+      _breachNamesFor(asset).length,
+      _alertsFor(asset).length,
+    ];
+    return counts.reduce((a, b) => a > b ? a : b);
+  }
+
+  /// True when anything real has been learned about [asset]: a completed
+  /// check, an alert, or a check result in memory.
+  bool _isKnown(MonitoredAsset asset) =>
+      asset.lastChecked != null ||
+      _alertsFor(asset).isNotEmpty ||
+      _checkResults[asset.value] != null;
+
+  bool _isOpen(MonitoredAsset asset) {
+    if (!_isKnown(asset)) return false;
+    final count = _evidenceCount(asset);
+    if (count == 0) return false;
+    final h = _handled[asset.id];
+    if (h == null) return true;
+    if (count > h.count) return true;
+    // A breach the person never saw when they said they dealt with it.
+    return !h.names.containsAll(_breachNamesFor(asset));
+  }
+
+  /// Watched email addresses whose known breaches the person has not marked
+  /// handled, in the order they were added.
+  List<MonitoredAsset> get openBreaches =>
+      List.unmodifiable(_emailAssets.where(_isOpen));
+
+  /// How many watched email addresses have breaches still open.
+  ///
+  /// Null when no email address is watched, or none has ever been checked
+  /// (no check, no alert, no result in memory): nothing is known, which is
+  /// never the same as safe. Addresses not yet checked add nothing to the
+  /// count.
+  int? get openBreachedAccounts {
+    final emails = _emailAssets.toList();
+    if (emails.isEmpty || !emails.any(_isKnown)) return null;
+    return openBreaches.length;
+  }
+
+  /// The most recent check among watched email addresses, or null.
+  DateTime? get lastBreachCheckAt {
+    DateTime? newest;
+    for (final a in _emailAssets) {
+      final t = a.lastChecked;
+      if (t != null && (newest == null || t.isAfter(newest))) newest = t;
+    }
+    return newest;
+  }
+
+  /// The number of breaches known for the address with [assetId] (see the
+  /// note above on how the sources combine), or 0 when it is not watched.
+  int breachCountFor(String assetId) {
+    final asset = _emailById(assetId);
+    return asset == null ? 0 : _evidenceCount(asset);
+  }
+
+  /// A real, named breach for the address with [assetId], preferring one the
+  /// person has not already dealt with, then the newest by breach date.
+  /// From a check result in memory (name, and date when the source gave one)
+  /// or else from the alert feed (name only). Null when no name is known.
+  BreachInfo? newestNamedBreachFor(String assetId) {
+    final asset = _emailById(assetId);
+    if (asset == null) return null;
+    final handledNames = _handled[asset.id]?.names ?? const <String>{};
+
+    final fromCheck = (_checkResults[asset.value]?.breaches ??
+            const <BreachInfo>[])
+        .where((b) => _breachKey(b.name).isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final ad = a.breachDate, bd = b.breachDate;
+        if (ad == null && bd == null) return 0;
+        if (ad == null) return 1;
+        if (bd == null) return -1;
+        return bd.compareTo(ad);
+      });
+    final fromAlerts = _alertsFor(asset)
+        .where((a) => _breachKey(a.breach.name).isNotEmpty)
+        .toList()
+      ..sort((a, b) => b.alertedAt.compareTo(a.alertedAt));
+
+    final candidates = [
+      ...fromCheck,
+      ...fromAlerts.map((a) => a.breach),
+    ];
+    if (candidates.isEmpty) return null;
+    return candidates.firstWhere(
+      (b) => !handledNames.contains(_breachKey(b.name)),
+      orElse: () => candidates.first,
+    );
+  }
+
+  /// True when the person marked the address with [assetId] handled, its
+  /// breaches are still known, and nothing new has reopened it.
+  bool isBreachHandled(String assetId) {
+    final asset = _emailById(assetId);
+    if (asset == null || !_handled.containsKey(asset.id)) return false;
+    return _isKnown(asset) && _evidenceCount(asset) > 0 && !_isOpen(asset);
+  }
+
+  /// A full address OrbGuard can send to the breach check. An address the
+  /// server only returned in masked form ("al***@x.com") cannot be checked.
+  static bool _checkable(String value) =>
+      value.contains('@') && !value.contains('*');
+
+  /// Whether [showLeakDetailsFor] can put the details of what leaked for the
+  /// address with [assetId] on the Email tab: a check result for it is in
+  /// memory, or its full address is known so a check can run.
+  bool canShowLeakDetailsFor(String assetId) {
+    final asset = _emailById(assetId);
+    if (asset == null) return false;
+    return _checkResults[asset.value] != null || _checkable(asset.value);
+  }
+
+  /// Makes the breach details for the address with [assetId] the Email
+  /// tab's result: the result already in memory, or else a fresh check of
+  /// that address. Does nothing when neither is possible.
+  Future<void> showLeakDetailsFor(String assetId) async {
+    final asset = _emailById(assetId);
+    if (asset == null) return;
+    final known = _checkResults[asset.value];
+    if (known != null) {
+      _lastCheckResult = known;
+      notifyListeners();
+      return;
+    }
+    if (_checkable(asset.value)) await checkEmail(asset.value);
+  }
+
+  MonitoredAsset? _emailById(String id) {
+    for (final a in _emailAssets) {
+      if (a.id == id) return a;
+    }
+    return null;
+  }
+
+  /// Records that the person dealt with every breach known for [assetId]
+  /// right now. Stored as the count and the breach names handled, so a later
+  /// check that finds MORE breaches, or a breach by a new name, reopens the
+  /// address; a check that finds the same ones does not.
+  ///
+  /// Also marks the address's alerts read, so the Alerts tab and Home never
+  /// disagree. [reopenBreach] puts back only the ones this call marked.
+  Future<void> markBreachHandled(String assetId) async {
+    final asset = _emailById(assetId);
+    if (asset == null) return;
+
+    final newlyRead = <String>[
+      for (final a in _alertsFor(asset))
+        if (a.id.isNotEmpty && !_isAlertRead(a)) a.id,
+    ];
+    _handled[asset.id] = _HandledBreach(
+      count: _evidenceCount(asset),
+      names: _breachNamesFor(asset),
+      at: DateTime.now(),
+      readIds: newlyRead,
+    );
+    _readAlertIds.addAll(newlyRead);
+    _updateStats();
+    await _saveHandled();
+    await _saveReadAlerts();
+    notifyListeners();
+  }
+
+  /// Undoes [markBreachHandled] for [assetId].
+  Future<void> reopenBreach(String assetId) async {
+    final h = _handled.remove(assetId);
+    if (h == null) return;
+    _readAlertIds.removeAll(h.readIds);
+    _updateStats();
+    await _saveHandled();
+    await _saveReadAlerts();
+    notifyListeners();
+  }
+
+  Future<void> _loadHandled() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to open preferences: $e');
+      return;
+    }
+    _handled.clear();
+    final raw = _prefs?.getString(_prefsHandledKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      decoded.forEach((id, value) {
+        try {
+          _handled[id] =
+              _HandledBreach.fromJson(Map<String, dynamic>.from(value as Map));
+        } catch (e) {
+          debugPrint('DarkWebProvider: skipping corrupt handled entry: $e');
+        }
+      });
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to restore handled breaches: $e');
+    }
+  }
+
+  Future<void> _saveHandled() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    try {
+      await prefs.setString(
+        _prefsHandledKey,
+        jsonEncode({
+          for (final e in _handled.entries) e.key: e.value.toJson(),
+        }),
+      );
+    } catch (e) {
+      debugPrint('DarkWebProvider: failed to persist handled breaches: $e');
+    }
   }
 
   /// Reads the Dark Web Monitoring master toggle (Settings → `prot_darkweb`).
@@ -409,6 +708,7 @@ class DarkWebProvider extends ChangeNotifier {
     }
 
     _assets.removeWhere((a) => a.id == id);
+    if (_handled.remove(id) != null) await _saveHandled();
     _updateStats();
     await _saveAssets();
     notifyListeners();
@@ -765,4 +1065,43 @@ class DarkWebProvider extends ChangeNotifier {
     if (lower.contains('date') || lower.contains('birth')) return 'cake';
     return 'data_object';
   }
+}
+
+/// What the person dealt with for one address, when they said so.
+class _HandledBreach {
+  /// The breach count known at that moment.
+  final int count;
+
+  /// The normalised breach names known at that moment.
+  final Set<String> names;
+
+  final DateTime at;
+
+  /// Alert ids that marking handled turned read (so undo restores only them).
+  final List<String> readIds;
+
+  const _HandledBreach({
+    required this.count,
+    required this.names,
+    required this.at,
+    required this.readIds,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'count': count,
+        'names': names.toList(),
+        'at': at.toIso8601String(),
+        'read_ids': readIds,
+      };
+
+  factory _HandledBreach.fromJson(Map<String, dynamic> json) => _HandledBreach(
+        count: (json['count'] as num).toInt(),
+        names: ((json['names'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toSet(),
+        at: DateTime.tryParse(json['at'] as String? ?? '') ?? DateTime(1970),
+        readIds: ((json['read_ids'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+      );
 }

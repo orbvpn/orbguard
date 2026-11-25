@@ -36,13 +36,59 @@ class LocationFixResult {
 }
 
 class LocationReporter {
+  /// The five calls into the system are parameters so a test can stand in
+  /// for the device. Left out, each one is the real `Geolocator` call.
+  LocationReporter({
+    Future<bool> Function()? serviceEnabled,
+    Future<LocationPermission> Function()? checkPermission,
+    Future<LocationPermission> Function()? requestPermission,
+    Future<Position> Function(Duration timeout)? currentPosition,
+    Future<Position?> Function()? lastKnownPosition,
+  })  : _serviceEnabled = serviceEnabled ?? Geolocator.isLocationServiceEnabled,
+        _checkPermission = checkPermission ?? Geolocator.checkPermission,
+        _requestPermission = requestPermission ?? Geolocator.requestPermission,
+        _currentPosition = currentPosition ?? _freshPosition,
+        _lastKnownPosition =
+            lastKnownPosition ?? Geolocator.getLastKnownPosition;
+
+  final Future<bool> Function() _serviceEnabled;
+  final Future<LocationPermission> Function() _checkPermission;
+  final Future<LocationPermission> Function() _requestPermission;
+  final Future<Position> Function(Duration timeout) _currentPosition;
+  final Future<Position?> Function() _lastKnownPosition;
+
+  static Future<Position> _freshPosition(Duration timeout) =>
+      Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: timeout,
+        ),
+      );
+
+  /// Puts the system's "Allow location?" question on screen when access has
+  /// not been decided yet, and answers whether access stands afterwards.
+  ///
+  /// Call it only from something the person just pressed: "Locate this
+  /// device", or switching remote locate on. It does not ask when access
+  /// already stands, when it was refused for good, or when location is
+  /// switched off for the whole device.
+  Future<bool> requestAccess() async =>
+      await _ensurePermission(mayAsk: true) == null;
+
   /// Acquires a fresh GPS fix. Falls back to the OS-cached last-known
   /// position (clearly marked with provider "last_known" and its original
   /// timestamp) only when a fresh fix times out.
+  ///
+  /// [mayAsk] is false unless the person just pressed something. The agent
+  /// reports on a timer that starts with the app, and it answers a remote
+  /// "locate" while the phone may be in someone else's hands: neither may
+  /// put a permission question on screen. Without access they get an honest
+  /// "not allowed" and try again next time.
   Future<LocationFixResult> getCurrentFix({
     Duration timeout = const Duration(seconds: 30),
+    bool mayAsk = false,
   }) async {
-    final permission = await _ensurePermission();
+    final permission = await _ensurePermission(mayAsk: mayAsk);
     if (permission != null) {
       developer.log('location unavailable: $permission',
           name: 'LocationReporter');
@@ -50,17 +96,12 @@ class LocationReporter {
     }
 
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: timeout,
-        ),
-      );
+      final position = await _currentPosition(timeout);
       return LocationFixResult.available(_toBackendJson(position), position);
     } on TimeoutException {
       // Fresh fix timed out — surface the cached fix honestly if one exists.
       try {
-        final last = await Geolocator.getLastKnownPosition();
+        final last = await _lastKnownPosition();
         if (last != null) {
           developer.log(
             'fresh GPS fix timed out; reporting OS-cached last-known position '
@@ -90,21 +131,22 @@ class LocationReporter {
 
   /// Returns null when permission is in place, otherwise the honest reason
   /// location is unavailable.
-  Future<String?> _ensurePermission() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  Future<String?> _ensurePermission({required bool mayAsk}) async {
+    final serviceEnabled = await _serviceEnabled();
     if (!serviceEnabled) {
       return 'location services are disabled on this device';
     }
 
-    var permission = await Geolocator.checkPermission();
+    var permission = await _checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      if (!mayAsk) return 'location access has not been allowed for OrbGuard';
+      permission = await _requestPermission();
     }
     if (permission == LocationPermission.denied) {
       return 'location permission denied by user';
     }
     if (permission == LocationPermission.deniedForever) {
-      return 'location permission permanently denied — enable it in system '
+      return 'location permission permanently denied, enable it in system '
           'settings';
     }
     return null;

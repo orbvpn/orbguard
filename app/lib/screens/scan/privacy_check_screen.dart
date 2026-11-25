@@ -137,7 +137,14 @@ class _PrivacyCheckScreenState extends State<PrivacyCheckScreen>
   late List<_CheckRow> _rows;
 
   // Real progress state — only ever written from DeviceScanProgress events.
+  /// Stages that have finished, run or not: this moves the ring.
   int _stagesCompleted = 0;
+
+  /// What each finished stage came to, by the engine's stage names. Only
+  /// [_stagesRan] counts as checked.
+  final List<String> _stagesRan = [];
+  final List<String> _stagesNotPossible = [];
+  final List<String> _stagesFailed = [];
   int _totalStages = 0;
   int _threatsSoFar = 0;
   bool _sawFirstEvent = false;
@@ -225,12 +232,19 @@ class _PrivacyCheckScreenState extends State<PrivacyCheckScreen>
       row.announced = true;
 
       if (update.stageCompleted) {
-        // Mirrors ScanningScreen: completed stages (including unavailable
-        // ones) advance the honest "stages completed" counter.
+        // Every finished stage moves the ring, but only one that ran counts
+        // as checked; the others are named for what they were.
         _stagesCompleted = update.stageIndex + 1;
-        row.state = update.stageError == null
-            ? _CheckState.done
-            : _CheckState.unavailable;
+        final String? error = update.stageError;
+        if (error == null) {
+          _stagesRan.add(update.stageName);
+        } else if (error == DeviceScanService.notSupported ||
+            error == DeviceScanService.notInBuild) {
+          _stagesNotPossible.add(update.stageName);
+        } else {
+          _stagesFailed.add(update.stageName);
+        }
+        row.state = error == null ? _CheckState.done : _CheckState.unavailable;
         final before = row.threatsBefore;
         if (before != null) {
           final delta = update.threatsFound - before;
@@ -281,14 +295,19 @@ class _PrivacyCheckScreenState extends State<PrivacyCheckScreen>
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted || !widget.popWithResult) return;
 
-    // Same ScanResult construction as ScanningScreen: threats, the number of
-    // stages that genuinely completed, and the real duration. The PARENT
-    // decides what screen shows the results (e.g. FindingsScreen).
+    // Threats, the number of stages that genuinely ran (a stage that could
+    // not run, or broke, is never counted), the names of each kind, and the
+    // real duration. The PARENT decides what screen shows the results (e.g.
+    // FindingsScreen).
     Navigator.pop(
       context,
       ScanResult(
         threats: _threats,
-        itemsScanned: _stagesCompleted,
+        itemsScanned: _stagesRan.length,
+        checksUnavailable: _stagesNotPossible.length + _stagesFailed.length,
+        stagesRan: List.unmodifiable(_stagesRan),
+        stagesNotPossible: List.unmodifiable(_stagesNotPossible),
+        stagesFailed: List.unmodifiable(_stagesFailed),
         scanDuration: DateTime.now().difference(_scanStartTime),
       ),
     );

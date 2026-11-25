@@ -129,7 +129,7 @@ class VictimSafetyNotice extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'If this is monitoring or spyware, removing it may alert the person '
-            'who set it up — and that could put you at risk. There is no rush to '
+            'who set it up, and that could put you at risk. There is no rush to '
             'act right now.',
             style: BrandText.body(size: 13, color: onSurface),
           ),

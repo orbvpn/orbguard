@@ -117,9 +117,9 @@ class SocialAuthService {
       String.fromEnvironment('GOOGLE_OAUTH_CLIENT_ID');
 
   static const String _googleFailCopy =
-      "Couldn't sign in with Google — try email instead.";
+      "Couldn't sign in with Google. Try email instead.";
   static const String _appleFailCopy =
-      "Couldn't sign in with Apple — try email instead.";
+      "Couldn't sign in with Apple. Try email instead.";
 
   // GoogleSignIn 7.x requires a single initialize() before authenticate().
   Future<void>? _googleInit;
@@ -175,7 +175,8 @@ class SocialAuthService {
       // Log the code/description (no PII) so a misconfig like the Google Cloud
       // OAuth "[28444] Developer console is not set up correctly" is diagnosable
       // from logs instead of being silently swallowed.
-      debugPrint('[OrbGuard] Google sign-in failed: ${e.code} — ${e.description}');
+      debugPrint(
+          '[OrbGuard] Google sign-in failed: ${e.code}: ${e.description}');
       return SocialAuthResult.failure(
           SocialAuthProvider.google, _googleFailCopy);
     } catch (e) {
@@ -218,11 +219,11 @@ class SocialAuthService {
       // Log the code (no PII): App Review's Aug 2026 iOS rejection was this
       // exact path failing before any network call, and the swallowed code
       // made it undiagnosable from the banner alone.
-      debugPrint('[OrbGuard] Apple sign-in failed: ${e.code} — ${e.message}');
+      debugPrint('[OrbGuard] Apple sign-in failed: ${e.code}: ${e.message}');
       // ASAuthorization error 1000 ("unknown") on a healthy build means the
       // device has no Apple Account signed in — tell the user the fix.
       final copy = e.code == AuthorizationErrorCode.unknown
-          ? "Couldn't start Sign in with Apple — check that this device is "
+          ? "Couldn't start Sign in with Apple. Check that this device is "
               'signed in to an Apple Account in Settings, or use email '
               'instead.'
           : _appleFailCopy;

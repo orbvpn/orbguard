@@ -158,7 +158,7 @@ class DevicePushService {
   Future<void> initFirebaseMessaging() async {
     if (!kFirebaseEnabled) {
       developer.log(
-        'initFirebaseMessaging() called while kFirebaseEnabled=false — no-op',
+        'initFirebaseMessaging() called while kFirebaseEnabled=false: no-op',
         name: _logName,
       );
       return;
@@ -213,7 +213,7 @@ class DevicePushService {
         if (apnsToken == null) {
           developer.log(
             'APNs token not delivered (expected on simulators without push '
-            'support / cold starts) — FCM token registration deferred to '
+            'support / cold starts), so FCM token registration deferred to '
             'onTokenRefresh; agent polling covers wake-ups meanwhile.',
             name: _logName,
           );
@@ -233,13 +233,13 @@ class DevicePushService {
       developer.log('Firebase messaging initialized', name: _logName);
     } on FirebaseException catch (e) {
       developer.log(
-        'Firebase messaging init failed (${e.code}) — push disabled this '
+        'Firebase messaging init failed (${e.code}): push disabled this '
         'session, agent polling remains: ${e.message}',
         name: _logName,
       );
     } catch (e) {
       developer.log(
-        'Firebase messaging init failed — push disabled this session, agent '
+        'Firebase messaging init failed: push disabled this session, agent '
         'polling remains: $e',
         name: _logName,
       );

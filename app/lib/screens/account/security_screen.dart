@@ -133,13 +133,13 @@ class _SecurityScreenState extends State<SecurityScreen> {
     final isNewestOfMany = keys.length > 1 && keys.first.id == key.id;
     final confirmed = await _confirmSheet(
       title: 'Delete passkey',
-      body: 'This removes "${key.name}" from your account — it can no longer '
+      body: 'This removes "${key.name}" from your account. It can no longer '
           'be used to sign in.'
           '${isLast ? '\n\nThis is your LAST passkey; after deleting it you can '
               'still sign in by email link or password.' : ''}'
           '${isNewestOfMany ? '\n\nThis is your MOST RECENT passkey. If the '
               'others are older duplicates from this same device, this is the '
-              'one that still works — consider deleting the older ones '
+              'one that still works. Consider deleting the older ones '
               'instead.' : ''}'
           '\n\nYou may also want to remove it from your device\'s password '
           'manager (iCloud Keychain / Google Password Manager).',
@@ -174,9 +174,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
       initial: '',
       confirmLabel: 'Delete forever',
       destructive: true,
-      explainer:
-          'This permanently deletes your account and ALL its data — scan '
-          'history, devices, credits, and passkeys — for BOTH OrbGuard and '
+      explainer: 'This permanently deletes your account and ALL its data: scan '
+          'history, devices, credits, and passkeys, for BOTH OrbGuard and '
           'OrbVPN (they share this account). This cannot be undone.\n\n'
           'An active subscription is NOT cancelled by deleting your account: '
           'manage it in your App Store / Google Play subscription settings, '
@@ -185,7 +184,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     );
     if (typed == null || !mounted) return;
     if (typed.trim().toUpperCase() != 'DELETE') {
-      _snack('Account not deleted — confirmation text did not match.');
+      _snack('Account not deleted. Confirmation text did not match.');
       return;
     }
 
@@ -353,7 +352,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 style: BrandText.h2(color: cs.onSurface, size: 20)),
             const SizedBox(height: 4),
             Text(
-              'Sign in with Face ID, fingerprint, or your device PIN — no '
+              'Sign in with Face ID, fingerprint, or your device PIN, no '
               'password to phish or leak.',
               style: BrandText.body(color: cs.onSurfaceVariant, size: 13.5),
             ),

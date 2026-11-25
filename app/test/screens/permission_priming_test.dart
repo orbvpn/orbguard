@@ -40,7 +40,7 @@ Finder inStep(String stepId, Finder matching) => find.descendant(
       matching: matching,
     );
 
-const String kSkippedCopy = 'Skipped — you can enable later in Settings';
+const String kSkippedCopy = 'Skipped. You can enable later in Settings';
 
 Future<void> pumpPriming(
   WidgetTester tester, {
@@ -159,7 +159,7 @@ void main() {
       expect(log, ['usage_access']);
       expect(
           inStep('usage_access',
-              find.text('Opened system Settings — finish turning it on there.')),
+              find.text('Opened system Settings. Finish turning it on there.')),
           findsOneWidget);
       expect(inStep('usage_access', find.text('On')), findsNothing);
     });

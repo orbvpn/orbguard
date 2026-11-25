@@ -129,6 +129,29 @@ class AppColors {
   /// until set. Powers every theme-aware getter here and in `brand.dart`.
   static Brightness uiBrightness = Brightness.dark;
 
+  /// Tells every brand token which theme is showing. Call it first thing in
+  /// `MaterialApp.builder`, before anything below reads a token.
+  ///
+  /// The tokens read [uiBrightness], not the widget tree. A widget built
+  /// `const` that never asks for the theme is therefore not rebuilt when the
+  /// theme changes, and would keep the old theme's ink: dark words on a dark
+  /// card. So when the brightness really changes, everything under [context]
+  /// is marked to build again, in this same frame.
+  static void syncWith(BuildContext context) {
+    final Brightness now = Theme.of(context).brightness;
+    if (now == uiBrightness) return;
+    uiBrightness = now;
+
+    void visit(Element element) {
+      element.markNeedsBuild();
+      element.visitChildren(visit);
+    }
+
+    // Not visitChildElements: that one refuses to run during a build, and
+    // the widgets already under [context] are exactly the ones to reach.
+    (context as Element).visitChildren(visit);
+  }
+
   static bool get _dark => uiBrightness == Brightness.dark;
 
   /// Theme-aware secondary text (brand --text-2). NOT const.
@@ -152,8 +175,8 @@ class AppColors {
   // on light. NOT const — do not use inside const expressions.
 
   /// Lime-family ink (accent/primary/success as text/icon): lime on dark,
-  /// deep lime #5C8A00 on light.
-  static Color get accentInk => _dark ? accent : const Color(0xFF5C8A00);
+  /// deep lime #4A7000 on light.
+  static Color get accentInk => _dark ? accent : const Color(0xFF4A7000);
 
   /// Pink-family ink (secondary/warning/info as text/icon): #FF6CC0 on dark,
   /// #D81B86 on light (AA).
@@ -178,7 +201,7 @@ class AppColors {
   // On-light foreground tokens (WCAG AA)
   // ==========================================
 
-  static const Color accentOnLight = Color(0xFF5C8A00); // deep lime ink
+  static const Color accentOnLight = Color(0xFF4A7000); // deep lime ink
   static const Color successOnLight = Color(0xFF2E7D32); // 5.13:1
   static const Color warningOnLight = Color(0xFFD81B86); // pink alert on light
   static const Color infoOnLight = Color(0xFFD81B86);
@@ -300,7 +323,7 @@ class AppColors {
   /// Volt Lime for dark surfaces (fill + ink on dark).
   static const Color brandDark = Color(0xFFC6FF3D);
   /// Deep lime for legibility on light surfaces (ink; lime stays fill-only).
-  static const Color brandLight = Color(0xFF5C8A00);
+  static const Color brandLight = Color(0xFF4A7000);
 
   // ---- Dark scheme (obsidian, layered) ----
   /// App background base — obsidian.

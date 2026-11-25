@@ -106,7 +106,7 @@ class _NotificationDisciplineScreenState
                               'Turn off to also allow high-severity alerts '
                               'through the same rare + actionable filter.'
                           : 'High-severity and critical alerts can both '
-                              'reach you — still rare, actionable, and '
+                              'reach you. Still rare, actionable, and '
                               'capped at once a day.',
                       style: BrandText.body(color: Brand.text2, size: 12.5),
                     ),
@@ -237,8 +237,8 @@ class _NotificationDisciplineScreenState
             ),
           const SizedBox(height: 4),
           Text(
-            'Everything else — routine scans, minor findings, general '
-            'updates — stays quiet. Check them anytime in the app.',
+            'Everything else (routine scans, minor findings, general '
+            'updates) stays quiet. Check them anytime in the app.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
           ),
         ],
@@ -247,7 +247,7 @@ class _NotificationDisciplineScreenState
   }
 
   static const List<String> _explainerPoints = [
-    "It's high-severity or critical — never routine.",
+    "It's high-severity or critical, never routine.",
     "It's something you can act on right now.",
     "We haven't already alerted for this topic in the last 24 hours.",
     "We haven't sent any other alert today.",

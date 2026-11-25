@@ -148,7 +148,7 @@ class BreachMonitoringService {
   ) async {
     debugPrint(
       'BreachMonitoringService: domain breach check for "$domain" is '
-      'disabled — backend endpoint /api/v1/darkweb/check/domain is not '
+      'disabled: backend endpoint /api/v1/darkweb/check/domain is not '
       'available yet.',
     );
     return BreachCapabilityResult.pendingBackendSupport(
@@ -166,7 +166,7 @@ class BreachMonitoringService {
   /// returning an empty catalog as if it were real.
   Future<BreachCapabilityResult<List<BreachInfo>>> getAllBreaches() async {
     debugPrint(
-      'BreachMonitoringService: known-breach catalog is disabled — '
+      'BreachMonitoringService: known-breach catalog is disabled: '
       'GET /api/v1/darkweb/breaches does not serve catalog data yet.',
     );
     return BreachCapabilityResult.pendingBackendSupport(
@@ -182,7 +182,7 @@ class BreachMonitoringService {
   /// catalog, which the backend does not serve yet.
   Future<BreachCapabilityResult<BreachStats>> getStats() async {
     debugPrint(
-      'BreachMonitoringService: breach corpus statistics are disabled — '
+      'BreachMonitoringService: breach corpus statistics are disabled: '
       'they depend on the breach catalog endpoint, which is not served '
       'by the backend yet.',
     );

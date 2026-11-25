@@ -75,7 +75,7 @@ class Brand {
   static Color get pinkInk => _dark ? const Color(0xFFFF6CC0) : const Color(0xFFD81B86);
 
   /// Lime for TEXT/ICONS (contrast-safe): lime on dark, deep lime on light.
-  static Color get limeInk => _dark ? lime : const Color(0xFF5C8A00);
+  static Color get limeInk => _dark ? lime : const Color(0xFF4A7000);
 
   static Color get danger => _dark ? const Color(0xFFFF5C6C) : const Color(0xFFE0354A);
   /// Text/icon ON a destructive (danger) fill.
@@ -92,7 +92,8 @@ class Brand {
   // ── Bottom navigation (glass bar; only the ACTIVE item takes lime) ─────────
   /// Active icon + label. Light uses DEEP lime — raw #C6FF3D is a fill color and
   /// fails contrast as an icon tint on white (kit note).
-  static Color get navActive => _dark ? lime : const Color(0xFF5C8A00);
+  static Color get navActive => _dark ? lime : const Color(0xFF4A7000);
+
   /// Active pill behind the item: dark lime@.14 · light #96C414@.20.
   static Color get navActivePill => _dark
       ? lime.withValues(alpha: 0.14)
@@ -103,6 +104,65 @@ class Brand {
   /// ORB currency identity (product token — NOT a brand accent).
   static const Color orbGold = Color(0xFFFFB800);
   static const Color orbGoldLight = Color(0xFFFFD54F);
+
+  // ── The Orb: the brand ring, drawn live by `OrbRing` ──────────────────────
+  /// The ring's radial fill, six even stops from its lit edge to its deep
+  /// edge. Light is the logo's own ramp (`assets/branding/orbguard_icon.svg`);
+  /// dark runs a touch brighter so the ring glows on obsidian.
+  static List<Color> get orbFill => _dark
+      ? const [
+          Color(0xFFF6FFDA),
+          Color(0xFFE6FBAE),
+          Color(0xFFCDF57A),
+          Color(0xFFA9E36C),
+          Color(0xFF86CB6B),
+          Color(0xFF63AD5C),
+        ]
+      : const [
+          Color(0xFFF2FCD0),
+          Color(0xFFE0F4B0),
+          Color(0xFFC4E896),
+          Color(0xFFA0D87C),
+          Color(0xFF84C86C),
+          Color(0xFF68B060),
+        ];
+
+  /// Soft bloom behind the ring.
+  static Color get orbGlow =>
+      _dark ? const Color(0x4DBEFA50) : const Color(0x5796D25A);
+
+  /// Contact shadow under the ring body.
+  static Color get orbShadow =>
+      _dark ? const Color(0x736A9858) : const Color(0x6B6A9858);
+
+  /// The empty channel the ring runs in.
+  static Color get orbTrack => _dark
+      ? Colors.white.withValues(alpha: 0.065)
+      : const Color(0xFF12121C).withValues(alpha: 0.06);
+
+  /// A check segment that has not run yet.
+  static Color get orbSegmentIdle => _dark
+      ? Colors.white.withValues(alpha: 0.11)
+      : const Color(0xFF12121C).withValues(alpha: 0.10);
+
+  /// Shading on the band's inner and outer edge that gives it depth.
+  static const Color orbDepth = Color(0xFF12300A);
+
+  /// Pure light and pure shade, used at low alpha for the band's sheen.
+  static const Color orbSheen = Color(0xFFFFFFFF);
+  static const Color orbShade = Color(0xFF000000);
+
+  // ── Amber: one thing needs the user (a gap in the ring, its card) ─────────
+  static const Color amber = Color(0xFFFFB800);
+  static Color get amberPill => amber.withValues(alpha: _dark ? 0.12 : 0.16);
+  static Color get amberLine => _dark
+      ? amber.withValues(alpha: 0.36)
+      : const Color(0xFFBE8C00).withValues(alpha: 0.34);
+
+  /// Hairline between rows inside a glass card.
+  static Color get hairline => _dark
+      ? Colors.white.withValues(alpha: 0.08)
+      : const Color(0xFF12121C).withValues(alpha: 0.07);
 
   // ── Liquid glass ──────────────────────────────────────────────────────────
   static Color get glassFill =>
@@ -392,6 +452,10 @@ class BrandGlass extends StatelessWidget {
   final Widget child;
   final double radius;
   final Color? tint;
+
+  /// Replaces the hairline's colour, for a card that carries a state (the
+  /// amber line of something that needs the user).
+  final Color? borderColor;
   final EdgeInsetsGeometry? padding;
   final bool elevated;
   final List<BoxShadow>? extraShadow;
@@ -404,6 +468,7 @@ class BrandGlass extends StatelessWidget {
     required this.child,
     this.radius = Brand.rLg,
     this.tint,
+    this.borderColor,
     this.padding,
     this.elevated = true,
     this.extraShadow,
@@ -412,8 +477,13 @@ class BrandGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = tint == null ? Brand.glassFill : Color.alphaBlend(tint!, Brand.glassFill);
-    final brd = tint == null ? Brand.glassBorder : Color.alphaBlend(tint!, Brand.glassBorder);
+    final fill = tint == null
+        ? Brand.glassFill
+        : Color.alphaBlend(tint!, Brand.glassFill);
+    final brd = borderColor ??
+        (tint == null
+            ? Brand.glassBorder
+            : Color.alphaBlend(tint!, Brand.glassBorder));
     final r = BorderRadius.circular(radius);
     final shadows = [
       if (elevated) ...Brand.shadow,
@@ -541,41 +611,135 @@ class BrandGlassCircle extends StatelessWidget {
   }
 }
 
+/// The display voice: one step per size of heading. The bigger the type, the
+/// wider and lighter Archivo runs, so a headline reads as a shape and a small
+/// heading still holds its weight. The width axis is already in the bundled
+/// `Archivo-Variable.ttf` (wdth 62 to 125, wght 100 to 900); nothing is fetched.
+///
+/// This is the ONE place the width is set. [BrandText] reads it for its
+/// recipes and the Material text theme reads it through [forSize].
+enum BrandVoice {
+  /// Screen verdicts and hero lines.
+  display(width: 118, weight: 580, tracking: -0.026),
+
+  /// Section and sheet titles.
+  h2(width: 116, weight: 600, tracking: -0.022),
+
+  /// Card headings and values.
+  heading(width: 112, weight: 620, tracking: -0.018),
+
+  /// Figures that carry meaning on their own (the privacy score).
+  numeral(width: 108, weight: 640, tracking: -0.02);
+
+  const BrandVoice({
+    required this.width,
+    required this.weight,
+    required this.tracking,
+  });
+
+  /// Archivo `wdth` axis value (100 is the font's flat default).
+  final double width;
+
+  /// Archivo `wght` axis value.
+  final double weight;
+
+  /// Letter-spacing as a fraction of the font size.
+  final double tracking;
+
+  /// The step a bare font size belongs to, for callers that only know a size.
+  static BrandVoice forSize(double size) {
+    if (size >= 30) return display;
+    if (size >= 22) return h2;
+    return heading;
+  }
+
+  /// A display-face style at this step.
+  ///
+  /// Latin script gets the Archivo axes; a caller that names a [weight] keeps
+  /// it at the step's width. Persian and Arabic keep their own fonts exactly as
+  /// before (no axes, no tracking, [legacyWeight] clamped by [Brand.weight]),
+  /// because Vazirmatn and IBM Plex Sans Arabic have no width axis to set.
+  TextStyle style({
+    required double size,
+    required FontWeight legacyWeight,
+    FontWeight? weight,
+    double? height,
+    Color? color,
+    List<FontFeature>? fontFeatures,
+  }) {
+    final bool latin = Brand.script == BrandScript.latin;
+    return TextStyle(
+      fontFamily: Brand.fontDisplay,
+      fontWeight: latin
+          ? (weight ?? FontWeight.w600)
+          : Brand.weight(weight ?? legacyWeight),
+      fontVariations: latin
+          ? [
+              FontVariation('wdth', width),
+              FontVariation('wght', weight?.value.toDouble() ?? this.weight),
+            ]
+          : null,
+      fontSize: size,
+      letterSpacing: Brand.track(size * tracking),
+      height: height,
+      color: color ?? Brand.text,
+      fontFeatures: fontFeatures,
+    );
+  }
+}
+
 /// Brand typography. Defaults follow the kit's `.t-*` recipes; pass [color] to
 /// override (defaults to [Brand.text] / [Brand.text2]).
 class BrandText {
   BrandText._();
 
-  /// `.t-display` — Archivo 800, -3% tracking. [size] defaults to 40.
-  static TextStyle display({Color? color, double size = 40, FontWeight weight = FontWeight.w800}) =>
-      TextStyle(
-        fontFamily: Brand.fontDisplay,
-        fontWeight: Brand.weight(weight),
-        fontSize: size,
-        letterSpacing: Brand.track(size * -0.03),
-        height: Brand.displayHeight(1.04),
-        color: color ?? Brand.text,
+  /// `.t-display` — Archivo, the widest and lightest step of [BrandVoice].
+  /// [size] defaults to 40. Hero sizes set tight; app sizes (a two-line
+  /// verdict at 28) get a little air between the lines.
+  static TextStyle display(
+          {Color? color, double size = 40, FontWeight? weight}) =>
+      BrandVoice.display.style(
+        size: size,
+        legacyWeight: FontWeight.w800,
+        weight: weight,
+        height: Brand.displayHeight(size >= 36 ? 1.04 : 1.12),
+        color: color,
       );
 
-  /// `.t-h2` — Archivo 700, -2% tracking.
-  static TextStyle h2({Color? color, double size = 30}) => TextStyle(
-        fontFamily: Brand.fontDisplay,
-        fontWeight: FontWeight.w700,
-        fontSize: size,
-        letterSpacing: Brand.track(size * -0.02),
+  /// `.t-h2` — Archivo at the h2 step of [BrandVoice].
+  static TextStyle h2({Color? color, double size = 30}) => BrandVoice.h2.style(
+        size: size,
+        legacyWeight: FontWeight.w700,
         height: Brand.displayHeight(1.2),
-        color: color ?? Brand.text,
+        color: color,
       );
 
-  /// Heading/value in Archivo at an arbitrary size (e.g. score numerals).
-  static TextStyle heading({Color? color, double size = 21, FontWeight weight = FontWeight.w700}) =>
-      TextStyle(
-        fontFamily: Brand.fontDisplay,
-        fontWeight: Brand.weight(weight),
-        fontSize: size,
-        letterSpacing: Brand.track(size * -0.02),
+  /// Heading/value in Archivo at an arbitrary size, at the heading step of
+  /// [BrandVoice].
+  static TextStyle heading(
+          {Color? color, double size = 21, FontWeight? weight}) =>
+      BrandVoice.heading.style(
+        size: size,
+        legacyWeight: FontWeight.w700,
+        weight: weight,
         height: Brand.uiLineHeight,
-        color: color ?? Brand.text,
+        color: color,
+      );
+
+  /// Figures that stand alone (the privacy score in the ring). Lining figures
+  /// always; pass [tabular] only while the number is counting, so the digits
+  /// hold still as they change and sit naturally once they stop.
+  static TextStyle numeral(
+          {Color? color, double size = 35, bool tabular = false}) =>
+      BrandVoice.numeral.style(
+        size: size,
+        legacyWeight: FontWeight.w700,
+        height: 1.0,
+        color: color,
+        fontFeatures: [
+          const FontFeature.liningFigures(),
+          if (tabular) const FontFeature.tabularFigures(),
+        ],
       );
 
   /// Title row label — IBM Plex Sans 600.

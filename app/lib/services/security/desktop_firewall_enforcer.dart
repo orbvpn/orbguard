@@ -419,7 +419,7 @@ class DesktopFirewallEnforcer {
       return FirewallEnforcementStatus(
         state: FirewallEnforcementState.needsElevation,
         reason:
-            'Administrator authorization was cancelled — no firewall changes '
+            'Administrator authorization was cancelled. No firewall changes '
             'were made.',
         source: source,
         enabledPreference: enabledPreference,

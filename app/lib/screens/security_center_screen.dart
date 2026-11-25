@@ -237,7 +237,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                score < 0 ? '—' : '$score',
+                                score < 0 ? '-' : '$score',
                                 style: BrandText.display(
                                     size: 40, color: scoreInk),
                               ),

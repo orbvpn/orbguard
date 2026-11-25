@@ -67,7 +67,7 @@ class SimMonitor {
     final status = await Permission.phone.request();
     if (!status.isGranted) {
       return const SimReadResult.unavailable(
-        'READ_PHONE_STATE permission not granted — SIM monitoring is '
+        'READ_PHONE_STATE permission not granted, so SIM monitoring is '
         'unavailable until the Phone permission is allowed',
       );
     }

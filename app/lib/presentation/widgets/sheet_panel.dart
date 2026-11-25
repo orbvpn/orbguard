@@ -59,14 +59,20 @@ class SheetPanel extends StatelessWidget {
           Row(
             children: [
               if (secondaryLabel != null) ...[
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      onSecondary?.call();
-                    },
-                    child: Text(secondaryLabel!),
-                  ),
+                // The second action takes only the room its words need, so
+                // the primary one keeps enough to read whole on a narrow
+                // phone. Split evenly, "Set up permissions" was cut off.
+                // It is a dismiss, not an alert, so it is quiet glass with
+                // neutral ink: pink is for alerts, lime for the one action.
+                BrandButton.secondary(
+                  label: secondaryLabel!,
+                  expand: false,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    onSecondary?.call();
+                  },
                 ),
                 const SizedBox(width: 12),
               ],
@@ -88,6 +94,10 @@ class SheetPanel extends StatelessWidget {
                       )
                     : BrandButton(
                         label: primaryLabel,
+                        // It fills the row, so side padding only takes room
+                        // from the words.
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 15),
                         onPressed: () {
                           Navigator.of(context).pop();
                           onPrimary?.call();

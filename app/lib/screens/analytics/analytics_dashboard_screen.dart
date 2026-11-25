@@ -97,8 +97,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       _alertMetrics = alerts;
       _geoData = geo;
       _detectionMetrics = detections;
-      _analyticsError =
-          errors.isEmpty ? null : 'Failed to load analytics — ${errors.join('; ')}';
+      _analyticsError = errors.isEmpty
+          ? null
+          : 'Failed to load analytics: ${errors.join('; ')}';
       _isLoadingAnalytics = false;
     });
   }
@@ -1104,7 +1105,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       final status = report['status'] as String? ?? 'unknown';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Report $status${id.isNotEmpty ? ' — $id' : ''}'),
+          content: Text('Report $status${id.isNotEmpty ? ': $id' : ''}'),
           backgroundColor: GlassTheme.successColor,
         ),
       );

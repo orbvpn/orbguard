@@ -1,8 +1,8 @@
-/// Glass Bottom Navigation Bar - OrbX Style
-///
-/// A floating pill-shaped glass navigation bar matching OrbX design
-/// Features: 60px height, borderRadius 30, accent highlight on selected tab
+/// The floating tab bar: a glass pill over the page, where only the current
+/// tab takes lime.
 library;
+
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +11,7 @@ import '../theme/brand.dart';
 import '../theme/colors.dart';
 import '../theme/glass_theme.dart';
 import 'duotone_icon.dart';
+import 'pressable.dart';
 
 /// Navigation item data
 class NavItem {
@@ -25,9 +26,11 @@ class NavItem {
   });
 }
 
-/// Glass Bottom Navigation Bar - OrbX Style
+/// The floating tab bar.
 ///
-/// Pill-shaped (60px height, 30px radius), glass blur, accent background on selected
+/// Each tab is one button that says its name and whether it is the current
+/// one, can be reached and pressed from a keyboard, and keeps its label on one
+/// line at any text size.
 class GlassBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -39,6 +42,10 @@ class GlassBottomNavBar extends StatelessWidget {
     required this.onTap,
     required this.items,
   });
+
+  /// Height of the glass pill. With the 12 it floats above the bottom inset,
+  /// this is what [GlassTheme.bottomNavClearance] reserves under a page.
+  static const double height = 66;
 
   /// Default navigation items for OrbGuard
   static const List<NavItem> defaultItems = [
@@ -60,20 +67,29 @@ class GlassBottomNavBar extends StatelessWidget {
     ),
   ];
 
+  /// How far the pill floats above the bottom edge of the screen.
+  ///
+  /// An iPhone reserves 34 for a home indicator that uses the lowest 13, so
+  /// the pill sits inside the rest, the way the system's own floating bars do.
+  /// Everywhere else the inset is the system's controls themselves (Android's
+  /// navigation buttons), and the pill stays clear of all of it.
+  static double _lift(BuildContext context) {
+    final double inset = MediaQuery.paddingOf(context).bottom;
+    return Theme.of(context).platform == TargetPlatform.iOS
+        ? math.max(12, inset - 10)
+        : inset + 12;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final bool reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: bottomPadding + 12,
-      ),
-      // OrbX-style floating glass bar: translucent pill fill + border + blur —
-      // the page scrolls behind it and shows through, frosted.
+      padding: EdgeInsets.only(left: 14, right: 14, bottom: _lift(context)),
+      // Translucent pill fill + border + blur: the page scrolls behind it and
+      // shows through, frosted.
       child: Container(
-        height: 60,
+        height: height,
         decoration: GlassTheme.pillGlassDecoration(
             isDark: Theme.of(context).brightness == Brightness.dark),
         child: ClipRRect(
@@ -81,65 +97,91 @@ class GlassBottomNavBar extends StatelessWidget {
           child: BackdropFilter(
             filter: GlassTheme.blurFilter,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              padding: const EdgeInsets.all(6),
               child: Row(
-                children: List.generate(items.length, (index) {
-                  final isSelected = currentIndex == index;
-                  final item = items[index];
-
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        onTap(index);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(26),
-                          // Kit: only the ACTIVE item takes lime — pill tint
-                          // + ink-safe icon/label (deep lime on light).
-                          color: isSelected
-                              ? Brand.navActivePill
-                              : Colors.transparent,
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            DuotoneIcon(
-                              item.iconPath,
-                              size: 22,
-                              color: isSelected
-                                  ? Brand.navActive
-                                  : Brand.navInactive,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              item.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? Brand.navActive
-                                    : Brand.navInactive,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ],
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (int index = 0; index < items.length; index++)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        child: _Tab(
+                          item: items[index],
+                          selected: currentIndex == index,
+                          reduceMotion: reduceMotion,
+                          onTap: () => onTap(index),
                         ),
                       ),
                     ),
-                  );
-                }),
+                ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  const _Tab({
+    required this.item,
+    required this.selected,
+    required this.reduceMotion,
+    required this.onTap,
+  });
+
+  final NavItem item;
+  final bool selected;
+  final bool reduceMotion;
+  final VoidCallback onTap;
+
+  static const BorderRadius _radius = BorderRadius.all(Radius.circular(32));
+
+  @override
+  Widget build(BuildContext context) {
+    // Kit: only the ACTIVE item takes lime, as a pill tint with ink-safe
+    // icon and label (deep lime on light).
+    final Color ink = selected ? Brand.navActive : Brand.navInactive;
+
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: item.label,
+      selected: selected,
+      radius: _radius,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: reduceMotion ? 0 : 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: _radius,
+          color: selected ? Brand.navActivePill : Colors.transparent,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DuotoneIcon(
+              selected ? item.activeIconPath ?? item.iconPath : item.iconPath,
+              size: 23,
+              color: ink,
+            ),
+            const SizedBox(height: 3),
+            // A tab label is a fixed piece of chrome: it grows a little with
+            // the reader's text size, then holds, so it never leaves the bar.
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.3,
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BrandText.body(
+                  size: 11,
+                  weight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: ink,
+                ).copyWith(height: 1.15),
+              ),
+            ),
+          ],
         ),
       ),
     );

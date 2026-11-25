@@ -203,7 +203,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '${vuln.cveId} — CVSS '
+                            '${vuln.cveId}: CVSS '
                             '${vuln.cvssScore.toStringAsFixed(1)}',
                             style: TextStyle(
                               color: cs.onSurface,

@@ -15,7 +15,11 @@ import '../../providers/darkweb_provider.dart';
 import '../../widgets/darkweb/darkweb_widgets.dart';
 
 class DarkWebScreen extends StatefulWidget {
-  const DarkWebScreen({super.key});
+  const DarkWebScreen({super.key, this.title = 'Dark Web Monitor'});
+
+  /// The name in the header. A shield passes its own, so the sheet reads
+  /// the same as the moon or the card that opened it.
+  final String title;
 
   @override
   State<DarkWebScreen> createState() => _DarkWebScreenState();
@@ -28,7 +32,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       builder: (context, provider, child) {
         final cs = Theme.of(context).colorScheme;
         return GlassTabPage(
-          title: 'Dark Web Monitor',
+          title: widget.title,
           hasSearch: true,
           searchHint: 'Search breaches...',
           // Issue 2: screen-level action icon lives in the header pill.
@@ -406,17 +410,24 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
       children: assets.map((asset) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: MonitoredAssetCard(
-            asset: asset,
-            onTap: () {
-              // Show breach details for this asset
-              final result = provider.getCheckResult(asset.value);
-              if (result != null && result.breaches.isNotEmpty) {
-                _showAssetBreaches(context, asset, result.breaches);
-              }
-            },
-            onDelete: () => _confirmDeleteAsset(context, provider, asset),
-            onToggle: () => provider.toggleMonitoring(asset.id),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              MonitoredAssetCard(
+                asset: asset,
+                onTap: () {
+                  // Show breach details for this asset
+                  final result = provider.getCheckResult(asset.value);
+                  if (result != null && result.breaches.isNotEmpty) {
+                    _showAssetBreaches(context, asset, result.breaches);
+                  }
+                },
+                onDelete: () => _confirmDeleteAsset(context, provider, asset),
+                onToggle: () => provider.toggleMonitoring(asset.id),
+              ),
+              if (asset.type == AssetType.email)
+                _HandledRow(provider: provider, asset: asset),
+            ],
           ),
         );
       }).toList(),
@@ -958,6 +969,52 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Under a watched address with breaches: say it is dealt with, or take that
+/// back. The same state Home's Identity & breach gap reads, so the two never
+/// disagree.
+class _HandledRow extends StatelessWidget {
+  const _HandledRow({required this.provider, required this.asset});
+
+  final DarkWebProvider provider;
+  final MonitoredAsset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bool open = provider.openBreaches.any((a) => a.id == asset.id);
+    final bool handled = !open && provider.isBreachHandled(asset.id);
+    if (!open && !handled) return const SizedBox.shrink();
+
+    final quiet = TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant);
+    final label = BrandText.title(
+        size: 14, weight: FontWeight.w500, color: cs.onSurfaceVariant);
+
+    if (open) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          style: quiet,
+          onPressed: () => provider.markBreachHandled(asset.id),
+          child: Text('I dealt with this', style: label),
+        ),
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text('Dealt with',
+            style: BrandText.body(size: 13.5, color: cs.onSurfaceVariant)),
+        const SizedBox(width: 4),
+        TextButton(
+          style: quiet,
+          onPressed: () => provider.reopenBreach(asset.id),
+          child: Text('Undo', style: label),
+        ),
+      ],
     );
   }
 }

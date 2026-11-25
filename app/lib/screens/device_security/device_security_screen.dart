@@ -355,7 +355,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
-                  score == null ? '—' : '$score',
+                  score == null ? '-' : '$score',
                   style: BrandText.heading(size: 20, color: ink),
                 ),
               ],
@@ -373,7 +373,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 const SizedBox(height: 4),
                 Text(
                   score == null
-                      ? 'Not assessed yet — run a scan'
+                      ? 'Not assessed yet. Run a scan'
                       : score >= 80
                           ? 'Your device is well protected'
                           : score >= 50
@@ -1097,7 +1097,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Android does not expose real ICCIDs to apps — entries marked '
+              'Android does not expose real ICCIDs to apps. Entries marked '
               '"sub:" are stable subscription fingerprints used for change '
               'detection.',
               style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
@@ -1488,8 +1488,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       }
     }
     return Text(
-      'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}) '
-      '— cannot be rendered inline',
+      'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}). '
+      'It cannot be rendered inline.',
       style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
     );
   }

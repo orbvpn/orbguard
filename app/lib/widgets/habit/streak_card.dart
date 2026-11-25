@@ -79,7 +79,7 @@ class StreakCard extends StatelessWidget {
                     Text(
                       started
                           ? '$current ${_dayWord(current)} protected'
-                          : 'Start your streak — run a checkup',
+                          : 'Start your streak. Run a checkup',
                       style: BrandText.heading(size: 20, color: cs.onSurface),
                     ),
                     if (best > 0) ...[

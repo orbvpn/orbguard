@@ -339,12 +339,12 @@ class IapService extends ChangeNotifier {
     }
     if (!_available) {
       _emit(IapOutcome.failed, '',
-          message: 'The store is unavailable right now — try again later.');
+          message: 'The store is unavailable right now. Try again later.');
       return;
     }
     if (isBusy) {
       _emit(IapOutcome.failed, '',
-          message: 'Another purchase is still in progress — try again in a '
+          message: 'Another purchase is still in progress. Try again in a '
               'moment.');
       return;
     }
@@ -492,7 +492,7 @@ class IapService extends ChangeNotifier {
       _log('verify errored transiently (leaving pending for retry): $e');
       _emit(IapOutcome.failed, purchase.productID,
           message:
-              'Purchase received — activating it failed, we\'ll retry automatically.');
+              'Purchase received. Activating it failed, we\'ll retry automatically.');
       return false;
     }
   }

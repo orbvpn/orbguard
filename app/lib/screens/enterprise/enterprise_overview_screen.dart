@@ -160,10 +160,10 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     );
   }
 
-  String _fmt(num? value) => value?.toString() ?? '—';
+  String _fmt(num? value) => value?.toString() ?? '-';
 
   String _fmtScore(double? value) =>
-      value != null ? value.toStringAsFixed(1) : '—';
+      value != null ? value.toStringAsFixed(1) : '-';
 
   Widget _buildZeroTrustSection() {
     return Column(

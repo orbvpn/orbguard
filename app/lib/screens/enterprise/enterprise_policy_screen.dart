@@ -381,7 +381,7 @@ class _EnterprisePolicyScreenState extends State<EnterprisePolicyScreen> {
               _buildSummarySection(
                 'Conditions',
                 policy.conditions.summary,
-                'No conditions configured — policy applies unconditionally.',
+                'No conditions configured. Policy applies unconditionally.',
               ),
               const SizedBox(height: 24),
               _buildSummarySection(

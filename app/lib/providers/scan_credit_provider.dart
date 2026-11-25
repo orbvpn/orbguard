@@ -62,6 +62,7 @@ class ScanCreditProvider extends ChangeNotifier {
   final String? Function()? _deviceId;
 
   double _balance = 0;
+  bool _balanceKnown = false;
   bool _loading = false;
   bool _watching = false;
   String? _lastError;
@@ -80,6 +81,11 @@ class ScanCreditProvider extends ChangeNotifier {
 
   // ── State ───────────────────────────────────────────────────────────────────
   double get balance => _balance;
+
+  /// Whether [balance] is a number the server gave (a refresh, a spend or an
+  /// earned credit). Until then [balance] is only the starting 0, and the UI
+  /// must not print it as the person's balance.
+  bool get balanceKnown => _balanceKnown;
   bool get loading => _loading;
   bool get isWatchingAd => _watching;
   String? get lastError => _lastError;
@@ -96,6 +102,7 @@ class ScanCreditProvider extends ChangeNotifier {
   Future<void> refresh() async {
     if (!_isLoggedIn()) {
       _balance = 0;
+      _balanceKnown = false;
       _lastError = null;
       notifyListeners();
       return;
@@ -105,6 +112,7 @@ class ScanCreditProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _balance = await _scanCreditApi.getBalance();
+      _balanceKnown = true;
     } catch (e) {
       _lastError = _friendly(e);
     } finally {
@@ -164,7 +172,10 @@ class ScanCreditProvider extends ChangeNotifier {
 
       // Adopt the server's authoritative balance, then confirm from source.
       final serverBalance = reward.newScanCreditBalance;
-      if (serverBalance != null) _balance = serverBalance;
+      if (serverBalance != null) {
+        _balance = serverBalance;
+        _balanceKnown = true;
+      }
       await _refreshQuietly();
       return true;
     } on AdsNotConfiguredException {
@@ -191,6 +202,7 @@ class ScanCreditProvider extends ChangeNotifier {
     try {
       final newBalance = await _scanCreditApi.consume(amount: 1);
       _balance = newBalance;
+      _balanceKnown = true;
       notifyListeners();
       return ConsumeResult.spent(newBalance);
     } on InsufficientScanCreditsException {
@@ -211,6 +223,7 @@ class ScanCreditProvider extends ChangeNotifier {
   Future<void> _refreshQuietly() async {
     try {
       _balance = await _scanCreditApi.getBalance();
+      _balanceKnown = true;
     } catch (_) {
       // The credit already landed server-side; a failed re-read must not turn a
       // successful earn into an error. Keep the optimistic balance.

@@ -189,7 +189,7 @@ class _ThreatGraphScreenState extends State<ThreatGraphScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'The threat graph has no nodes yet — indicators, campaigns and '
+            'The threat graph has no nodes yet. Indicators, campaigns and '
             'actors appear here once they are synced to the graph database.',
             textAlign: TextAlign.center,
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),

@@ -35,19 +35,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingPage(
       'eye_closed',
       "Know if you're\nbeing watched.",
-      'OrbGuard checks your ${DeviceWords.noun} for the ways someone could be spying on you — '
+      'OrbGuard checks your ${DeviceWords.noun} for the ways someone could be spying on you: '
           'spyware, stalkerware, scam messages, and hidden network tricks.',
     ),
     _OnboardingPage(
       'magnifer_bug',
       'One tap.\nA clear answer.',
       'Run a checkup anytime. OrbGuard names every check as it runs, and tells '
-          "you honestly what it finds — and what your ${DeviceWords.noun} won't let any app see.",
+          "you honestly what it finds, and what your ${DeviceWords.noun} won't let any app see.",
     ),
     _OnboardingPage(
       'shield_keyhole',
       'Private\nby design.',
-      "Everything runs on your ${DeviceWords.noun} — we can't see your data. You're always in "
+      "Everything runs on your ${DeviceWords.noun}, so we can't see your data. You're always in "
           'control of what OrbGuard can access.',
     ),
   ];

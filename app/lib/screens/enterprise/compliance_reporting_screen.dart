@@ -447,11 +447,16 @@ class _ComplianceReportingScreenState extends State<ComplianceReportingScreen> {
                         report.overallScore != null
                             ? '${report.overallScore!.toStringAsFixed(1)}%'
                             : 'Not available'),
-                    _buildDetailRow('Total controls', '${report.totalControls ?? '—'}'),
-                    _buildDetailRow('Passed', '${report.passedControls ?? '—'}'),
-                    _buildDetailRow('Failed', '${report.failedControls ?? '—'}'),
-                    _buildDetailRow('Partial', '${report.partialControls ?? '—'}'),
-                    _buildDetailRow('Findings', '${report.findingsCount ?? '—'}'),
+                    _buildDetailRow(
+                        'Total controls', '${report.totalControls ?? '-'}'),
+                    _buildDetailRow(
+                        'Passed', '${report.passedControls ?? '-'}'),
+                    _buildDetailRow(
+                        'Failed', '${report.failedControls ?? '-'}'),
+                    _buildDetailRow(
+                        'Partial', '${report.partialControls ?? '-'}'),
+                    _buildDetailRow(
+                        'Findings', '${report.findingsCount ?? '-'}'),
                     _buildDetailRow(
                         'Generated',
                         report.generatedAt != null

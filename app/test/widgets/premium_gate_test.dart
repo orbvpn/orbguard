@@ -19,9 +19,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orbguard/presentation/theme/app_theme.dart';
 import 'package:orbguard/presentation/theme/colors.dart';
 import 'package:orbguard/providers/account_provider.dart';
+import 'package:orbguard/providers/scan_credit_provider.dart';
 import 'package:orbguard/providers/settings_provider.dart';
+import 'package:orbguard/screens/account/login_screen.dart';
+import 'package:orbguard/screens/pricing/pricing_screen.dart';
 import 'package:orbguard/screens/settings/settings_screen.dart';
+import 'package:orbguard/services/iap/iap_service.dart';
 import 'package:orbguard/widgets/premium/premium_gate.dart';
+
+import '../support/sale_fakes.dart';
 
 /// A controllable AccountProvider: hasPremium / isLoggedIn are fixed inputs.
 class _FakeAccount extends AccountProvider {
@@ -163,12 +169,15 @@ void main() {
       final settings = SettingsProvider();
       await settings.init();
       final account = _FakeAccount(premium: false, loggedIn: false);
+      // The Me tab's plan card reads the scan-credit balance.
+      final credits = SaleCredits(account: account).provider;
 
       await tester.pumpWidget(
         MultiProvider(
           providers: [
             ChangeNotifierProvider<SettingsProvider>.value(value: settings),
             ChangeNotifierProvider<AccountProvider>.value(value: account),
+            ChangeNotifierProvider<ScanCreditProvider>.value(value: credits),
           ],
           child: MaterialApp(
             theme: AppTheme.light,
@@ -193,4 +202,51 @@ void main() {
       account.dispose();
     },
   );
+
+  group('the upsell opens sheets', () {
+    setUp(() => IapService.instance.debugSeed(available: false, products: []));
+
+    Future<void> upsell(WidgetTester tester, FakeSaleAccount account) async {
+      await pumpSale(
+        tester,
+        account: account,
+        credits: SaleCredits(account: account).provider,
+        dark: false,
+        child: Builder(
+          builder: (ctx) => Center(
+            child: TextButton(
+              onPressed: () => PremiumGate.ensure(ctx, account),
+              child: const Text('go'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('go'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    testWidgets('signed in: See plans opens the plans sheet', (tester) async {
+      await upsell(tester, FakeSaleAccount(loggedIn: true));
+      await tester.tap(find.text('See plans'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(
+          find.ancestor(
+              of: find.byType(PricingScreen),
+              matching: find.byType(BottomSheet)),
+          findsOneWidget);
+    });
+
+    testWidgets('signed out: Sign in opens the sign-in sheet', (tester) async {
+      await upsell(tester, FakeSaleAccount());
+      await tester.tap(find.text('Sign in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(
+          find.ancestor(
+              of: find.byType(LoginScreen), matching: find.byType(BottomSheet)),
+          findsOneWidget);
+    });
+  });
 }

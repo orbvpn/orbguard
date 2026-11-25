@@ -592,9 +592,8 @@ class IdentityTheftProtectionService {
 
     final supportsLiveScan = type == AssetType.email;
     if (!supportsLiveScan) {
-      debugPrint(
-          'IdentityProtection: no live monitoring source for asset type '
-          '"${type.name}" — stored with status=unavailable');
+      debugPrint('IdentityProtection: no live monitoring source for asset type '
+          '"${type.name}": stored with status=unavailable');
     }
 
     final asset = MonitoredAsset(
@@ -754,7 +753,7 @@ class IdentityTheftProtectionService {
             'Enable two-factor authentication',
             if (breach.dataClasses
                 .any((d) => d.toLowerCase().contains('password')))
-              'This breach exposed passwords — change reused passwords everywhere',
+              'This breach exposed passwords. Change reused passwords everywhere',
           ],
         );
         _alerts.add(alert);
@@ -998,9 +997,9 @@ class IdentityTheftProtectionService {
     final recommendations = <String>[];
 
     if (!_monitoredAssets.any((a) => a.type == AssetType.email)) {
-      recommendations.add(
-          'Add your email address — it is checked against live breach and '
-          'data-broker sources');
+      recommendations
+          .add('Add your email address. It is checked against live breach and '
+              'data-broker sources');
     }
 
     if (frozenBureaus < 3) {

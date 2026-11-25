@@ -79,10 +79,10 @@ List<_CapabilityRow> _capabilityRows(TargetPlatform platform) {
               ? _CapabilityStatus.available
               : _CapabilityStatus.limited,
       explanation: isIOS
-          ? 'iOS sandboxes every app, so no tool — including OrbGuard — can '
+          ? 'iOS sandboxes every app, so no tool, including OrbGuard, can'
               "scan other apps for malware. Here's what we check instead: "
               'jailbreak status, screen recording, and proxy or certificate '
-              'interception — the conditions spyware like Pegasus needs.'
+              'interception: the conditions spyware like Pegasus needs.'
           : isAndroid
               ? 'OrbGuard analyzes system logs, installed apps, and '
                   'research-grade indicators of compromise to flag '
@@ -101,7 +101,7 @@ List<_CapabilityRow> _capabilityRows(TargetPlatform platform) {
           isAndroid ? _CapabilityStatus.available : _CapabilityStatus.limited,
       explanation: isAndroid
           ? 'OrbGuard inspects installed apps, risky permissions, and '
-              'abused accessibility-service access — the exact mechanism '
+              'abused accessibility-service access: the exact mechanism '
               'most stalkerware relies on to hide and spy.'
           : isIOS
               ? 'iOS keeps every app sandboxed from inspecting others, so '
@@ -146,11 +146,11 @@ List<_CapabilityRow> _capabilityRows(TargetPlatform platform) {
           : _CapabilityStatus.available,
       explanation: isDesktop
           ? 'Not available on desktop: OrbGuard runs this device-posture '
-              'check on a phone (iPhone or Android) — a $noun doesn\'t '
+              'check on a phone (iPhone or Android). A $noun doesn\'t '
               'carry the call posture this check looks for.'
           : 'Before a sensitive call, OrbGuard checks this device for '
               'screen recording, risky accessibility access, network '
-              'interception, and jailbreak or root — the conditions an '
+              'interception, and jailbreak or root: the conditions an '
               'eavesdropper would need first.',
     ),
     _CapabilityRow(
@@ -159,7 +159,7 @@ List<_CapabilityRow> _capabilityRows(TargetPlatform platform) {
       area: 'Dark-web & breach lookup',
       status: _CapabilityStatus.available,
       explanation: 'OrbGuard checks your email, phone number, or password '
-          "against known breach databases. It's the same everywhere — a "
+          "against known breach databases. It's the same everywhere: a "
           'lookup, not a device scan.',
     ),
     _CapabilityRow(
@@ -171,13 +171,13 @@ List<_CapabilityRow> _capabilityRows(TargetPlatform platform) {
           : _CapabilityStatus.limited,
       explanation: isAndroid
           ? 'A real on-device DNS filter blocks known-malicious domains '
-              'directly on this phone — no server round-trip required.'
+              'directly on this phone. No server round-trip required.'
           : isDesktop
-              ? 'OrbGuard installs real OS firewall rules — pf on Mac, '
-                  'netsh on Windows, iptables on Linux — that block '
+              ? 'OrbGuard installs real OS firewall rules (pf on Mac, '
+                  'netsh on Windows, iptables on Linux) that block '
                   'known-malicious IPs at the network level.'
               : 'On iPhone, OrbGuard filters DNS on-device while '
-                  'connected — no MDM required for that. Full system-wide '
+                  'connected. No MDM required for that. Full system-wide '
                   'content filtering needs enterprise MDM supervision, '
                   "which most personal iPhones don't have.",
     ),
@@ -241,7 +241,7 @@ class DeviceCapabilitiesScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "Here's exactly what OrbGuard can check on this device — and an "
+            "Here's exactly what OrbGuard can check on this device, and an "
             'honest answer everywhere the operating system draws the line.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
           ),
@@ -438,7 +438,7 @@ class _HonestyFooter extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Every phone and computer sandboxes apps away from each other on '
-            "purpose — it's the same protection that keeps other apps from "
+            "purpose. It's the same protection that keeps other apps from "
             'reading yours. When OrbGuard says a check is limited or not '
             'available on your $platformNoun, that\'s the operating system '
             'telling the truth, not OrbGuard cutting a corner.',

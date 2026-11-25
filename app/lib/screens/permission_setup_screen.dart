@@ -163,7 +163,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
                             'Settings → Notifications, and System Settings → '
                             'Privacy & Security → Location Services.'
                         : 'If nothing was asked, the system remembered an '
-                            'earlier choice — you can enable OrbGuard in the '
+                            'earlier choice. You can enable OrbGuard in the '
                             'system Settings app.',
                     style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                   ),
@@ -252,7 +252,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
       showResultSnackBar(
         context,
         _allSimpleGranted
-            ? 'All set — alerts and Wi-Fi checks are on'
+            ? 'All set. Alerts and Wi-Fi checks are on'
             : 'You can change this anytime in system Settings',
         background:
             _allSimpleGranted ? AppColors.success : AppColors.warning,
@@ -455,7 +455,7 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
         leading: DuotoneIcon(AppIcons.folder, color: AppColors.accentInk),
         title: const Text('File scanning'),
         subtitle: const Text(
-            'Check any file or APK you pick — no storage permission needed',
+            'Check any file or APK you pick. No storage permission needed',
             style: TextStyle(fontSize: 12)),
         trailing: DuotoneIcon(AppIcons.checkCircle, color: AppColors.accentInk),
       ),

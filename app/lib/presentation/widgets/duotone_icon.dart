@@ -50,6 +50,7 @@ class AppIcons {
   static const String userBlock = 'user_block';
   static const String userHeart = 'user_heart';
   static const String userId = 'user_id';
+  static const String phoneCalling = 'phone_calling';
   static const String userSpeak = 'user_speak';
   static const String usersGroup = 'users_group_rounded';
 
@@ -57,6 +58,7 @@ class AppIcons {
   static const String chatDots = 'chat_dots';
   static const String chatLine = 'chat_line';
   static const String chatRound = 'chat_round';
+  static const String chatRoundCheck = 'chat_round_check';
   static const String chatSquare = 'chat__square';
   static const String letter = 'letter';
   static const String letterOpened = 'letter_opened';
@@ -382,7 +384,12 @@ class DuotoneIcon extends StatelessWidget {
           'assets/icons/$icon.svg',
           width: size,
           height: size,
-          colorFilter: ColorFilter.mode(iconColor, blendMode ?? BlendMode.srcIn),
+          colorFilter:
+              ColorFilter.mode(iconColor, blendMode ?? BlendMode.srcIn),
+          // An icon here never carries a label of its own: whatever it sits
+          // in names the control. Left in, each one adds an unnamed "image"
+          // to what a screen reader announces.
+          excludeFromSemantics: true,
         ),
       ),
     );

@@ -63,7 +63,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Exactly how OrbGuard treats your data — plainly, and without '
+            'Exactly how OrbGuard treats your data, plainly and without '
             'the fine print.',
             textAlign: TextAlign.center,
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
@@ -78,7 +78,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             icon: 'smartphone',
             tint: AppColors.accentInk,
             title: 'Everything runs on your ${DeviceWords.noun}',
-            body: 'Every scan happens locally, right here on your device — '
+            body: 'Every scan happens locally, right here on your device, '
                 'never sent to a server first. Results stay on your ${DeviceWords.noun} '
                 'unless you choose to share them, for example when '
                 'contacting support.',
@@ -88,7 +88,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             tint: AppColors.secondaryInk,
             title: "We can't read your messages or listen to your calls",
             body: 'OrbGuard cannot open WhatsApp, Signal, or Telegram, and it '
-                'cannot listen in on a call — your ${DeviceWords.noun} simply does not '
+                'cannot listen in on a call. Your ${DeviceWords.noun} simply does not '
                 'allow any app that kind of access. That is not a gap. It is '
                 'by design, and it is a good thing.',
           ),
@@ -97,7 +97,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             tint: AppColors.amberInk,
             title: 'What we keep',
             body: 'We keep the minimum needed to show your protection '
-                'status — scan results and your settings — stored locally '
+                'status: scan results and your settings, stored locally '
                 'on this device. Nothing is collected just in case.',
           ),
           _TrustCard(
@@ -105,7 +105,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             tint: AppColors.accentInk,
             title: 'Your data is yours',
             body: 'No accounts sold, no tracking across apps, and no ads. '
-                'OrbGuard answers to you — never to an advertiser or a data '
+                'OrbGuard answers to you, never to an advertiser or a data '
                 'broker.',
           ),
         ],

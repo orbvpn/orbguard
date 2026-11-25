@@ -248,7 +248,7 @@ void main() {
 
     expect(account.magicCalls, 1);
     expect(account.magicEmail, 'nima@example.com');
-    expect(find.textContaining('we sent a sign-in link to'), findsOneWidget);
+    expect(find.textContaining('We sent a sign-in link to'), findsOneWidget);
 
     // Regression guard for the Microsoft Store 10.1.2.10 rejection: the code
     // field must be on screen the moment the link is sent. Hiding it behind a

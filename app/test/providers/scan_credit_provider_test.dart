@@ -242,4 +242,41 @@ void main() {
     expect(p.loading, isFalse);
     expect(p.lastError, isNull);
   });
+
+  // The balance is only a number to show once the server has said it: a
+  // freshly made provider holds 0 because nothing has been asked yet, and
+  // printing "0 scan credits" then would be a guess.
+  test('the balance is not known until the server has given it', () async {
+    final creditApi = _FakeScanCreditApi(balance: 3);
+    final p = _provider(creditApi: creditApi);
+    expect(p.balanceKnown, isFalse);
+
+    await p.refresh();
+    expect(p.balanceKnown, isTrue);
+  });
+
+  test('a failed refresh leaves the balance unknown', () async {
+    final p = _provider(creditApi: _ThrowingScanCreditApi());
+    await p.refresh();
+    expect(p.balanceKnown, isFalse);
+    expect(p.lastError, isNotNull);
+  });
+
+  test('a spend makes the balance known', () async {
+    final p = _provider(creditApi: _FakeScanCreditApi(balance: 2));
+    await p.spendForScan();
+    expect(p.balanceKnown, isTrue);
+    expect(p.balance, 1);
+  });
+
+  test('signed out, there is no balance to know', () async {
+    final p = _provider(loggedIn: false);
+    await p.refresh();
+    expect(p.balanceKnown, isFalse);
+  });
+}
+
+class _ThrowingScanCreditApi extends _FakeScanCreditApi {
+  @override
+  Future<double> getBalance() async => throw Exception('offline');
 }

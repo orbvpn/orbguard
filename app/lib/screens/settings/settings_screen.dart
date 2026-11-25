@@ -16,6 +16,7 @@ import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/app_sheet.dart';
 import '../../presentation/widgets/brand_button.dart';
 import '../../presentation/widgets/duotone_icon.dart';
+import '../../presentation/widgets/page_head.dart';
 import '../../presentation/widgets/theme_mode_selector.dart';
 import '../../models/app_mode.dart';
 import '../../providers/settings_provider.dart';
@@ -23,10 +24,8 @@ import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
 import '../../services/security/desktop_scan_config.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../pricing/pricing_screen.dart';
 import '../trust/device_capabilities_screen.dart';
 import '../trust/privacy_explainer_screen.dart';
-import '../account/login_screen.dart';
 import '../account/security_screen.dart';
 import '../../providers/account_provider.dart';
 import '../../services/iap/iap_service.dart';
@@ -34,6 +33,10 @@ import '../../widgets/premium/premium_gate.dart';
 import '../legal/legal_screen.dart';
 import 'notification_discipline_screen.dart';
 import '../../utils/device_words.dart';
+import '../../widgets/sale/account_card.dart';
+import '../../widgets/sale/login_sheet.dart';
+import '../../widgets/sale/plan_card.dart';
+import '../../widgets/sale/plans_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -48,14 +51,20 @@ class SettingsScreen extends StatelessWidget {
       embedded: embedded,
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
+          // Guard mode's Me tab opens with its own head, the account and the
+          // plan; the shell draws no floating header over it. Pro mode keeps
+          // the console layout under the floating header.
+          final bool guard = !settings.isProMode;
+          final bool meTab = embedded && guard;
           return ListView(
-            // Embedded (tab) mode renders full-bleed behind the transparent
-            // floating header + bottom nav, so the list itself clears them.
-            // Standalone pushed routes keep the GlassPage header flow.
+            // Embedded (tab) mode renders full-bleed behind the bottom nav
+            // (and, in Pro mode, the transparent floating header), so the
+            // list itself clears them. Standalone pushed routes keep the
+            // GlassPage header flow.
             padding: embedded
                 ? EdgeInsets.fromLTRB(
                     16,
-                    12 + GlassTheme.headerClearance,
+                    meTab ? 8 : 12 + GlassTheme.headerClearance,
                     16,
                     24 +
                         GlassTheme.bottomNavClearance +
@@ -63,11 +72,21 @@ class SettingsScreen extends StatelessWidget {
                   )
                 : const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
+              if (meTab) ...[
+                const PageHead(title: 'Me'),
+                const AccountCard(),
+                const SizedBox(height: 12),
+                const PlanCard(),
+                const SizedBox(height: 24),
+              ],
               // Account — shared OrbVPN/OrbNet sign-in (optional; unlocks
               // subscription/credits/remote control). Anonymous scanning works
-              // without it.
-              _buildAccountSection(context),
-              const SizedBox(height: 24),
+              // without it. On the Me tab the cards above already name the
+              // account and the plan, so only the account tools remain here.
+              if (!meTab || context.watch<AccountProvider>().isLoggedIn) ...[
+                _buildAccountSection(context, compact: meTab),
+                const SizedBox(height: 24),
+              ],
               // Appearance
               _buildSettingsSection(
                 context,
@@ -141,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     context,
                     'Notification discipline',
-                    'How we decide to alert you — rare, serious, actionable',
+                    'How we decide to alert you: rare, serious, actionable',
                     'bell',
                     onTap: () => Navigator.push(
                       context,
@@ -243,7 +262,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     context,
                     'How your privacy works',
-                    'Everything runs on your ${DeviceWords.noun} — what we can and cannot see',
+                    'Everything runs on your ${DeviceWords.noun}. What we can and cannot see',
                     'incognito',
                     onTap: () => Navigator.push(
                       context,
@@ -269,12 +288,7 @@ class SettingsScreen extends StatelessWidget {
                     'Plans & pricing',
                     'The price you see is the price that renews',
                     'wallet',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PricingScreen(),
-                      ),
-                    ),
+                    onTap: () => showPlansSheet(context),
                   ),
                 ],
               ),
@@ -318,10 +332,10 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         subtitle: Text(
                           settings.isProMode
-                              ? 'On — advanced threat-intelligence & enterprise tools are visible'
+                              ? 'On. Advanced threat-intelligence & enterprise tools are visible'
                               : locked
-                                  ? 'Premium — subscribe to unlock the expert console'
-                                  : 'Off — the simple, consumer Guard experience',
+                                  ? 'Premium. Subscribe to unlock the expert console'
+                                  : 'Off. The simple, consumer Guard experience',
                           style: TextStyle(
                             color: cs.onSurfaceVariant,
                             fontSize: 12,
@@ -443,8 +457,11 @@ class SettingsScreen extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                // The label takes a neutral ink, not the section's tint: a
+                // tint such as the spectrum purple is a fill colour and all
+                // but vanished on the light background.
                 style: TextStyle(
-                  color: color,
+                  color: Brand.text2,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -501,7 +518,11 @@ class SettingsScreen extends StatelessWidget {
   /// Account section — reflects login state from [AccountProvider]. Logged
   /// out: a single "Sign in / Account" row opening the login screen. Logged in:
   /// the account email + a "Sign out" row.
-  Widget _buildAccountSection(BuildContext context) {
+  ///
+  /// [compact] is the Me tab, where the account and plan cards above already
+  /// show the sign-in, the email and the plan: only the rows those cards do
+  /// not cover remain (manage, restore, security, sign out).
+  Widget _buildAccountSection(BuildContext context, {bool compact = false}) {
     return Consumer<AccountProvider>(
       builder: (context, account, _) {
         final loggedIn = account.isLoggedIn;
@@ -518,46 +539,39 @@ class SettingsScreen extends StatelessWidget {
                 'Sign in / Account',
                 'Use your OrbVPN account to unlock subscription & remote control',
                 'login',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
+                onTap: () => showLoginSheet(context),
               ),
               // Subscription: the purchase path must be findable without an
               // account — signing in is only required at checkout.
               _buildSettingsTile(
                 context,
                 'Subscription',
-                'View plans & subscribe — one subscription covers OrbGuard & OrbVPN',
+                'View plans & subscribe. One subscription covers OrbGuard & OrbVPN',
                 'wallet',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PricingScreen()),
-                ),
+                onTap: () => showPlansSheet(context),
               ),
             ] else ...[
-              _buildSettingsTile(
-                context,
-                account.email ?? 'Signed in',
-                tier != null && tier.isNotEmpty
-                    ? 'Signed in with your OrbVPN account · $tier'
-                    : 'Signed in with your OrbVPN account',
-                'shield_keyhole',
-              ),
+              if (!compact)
+                _buildSettingsTile(
+                  context,
+                  account.email ?? 'Signed in',
+                  tier != null && tier.isNotEmpty
+                      ? 'Signed in with your OrbVPN account, $tier plan'
+                      : 'Signed in with your OrbVPN account',
+                  'shield_keyhole',
+                ),
               // Subscription: current plan + the purchase path. One subscription
               // covers OrbGuard and OrbVPN.
-              _buildSettingsTile(
-                context,
-                'Subscription',
-                account.hasPremium
-                    ? '${account.subscriptionLabel} — unlocks OrbGuard, OrbVPN & OrbBrowser'
-                    : 'Free plan — view plans & subscribe',
-                'wallet',
-                onTap: () => Navigator.push(
+              if (!compact)
+                _buildSettingsTile(
                   context,
-                  MaterialPageRoute(builder: (_) => const PricingScreen()),
+                  'Subscription',
+                  account.hasPremium
+                      ? '${account.subscriptionLabel}. Unlocks OrbGuard, OrbVPN & OrbBrowser'
+                      : 'Free plan. View plans & subscribe',
+                  'wallet',
+                  onTap: () => showPlansSheet(context),
                 ),
-              ),
               if (account.hasPremium)
                 _buildSettingsTile(
                   context,
@@ -622,7 +636,7 @@ class SettingsScreen extends StatelessWidget {
       // manage it.
       messenger.showSnackBar(const SnackBar(
         content: Text(
-            'This subscription is billed outside the app stores — manage it '
+            'This subscription is billed outside the app stores. Manage it '
             'where you purchased it (e.g. the OrbVPN website).'),
       ));
       return;
@@ -675,7 +689,7 @@ class SettingsScreen extends StatelessWidget {
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
           content: Text(r.isSuccess
-              ? 'Subscription restored — premium unlocked.'
+              ? 'Subscription restored. Premium unlocked.'
               : r.message!),
         ));
     });
@@ -1518,7 +1532,7 @@ class VpnSettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'OrbGuard uses the OrbVPN app for the VPN tunnel. Open OrbVPN to '
-            "connect — or download it if you don't have it yet.",
+            "connect, or download it if you don't have it yet.",
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 13,
@@ -2120,7 +2134,7 @@ class DesktopPermissionsScreen extends StatelessWidget {
             Expanded(
               child: Text(
                 'OrbGuard is signed and distributed through the Mac App Store '
-                'and runs fully sandboxed — no Gatekeeper changes needed.',
+                'and runs fully sandboxed. No Gatekeeper changes needed.',
                 style: TextStyle(color: AppColors.accentInk, fontSize: 13),
               ),
             ),

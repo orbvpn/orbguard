@@ -37,11 +37,25 @@ class ScanResult {
   final int checksUnavailable;
   final Duration scanDuration;
 
+  /// The stages that ran, by the engine's stage names (`CheckPlan.byStage`
+  /// has the words). Null when the runner did not say, which is "not known"
+  /// and never "none".
+  final List<String>? stagesRan;
+
+  /// Stages this device or build does not let run.
+  final List<String> stagesNotPossible;
+
+  /// Stages that should have run and broke.
+  final List<String> stagesFailed;
+
   ScanResult({
     required this.threats,
     required this.itemsScanned,
     required this.scanDuration,
     this.checksUnavailable = 0,
+    this.stagesRan,
+    this.stagesNotPossible = const [],
+    this.stagesFailed = const [],
   });
 }
 
@@ -472,7 +486,7 @@ class _ScanningScreenState extends State<ScanningScreen>
                   _threats.isNotEmpty
                       ? '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found'
                       : (_stageWarnings.isEmpty
-                          ? "You're protected — no threats found"
+                          ? "You're protected. No threats found"
                           : 'No threats found in the checks we ran'),
                   style: TextStyle(
                     color: _threats.isEmpty

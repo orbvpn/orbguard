@@ -201,7 +201,7 @@ class _ProtectionScoreCircle extends StatelessWidget {
               DuotoneIcon(icon, size: 32, color: color),
               const SizedBox(height: 6),
               Text(
-                score < 0 ? '—' : '${score.round()}%',
+                score < 0 ? '-' : '${score.round()}%',
                 style: BrandText.heading(size: 26, color: color),
               ),
             ],

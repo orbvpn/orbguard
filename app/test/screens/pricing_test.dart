@@ -164,6 +164,25 @@ void main() {
     // A purchase can only be verified for a signed-in account, so the flow
     // sends the user to sign in first rather than starting a doomed purchase.
     expect(find.byType(LoginScreen), findsOneWidget);
+    // It rises as a sheet over the plans, never as a page pushed inside them.
+    expect(
+        find.ancestor(
+            of: find.byType(LoginScreen), matching: find.byType(BottomSheet)),
+        findsOneWidget);
+  });
+
+  testWidgets('logged out: "Sign in to subscribe" opens sign-in as a sheet',
+      (tester) async {
+    await pumpTall(tester);
+
+    await tester.tap(find.text('Sign in to subscribe'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+        find.ancestor(
+            of: find.byType(LoginScreen), matching: find.byType(BottomSheet)),
+        findsOneWidget);
   });
 
   testWidgets('offers Restore purchases', (tester) async {

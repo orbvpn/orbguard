@@ -46,4 +46,11 @@ void main() {
     expect(PermissionAbuseDetector().detectPermissionAbuse(),
         throwsA(isA<DetectionUnsupportedException>()));
   });
+
+  // An iPhone cannot say which apps read the location. Swallowed into an
+  // empty list, that read as "location tracking: checked, nothing found".
+  test('location-stalker detector surfaces UNSUPPORTED', () {
+    expect(GeolocationStalkerDetector().detectLocationStalkers(),
+        throwsA(isA<DetectionUnsupportedException>()));
+  });
 }

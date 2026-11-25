@@ -243,6 +243,10 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(pollNow());
   }
 
+  /// Asks the system for location access. Only for something the person
+  /// just pressed; see [LocationReporter.requestAccess].
+  Future<bool> requestLocationAccess() => _locationReporter.requestAccess();
+
   Future<void> updatePolicy(AgentPolicy policy) async {
     _policy = policy;
     await _persistPolicy(policy);
@@ -311,8 +315,10 @@ class DeviceAgent extends ChangeNotifier with WidgetsBindingObserver {
             .timeout(_kCommandTimeout);
       } on TimeoutException {
         final commandId = cmd['id']?.toString() ?? '';
-        developer.log('command $commandId timed out after '
-            '${_kCommandTimeout.inSeconds}s — acking failed', name: 'DeviceAgent');
+        developer.log(
+            'command $commandId timed out after '
+            '${_kCommandTimeout.inSeconds}s, acking failed',
+            name: 'DeviceAgent');
         if (commandId.isNotEmpty) {
           try {
             await api

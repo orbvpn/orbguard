@@ -227,11 +227,11 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
                   for (final step in _coreSteps) _buildStep(step),
                   if (advanced.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    const GlassSectionHeader(title: 'Advanced — optional'),
+                    const GlassSectionHeader(title: 'Advanced (optional)'),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
                       child: Text(
-                        'These two open system Settings — you finish '
+                        'These two open system Settings. You finish '
                         'turning them on there.',
                         style:
                             BrandText.body(color: cs.onSurfaceVariant, size: 13),
@@ -258,7 +258,7 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
         const SizedBox(height: 10),
         Text(
           'Each permission unlocks part of your first checkup. Turn on what '
-          "you're comfortable with — skip anything, and change your mind "
+          "you're comfortable with. Skip anything, and change your mind "
           'later in Settings.',
           style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
         ),
@@ -412,11 +412,11 @@ class _StepCard extends StatelessWidget {
           ),
         );
       case _StepState.skipped:
-        return Text('Skipped — you can enable later in Settings',
+        return Text('Skipped. You can enable later in Settings',
             style: BrandText.label(color: cs.onSurfaceVariant));
       case _StepState.openedSettings:
         // Honest: we cannot confirm these from here, so never claim "On".
-        return Text('Opened system Settings — finish turning it on there.',
+        return Text('Opened system Settings. Finish turning it on there.',
             style: BrandText.label(color: cs.onSurfaceVariant));
     }
   }

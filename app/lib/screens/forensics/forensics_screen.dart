@@ -15,7 +15,11 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
 
 class ForensicsScreen extends StatefulWidget {
-  const ForensicsScreen({super.key});
+  const ForensicsScreen({super.key, this.title = 'Forensic Analysis'});
+
+  /// The name in the header. A shield passes its own, so the sheet reads
+  /// the same as the moon or the card that opened it.
+  final String title;
 
   @override
   State<ForensicsScreen> createState() => _ForensicsScreenState();
@@ -35,7 +39,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     return Consumer<ForensicsProvider>(
       builder: (context, provider, child) {
         return GlassTabPage(
-          title: 'Forensic Analysis',
+          title: widget.title,
           hasSearch: true,
           searchHint: 'Search analysis...',
           actions: [
@@ -1075,7 +1079,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Unsupported file type "$lowerName" — expected: '
+              'Unsupported file type "$lowerName". Expected: '
               '${serverAcceptedSuffixes.join(', ')}',
             ),
             backgroundColor: AppColors.error,
