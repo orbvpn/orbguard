@@ -1,0 +1,285 @@
+<div class="page" id="top">
+
+<header class="p-top wrap">
+  <span class="p-lockup"><span data-slot="mark"></span>OrbGuard</span>
+  <nav class="p-index" aria-label="On this page">
+    <a href="#ring">The ring</a><a href="#type">Type</a><a href="#screens">Screens</a><a href="#fold">Foldable</a><a href="#desktop">Desktop</a><a href="#sell">Selling it</a><a href="#today">Today</a><a href="#map">Nothing lost</a><a href="#build">Building it</a>
+  </nav>
+</header>
+
+<main>
+
+<section class="p-hero wrap">
+  <div class="p-hero-copy">
+    <h1 class="p-h1">Close the circle.</h1>
+    <p class="p-lead">The OrbGuard logo is a ring. In this design the ring runs the whole product. Whole means you are covered. A gap means one thing to fix. Segments mean a check is running. Nobody has to learn anything else.</p>
+    <div class="p-ctl" role="group" aria-label="Phone controls">
+      <span>Moment</span>
+      <div class="p-seg" data-seg="moment"><button data-v="clear" aria-pressed="true">All clear</button><button data-v="gap" aria-pressed="false">One gap</button><button data-v="fresh" aria-pressed="false">First run</button></div>
+      <span>Look</span>
+      <div class="p-seg" data-seg="look"><button data-v="dark" aria-pressed="true">Dark</button><button data-v="light" aria-pressed="false">Light</button></div>
+      <span>Sound</span>
+      <div class="p-seg" data-seg="sound"><button data-v="off" aria-pressed="true">Off</button><button data-v="on" aria-pressed="false">On</button></div>
+    </div>
+    <ul class="p-try">
+      <li>Tap <b>Check now</b>. Each segment that lights is one real check.</li>
+      <li>Pick <b>One gap</b>, then close it and watch the ring join.</li>
+      <li>Tap a shield on the orbit to see what an iPhone honestly cannot check.</li>
+      <li>Open <b>Me</b>, then <b>Go unlimited</b>. Real tiers, real prices.</li>
+    </ul>
+  </div>
+  <div class="p-hero-stage" data-slot="phone"></div>
+</section>
+
+<section class="p-sec p-fid wrap">
+  <div class="p-fid-q">
+    <h2 class="p-h2">Is this just a mock?</h2>
+    <p class="p-sub">It is a working prototype in HTML, not the Flutter app yet. It is made so the app can match it one for one, and so nothing on it promises what the product cannot do.</p>
+  </div>
+  <div class="p-notes">
+    <div><b>True size</b><p>Every screen is drawn at 393 by 852 points, the real logical size, then scaled to fit your display.</p></div>
+    <div><b>Your kit</b><p>Colors, glass, radii and spacing are copied from brand.dart. The fonts are the three the app already bundles. One lime action per screen.</p></div>
+    <div><b>Your icons</b><p>Every icon is a Solar icon already shipped in app/assets/icons. None were drawn for this page.</p></div>
+    <div><b>Your product</b><p>Real shields, real checks, real score rules, real prices. Only times, counts and the person are samples.</p></div>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="ring">
+  <div class="p-head">
+    <h2 class="p-h2">One shape. Every state.</h2>
+    <p class="p-sub">No red screens and no wall of toggles. The ring changes shape, and that is the whole status system. It is drawn with arcs, gradients and blur only, so in Flutter it is one CustomPainter, not an image.</p>
+  </div>
+  <div class="p-panel os" data-app="dark"><div class="bed"></div><div class="p-states" data-slot="states"></div></div>
+</section>
+
+<section class="p-sec wrap" id="type">
+  <div class="p-head p-head-row">
+    <div>
+      <h2 class="p-h2">Same fonts. A wider voice.</h2>
+      <p class="p-sub">Archivo, IBM Plex Sans and IBM Plex Mono stay, exactly as the kit names them. One thing changes. The Archivo file inside the app already carries a width axis that no screen uses. Headlines now run wide and lighter, so they take the calm, round shape of the ring.</p>
+    </div>
+    <div class="p-seg" data-seg="type" role="group" aria-label="Display type"><button data-v="kit" aria-pressed="false">Kit today</button><button data-v="wide" aria-pressed="true">Flagship</button></div>
+  </div>
+  <div class="p-pair os" data-app="dark"><div class="bed"></div>
+    <figure><p class="was">No signs you’re being watched.</p><figcaption><b>Kit today</b>Archivo at normal width, weight 800</figcaption></figure>
+    <figure><p class="now">No signs you’re being watched.</p><figcaption><b>Flagship</b>The same Archivo at width 118, weight 580</figcaption></figure>
+  </div>
+  <div class="p-typerow">
+    <ul class="p-roles">
+      <li><span class="t-xl">Close the circle.</span><span class="p-role"><code>display, in ads and the store</code><span class="is">Archivo up to 96, width 124, weight 540</span><span class="was">Kit today: width 100, weight 800</span></span></li>
+      <li><span class="orb-num">1000</span><span class="p-role"><code>heading, as numerals</code><span class="is">Archivo 35, width 108, weight 640</span><span class="was">Kit today: width 100, weight 700</span></span></li>
+      <li><span class="t-display">No signs you’re being watched.</span><span class="p-role"><code>display</code><span class="is">Archivo 28, width 118, weight 580</span><span class="was">Kit today: width 100, weight 800</span></span></li>
+      <li><span class="t-h2">Protect</span><span class="p-role"><code>h2</code><span class="is">Archivo 23, width 116, weight 600</span><span class="was">Kit today: width 100, weight 700</span></span></li>
+      <li><span class="t-head">Guard+ plan</span><span class="p-role"><code>heading</code><span class="is">Archivo 18, width 112, weight 620</span><span class="was">Kit today: width 100, weight 700</span></span></li>
+      <li><span class="t-title">Your email was in a data breach</span><span class="p-role"><code>title</code><span class="same">IBM Plex Sans 600 at 16, unchanged</span></span></li>
+      <li><span class="t-body">OrbGuard looks for spyware, stalkerware and trackers on this phone.</span><span class="p-role"><code>body</code><span class="same">IBM Plex Sans 400 at 15, unchanged</span></span></li>
+      <li><span class="t-mono">07:02    200 of 200</span><span class="p-role"><code>mono</code><span class="same">IBM Plex Mono 500 at 12.5. Times and points</span></span></li>
+      <li><span class="t-label">Today</span><span class="p-role"><code>label</code><span class="same">IBM Plex Mono 500 at 11.5. Section labels</span></span></li>
+    </ul>
+    <figure class="p-type-dev"><div data-slot="type-phone"></div><figcaption>Switch between Kit today and Flagship above. Every screen on this page follows.</figcaption></figure>
+  </div>
+  <div class="p-notes">
+    <div><b>No new font file</b><p>Archivo-Variable.ttf in app/assets/fonts already spans width 62 to 125. In Flutter this is one FontVariation('wdth', 118) inside BrandText.</p></div>
+    <div><b>Mono does one job</b><p>IBM Plex Mono keeps section labels, times and points, the job brand.dart gives it. Sentences that sat in mono are now IBM Plex Sans.</p></div>
+    <div><b>Other scripts untouched</b><p>Persian stays on Vazirmatn and Arabic on IBM Plex Sans Arabic. The width change applies to Latin display type only.</p></div>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="screens">
+  <div class="p-head">
+    <h2 class="p-h2">Every screen, one hand.</h2>
+    <p class="p-sub">Four tabs: Home, Protect, Check, Me. No drawer. Every pop-up is a sheet. Each frame below is drawn by the same code as the live phone above.</p>
+  </div>
+  <div class="p-wall" data-slot="wall"></div>
+</section>
+
+<section class="p-sec" id="fold">
+  <div class="wrap">
+    <div class="p-head p-head-row">
+      <div>
+        <h2 class="p-h2">It unfolds.</h2>
+        <p class="p-sub">Today a foldable gets a stretched phone. Here the ring keeps the left half and the detail takes the right. Nothing sits under the hinge. Close it and the cover screen carries on.</p>
+      </div>
+      <div class="p-seg" data-seg="posture" role="group" aria-label="Posture"><button data-v="closed" aria-pressed="false">Closed</button><button data-v="open" aria-pressed="true">Open</button><button data-v="tabletop" aria-pressed="false">Tabletop</button></div>
+    </div>
+    <div class="p-stage p-stage-fold"><div data-slot="fold"></div><div data-slot="tabletop" hidden></div></div>
+    <div class="p-notes">
+      <div><b>Two panes, one ring</b><p>The four tabs change the right pane. The ring, the verdict and the one action never leave the left.</p></div>
+      <div><b>Hinge aware</b><p>The layout reads the hinge from MediaQuery.displayFeatures and keeps every control off it.</p></div>
+      <div><b>Tabletop</b><p>Half open on a table, the ring stands up and the checklist lies flat. A check you can watch hands free.</p></div>
+      <div><b>Android honest</b><p>All 11 checks run here, and the tracker firewall counts real blocks. iPhone shows 5 and says why.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="p-sec" id="desktop">
+  <div class="wrap">
+    <div class="p-head p-head-row">
+      <div>
+        <h2 class="p-h2">A real desktop app.</h2>
+        <p class="p-sub">The Mac build today is the phone layout centered in a wide window. This one has a sidebar, two working columns and a keyboard.</p>
+      </div>
+      <div class="p-row">
+        <div class="p-seg" data-seg="os" role="group" aria-label="System"><button data-v="mac" aria-pressed="true">macOS</button><button data-v="win" aria-pressed="false">Windows</button><button data-v="linux" aria-pressed="false">Linux</button></div>
+        <button class="p-btn" data-open-palette>Open the command palette</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap"><div class="p-stage pan" data-slot="desk"></div><p class="p-swipe">Swipe sideways to see the whole window.</p></div>
+  <div class="wrap">
+    <div class="p-split">
+      <div data-slot="tray"></div>
+      <div class="p-notes">
+        <div><b>It lives in the menu bar</b><p>At 16 pixels the ring still says everything. The system tray on Windows and Linux gets the same popover.</p></div>
+        <div><b>Six desktop checks</b><p>Startup items, code signing, firewall, network, browser and quarantine. The same areas the desktop screen has today.</p></div>
+        <div><b>Honest about phones</b><p>Secure call and the tracker firewall need a phone, so their shields are dashed and say so.</p></div>
+        <div><b>Sold where it can be</b><p>Windows and Linux do not sell in the app. Switch the system above and open Go unlimited to see the wording.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="sell">
+  <div class="p-head">
+    <h2 class="p-h2">Built to be sold.</h2>
+    <p class="p-sub">One question does the advertising: is your circle closed? The same ring carries the store page, the ads, the site, the widgets and the card people share.</p>
+  </div>
+
+  <h3 class="p-h3">The store page</h3>
+  <p class="p-line">Five screenshots, five plain claims. The last one is the one no rival makes.</p>
+  <div class="p-shots" data-slot="shots"></div>
+
+  <h3 class="p-h3">The ads</h3>
+  <p class="p-line">The gap is the hook. In motion it closes, which is the whole pitch in two seconds.</p>
+  <div class="p-ads" data-slot="ads"></div>
+
+  <h3 class="p-h3">The site</h3>
+  <p class="p-line">Same question, same ring, one button.</p>
+  <div data-slot="landing"></div>
+
+  <h3 class="p-h3">The places it shows up for free</h3>
+  <p class="p-line">Home screen, lock screen and the card people post after an all clear.</p>
+  <div class="p-free" data-slot="widgets"></div>
+
+  <h3 class="p-h3">Where the sale happens</h3>
+  <p class="p-line">Four honest moments, each one tap from the plans sheet.</p>
+  <div class="p-notes p-pos">
+    <div><b>Right after a check</b><p>The results sheet shows credits left with Go unlimited beside it. The best moment to ask is when it just worked.</p></div>
+    <div><b>Out of credits</b><p>Check now opens the credits sheet: watch an ad to earn a scan, or go unlimited with a plan. Never a dead end.</p></div>
+    <div><b>On the Me tab</b><p>The plan card sits second, under the account. Free shows its credits. Paid shows what else it unlocks.</p></div>
+    <div><b>In the desktop sidebar</b><p>The plan is always visible bottom left. One subscription, three apps, said once.</p></div>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="today">
+  <div class="p-head">
+    <h2 class="p-h2">Why it had to change.</h2>
+    <p class="p-sub">What the code and the store screenshots show today. Each number below was counted in the repository, not estimated.</p>
+  </div>
+  <div class="p-finds">
+    <div><b>3</b><p>names for the same features: guards on Home, shields on Protect, and a third set in the drawer.</p></div>
+    <div><b>16</b><p>drawer items behind a hamburger in everyday mode. 34 in Pro mode. This is where services get lost.</p></div>
+    <div><b>0</b><p>layout breakpoints. Foldables, tablets and desktops all get the phone column, capped at 760 points.</p></div>
+    <div><b>5 of 11</b><p>checks can run on an iPhone, yet the results line says “11 checks ran clean”.</p></div>
+    <div><b>2 of 8</b><p>home guards can never read On. Breach monitor and hidden VPN watch have no working probe.</p></div>
+    <div><b>166</b><p>lines of user-facing text contain an em dash, the mark that makes copy read as machine written.</p></div>
+    <div><b>0</b><p>screens for family or devices, although two of the three plans sell exactly that.</p></div>
+    <div><b>2</b><p>home tiles with cut-off names in the store screenshots: “App malware s…” and “Hidden VPN wa…”.</p></div>
+  </div>
+  <div class="p-cmp">
+    <div class="p-cmp-pair">
+    <figure><div class="p-shotimg"><img src="today-ios.jpg" width="508" height="1100" alt="OrbGuard home screen as it ships today: a small shield icon, a lime headline, a score card reading 756 of 1000, and a Run scan button" loading="lazy"></div><figcaption><b>Today</b><span>A lime headline beside the lime button, a generic shield, and “2 things to fix” hidden in a row with an em dash.</span></figcaption></figure>
+    <figure><div data-slot="cmp-new"></div><figcaption><b>Flagship</b><span>The brand ring is the status. The gap is the thing to fix. One lime action.</span></figcaption></figure>
+    </div>
+    <figure class="p-cmp-wide"><div class="p-shotimg wide"><img src="today-mac.jpg" width="1500" height="937" alt="OrbGuard on macOS today: the phone layout centered in a wide, mostly empty window" loading="lazy"></div><figcaption><b>Today on a Mac</b><span>The phone screen, centered. The desktop above replaces it.</span></figcaption></figure>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="map">
+  <div class="p-head">
+    <h2 class="p-h2">Nothing gets lost.</h2>
+    <p class="p-sub">Every feature keeps working. It just gets one name and one place. The six shields absorb the drawer, Check holds everything you ask on demand, and the expert tools move under Me.</p>
+  </div>
+  <div class="p-tablewrap">
+    <table class="p-table">
+      <thead><tr><th>Home tile today</th><th>Protect hub today</th><th>Drawer today</th><th>One name in the flagship</th></tr></thead>
+      <tbody>
+        <tr><td>Spyware watch</td><td>Spyware &amp; Pegasus</td><td>Dashboard, Forensics</td><td>Spyware &amp; Pegasus</td></tr>
+        <tr><td>App malware scan</td><td>none</td><td>App Security</td><td>A check inside Spyware &amp; Pegasus</td></tr>
+        <tr><td>Tracker firewall</td><td>Who’s watching you</td><td>Network Firewall, Privacy Protection</td><td>Who’s watching you</td></tr>
+        <tr><td>Scam text check</td><td>Scam shield</td><td>SMS Protection, URL Protection, QR Scanner, Scam Detection</td><td>Scam shield</td></tr>
+        <tr><td>Breach monitor</td><td>Identity &amp; breach</td><td>Dark Web Monitor, Identity Protection, Social Media</td><td>Identity &amp; breach</td></tr>
+        <tr><td>Hidden VPN watch</td><td>Hidden VPN &amp; proxy</td><td>none</td><td>Hidden VPN &amp; proxy</td></tr>
+        <tr><td>Secure call</td><td>Secure call</td><td>none</td><td>Secure call</td></tr>
+        <tr><td>Instant alerts</td><td>none</td><td>Settings</td><td>Me, Alerts</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="p-dest">
+    <div><span class="p-dest-h"><svg class="ic" aria-hidden="true"><use href="#i-home_smile"/></svg>Home</span><p>Am I OK?</p><ul><li>Dashboard</li><li>Privacy score</li><li>Today’s activity</li></ul></div>
+    <div><span class="p-dest-h"><svg class="ic" aria-hidden="true"><use href="#i-shield_check"/></svg>Protect</span><p>What is guarding me?</p><ul><li>The six shields</li><li>App Security</li><li>Network Firewall</li><li>Dark Web Monitor</li><li>Device Security, as “Find this phone”</li></ul></div>
+    <div><span class="p-dest-h"><svg class="ic" aria-hidden="true"><use href="#i-magnifer"/></svg>Check</span><p>Is this one thing safe?</p><ul><li>SMS and URL Protection, as one paste box</li><li>QR Scanner</li><li>Network Security and Rogue AP Detection, as “Check this Wi-Fi”</li><li>Check an app file</li></ul></div>
+    <div><span class="p-dest-h"><svg class="ic" aria-hidden="true"><use href="#i-user_rounded"/></svg>Me</span><p>My account and my plan.</p><ul><li>Settings</li><li>Plans and scan credits</li><li>Alerts</li><li>Forensics, Intelligence and Enterprise, as Pro tools</li></ul></div>
+  </div>
+</section>
+
+<section class="p-sec wrap" id="build">
+  <div class="p-head">
+    <h2 class="p-h2">From this page to the app.</h2>
+    <p class="p-sub">What is already in the code, what is new, and what needs wiring before the screens above are true.</p>
+  </div>
+  <div class="p-ledger">
+    <div>
+      <h3 class="p-h3">Already in the app</h3>
+      <ul>
+        <li>The whole kit: brand.dart tokens, glass, type, the Solar icons</li>
+        <li>Six shields and the eleven check stages</li>
+        <li>The privacy score engine and its seven rules</li>
+        <li>Scam, link, QR, breach, hidden VPN and secure call checks</li>
+        <li>Find, ring and photograph for a lost phone</li>
+        <li>Three tiers with store prices, shared with OrbVPN and OrbBrowser</li>
+        <li>Scan credits and the rewarded ad</li>
+        <li>Sheets for every pop-up</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="p-h3">New to build</h3>
+      <ul>
+        <li>OrbRing, one CustomPainter that replaces pulse_orb.dart</li>
+        <li>Wide display type, one width setting inside BrandText</li>
+        <li>Home with the orbit of shields and the Today strip</li>
+        <li>Four tabs with no drawer, and the shield detail screen</li>
+        <li>The check as segments, with results that count only what ran</li>
+        <li>An adaptive shell: two panes on foldables and tablets, a sidebar on desktop</li>
+        <li>Desktop extras: command palette, menu bar popover, window chrome</li>
+        <li>Mark a breach as handled, so the ring can close</li>
+        <li>Widgets, the share card and a family or devices screen</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="p-h3">To wire or fix</h3>
+      <ul>
+        <li>The breach and hidden VPN probes, so those shields can report</li>
+        <li>Three score signals that return nothing today</li>
+        <li>The iPhone results line, so it stops counting 11</li>
+        <li>One vocabulary: shields, and the verb check</li>
+        <li>A copy sweep of the 166 em dash lines</li>
+        <li>The Home headline back in ink, so one lime action leads</li>
+      </ul>
+    </div>
+  </div>
+  <ol class="p-phases">
+    <li><b>The ring and Home</b><p>OrbRing, the new Home, four tabs, the wide type, one vocabulary. This alone changes how the product feels.</p></li>
+    <li><b>Honest checks and the sale</b><p>The segment check, true results, the score sheet, and the four points of sale.</p></li>
+    <li><b>Every screen size</b><p>The adaptive shell for foldables and tablets, then the desktop window.</p></li>
+    <li><b>The sell kit</b><p>Store screenshots, widgets, the share card and the site hero, all cut from the same ring.</p></li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="p-foot wrap">
+  <p>Prototype for review. Shields, checks, score rules, tiers and prices are the app’s own. Times, counts, the person and the breach are invented samples.</p>
+</footer>
+
+</div>
