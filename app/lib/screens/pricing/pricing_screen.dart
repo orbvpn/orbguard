@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -10,11 +9,11 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/account_provider.dart';
 import '../../services/iap/iap_service.dart';
-import '../../utils/platform_info.dart';
+import '../../utils/host_platform.dart';
 import '../../widgets/sale/login_sheet.dart';
 import '../legal/legal_screen.dart';
 
-/// Whether digital goods can be sold in-app on this platform.
+/// Whether digital goods can be sold in-app on [platform].
 ///
 /// in_app_purchase has no Windows/Linux implementation, so no purchase can
 /// complete there. Just as important, Microsoft Store Policy 10.8.1/10.8.2
@@ -23,7 +22,8 @@ import '../legal/legal_screen.dart';
 /// platforms the app must not show tiers, prices, buy buttons, or any mention
 /// of the App Store / Google Play. Signing in to unlock an entitlement bought
 /// elsewhere is permitted; advertising where to buy it is not.
-bool get _canSellHere => !(PlatformInfo.isWindows || PlatformInfo.isLinux);
+bool _canSellOn(TargetPlatform? platform) =>
+    platform != TargetPlatform.windows && platform != TargetPlatform.linux;
 
 /// The transparent pricing screen — now wired to real in-app purchases.
 ///
@@ -45,7 +45,11 @@ class PricingScreen extends StatefulWidget {
   /// granted — e.g. to dismiss a paywall sheet. Never used to fake a purchase.
   final VoidCallback? onPurchased;
 
-  const PricingScreen({super.key, this.onPurchased});
+  /// The platform to draw for: it decides whether plans are sold here and
+  /// which store a subscriber is sent to. Null means the one the app runs on.
+  final TargetPlatform? platform;
+
+  const PricingScreen({super.key, this.onPurchased, this.platform});
 
   @override
   State<PricingScreen> createState() => _PricingScreenState();
@@ -228,7 +232,9 @@ class _PricingScreenState extends State<PricingScreen> {
     final iap = context.watch<IapService>();
 
     final subscribed = account.isLoggedIn && account.subscriptionValid;
-    final currentTier = subscribed ? _matchTier(account.subscriptionTier) : null;
+    final currentTier =
+        subscribed ? _matchTier(account.subscriptionTier) : null;
+    final TargetPlatform? platform = widget.platform ?? hostPlatform();
 
     return GlassPage(
       title: 'Plans',
@@ -245,9 +251,9 @@ class _PricingScreenState extends State<PricingScreen> {
             style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
           ),
           const SizedBox(height: 16),
-          _AccountStateBanner(account: account),
+          _AccountStateBanner(account: account, platform: platform),
           const SizedBox(height: 16),
-          if (!_canSellHere)
+          if (!_canSellOn(platform))
             const _ManagedElsewhereNotice()
           else if (!iap.isAvailable && !iap.isLoadingProducts)
             _StoreUnavailableNotice(onRetry: () => iap.loadProducts())
@@ -331,7 +337,12 @@ class _LegalLinksRow extends StatelessWidget {
 /// Honest banner above the plans, reflecting the real account state.
 class _AccountStateBanner extends StatelessWidget {
   final AccountProvider account;
-  const _AccountStateBanner({required this.account});
+
+  /// The platform the screen draws for: it picks the words about where a
+  /// plan is managed.
+  final TargetPlatform? platform;
+
+  const _AccountStateBanner({required this.account, required this.platform});
 
   @override
   Widget build(BuildContext context) {
@@ -374,8 +385,8 @@ class _AccountStateBanner extends StatelessWidget {
                       // Naming a rival store is prohibited steering under
                       // Microsoft Store Policy 10.8.2, so on Windows/Linux
                       // point at the place the plan actually lives instead.
-                      '${_canSellHere ? 'To change or cancel your plan, use your '
-                          '${Platform.isAndroid ? 'Google Play' : 'App Store'} '
+                      '${_canSellOn(platform) ? 'To change or cancel your plan, use your '
+                          '${platform == TargetPlatform.android ? 'Google Play' : 'App Store'} '
                           'subscription settings.' : 'Manage or cancel your plan wherever you originally '
                           'set it up, or from your Orb account.'}',
                       style: BrandText.body(

@@ -34,12 +34,16 @@ import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../providers/account_provider.dart';
 import '../../services/orbnet/magic_link_deep_link.dart';
-import '../../utils/platform_info.dart';
+import '../../utils/host_platform.dart';
 
 enum _LoginMode { password, magic }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.platform});
+
+  /// The platform to draw for: it decides which sign-in buttons are offered.
+  /// Null means the one the app runs on.
+  final TargetPlatform? platform;
 
   /// Whether a sign-in screen is mounted. TwoFactorResume checks this before
   /// opening one for a code step, so a link tapped while the screen is
@@ -147,25 +151,24 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// The platform the buttons are chosen for: the one the screen was given,
+  /// else the one the app runs on. Not the theme's: that is how the app is
+  /// styled, and a button depends on what this build can do.
+  TargetPlatform? get _platform => widget.platform ?? hostPlatform();
+
   /// Apple's guidelines: only offer "Sign in with Apple" on Apple platforms.
   /// The service also enforces [SignInWithApple.isAvailable] at attempt time.
-  bool _showApple(BuildContext context) {
-    final platform = Theme.of(context).platform;
-    return platform == TargetPlatform.iOS ||
-        platform == TargetPlatform.macOS;
-  }
+  bool get _showApple =>
+      _platform == TargetPlatform.iOS || _platform == TargetPlatform.macOS;
 
   /// google_sign_in ships Android/iOS/macOS/web implementations only — it is
   /// absent from windows/flutter/generated_plugins.cmake and the Linux build.
   /// Rendering the button there gives a second sign-in method that can never
   /// succeed, on the very screen Microsoft cited for 10.1.2.10.
-  bool _showGoogle(BuildContext context) {
-    if (PlatformInfo.isWindows || PlatformInfo.isLinux) return false;
-    final platform = Theme.of(context).platform;
-    return platform == TargetPlatform.android ||
-        platform == TargetPlatform.iOS ||
-        platform == TargetPlatform.macOS;
-  }
+  bool get _showGoogle =>
+      _platform == TargetPlatform.android ||
+      _platform == TargetPlatform.iOS ||
+      _platform == TargetPlatform.macOS;
 
   /// Closes this screen with [signedIn] as its result.
   ///
@@ -465,14 +468,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// True when at least one social/passkey button can actually run here.
   bool _hasSocialButtons(BuildContext context) =>
-      _showGoogle(context) || _showApple(context) || _passkeyAvailable;
+      _showGoogle || _showApple || _passkeyAvailable;
 
   /// Google + (on Apple platforms) Apple — glass buttons, never lime.
   Widget _socialButtons(BuildContext context, AccountProvider account) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_showGoogle(context))
+        if (_showGoogle)
           _socialButton(
             context,
             key: const ValueKey('google_signin_button'),
@@ -484,8 +487,8 @@ class _LoginScreenState extends State<LoginScreen> {
             label: 'Continue with Google',
             onPressed: account.isBusy ? null : _signInWithGoogle,
           ),
-        if (_showApple(context)) ...[
-          if (_showGoogle(context)) const SizedBox(height: 12),
+        if (_showApple) ...[
+          if (_showGoogle) const SizedBox(height: 12),
           _socialButton(
             context,
             key: const ValueKey('apple_signin_button'),

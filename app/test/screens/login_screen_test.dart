@@ -106,10 +106,16 @@ class _LockGate extends StatelessWidget {
       );
 }
 
+/// Mounts the sign-in screen as it shows on [platform]. The screen is told
+/// the platform itself: left alone it asks the machine it runs on, and the
+/// machine that runs these tests is not the phone they describe.
+/// [themePlatform] is the look the app is styled with, when a test needs it
+/// to differ from the device.
 Future<void> _pumpLogin(
   WidgetTester tester,
   AccountProvider account, {
   TargetPlatform platform = TargetPlatform.android,
+  TargetPlatform? themePlatform,
 }) async {
   // A tall viewport so the whole ListView builds without scrolling.
   tester.view.physicalSize = const Size(1200, 2600);
@@ -120,8 +126,8 @@ Future<void> _pumpLogin(
     ChangeNotifierProvider<AccountProvider>.value(
       value: account,
       child: MaterialApp(
-        theme: AppTheme.light.copyWith(platform: platform),
-        home: const LoginScreen(),
+        theme: AppTheme.light.copyWith(platform: themePlatform ?? platform),
+        home: LoginScreen(platform: platform),
       ),
     ),
   );
@@ -178,6 +184,39 @@ void main() {
 
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Continue with Apple'), findsOneWidget);
+
+    account.dispose();
+  });
+
+  // google_sign_in has no Windows or Linux implementation, and Apple only
+  // allows its button on Apple platforms. A button that can never work is
+  // what Microsoft rejected the Windows build for (10.1.2.10).
+  for (final platform in const [TargetPlatform.windows, TargetPlatform.linux]) {
+    testWidgets(
+        'on ${platform.name} neither Google nor Apple sign-in is offered',
+        (tester) async {
+      final account = _FakeAccount();
+      await _pumpLogin(tester, account, platform: platform);
+
+      expect(find.text('Continue with Google'), findsNothing);
+      expect(find.text('Continue with Apple'), findsNothing);
+      // The ways that do work there are still offered.
+      expect(find.text('Email me a sign-in link'), findsOneWidget);
+      expect(find.text('Use password instead'), findsOneWidget);
+
+      account.dispose();
+    });
+  }
+
+  testWidgets(
+      'a Windows build styled as a phone still offers no Google or Apple '
+      'sign-in', (tester) async {
+    final account = _FakeAccount();
+    await _pumpLogin(tester, account,
+        platform: TargetPlatform.windows, themePlatform: TargetPlatform.iOS);
+
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Continue with Apple'), findsNothing);
 
     account.dispose();
   });

@@ -8,6 +8,8 @@ import 'package:orbguard/screens/account/login_screen.dart';
 import 'package:orbguard/screens/pricing/pricing_screen.dart';
 import 'package:orbguard/services/iap/iap_service.dart';
 
+import '../support/sale_fakes.dart';
+
 /// The transparent pricing screen — now store-driven. Its whole pitch is its
 /// honesty, so the guard here is as much about what ISN'T on screen (fake
 /// urgency copy, hardcoded prices) as what is (real store prices + the
@@ -42,25 +44,41 @@ void main() {
   // PricingScreen reads AccountProvider (subscription state) and IapService
   // (prices + purchase state). Provide a logged-out (Free) account and the
   // seeded singleton IapService (.value so teardown never closes its stream).
-  Widget host() => MultiProvider(
+  //
+  // The screen sells through the device's own store, so every test names the
+  // device. Left to itself the screen asks the machine it runs on, and the
+  // Linux machine that runs these tests in CI is one where nothing is sold.
+  Widget host({required TargetPlatform platform, AccountProvider? account}) =>
+      MultiProvider(
         providers: [
           ChangeNotifierProvider<AccountProvider>(
-            create: (_) => AccountProvider(enableProactiveRefresh: false),
+            create: (_) =>
+                account ?? AccountProvider(enableProactiveRefresh: false),
           ),
           ChangeNotifierProvider<IapService>.value(value: IapService.instance),
         ],
-        child: const MaterialApp(home: PricingScreen()),
+        child: MaterialApp(home: PricingScreen(platform: platform)),
       );
 
   // The screen is a single tall ListView (3 tier cards + promise band) that
   // overflows the default 800×600 test surface. Widen the surface instead of
   // scrolling so every assertion below sees the whole tree.
-  Future<void> pumpTall(WidgetTester tester) async {
+  Future<void> pumpTall(
+    WidgetTester tester, {
+    TargetPlatform platform = TargetPlatform.iOS,
+    AccountProvider? account,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(420, 6400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(host());
+    await tester.pumpWidget(host(platform: platform, account: account));
     await tester.pump();
   }
+
+  /// Every word on the screen, in one string.
+  String wordsOnScreen(WidgetTester tester) => tester
+      .widgetList<Text>(find.byType(Text))
+      .map((t) => t.data ?? t.textSpan?.toPlainText() ?? '')
+      .join('\n');
 
   testWidgets('renders the honest-pricing promise band', (tester) async {
     await pumpTall(tester);
@@ -188,5 +206,62 @@ void main() {
   testWidgets('offers Restore purchases', (tester) async {
     await pumpTall(tester);
     expect(find.text('Restore purchases'), findsOneWidget);
+  });
+
+  testWidgets('a subscriber on an iPhone manages the plan in the App Store',
+      (tester) async {
+    await pumpTall(tester,
+        platform: TargetPlatform.iOS,
+        account: FakeSaleAccount(loggedIn: true, premium: true));
+
+    expect(wordsOnScreen(tester),
+        contains('use your App Store subscription settings.'));
+  });
+
+  testWidgets('a subscriber on Android manages the plan in Google Play',
+      (tester) async {
+    await pumpTall(tester,
+        platform: TargetPlatform.android,
+        account: FakeSaleAccount(loggedIn: true, premium: true));
+
+    expect(wordsOnScreen(tester),
+        contains('use your Google Play subscription settings.'));
+  });
+
+  // Microsoft Store policy 10.8.1 and 10.8.2: a Store app may not sell
+  // digital goods through another commerce engine, and may not point people
+  // at one. The same build runs on Linux, where no store plugin exists.
+  group('where plans are not sold', () {
+    for (final platform in const [
+      TargetPlatform.windows,
+      TargetPlatform.linux
+    ]) {
+      testWidgets('on ${platform.name} no plan, price or purchase is shown',
+          (tester) async {
+        await pumpTall(tester, platform: platform);
+
+        expect(
+            find.text('Premium travels with your Orb account'), findsOneWidget);
+        expect(find.text('Guard+'), findsNothing);
+        expect(find.text('\$9.99'), findsNothing);
+        expect(find.text('Choose Guard'), findsNothing);
+        expect(find.text('Restore purchases'), findsNothing);
+      });
+
+      testWidgets('on ${platform.name} a subscriber is not sent to a store',
+          (tester) async {
+        await pumpTall(tester,
+            platform: platform,
+            account: FakeSaleAccount(loggedIn: true, premium: true));
+
+        final String words = wordsOnScreen(tester);
+        expect(
+            words,
+            contains('Manage or cancel your plan wherever you originally '
+                'set it up, or from your Orb account.'));
+        expect(words, isNot(contains('App Store')));
+        expect(words, isNot(contains('Google Play')));
+      });
+    }
   });
 }
