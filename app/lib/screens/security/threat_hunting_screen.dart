@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -1544,7 +1543,7 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
               if (allNodes.length > nodes.length) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Showing ${nodes.length} of ${allNodes.length} entities — '
+                  'Showing ${nodes.length} of ${allNodes.length} entities. '
                   'open the Threat Graph screen for the full graph',
                   style: TextStyle(
                       color: context.onSurfaceMuted, fontSize: 11),
@@ -1784,8 +1783,8 @@ class _ThreatHuntingScreenState extends State<ThreatHuntingScreen> {
         SnackBar(
           content: Text(
             found == 0
-                ? 'Correlation run complete — no new correlations found'
-                : 'Correlation run complete — $found correlation'
+                ? 'Correlation run complete. No new correlations found'
+                : 'Correlation run complete. $found correlation'
                     '${found == 1 ? '' : 's'} found',
           ),
         ),

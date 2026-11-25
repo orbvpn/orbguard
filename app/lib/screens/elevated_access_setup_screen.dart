@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
+import '../presentation/theme/app_snack.dart';
 import '../presentation/theme/glass_theme.dart';
 import '../presentation/widgets/duotone_icon.dart';
 
@@ -389,11 +390,10 @@ class _SetupInstructionsPageState extends State<SetupInstructionsPage> {
   }
 
   void _showSuccess() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✓ Shell access enabled successfully!'),
-        backgroundColor: AppColors.success,
-      ),
+    showResultSnackBar(
+      context,
+      '✓ Shell access enabled successfully!',
+      background: AppColors.success,
     );
   }
 

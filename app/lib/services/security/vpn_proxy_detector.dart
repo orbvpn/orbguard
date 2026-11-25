@@ -115,6 +115,16 @@ class VpnProxyStatus {
   /// Set when the whole inspection failed (e.g. native channel missing).
   final String? errorMessage;
 
+  /// Whether the active tunnel is OrbGuard's own tracker firewall, from the
+  /// Android native scan (its live running flag). Null when not known: no
+  /// tunnel, an older native build, iPhone, desktop.
+  final bool? tunnelIsOwnFirewall;
+
+  /// Whether the GENUINE OrbVPN (signing certificate checked natively) is
+  /// installed, from the Android tunnel entry. Null when not known. Unlike
+  /// [orbVpnInstalled], which trusts the package name.
+  final bool? genuineOrbVpnInstalled;
+
   const VpnProxyStatus({
     required this.verdict,
     required this.activeTunnel,
@@ -125,6 +135,8 @@ class VpnProxyStatus {
     required this.limitations,
     this.proxyHost,
     this.errorMessage,
+    this.tunnelIsOwnFirewall,
+    this.genuineOrbVpnInstalled,
   });
 
   /// True when OrbVPN is among the installed VPN apps.
@@ -240,6 +252,7 @@ class VpnProxyDetector {
     final tunnel = tunnelFromThreats(threats);
     const proxy = TriState.unknown; // Android proxy read isn't exposed yet.
     final installed = classifyInstalledVpnApps(apps);
+    final facts = tunnelFacts(threats);
 
     return VpnProxyStatus(
       verdict: verdictFor(tunnel: tunnel, proxy: proxy),
@@ -248,6 +261,8 @@ class VpnProxyDetector {
       installedVpnApps: installed,
       tunnelOwnerIdentifiable: false,
       platformLabel: 'This phone',
+      tunnelIsOwnFirewall: facts.ownFirewall,
+      genuineOrbVpnInstalled: facts.orbVpnInstalled,
       limitations: const [
         'Android does not let an app read the system HTTP-proxy setting, so a '
             'proxy can’t be confirmed here.',
@@ -330,14 +345,51 @@ class VpnProxyDetector {
   /// because the check always runs on Android; callers on platforms that don't
   /// run this check must pass [TriState.unknown] themselves.
   static TriState tunnelFromThreats(List<Map<String, dynamic>> threats) {
+    return threats.any(_isTunnelEntry) ? TriState.yes : TriState.no;
+  }
+
+  static bool _isNetwork(Map<String, dynamic> t) =>
+      (t['type'] ?? '').toString().toLowerCase() == 'network';
+
+  static bool _isTunnelEntry(Map<String, dynamic> t) {
+    if (!_isNetwork(t)) return false;
+    final path = (t['path'] ?? '').toString().toUpperCase();
+    final name = (t['name'] ?? '').toString().toLowerCase();
+    return path == 'VPN' || name.contains('vpn');
+  }
+
+  static bool _isProxyEntry(Map<String, dynamic> t) {
+    if (!_isNetwork(t)) return false;
+    final id = (t['id'] ?? '').toString().toLowerCase();
+    final name = (t['name'] ?? '').toString().toLowerCase();
+    return id.startsWith('net_proxy') || name.contains('proxy');
+  }
+
+  /// True for exactly the native scan entries [tunnelFromThreats] and
+  /// [proxyFromThreats] read: an active tunnel or a system proxy. That is
+  /// reroute state, which VpnWatch owns; the device check leaves these out of
+  /// its findings so one thing never counts twice.
+  static bool isRerouteFinding(Map<String, dynamic> threat) =>
+      _isTunnelEntry(threat) || _isProxyEntry(threat);
+
+  /// The two facts the Android tunnel entry carries in its metadata:
+  /// `ownFirewall` (OrbGuard's firewall is the running VpnService) and
+  /// `orbVpnInstalled` (genuine OrbVPN, signature checked). A fact that is
+  /// absent or not a bool is null, "not known", never "no".
+  static ({bool? ownFirewall, bool? orbVpnInstalled}) tunnelFacts(
+      List<Map<String, dynamic>> threats) {
     for (final t in threats) {
-      final type = (t['type'] ?? '').toString().toLowerCase();
-      if (type != 'network') continue;
-      final path = (t['path'] ?? '').toString().toUpperCase();
-      final name = (t['name'] ?? '').toString().toLowerCase();
-      if (path == 'VPN' || name.contains('vpn')) return TriState.yes;
+      if (!_isTunnelEntry(t)) continue;
+      final meta = t['metadata'];
+      if (meta is! Map) return (ownFirewall: null, orbVpnInstalled: null);
+      final own = meta['ownFirewall'];
+      final orb = meta['orbVpnInstalled'];
+      return (
+        ownFirewall: own is bool ? own : null,
+        orbVpnInstalled: orb is bool ? orb : null,
+      );
     }
-    return TriState.no;
+    return (ownFirewall: null, orbVpnInstalled: null);
   }
 
   /// Whether the iOS `scanNetwork` result reports a system HTTP proxy, plus the
@@ -347,11 +399,7 @@ class VpnProxyDetector {
   static ({TriState state, String? host}) proxyFromThreats(
       List<Map<String, dynamic>> threats) {
     for (final t in threats) {
-      final type = (t['type'] ?? '').toString().toLowerCase();
-      if (type != 'network') continue;
-      final id = (t['id'] ?? '').toString().toLowerCase();
-      final name = (t['name'] ?? '').toString().toLowerCase();
-      if (id.startsWith('net_proxy') || name.contains('proxy')) {
+      if (_isProxyEntry(t)) {
         final meta = t['metadata'];
         final metaHost = meta is Map ? meta['proxy_host']?.toString() : null;
         final pathHost = t['path']?.toString();

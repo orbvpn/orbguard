@@ -954,7 +954,7 @@ func (a *AppAnalyzer) GetAppReputation(ctx context.Context, packageName string) 
 // SaveAppReport persists a user-submitted report about a suspicious app.
 func (a *AppAnalyzer) SaveAppReport(ctx context.Context, rec *repository.AppReportRecord) (*repository.AppReportRecord, error) {
 	if a.appSec == nil {
-		a.logger.Warn().Str("package", rec.PackageName).Msg("app report received but repository not configured")
+		a.logger.Warn().Str("type", rec.ReportType).Msg("app report received but repository not configured")
 		return nil, ErrAppSecurityUnavailable
 	}
 
@@ -966,12 +966,11 @@ func (a *AppAnalyzer) SaveAppReport(ctx context.Context, rec *repository.AppRepo
 	// A new report invalidates the cached reputation for the package.
 	if a.cache != nil {
 		if err := a.cache.Delete(ctx, "appsec:reputation:"+rec.PackageName); err != nil {
-			a.logger.Warn().Err(err).Str("package", rec.PackageName).Msg("failed to invalidate reputation cache")
+			a.logger.Warn().Err(err).Str("report_id", saved.ID.String()).Msg("failed to invalidate reputation cache")
 		}
 	}
 
 	a.logger.Info().
-		Str("package", rec.PackageName).
 		Str("type", rec.ReportType).
 		Str("report_id", saved.ID.String()).
 		Msg("app report persisted")

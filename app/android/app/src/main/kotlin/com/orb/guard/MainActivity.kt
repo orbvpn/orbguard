@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.app.AppOpsManager
+import android.app.admin.DevicePolicyManager
 import android.os.Build
 import android.os.Environment
 import android.net.Uri
@@ -31,8 +32,16 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.orb.guard/system"
     private val SMS_CHANNEL = "com.orb.guard/sms"
     private val BROWSER_CHANNEL = "com.orb.guard/browser"
+    private val DEVICE_ADMIN_CHANNEL = "com.orb.guard/device_admin"
+    // Distinct from FirewallChannelHandler.VPN_CONSENT_REQUEST (0x0F1A) and the
+    // storage/SMS permission codes (100/200) so onActivityResult can tell the
+    // device-admin grant apart.
+    private val DEVICE_ADMIN_ENABLE_REQUEST = 0x0DA1
+    // Held while the ACTION_ADD_DEVICE_ADMIN system screen is showing.
+    private var pendingAdminResult: MethodChannel.Result? = null
     private var rootAccess: RootAccess? = null
     private var spywareScanner: SpywareScanner? = null
+    private var apkFileScanner: ApkFileScanner? = null
     private var smsAnalyzer: SMSAnalyzer? = null
     private var browserMonitor: BrowserMonitor? = null
     private var systemMetricsHandler: SystemMetricsHandler? = null
@@ -45,6 +54,7 @@ class MainActivity: FlutterActivity() {
 
         rootAccess = RootAccess()
         spywareScanner = SpywareScanner(this, rootAccess!!)
+        apkFileScanner = ApkFileScanner(this)
         smsAnalyzer = SMSAnalyzer.getInstance(this)
         browserMonitor = BrowserMonitor.getInstance(this)
         systemMetricsHandler = SystemMetricsHandler(this, rootAccess)
@@ -54,6 +64,9 @@ class MainActivity: FlutterActivity() {
 
         // Setup Browser Method Channel
         setupBrowserChannel(flutterEngine)
+
+        // Device-administrator channel (remote anti-theft lock / wipe)
+        setupDeviceAdminChannel(flutterEngine)
 
         // Wi-Fi inspection channel (com.orb.guard/wifi)
         wifiChannelHandler = WifiChannelHandler(this).also {
@@ -94,23 +107,8 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 
-                "checkAccessibilityPermission" -> {
-                    val hasPermission = checkAccessibilityPermission()
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-                
-                "requestAccessibilityPermission" -> {
-                    requestAccessibilityPermission()
-                    result.success(true)
-                }
-
                 "openUsageStatsSettings" -> {
                     requestUsageStatsPermission()
-                    result.success(true)
-                }
-
-                "openAccessibilitySettings" -> {
-                    requestAccessibilityPermission()
                     result.success(true)
                 }
 
@@ -177,6 +175,18 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 
+                // Scoped APK/file scan: analyses only the files the user picked.
+                // No all-files permission needed.
+                "scanApkFiles" -> {
+                    val paths = call.argument<List<String>>("paths") ?: emptyList()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val results = apkFileScanner?.scanApks(paths) ?: emptyList()
+                        withContext(Dispatchers.Main) {
+                            result.success(mapOf("results" to results))
+                        }
+                    }
+                }
+
                 "scanFileSystem" -> {
                     CoroutineScope(Dispatchers.IO).launch {
                         val threats = spywareScanner!!.scanFileSystem()
@@ -347,63 +357,6 @@ class MainActivity: FlutterActivity() {
         }
     }
     
-    private fun checkAccessibilityPermission(): Boolean {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-
-        if (accessibilityEnabled == 1) {
-            val service = "$packageName/$packageName.AccessibilityMonitorService"
-            val settingValue = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-
-            // Log for debugging
-            android.util.Log.d("OrbGuard", "Looking for service: $service")
-            android.util.Log.d("OrbGuard", "Enabled services: $settingValue")
-
-            // Check both possible formats
-            val found = settingValue?.contains(service) == true ||
-                        settingValue?.contains("$packageName/.AccessibilityMonitorService") == true ||
-                        settingValue?.contains("AccessibilityMonitorService") == true
-
-            android.util.Log.d("OrbGuard", "Accessibility found: $found")
-            return found
-        }
-        return false
-    }
-    
-    private fun requestAccessibilityPermission() {
-        try {
-            // Create the component name for our accessibility service
-            val componentName = ComponentName(packageName, "$packageName.AccessibilityMonitorService")
-
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-            // Add extras to highlight our service in the list
-            val bundle = Bundle()
-            val componentNameString = componentName.flattenToString()
-            bundle.putString(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:show_fragment_args", bundle)
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback to general accessibility settings
-            try {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            } catch (e2: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                startActivity(intent)
-            }
-        }
-    }
-
     // ============================================================================
     // STORAGE PERMISSION (Android 11+)
     // ============================================================================
@@ -796,6 +749,124 @@ class MainActivity: FlutterActivity() {
         // Forward the VPN consent-dialog result to the firewall handler.
         if (requestCode == FirewallChannelHandler.VPN_CONSENT_REQUEST) {
             firewallChannelHandler?.onVpnConsentResult(resultCode)
+        } else if (requestCode == DEVICE_ADMIN_ENABLE_REQUEST) {
+            // Report the real grant state back to Dart. Some OEMs return
+            // RESULT_CANCELED even after a successful enable, so trust
+            // isAdminActive() over resultCode.
+            val pending = pendingAdminResult
+            pendingAdminResult = null
+            val granted = try {
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                dpm.isAdminActive(ComponentName(this, OrbDeviceAdminReceiver::class.java))
+            } catch (e: Exception) {
+                false
+            }
+            pending?.success(granted)
+        }
+    }
+
+    // ============================================================================
+    // DEVICE ADMINISTRATOR CHANNEL (remote anti-theft lock / wipe)
+    // ============================================================================
+    //
+    // Serves com.orb.guard/device_admin for the Dart DeviceAdminBridge:
+    //   isAdminActive -> Boolean: is OrbGuard an active device administrator
+    //   lockNow       -> Boolean: lock the screen now (false if admin inactive)
+    //   wipeData      -> Boolean: factory reset (false if admin inactive); also
+    //                    wipes external storage when wipe_sd_card == true
+    //   requestAdmin  -> Boolean: launch the intrusive ACTION_ADD_DEVICE_ADMIN
+    //                    system screen and report whether the user granted it
+    //
+    // HONEST FAILURE: lock/wipe never fake success — without an active admin
+    // they return false, which the bridge surfaces as a real failure so the
+    // backend acks the command FAILED. WIPE is irreversible; it only ever runs
+    // through a genuine remote 'wipe' command with admin already granted.
+
+    private fun setupDeviceAdminChannel(flutterEngine: FlutterEngine) {
+        val channel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            DEVICE_ADMIN_CHANNEL
+        )
+        channel.setMethodCallHandler { call, result ->
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val component = ComponentName(this, OrbDeviceAdminReceiver::class.java)
+            when (call.method) {
+                "isAdminActive" -> {
+                    result.success(
+                        try {
+                            dpm.isAdminActive(component)
+                        } catch (e: Exception) {
+                            false
+                        }
+                    )
+                }
+
+                "lockNow" -> {
+                    if (!dpm.isAdminActive(component)) {
+                        // Honest failure — the bridge maps false to "enable
+                        // OrbGuard as a device administrator".
+                        result.success(false)
+                    } else {
+                        try {
+                            dpm.lockNow()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("LOCK_FAILED", e.message, null)
+                        }
+                    }
+                }
+
+                "wipeData" -> {
+                    if (!dpm.isAdminActive(component)) {
+                        result.success(false)
+                    } else {
+                        try {
+                            val wipeSdCard = call.argument<Boolean>("wipe_sd_card") ?: false
+                            val flags = if (wipeSdCard)
+                                DevicePolicyManager.WIPE_EXTERNAL_STORAGE else 0
+                            dpm.wipeData(flags)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("WIPE_FAILED", e.message, null)
+                        }
+                    }
+                }
+
+                "requestAdmin" -> requestDeviceAdmin(result)
+
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /**
+     * Launches the system ACTION_ADD_DEVICE_ADMIN screen so the user can grant
+     * OrbGuard device-administrator privileges (the prerequisite for remote
+     * lock/wipe). The grant outcome is delivered back through onActivityResult.
+     * If admin is already active, succeeds immediately.
+     */
+    private fun requestDeviceAdmin(result: MethodChannel.Result) {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val component = ComponentName(this, OrbDeviceAdminReceiver::class.java)
+        if (dpm.isAdminActive(component)) {
+            result.success(true)
+            return
+        }
+        pendingAdminResult = result
+        try {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "OrbGuard needs device-administrator access so you can " +
+                        "remotely lock or factory-reset this device from the web " +
+                        "if it is lost or stolen."
+                )
+            }
+            startActivityForResult(intent, DEVICE_ADMIN_ENABLE_REQUEST)
+        } catch (e: Exception) {
+            pendingAdminResult = null
+            result.error("ADMIN_REQUEST_FAILED", e.message, null)
         }
     }
 
@@ -804,30 +875,18 @@ class MainActivity: FlutterActivity() {
 
         // Set the method channel for the analyzer
         smsAnalyzer?.setMethodChannel(smsChannel)
+        smsMethodChannel = smsChannel
 
         smsChannel.setMethodCallHandler { call, result ->
             when (call.method) {
-                // Check SMS permission
-                "checkSmsPermission" -> {
-                    val hasPermission = smsAnalyzer?.hasSmsPermission() ?: false
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-
-                // Request SMS permission
-                "requestSmsPermission" -> {
-                    requestSmsPermission()
-                    result.success(true)
-                }
-
-                // Read SMS inbox
-                "readSmsInbox" -> {
-                    val limit = call.argument<Int>("limit") ?: 100
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val messages = smsAnalyzer?.readSmsInbox(limit) ?: emptyList()
-                        withContext(Dispatchers.Main) {
-                            result.success(mapOf("messages" to messages))
-                        }
-                    }
+                // Text shared to OrbGuard via the system share sheet
+                // (ACTION_SEND text/plain) before Dart was listening — Dart
+                // pulls it once at startup; a share into a running app is
+                // pushed through "onSharedText" instead (see handleShareIntent).
+                "getSharedText" -> {
+                    val text = pendingSharedText
+                    pendingSharedText = null
+                    result.success(text)
                 }
 
                 // Update SMS protection settings
@@ -870,15 +929,39 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun requestSmsPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(
-                arrayOf(
-                    android.Manifest.permission.READ_SMS,
-                    android.Manifest.permission.RECEIVE_SMS
-                ),
-                200
-            )
+    // ============================================================================
+    // SHARE-TO-CHECK (ACTION_SEND text/plain)
+    // ============================================================================
+    //
+    // OrbGuard holds NO SMS permissions (Google Play restricts the anti-SMS-
+    // phishing use case), so the scam-text checker receives text the user
+    // shares from Messages / WhatsApp / any app via the share sheet.
+
+    private var smsMethodChannel: MethodChannel? = null
+    private var pendingSharedText: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleShareIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("text/") != true) return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+        if (text.isNullOrEmpty()) return
+        // Consume it so a configuration change does not re-deliver the same text.
+        intent.removeExtra(Intent.EXTRA_TEXT)
+        val channel = smsMethodChannel
+        if (channel != null) {
+            channel.invokeMethod("onSharedText", mapOf("text" to text))
+        } else {
+            pendingSharedText = text
         }
     }
 
@@ -894,18 +977,6 @@ class MainActivity: FlutterActivity() {
 
         browserChannel.setMethodCallHandler { call, result ->
             when (call.method) {
-                // Check browser accessibility permission
-                "checkBrowserAccessibilityPermission" -> {
-                    val hasPermission = checkBrowserAccessibilityPermission()
-                    result.success(mapOf("hasPermission" to hasPermission))
-                }
-
-                // Request browser accessibility permission
-                "requestBrowserAccessibilityPermission" -> {
-                    requestBrowserAccessibilityPermission()
-                    result.success(true)
-                }
-
                 // Update browser protection settings
                 "updateSettings" -> {
                     val protectionEnabled = call.argument<Boolean>("protectionEnabled") ?: true
@@ -913,7 +984,6 @@ class MainActivity: FlutterActivity() {
                     val blockDangerous = call.argument<Boolean>("blockDangerous") ?: false
 
                     browserMonitor?.updateSettings(protectionEnabled, notifyOnThreat, blockDangerous)
-                    BrowserAccessibilityService.getInstance()?.updateSettings(protectionEnabled, true)
                     result.success(true)
                 }
 
@@ -983,51 +1053,6 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun checkBrowserAccessibilityPermission(): Boolean {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-
-        if (accessibilityEnabled == 1) {
-            val service = "$packageName/$packageName.BrowserAccessibilityService"
-            val settingValue = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-
-            return settingValue?.contains(service) == true ||
-                    settingValue?.contains("$packageName/.BrowserAccessibilityService") == true ||
-                    settingValue?.contains("BrowserAccessibilityService") == true
-        }
-        return false
-    }
-
-    private fun requestBrowserAccessibilityPermission() {
-        try {
-            val componentName = ComponentName(packageName, "$packageName.BrowserAccessibilityService")
-
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-            val bundle = Bundle()
-            val componentNameString = componentName.flattenToString()
-            bundle.putString(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:fragment_args_key", componentNameString)
-            intent.putExtra(":settings:show_fragment_args", bundle)
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            try {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            } catch (e2: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                startActivity(intent)
-            }
-        }
-    }
 }
 
 // ============================================================================

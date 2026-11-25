@@ -7,7 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/glass_widgets.dart';
@@ -16,7 +15,11 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/scam_detection_provider.dart';
 
 class ScamDetectionScreen extends StatefulWidget {
-  const ScamDetectionScreen({super.key});
+  const ScamDetectionScreen({super.key, this.title = 'Scam Detection'});
+
+  /// The name in the header. A shield passes its own, so the sheet reads
+  /// the same as the moon or the card that opened it.
+  final String title;
 
   @override
   State<ScamDetectionScreen> createState() => _ScamDetectionScreenState();
@@ -58,7 +61,7 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     return Consumer<ScamDetectionProvider>(
       builder: (context, provider, _) {
         return GlassTabPage(
-          title: 'Scam Detection',
+          title: widget.title,
           hasSearch: true,
           searchHint: 'Search scams...',
           tabs: [
@@ -414,9 +417,9 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           err.contains('Service Unavailable')) {
         setState(() {
           _mediaCapabilityNotice = _selectedType == ScamContentType.image
-              ? 'Image analysis isn\'t available right now — it isn\'t '
+              ? 'Image analysis isn\'t available right now. It isn\'t '
                   'enabled on our servers.'
-              : 'Voice analysis isn\'t available right now — it isn\'t '
+              : 'Voice analysis isn\'t available right now. It isn\'t '
                   'enabled on our servers.';
         });
       }

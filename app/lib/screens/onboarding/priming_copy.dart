@@ -4,7 +4,9 @@
 // (PermissionPrimingScreen). One place to read every value line, so the
 // honest-copy rules are easy to audit:
 //   • one calm sentence per permission — the WHY, never fear
-//   • no Android-isms on iOS (no SMS/storage/usage/accessibility asks there)
+//   • no Android-isms on iOS (no usage-access ask there)
+//   • NO SMS and NO Accessibility steps anywhere: OrbGuard holds neither
+//     permission (Google Play policy) — scam texts are checked by paste/share.
 //   • steps that only deep-link to system Settings say so.
 
 import 'package:flutter/foundation.dart' show TargetPlatform;
@@ -18,10 +20,8 @@ class PrimingStepIds {
 
   static const String notifications = 'notifications';
   static const String storage = 'storage';
-  static const String sms = 'sms';
   static const String location = 'location';
   static const String usageAccess = 'usage_access';
-  static const String accessibility = 'accessibility';
 }
 
 /// One permission step: what it is, why it helps (one plain-English
@@ -35,10 +35,14 @@ class PrimingStep {
 
   /// The value line: the WHY in one calm sentence.
   final String value;
+
+  /// App Review 5.1.1(iv): a custom pre-permission screen must NOT put
+  /// "Allow" on its action button — Apple requires neutral wording like
+  /// "Continue"/"Next" so consent happens only in the OS dialog.
   final String buttonLabel;
 
   /// True for the advanced steps that can only deep-link into system
-  /// Settings (usage access, accessibility). The screen labels these
+  /// Settings (usage access). The screen labels these
   /// "Opens system Settings" and never claims they are on afterwards.
   final bool opensSystemSettings;
 
@@ -47,7 +51,7 @@ class PrimingStep {
     required this.icon,
     required this.title,
     required this.value,
-    this.buttonLabel = 'Allow',
+    this.buttonLabel = 'Continue',
     this.opensSystemSettings = false,
   });
 }
@@ -57,20 +61,6 @@ const PrimingStep _notifications = PrimingStep(
   icon: AppIcons.bell,
   title: 'Notifications',
   value: 'Get alerted the moment we spot a threat.',
-);
-
-const PrimingStep _storage = PrimingStep(
-  id: PrimingStepIds.storage,
-  icon: AppIcons.folder,
-  title: 'Storage',
-  value: 'Let OrbGuard check files and apps for spyware.',
-);
-
-const PrimingStep _sms = PrimingStep(
-  id: PrimingStepIds.sms,
-  icon: AppIcons.chatDots,
-  title: 'SMS',
-  value: 'Catch scam texts before you tap them.',
 );
 
 const PrimingStep _locationAndroid = PrimingStep(
@@ -99,28 +89,19 @@ const PrimingStep _usageAccess = PrimingStep(
   opensSystemSettings: true,
 );
 
-const PrimingStep _accessibility = PrimingStep(
-  id: PrimingStepIds.accessibility,
-  icon: 'accessibility',
-  title: 'Accessibility',
-  value: 'Detect stalkerware screen-readers.',
-  buttonLabel: 'Turn on',
-  opensSystemSettings: true,
-);
-
-/// The ordered steps for a platform. Android gets the full set (four
-/// one-tap permissions + two advanced Settings deep-links); iOS — and any
-/// other platform — gets only the asks that actually exist there:
-/// notifications and location.
+/// The ordered steps for a platform. Android gets two one-tap permissions
+/// plus the usage-access Settings deep-link; iOS — and any other platform —
+/// gets only the asks that actually exist there: notifications and location.
 List<PrimingStep> primingStepsFor(TargetPlatform platform) {
   if (platform == TargetPlatform.android) {
     return const [
       _notifications,
-      _storage,
-      _sms,
+      // (No storage step: file/APK scanning uses the system file picker and
+      // needs no storage permission. No SMS step: OrbGuard never reads the
+      // inbox — texts are checked by paste/share. No accessibility step:
+      // the app has no AccessibilityService.)
       _locationAndroid,
       _usageAccess,
-      _accessibility,
     ];
   }
   return const [_notifications, _locationIos];

@@ -17,8 +17,8 @@ ios/DerivedData/
 macos/Flutter/ephemeral/
 macos/Pods/
 macos/Runner.xcworkspace/
-linux/flutter/
-windows/flutter/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
 web/.dart_tool/
 web/wasm/
 .wasm_tool/

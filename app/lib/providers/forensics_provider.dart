@@ -344,7 +344,7 @@ class ForensicsProvider extends ChangeNotifier {
     if ((newProgress - _progress).abs() < 0.01 && sent != total) return;
     _progress = newProgress;
     _currentPhase = sent >= total
-        ? 'Upload complete — analyzing on server...'
+        ? 'Upload complete. Analyzing on server...'
         : 'Uploading... ${(fraction * 100).toStringAsFixed(0)}%';
     notifyListeners();
   }
@@ -492,7 +492,7 @@ class ForensicsProvider extends ChangeNotifier {
         infectionLikelihood: isSuspicious ? 0.5 : 0.0,
         recommendations: [
           if (response['recommend_full_scan'] == true)
-            'Suspicious indicators found — run a full forensic analysis.',
+            'Suspicious indicators found. Run a full forensic analysis.',
         ],
         totalIndicatorsChecked:
             (response['indicators_found'] as num?)?.toInt() ?? findings.length,

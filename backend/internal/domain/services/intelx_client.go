@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -19,11 +20,15 @@ import (
 // for a selector (e.g. an email address) and is aggregated as an optional
 // breach provider alongside HIBP and LeakCheck.
 type IntelXClient struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
-	logger     *logger.Logger
+	apiKey       string
+	baseURL      string
+	httpClient   *http.Client
+	logger       *logger.Logger
+	pollInterval time.Duration
 }
+
+// errIntelXIncomplete means a search ended without a result.
+var errIntelXIncomplete = errors.New("intelx: search did not complete")
 
 // IntelXClientConfig holds configuration for the Intelligence X client.
 type IntelXClientConfig struct {
@@ -50,7 +55,8 @@ func NewIntelXClient(config IntelXClientConfig, log *logger.Logger) *IntelXClien
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		logger: log.WithComponent("intelx-client"),
+		logger:       log.WithComponent("intelx-client"),
+		pollInterval: 700 * time.Millisecond,
 	}
 }
 
@@ -202,7 +208,7 @@ func (c *IntelXClient) collectResults(ctx context.Context, searchID string) ([]i
 		case 1: // success, finished
 			return records, nil
 		case 2: // search id not found / expired
-			return records, nil
+			return completedOrFailed(records)
 		case 0, 3: // more results coming / nothing yet — keep polling
 		default:
 			return nil, fmt.Errorf("intelx: unexpected result status %d", resultResp.Status)
@@ -211,11 +217,20 @@ func (c *IntelXClient) collectResults(ctx context.Context, searchID string) ([]i
 		select {
 		case <-ctx.Done():
 			return records, ctx.Err()
-		case <-time.After(700 * time.Millisecond):
+		case <-time.After(c.pollInterval):
 		}
 	}
 
 	// Polling budget exhausted; return what we have so far.
+	return completedOrFailed(records)
+}
+
+// completedOrFailed handles a search that did not finish: what it found is
+// real, but finding nothing is not an answer.
+func completedOrFailed(records []intelxRecord) ([]intelxRecord, error) {
+	if len(records) == 0 {
+		return nil, errIntelXIncomplete
+	}
 	return records, nil
 }
 

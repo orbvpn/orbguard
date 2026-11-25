@@ -112,8 +112,13 @@ class GlassTheme {
   /// Max content width on wide screens (tablet/desktop).
   static const double contentMaxWidth = 760.0;
 
-  /// Vertical space reserved for the floating pill nav (60 height + 12 margin).
-  static const double bottomNavClearance = 72.0;
+  /// Vertical space reserved for the floating pill nav (66 height + 12 margin).
+  static const double bottomNavClearance = 78.0;
+
+  /// Vertical space the floating header occupies (50 pill + 24 vertical
+  /// padding). Scrollable tab content starts below this at rest and passes
+  /// BEHIND the (fully transparent) header while scrolling.
+  static const double headerClearance = 74.0;
 
   // ============================================================================
   // BORDER RADIUS
@@ -362,11 +367,10 @@ class GlassTheme {
 
   /// Section/card heading — display face.
   static TextStyle headingStyle({bool isDark = true}) {
-    return TextStyle(
-      fontFamily: Brand.fontDisplay,
+    return BrandVoice.heading.style(
+      size: 18,
+      legacyWeight: FontWeight.w700,
       color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-      fontWeight: FontWeight.w700,
-      fontSize: 18,
     );
   }
 

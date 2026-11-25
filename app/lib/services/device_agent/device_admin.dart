@@ -107,4 +107,34 @@ class DeviceAdminBridge {
       );
     }
   }
+
+  /// Prompts the user to grant device-administrator privileges via the
+  /// intrusive one-time Android ACTION_ADD_DEVICE_ADMIN system screen. This is
+  /// the prerequisite for [lockNow]/[wipe]; returns success only when the user
+  /// actually completed the grant. Honest (never fakes) when the native
+  /// handler is missing or the user declines.
+  Future<DeviceAdminResult> requestAdmin() async {
+    if (!PlatformInfo.isAndroid) {
+      return DeviceAdminResult.failure(
+        'device administrator is not supported on '
+        '${PlatformInfo.operatingSystem}',
+      );
+    }
+    try {
+      final granted = await _channel.invokeMethod<bool>('requestAdmin');
+      if (granted == true) return const DeviceAdminResult.success();
+      return const DeviceAdminResult.failure(
+        'device administrator was not granted',
+      );
+    } on MissingPluginException {
+      return const DeviceAdminResult.failure(
+        'device admin not granted: native device-admin handler is not '
+        'implemented in this build',
+      );
+    } on PlatformException catch (e) {
+      return DeviceAdminResult.failure(
+        'device admin request failed: ${e.code} ${e.message ?? ''}'.trim(),
+      );
+    }
+  }
 }

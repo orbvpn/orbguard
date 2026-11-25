@@ -1,8 +1,11 @@
 package forensics
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +16,12 @@ import (
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/pkg/logger"
 )
+
+// ErrNothingExamined means an analysis recognised nothing in what it was given.
+var ErrNothingExamined = models.ErrNothingExamined
+
+// ErrAnalysisBusy means the server is at its limit for analyses running at once.
+var ErrAnalysisBusy = models.ErrAnalysisBusy
 
 // Service provides forensic analysis capabilities
 type Service struct {
@@ -65,7 +74,7 @@ func NewServiceWithCache(cache *cache.RedisCache, log *logger.Logger) *Service {
 func (s *Service) AnalyzeShutdownLog(ctx context.Context, data []byte, deviceID string) (*models.ForensicResult, error) {
 	s.logger.Info().Str("device_id", deviceID).Msg("analyzing shutdown.log")
 
-	result, err := s.shutdownLogParser.Parse(data)
+	result, err := s.shutdownLogParser.ParseContext(ctx, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shutdown.log: %w", err)
 	}
@@ -129,9 +138,15 @@ func (s *Service) AnalyzeDataUsage(ctx context.Context, dbPath, deviceID string)
 
 // AnalyzeLogcat analyzes Android logcat output for forensic indicators
 func (s *Service) AnalyzeLogcat(ctx context.Context, data []byte, deviceID string) (*models.ForensicResult, error) {
+	return s.AnalyzeLogcatStream(ctx, bytes.NewReader(data), 0, deviceID)
+}
+
+// AnalyzeLogcatStream analyzes a log as it is read, up to maxBytes (0 means no
+// limit), and stops when ctx ends.
+func (s *Service) AnalyzeLogcatStream(ctx context.Context, r io.Reader, maxBytes int64, deviceID string) (*models.ForensicResult, error) {
 	s.logger.Info().Str("device_id", deviceID).Msg("analyzing Android logcat")
 
-	result, err := s.logcatParser.Parse(data)
+	result, err := s.logcatParser.ParseStream(ctx, r, maxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse logcat: %w", err)
 	}
@@ -171,17 +186,23 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 	combinedTimeline := models.NewTimeline()
 	scansPerformed := make([]string, 0)
+	notExamined := make([]string, 0)
+	busy := false
 
 	// iOS Analysis
 	if req.Platform == "ios" {
 		// Shutdown.log analysis
 		if len(req.ShutdownLogData) > 0 {
-			result, err := s.shutdownLogParser.Parse(req.ShutdownLogData)
+			result, err := s.shutdownLogParser.ParseContext(ctx, req.ShutdownLogData)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("shutdown.log analysis failed")
+				notExamined = append(notExamined, "shutdown_log")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "shutdown_log")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "shutdown_log")
+				}
 			}
 		}
 
@@ -190,6 +211,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.backupParser.Parse(req.BackupPath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("backup analysis failed")
+				notExamined = append(notExamined, "backup")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "backup")
@@ -201,6 +223,7 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 			result, err := s.dataUsageParser.Parse(req.DataUsagePath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("DataUsage.sqlite analysis failed")
+				notExamined = append(notExamined, "data_usage")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "data_usage")
@@ -209,12 +232,17 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 		// Sysdiagnose archive analysis
 		if req.SysdiagnosePath != "" {
-			result, err := s.sysdiagnoseParser.Parse(req.SysdiagnosePath)
+			result, err := s.sysdiagnoseParser.ParseContext(ctx, req.SysdiagnosePath)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("sysdiagnose analysis failed")
+				notExamined = append(notExamined, "sysdiagnose")
+				busy = errors.Is(err, ErrAnalysisBusy)
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "sysdiagnose")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "sysdiagnose")
+				}
 			}
 		}
 	}
@@ -223,14 +251,32 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 	if req.Platform == "android" {
 		// Logcat analysis
 		if len(req.LogcatData) > 0 {
-			result, err := s.logcatParser.Parse(req.LogcatData)
+			result, err := s.logcatParser.ParseStream(ctx, bytes.NewReader(req.LogcatData), 0)
 			if err != nil {
 				s.logger.Warn().Err(err).Msg("logcat analysis failed")
+				notExamined = append(notExamined, "logcat")
 			} else {
 				s.mergeResults(combinedResult, result, combinedTimeline)
 				scansPerformed = append(scansPerformed, "logcat")
+				if _, partial := result.RawData["not_examined"]; partial {
+					notExamined = append(notExamined, "logcat")
+				}
 			}
 		}
+	}
+
+	if busy && !combinedResult.HasHighFinding() {
+		return nil, ErrAnalysisBusy
+	}
+
+	// A normal result here would read as an all-clear for a device nobody
+	// examined, so an analysis with no scan behind it is a failure.
+	if len(scansPerformed) == 0 {
+		s.logger.Warn().
+			Str("device_id", req.DeviceID).
+			Str("platform", req.Platform).
+			Msg("full forensic analysis examined nothing")
+		return nil, ErrNothingExamined
 	}
 
 	// Sort and finalize timeline
@@ -261,6 +307,19 @@ func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRe
 
 	// Enhance with IOC scanner (Citizen Lab/Amnesty MVT integration)
 	s.iocScanner.EnhanceForensicResult(combinedResult)
+
+	// Never clean while something supplied went unexamined. Only a high or
+	// critical finding may stand, and the result lists what was skipped.
+	if len(notExamined) > 0 {
+		if !combinedResult.HasHighFinding() {
+			s.logger.Warn().
+				Str("device_id", req.DeviceID).
+				Strs("not_examined", notExamined).
+				Msg("full forensic analysis examined only part of what was supplied")
+			return nil, &models.PartlyExaminedError{NotExamined: notExamined}
+		}
+		combinedResult.RawData["not_examined"] = notExamined
+	}
 
 	// Store metadata
 	combinedResult.RawData["scans_performed"] = scansPerformed
@@ -388,7 +447,7 @@ func (s *Service) AnalyzeSysdiagnose(ctx context.Context, archivePath, deviceID 
 		Str("path", archivePath).
 		Msg("analyzing sysdiagnose archive")
 
-	result, err := s.sysdiagnoseParser.Parse(archivePath)
+	result, err := s.sysdiagnoseParser.ParseContext(ctx, archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sysdiagnose: %w", err)
 	}
@@ -481,9 +540,27 @@ func (s *Service) QuickCheck(ctx context.Context, platform string, data []byte) 
 
 	if result.IndicatorsFound > 0 {
 		result.RecommendFullScan = true
+	} else if !s.recognisesLog(ctx, platform, data) {
+		if ctx.Err() != nil {
+			return nil, &models.PartlyExaminedError{NotExamined: []string{"log beyond the time limit"}}
+		}
+		// No indicator in text that is not a log of this platform says
+		// nothing about the device.
+		return nil, ErrNothingExamined
 	}
 
 	return result, nil
+}
+
+// recognisesLog reports whether data holds a line the platform's parser reads.
+func (s *Service) recognisesLog(ctx context.Context, platform string, data []byte) bool {
+	switch platform {
+	case "ios":
+		return s.shutdownLogParser.RecognisesContext(ctx, data)
+	case "android":
+		return s.logcatParser.RecognisesContext(ctx, data)
+	}
+	return false
 }
 
 // QuickCheckResult represents the result of a quick check

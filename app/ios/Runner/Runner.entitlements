@@ -2,6 +2,32 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Sign in with Apple - social sign-in for the shared OrbVPN/OrbNet
+	     account. This entitlement is the on-device half; you MUST also enable
+	     the "Sign in with Apple" capability on the App ID (Apple Developer
+	     portal) and in the target's Signing & Capabilities so the provisioning
+	     profile carries it, or getAppleIDCredential() fails at runtime. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!-- Associated Domains - passkey (WebAuthn) sign-in is bound to RP ID
+	     orbvpn.com, which is the relying party the API now presents for every
+	     customer surface. A credential belongs to exactly one relying party and
+	     is invisible to every other, so this app, the OrbVPN app and the website
+	     have to name the same one or each ends up with its own passkey that the
+	     others cannot see — which is what happened while this said orbai.world.
+	     iOS requires this webcredentials association plus the matching AASA file
+	     at https://orbvpn.com/.well-known/apple-app-site-association, which is
+	     served and carries this app's ID. You MUST also enable the "Associated
+	     Domains" capability on the App ID (Apple Developer portal) so the
+	     provisioning profile carries it. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:orbvpn.com</string>
+	</array>
+
 	<!-- Apple Push Notifications (FCM anti-theft wake-ups). Requires the Push
 	     Notifications capability on the App ID + an APNs auth key uploaded to
 	     Firebase (Apple Developer account). Set to `production` for release /
@@ -16,23 +42,13 @@
 		<string>group.com.orb.guard.shared</string>
 	</array>
 
-	<!-- Network Extensions - Required for VPN and DNS filtering. The host app
-	     also lists content-filter-provider because it hosts the OrbGuardFilter
-	     NEFilterDataProvider content filter (managed via NEFilterManager on
-	     MDM-supervised devices). -->
-	<key>com.apple.developer.networking.networkextension</key>
-	<array>
-		<string>packet-tunnel-provider</string>
-		<string>dns-proxy</string>
-		<string>app-proxy-provider</string>
-		<string>content-filter-provider</string>
-	</array>
-
-	<!-- Personal VPN - Required for VPN configuration -->
-	<key>com.apple.developer.networking.vpn.api</key>
-	<array>
-		<string>allow-vpn</string>
-	</array>
+	<!-- No Network Extension entitlements. The OrbGuardFilter appex
+	     (NEFilterDataProvider, MDM-only) is NOT embedded in consumer builds
+	     and the app itself never configures NEFilterManager, so claiming
+	     content-filter-provider here would describe capability the shipped
+	     binary doesn't have — and NE entitlements previously made App Review's
+	     automated analysis classify OrbGuard as a VPN app. Restore this (on
+	     the appex, not the app) only when the filter actually ships. -->
 
 	<!-- Access WiFi Information - Required for NEHotspotNetwork.fetchCurrent
 	     (current SSID/BSSID on the com.orb.guard/wifi channel) -->

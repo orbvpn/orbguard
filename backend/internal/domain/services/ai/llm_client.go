@@ -499,7 +499,7 @@ func (c *LLMClient) callClaude(ctx context.Context, system string, messages []Me
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Claude API error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("Claude API error %d", resp.StatusCode)
 	}
 
 	// Parse Claude response
@@ -714,9 +714,9 @@ func (c *LLMClient) callOpenAICompatible(ctx context.Context, system string, mes
 			// content being ANALYZED as if it were an attack prompt. This is
 			// a deployment-policy limitation, not a transient error.
 			c.recordContentFilter()
-			return nil, fmt.Errorf("%s content filter blocked the analysis prompt (deployment policy; request a Responsible-AI filter exemption for security-analysis use cases or switch llm_provider): %d: %s", providerName, status, string(body))
+			return nil, fmt.Errorf("%s content filter blocked the analysis prompt (deployment policy; request a Responsible-AI filter exemption for security-analysis use cases or switch llm_provider): %d", providerName, status)
 		}
-		return nil, fmt.Errorf("%s API error %d: %s", providerName, status, string(body))
+		return nil, fmt.Errorf("%s API error %d", providerName, status)
 	}
 	c.recordLLMSuccess()
 

@@ -1,0 +1,173 @@
+# OrbGuard Release Fix Plan
+**Context:** Microsoft Store rejection, policy 10.1.2.10 "Unusable Feature: Sign in", MSIX 1.0.6.0. Sources: 7-dimension adversarial audit (verified findings only). Deduplicated — one root cause = one item.
+
+**Working-tree status check (run at plan time, `git status --porcelain`):** several fixes for this rejection are **already written but UNCOMMITTED and therefore UNSHIPPED**: `app/pubspec.yaml` (`protocol_activation: orbguard` at :126, `msix_version: 1.0.7.0` at :117), `app/windows/runner/main.cpp` (`SendAppLinkToInstance` at :18/:50), `app/macos/Runner/Info.plist` (`CFBundleURLTypes` at :45), `app/lib/screens/account/login_screen.dart` (code field always visible), `app/linux/CMakeLists.txt`, `.github/workflows/linux-build.yml`. `backend/.env.production.local` is staged deleted. **Item 0 of every sequence below is: commit this work.** A green analyzer on an uncommitted tree is worth nothing to a reviewer.
+
+---
+
+## Microsoft 10.1.2.10 sign-in rejection
+
+Ranked by likelihood of being *the* thing the reviewer hit. The rejection wording — "The login link was confirmed as successful, but login within the product was not successful" — means OrbNet's confirmation page rendered but the app never reflected it. That points at the **link→app** hop and at the **app's own UI never acknowledging success**. Causes 1–3 are each independently sufficient; all three were true in 1.0.6.0.
+
+### 1. `orbguard://` had no Windows handler at all — the link could not reach the process *(decisive, highest confidence)*
+The scheme is registered only in `app/ios/Runner/Info.plist` and `app/android/app/src/main/AndroidManifest.xml`. `msix_config` in `app/pubspec.yaml` shipped with no `protocol_activation`, so Windows had no registered handler; clicking the emailed link did nothing (or produced a shell "no app associated" dialog) while OrbNet's web page still said "confirmed". This alone reproduces the reviewer's sentence verbatim.
+**Fix (written, uncommitted):** `app/pubspec.yaml:126 protocol_activation: orbguard`. **Commit it and rebuild.** Verify the generated `AppxManifest.xml` contains `<uap:Extension Category="windows.protocol">` before submitting.
+
+### 2. Even when the link arrives, the sign-in sheet never closes — the user watches the same empty form *(decisive; platform-independent, exact match to the rejection wording)*
+`WIN-EXTRA-1` / `DART-3`. The magic-link listener lives on the home screen (`app/lib/main.dart:408-409`, started at :419) and only updates `AccountProvider`. `LoginScreen.build` is a `Consumer<AccountProvider>` (`app/lib/screens/account/login_screen.dart:227-289`) with **no `account.isLoggedIn` branch**; the sheet only pops from its own handlers via `_dismiss(true)` (:88, :96, :104, :180, :213). So on a successful deep-link sign-in the reviewer keeps staring at "Sign in with your OrbVPN account" with an empty code field. Confirmed still unfixed in the working tree (no `isLoggedIn` reference in the file).
+Compounding: `app/lib/main.dart:439 navigator.popUntil((route) => route.isFirst)` completes the awaited `push<bool>` with **null**, so `scan_gate.dart:36-42` (`signedIn != true`) and `pricing_screen.dart:180-186` abandon the action the user signed in for.
+**Fix:** in `_LoginScreenState`, listen to `AccountProvider` and call `_dismiss(true)` on the `isLoggedIn` false→true transition (it already owns the `pop(signedIn)` contract at `login_screen.dart:84-88`); **delete** the `popUntil` at `main.dart:439`. This preserves both the awaited result and any intermediate routes.
+
+### 3. The only in-app fallback was hidden; the lime CTA said "Resend link" *(decisive for the shipped build — already fixed, must ship)*
+`SI-2`. In the submitted 1.0.6.0, `_showCodeEntry` defaulted false: the code field sat behind a 13px `onSurfaceVariant` `TextButton` ("Can't open the link? Enter the code instead") while the primary action read **"Resend link"**. A reviewer whose link went nowhere had no discoverable way to finish. The working tree already deletes `_showCodeEntry` and renders the field unconditionally (`login_screen.dart:466-490`), CTA is now `'Verify & sign in'` (:497) with Resend demoted to a `TextButton` (:503-512), plus an empty-field guard (:196-204).
+**Fix:** none needed — **verify it ships** and that `app/test/screens/login_screen_test.dart` asserts the field appears the moment `_magicSent` is true.
+
+### 4. "Continue with Google" is the top control on that screen and can never succeed on Windows
+`SI-1`/`WIN-4`/`MSFT-03`/`DART-1` (one root cause, four dimensions). `login_screen.dart:330-340` renders the Google button with **no platform condition**, while Apple immediately below is gated by `if (_showApple(context))` (:341, predicate :78-82, iOS/macOS only). `google_sign_in` 7.2.0 declares android/ios/macos/web only and is absent from `app/windows/flutter/generated_plugins.cmake`, so `GoogleSignInPlatform._instance` stays `_PlaceholderImplementation` whose `init()` throws `UnimplementedError`; `social_auth_service.dart:124-130 → :168-173` swallows it into the banner "Couldn't sign in with Google — try email instead." Reachable via the ungated push at `settings_screen.dart:520-523` — literally the reviewer's repro step 2. **This would independently justify the same 10.1.2.10 citation.**
+**Fix:** add `bool _showGoogle(BuildContext context)` beside `_showApple` (`login_screen.dart:77-82`) returning true only for android/iOS/macOS, wrap :330-340; hide `_orDivider` (:428) when no social button renders. Also null out `_googleInit` on failure (`social_auth_service.dart:125`) — it currently memoises the *errored* Future, so even on Android one transient init failure is replayed for the process lifetime.
+
+### 5. A link forwarded to a running instance is dropped if the listener isn't mounted yet
+`SI-3`. `MagicLinkDeepLinkHandler` is constructed inside `_HomeScreenState` (`main.dart:408-409`), which is only reached after `hasSeenOnboarding` + `permissionsPrimed` (`main.dart:316-327`). The new `SendAppLinkToInstance` (`app/windows/runner/main.cpp:18-50`) delivers via WM_COPYDATA into `latestLink_`, but `app_links_plugin.cpp:114-131` only emits `if (eventSink_)`; nothing re-reads `latestLink_`, and `start()` later calls only `getInitialLink()` (the running process's own command line, which has no URI). The code is lost permanently. Cold start is *not* affected (Windows app_links re-parses `GetCommandLineW()` on every `getInitialLink`), so this is deferral-until-mount, not loss — except in the warm/onboarding case, which is exactly a first-run reviewer.
+**Fix:** hoist `MagicLinkDeepLinkHandler` construction/`start()` out of `_HomeScreenState` to the MaterialApp/root level so `eventSink_` is attached before onboarding and priming.
+
+### 6. Single-instance forwarding was absent in the shipped build
+Known root cause; **fix written, uncommitted** (`app/windows/runner/main.cpp:7,18,50`). Without it a link arriving while the app runs spawns a second process instead of reaching the live window. Ship it together with #1 and #5 — all three are required for the warm path to work at all.
+
+### 7. Misleading failure copy on the rejected screen
+`SI-4`. `account_provider.dart:194` calls `_friendlyError(e)` with no flag, so any 401 from `/auth/magic-link/verify` maps through :386-398 to **"Your session has expired. Please sign in again."** shown to someone who has never had a session, with no instruction to request a new link. Same wrong string reaches the deep-link path via `main.dart:433`.
+**Fix:** add a `magicFlow: true` branch to `_friendlyError` (`account_provider.dart:386`), pass it from `verifyMagicCode` (:194) and `loginWithMagicLink` (:173): "That sign-in code is invalid or has already been used. Tap Resend link to get a new one." Honest wording already exists at `main.dart:443`.
+
+### 8. Windows identifies itself to OrbNet as `source: 'mobile'`
+`SI-6`. `app/lib/services/orbnet/auth_api.dart:104` hardcodes `'source': 'mobile'` with no override in the signature (:92-96), while the correct value is already computed on the same class (`auth_repository.dart:260-268 _platformName`) and used only by the passkey flow. Whether OrbNet keys the email template off it is unverifiable from this repo — **but this is the one item that could make the reviewer's email itself wrong, and it's a 2-line fix.** Confirm with the OrbNet owner what `source` drives, then thread `_platformName` through `AuthApi.requestMagicLink`.
+
+### 9. Throttling is indistinguishable from an outage
+`SI-7`. `orbnet_api_client.dart:305-329` has no `429` branch and never reads `retry-after`; a non-JSON throttle body yields the banner "Request failed". Same block: `message = (data['detail'] ?? …) as String` (:310-314) throws a `TypeError` inside the error handler if `detail` is a List/Map, degrading to "Something went wrong."
+**Fix:** add a `429` → `RateLimitedException` carrying `retry-after`; harden the cast at :310-314.
+
+### 10. Token written before the user envelope is parsed
+`SI-5` + `DART-2` (one root cause). `auth_repository.dart:352/:354/:362` write `auth_token`/`refresh_token`/`user_data`, then :364 `User.fromJson(userData)` — cast-heavy (`models/user.dart:73, :179, :183`) and outside any try/catch, with no rollback. `loadUser()` (:478-494) then caches a live token from storage before re-throwing on the same bad blob, so a relaunch reports signed out while holding a valid token. Same file, :332-343: unchecked non-nullable casts (`as Map<String, dynamic>`, `as String`) turn envelope drift into "Something went wrong. Please try again." — the server's real reason is discarded.
+**Fix:** parse before persist; cast to nullable and throw typed errors (mirror `social_auth_service.dart:232-238`); wrap the writes so failure calls `clearLocalSession()`. Fix `orbnet_api_client.dart:203` (`null as T` cannot satisfy non-nullable `T`) at the same time. Add the missing `_persistAuthResult` tests — `app/test/services/orbnet/` currently contains only `scan_credit_api_test.dart` and there is **zero** coverage of this function.
+
+---
+
+## Blockers
+
+Must be fixed before **any** store submission, on any platform.
+
+**Security — fix today, independent of any release**
+- **`backend/.env.production.local:1` — live admin token in git history.** `ORBGUARD_ADMIN_TOKEN=vIpx…` is a tracked blob (entered via merge 6d350d5, remote `github.com/orbvpn/orbguard`); `backend/.gitignore:26-28` (`.env`/`.env.local`/`*.env`) does not match dotted suffixes. It is the sole guard on `POST /api/v1/admin/yara/submissions/{id}/approve` (`router.go:807-829`, `middleware/auth.go:41,96,246`) — i.e. the threat-intel pipeline every client downloads. **Rotate in the Azure Container App now**; the staged deletion does not revoke it. Broaden the ignore to `.env*`.
+- **`backend/internal/api/handlers/auth.go:215` — anyone can mint a device API key for anyone's `device_id`.** `/api/v1/auth/device` is in the public group (`router.go:85`), validates only non-empty (`auth.go:208-212`), and re-issues a key even for an existing device (:221-225). `DeviceOwnership` admits it on a bare string compare (`middleware/device_ownership.go:45-51`). On Android the `device_id` is `Build.ID` — a public, enumerable OS build string (`app/lib/services/api/orbguard_api_client.dart:113 'device_id': info.id`). Yields any user's thief selfies and GPS history (`router.go:497-541`), plus `/mark-stolen` and command-ack hijack. **Fix both ends:** persisted `Random.secure()` install UUID on the app side (pattern exists at `orbguard_api_client.dart:180-194`, plan the id migration), and require proof-of-possession on re-registration server-side.
+- **`app/lib/main.dart:426-431` — an unsolicited `orbguard://` link signs a logged-out user into the attacker's account and claims their device to it.** `magic_link_deep_link.dart:17-23` validates only scheme+`code`; nothing correlates the code with a request this device made (`auth_repository.dart:163-177` stores no nonce; :180-185 ignores the email). `verifyMagicCode` then fires `unawaited(DeviceClaimService.instance.claimIfReady())` (`account_provider.dart:311-315` → `device_claim_service.dart:45-51` → `handlers/device_ownership.go:38-73`), binding the victim's phone to the attacker's user_id — after which the attacker's panel can read location history and thief selfies and issue lock/wipe. **We are about to widen this surface to Windows, macOS and Linux in the very same release.** Fix before shipping the protocol registration: persist a per-request nonce and auto-redeem only locally-requested codes, otherwise show a confirmation sheet naming the account; gate `claimIfReady()` behind an explicit user action.
+
+**Honesty / functionality — Windows *and* macOS + Linux**
+- **Fabricated all-clear scan.** `app/lib/detection/advanced_detection_modules.dart:274-277, :394-397, :473-476, :565-568, :722-724` — `MissingPluginException` is **not** a `PlatformException`, so it lands in the bare `catch (e) { return []; }` instead of the `UNSUPPORTED → DetectionUnsupportedException` arm. `device_scan_service.dart:182` then sets `anyStageSucceeded = true`, the honesty guard at :207/:217-222 never fires, and `findings_screen.dart:251,257` prints **"All clear — 11 checks ran clean"** on a machine where zero bytes were inspected. Reachable with no sign-in and no credit: `main.dart:481 _startScan(userInitiated: false)`. macOS (a shipping platform) registers only `com.orb.guard/wifi` and `com.orb.guard/logs` (`MainFlutterWindow.swift:35,57`) — **same defect on macOS and Linux.** Fix: `on MissingPluginException { throw DetectionUnsupportedException(...); }` ahead of each bare catch, and only set `anyStageSucceeded` for stages that genuinely executed.
+- **Coverage score inflated to 55% by permissions that don't exist.** `permission_handler_windows-0.2.1/windows/permission_handler_windows_plugin.cpp:123-124` returns `GRANTED` unconditionally. `app/lib/main.dart:585-587` adds +5/+10/+5 for phone/SMS/location behind only a `isWeb` early-return (:578-581) → 25+5+10+5+10 = 55. That clears the `_detectionCapability < 50` gate at `main.dart:611-614` — **this fabricated number is precisely what makes the fake scan reachable on Windows** — and yields a "protected" verdict of 74 via `last_scan_verdict_controller.dart:101-105`. Fix: guard the permission-derived terms on `isAndroid || isIOS`; derive desktop coverage from stages that actually ran.
+- **`app/lib/screens/pricing/pricing_screen.dart:232` — the Windows paywall is dead by construction and its copy names Apple/Google.** `in_app_purchase` 3.3.0 registers a platform only for android/iOS/macOS; on Windows the first `InAppPurchasePlatform.instance` read throws `LateInitializationError`, swallowed at `iap_service.dart:186-188` → `_available` false forever, and the "Try again" button (`pricing_screen.dart:436`) re-enters the same throw. The screen is reachable from an **ungated** `Settings → Plans & pricing` tile (`settings_screen.dart:266-276`), plus `premium_gate.dart:100` and `watch_ad_sheet.dart:67`. Store-visible copy reads "Subscriptions are purchased through the App Store or Google Play" (`pricing_screen.dart:431-432`). Fix: `PlatformInfo.isWindows` branch rendering a non-transactional account panel (url_launcher_windows *is* registered); never emit App Store/Google Play strings on a Windows surface.
+- **`app/pubspec.yaml:119` — MSIX declares `webcam, microphone` capabilities the build cannot use and the privacy policy never mentions.** msix 3.18.0 emits both as `<DeviceCapability>`; no camera plugin is registered on Windows, there is no audio-capture dependency at all, and `lib/legal/legal_documents.dart:180-184` discloses only location and camera. The Store page will read "This app can: Use your microphone" on an anti-surveillance product. **One-line fix:** `capabilities: internetClient, location`.
+
+**Store-gate mechanics**
+- **`app/android/app/build.gradle.kts:44-45` — `versionCode = 6` / `versionName = "1.0"` are literals**, so `--build-number` is ignored (only `flutter.*` use is `minSdk` at :39). `pubspec.yaml:3` is `1.0.0+7`; iOS already ships 7. Play will reject the AAB with "Version code 6 has already been used". Fix: `flutter.versionCode` / `flutter.versionName`, bump to `1.0.0+8`, delete the stale comment at :42-43.
+- **`app/ios/Runner.xcodeproj/project.pbxproj` — no app-level `PrivacyInfo.xcprivacy`** while compiled first-party Swift calls a required-reason API: `AppDelegate.swift:583` and `BackgroundScanService.swift:321,397` use `UserDefaults.standard` (category CA92.1). Vendored Pod manifests do not cover Runner's own calls → ITMS-91053 on upload. Add the manifest to Runner's Resources phase with the UserDefaults entry only (do **not** add FileTimestamp/SystemBootTime — `JailbreakAccess.swift`, `EnhancedScanner.swift`, `VPNManager.swift` are not in the Sources phase and are never compiled).
+- **`APP_STORE_LISTING.md:33` and `:37-39` advertise two features unavailable on iPhone** — SMS scam filtering (`sms_platform_service.dart:61-62,70-72`: "iOS does not allow apps to read the SMS inbox") and an on-device firewall (`com.orbvpn.orbguard/firewall` has no iOS registration; `network_firewall_service.dart:339-344` → `unavailable`; the screen is pushed unconditionally at `main.dart:503,1317`). Guideline 2.3.1/2.1. Fork the iOS description from the Play description; drop "firewall" from the keyword list at `:16`.
+- **`app/macos/Runner/Release.entitlements` — no `keychain-access-groups`** in either Release or DebugProfile, while `flutter_secure_storage_darwin` (linked, `macos/Podfile.lock:111,237,298`) holds the session token and its README makes the entitlement a mandatory macOS setup step. `auth_repository.dart:352` has no try/catch, so `errSecMissingEntitlement (-34018)` aborts login and bounces the user back signed-out — **the exact Microsoft symptom on a second platform.** Add `$(AppIdentifierPrefix)com.orb.guard` to both files and QA on a signed sandboxed Release build (not `flutter run`).
+
+---
+
+## High / Medium / Low
+
+### High
+- Notifications are a dead subsystem on all three desktop platforms while the UI claims "Instant alerts — Armed" — `app/lib/services/notifications/notification_service.dart:102` guards only web; `:121-124` passes no `macOS:`/`linux:` settings so `initialize()` throws `ArgumentError` on macOS/Linux, and on Windows `show()` falls through to an unimplemented platform instance; `guard_status_controller.dart:148-155` renders "Armed" off the always-GRANTED Windows stub via `main.dart:399`. *(WIN-3 + FH-03, one item.)*
+- Dead priming step on Windows: `permission_priming_screen.dart:86` reads back `Permission.notification.isGranted` (always true) after `NotificationService.requestPermissions()` returned false without prompting (`notification_service.dart:178-198`), flipping the card to a lime "On" chip with no OS prompt.
+- QR Scanner is offered on Windows and renders a featureless black box plus an unhandled zone exception — ungated drawer entry `app/lib/main.dart:1228-1239` and `security_center_screen.dart:395-401`; `mobile_scanner_controller.dart:509` catches only `MobileScannerException`, so the `MissingPluginException` escapes and only `defaultPlaceholder` (black `ColoredBox`) renders.
+- Watch-ad button is enabled on Windows with no ad SDK — `rewarded_ad_service.dart:109` `_unityConfigured` and `:114` `_yandexConfigured` lack the `&& _isAndroid` guard that :111-112 has, so `scan_credit_provider.dart:90 adsAvailable` is true and every tap opens a backend ad session that can never complete; `scan_credit_provider.dart:209` also reports `'android'` from Windows.
+- `app/lib/main.dart:675-682` passes `checksRun:` but never `checksUnavailable:` — the only production `FindingsScreen` construction in the repo, so the honest caveat block at `findings_screen.dart:265-276` is dead code on every path, and `privacy_check_screen.dart:227-233` counts errored stages as completed.
+
+### Medium
+- `app/lib/screens/settings/settings_screen.dart:619` falls back to **Apple's** subscription page on Windows (two-way `Platform.isAndroid` ternary, no Windows case), and `pricing_screen.dart:350` tells every logged-in subscriber to use "App Store subscription settings".
+- `app/lib/screens/settings/settings_screen.dart:2184-2191` + `:2196-2212` instruct Store-MSIX users to "Right-click → Run as administrator" and to add the app's own folder to Defender exclusions — impossible under `%ProgramFiles%\WindowsApps`, and the exclusion advice is a standing certification red flag. (Do **not** mark Registry Access unavailable — `windows_persistence_scanner_service.dart:376` really runs `reg query`.)
+- `app/lib/screens/trust/device_capabilities_screen.dart:128-139` shows hidden-VPN detection as "Available" on desktop while `vpn_proxy_detector.dart:296` is `const tunnel = TriState.unknown; // Needs a system helper — not wired yet.`
+- `app/lib/main.dart:429` `if (account.isLoggedIn) return;` silently consumes a magic-link code with zero feedback (messenger captured only after the return) — no way to switch accounts from an email link, including when `_user` is a stale hydrated blob.
+- `backend/internal/infrastructure/graph/repository.go:208-215` — write-capable Cypher injection: `MERGE (i1)-[r:%s]->(i2)` inside `ExecuteWrite` (:224), fed unvalidated from `handlers/graph.go:546` via `router.go:307`. The read-side sibling at `repository.go:702-728` (`/graph/traverse`, `router.go:303`) leaks the whole graph past start-node scoping. One shared `IsValidRelationType()` allowlist fixes both.
+- `app/lib/services/api/api_interceptors.dart:46-50` stores the 365-day device API key in plaintext `SharedPreferences` while `auth_repository.dart:352-355` uses secure storage; `app/android/app/src/main/AndroidManifest.xml:90-94` has no `allowBackup="false"` and no extraction rules.
+- `backend/internal/api/middleware/ratelimit.go:56-72` keys the bucket on client-controlled `X-Forwarded-For` (and `middleware.RealIP` at `router.go:41` makes the `RemoteAddr` fallback spoofable too); the `key:<apiKey>` branch is dead because the limiter is registered at `router.go:57` before `APIKeyAuth` at `:88-90`. Removes the only brake on the device-key sweep above.
+- `snap/snapcraft.yaml` ships **no `.desktop` file at all** (apps.orbguard at :13-22 has no `desktop:` key, no top-level `icon:`), so snap users get no `x-scheme-handler/orbguard` and can never complete magic-link sign-in — the deb fix in `.github/workflows/linux-build.yml:69,74` does not cover them.
+- `snap/snapcraft.yaml:17-22` declares `password-manager-service` and `camera` under `confinement: strict` (:11); neither auto-connects, so libsecret is denied and `auth_repository.dart:352` throws → silent signed-out bounce on a fresh `snap install`.
+- CI can report green while dropping the deliverable — `.github/workflows/linux-build.yml:97-98` (`continue-on-error: true` on the snap, masked by two always-present globs under one `if-no-files-found: error` at :108-109) and `.github/workflows/windows-msix.yml:73` (whole-file `grep -q "REPLACE"` skips both packaging and upload while succeeding; `:41` silently skips Trusted Signing).
+- `app/pubspec.yaml:117` `msix_version` is hand-maintained (now 1.0.7.0) with no CI derivation — four version sources already diverge (`pubspec.yaml:3` `1.0.0+7`, msix `1.0.7.0`, `build.gradle.kts:44` `6`, `snapcraft.yaml:3` `1.0.0`).
+- `PLAY_PERMISSION_DECLARATIONS.md:129-136` has no SMS row while `AndroidManifest.xml:55-56` ships READ_SMS/RECEIVE_SMS and the app can never become the default SMS handler (no `RoleManager`/`SMS_DELIVER` components anywhere); §4 at `:72-91` still debates MANAGE_EXTERNAL_STORAGE that `AndroidManifest.xml:35` already excludes.
+- `app/macos/Runner/Release.entitlements` lacks `com.apple.security.files.user-selected.read-only` while file_picker is linked (`macos/Podfile.lock:23,231,286`) — the scam image/audio pick (`scam_detection_screen.dart:379-384`, `withData: true`) silently returns empty bytes and `:397` no-ops.
+
+### Low
+- `app/lib/services/home/guard_status_controller.dart:194` tells Windows/macOS/Linux users "iPhone blocks scanning other apps" (sibling probes at :108, :133, :212 already use the neutral "Not available on this device").
+- Thief Selfie and SIM Monitoring toggles persist on desktop and can never work — `device_security_screen.dart:810-826`; only the device-admin card is gated (`:773-776`), and `selfie_capture.dart:65` throws on `availableCameras()`. (Ring/Locate/Lock/Wipe do work or fail honestly — do not claim otherwise.)
+- `notification_service.dart:214-216 setActionCallback` has no caller and `notification_actions.dart:482,503,532,539,550` are TODO stubs; latent only because `showSmsThreatNotification`/`showThreatNotification`/`showUrlBlockedNotification` have zero call sites — strip the `actions:` or wire it before any detection path starts calling them.
+- `app/lib/services/orbnet/token_service.dart:137` reschedules the refresh loop after `stopProactiveRefresh()` (no stopped/disposed flag at :59-63), so logout can be followed by `_onSessionExpired` → `notifyListeners()` on a disposed provider.
+- `backend/internal/streaming/websocket.go:15-22` `CheckOrigin` always true, routes registered outside the auth group (`router.go:844-845` vs `:88-90`), unbounded `h.clients` at `:113-119`.
+- `app/ios/Runner/Runner.entitlements:44-56` claims four NetworkExtension types and `Info.plist:44-50` names provider classes with **zero** shipped extensions; `app/ios/Runner/VPNManager.swift` is uncompiled dead code (the repo's own `docs/IOS_PROVISIONING.md:38` already recommends trimming).
+- `app/ios/Runner/Info.plist:68-69` declares `NSContactsUsageDescription` for a Contacts API the app never calls; `:78-79` and `:66-67` purpose strings don't match actual use.
+- No Windows listing screenshots — `store-assets/` has ios/ipad/macos only; `app/docs/DESKTOP_STORE_SUBMISSION.md:69` names the folder but no `windows/` subfolder exists, and step 6 at `:74-76` already records that the Windows build has never been smoke-tested.
+
+---
+
+## Cross-cutting themes
+
+Fix these as **one systemic change each**, not as N point fixes. Every "High/Medium" item above collapses into one of these five.
+
+**1. `MissingPluginException` is not a `PlatformException`.** This single misconception produces the fake all-clear scan, the black QR screen, the silently-failing ads, and the swallowed camera failure — `advanced_detection_modules.dart:274/394/473/565/722`, `mobile_scanner_controller.dart:509`, `rogue_ap_provider.dart:246`, `selfie_capture.dart:66`, `rewarded_ad_service.dart:191-194`. **Systemic fix:** one `invokePlatform<T>()` helper that catches `MissingPluginException` and rethrows a typed `Unsupported` result; ban bare `catch (e) { return []; }` in detection code via review.
+
+**2. No capability registry — UI entry points are ungated by default.** Google button, QR Scanner (drawer + Security Center), Plans & pricing tile, watch-ad sheet, anti-theft toggles, notification settings, Sign in — each was written with no platform condition, while the few gated ones (`_showApple`, `GuardProbes.malwareScan(supported:)`, `if (Platform.isAndroid) _buildDeviceAdminCard`) prove the idiom exists and is simply applied ad hoc. **Systemic fix:** a single `Capabilities` map (google/inAppPurchase/ads/camera/qr/notifications/sms/firewall/antiTheft) keyed off `PlatformInfo`, asserted in one test that iterates every menu/settings entry. Default should be *hidden unless declared supported*.
+
+**3. Plugin stubs are trusted as ground truth.** `permission_handler_windows` returns GRANTED for everything, and the app treats that as a real grant in three places: the coverage score (`main.dart:585-587`), the alerts guard tile (`main.dart:399`), and the priming read-back (`permission_priming_screen.dart:86`). **Systemic fix:** never call `Permission.*.isGranted` without first asking "does this platform have this permission at all?" — route every probe through the same capability registry as theme 2.
+
+**4. The honesty ledger is broken end-to-end.** `anyStageSucceeded` counts errors as successes; `checksUnavailable` is computed and rendered but never passed; coverage is derived from phantom permissions; the verdict band is computed from that number. The app's own file headers (`device_scan_service.dart:11-13`, `findings_screen.dart:32-34`, `last_scan_verdict_controller.dart:10-14`) document the intended contract — the plumbing just doesn't honor it. **Systemic fix:** carry `stagesRun` / `stagesSucceeded` / `stagesUnavailable` on `ScanResult` as a unit, and make the "All clear" string a pure function of all three.
+
+**5. Copy that lies about the platform.** "Your session has expired", "iPhone blocks scanning other apps", "App Store subscription settings", "Run as administrator", "source: mobile", "Hidden VPN & proxy — Available". **Systemic fix:** one copy pass over every user-visible string that names a platform, an OS action or a store, with a test asserting no string containing "App Store"/"Google Play"/"iPhone"/"administrator" renders on a platform where it is false.
+
+**Bonus (backend, separate owner):** client-controlled values used as security identities — `device_id` (`auth.go:215`), `X-Forwarded-For` (`ratelimit.go:65`), relation type strings spliced into Cypher (`repository.go:208`), unauthenticated WS routes registered outside the auth group (`router.go:844`). One trust-boundary review of `router.go`'s public group covers all four.
+
+---
+
+## Suggested fix order
+
+**Track 0 — before anything else (blocking, ~1 hour)**
+1. Rotate `ORBGUARD_ADMIN_TOKEN` in the Azure Container App; commit the `backend/.env.production.local` deletion; widen `backend/.gitignore` to `.env*`. *(Independent of the app entirely — do it first, in parallel with everything.)*
+2. **Commit the uncommitted working tree.** `protocol_activation` (`pubspec.yaml:126`), `msix_version 1.0.7.0` (:117), `main.cpp` single-instance forwarding, macOS `CFBundleURLTypes`, the always-visible code field, the Linux deb/app-id fixes. Nothing below matters if this tree is lost.
+
+**Track A — the resubmission critical path (serialized; one owner)**
+3. LoginScreen auto-dismiss on `isLoggedIn` + delete `main.dart:439 popUntil`. *(Rejection cause #2 + `DART-3`.)*
+4. Hoist `MagicLinkDeepLinkHandler` to the root above the onboarding gate. *(Cause #5; must land with the `main.cpp` forwarding to be meaningful.)*
+5. Gate the Google button (`_showGoogle`) + hide the divider + un-memoise the failed `_googleInit`. *(Cause #4.)*
+6. Magic-flow error copy (`_friendlyError` + `verifyMagicCode`/`loginWithMagicLink`). *(Cause #7.)*
+7. **Gate the magic-link auto-redeem behind a nonce/confirmation and detach `claimIfReady()` from login** — this must ship *in the same build* as the protocol registration, not after, because step 2 is what opens the attack surface on three new platforms. *(SEC-3.)*
+8. Confirm with the OrbNet owner what `source` drives; thread `_platformName` if it affects the email. *(Cause #8 — do this as an async question started at step 3 so the answer lands by step 8.)*
+9. `capabilities: internetClient, location` in `pubspec.yaml:119`.
+10. Windows commerce surfaces: paywall panel + `settings_screen.dart:619` + `pricing_screen.dart:350`.
+11. Capture Windows screenshots from the *actual* MSIX and run the first-run QA pass `DESKTOP_STORE_SUBMISSION.md:74-76` already demands. **Manual sign-in run-through on a real Windows machine is a hard gate — do not resubmit without it.**
+
+**Track B — honesty/functionality, fully parallel to Track A (different files, no overlap)**
+- B1. `MissingPluginException` → `DetectionUnsupportedException` in `advanced_detection_modules.dart` + real `anyStageSucceeded` in `device_scan_service.dart`. *(Blocker; also fixes macOS/Linux.)*
+- B2. Coverage math guards in `main.dart:585-587` + `checksRun`/`checksUnavailable` plumbing at `:675-682`. *(Depends on B1 landing first only for the final numbers; the code changes are independent.)*
+- B3. Notification service desktop branches + `GuardProbes.alerts(supported:)` + priming read-back + hide desktop notification switches.
+- B4. Capability registry (theme 2) and apply it to QR Scanner, ads config flags, anti-theft toggles, `guard_status_controller.dart:194`, `device_capabilities_screen.dart:128-139`. **This is the one place to invest in the systemic fix** — B4 subsumes six point-fixes.
+- B5. Windows permissions help copy (`settings_screen.dart:2173-2212`) behind a packaged-build detect.
+
+**Track C — auth robustness, parallel, separate owner**
+- C1. Parse-before-persist + nullable casts in `auth_repository.dart:332-370` + `orbnet_api_client.dart:203`; add the missing `_persistAuthResult` tests for both envelopes.
+- C2. 429 branch + `retry-after` + harden `detail` extraction (`orbnet_api_client.dart:305-329`).
+- C3. `TokenService` stopped/disposed flags.
+
+**Track D — backend security, fully independent (different repo dir, no app dependency)**
+- D1. Device-key proof-of-possession (`auth.go:215`) + app-side install-UUID with an id migration plan. *(Coordinate the app half with Track C's owner.)*
+- D2. `IsValidRelationType()` allowlist on both Cypher call sites.
+- D3. Rate-limit key from a trusted-proxy-aware IP + dedicated `/auth/*` limit.
+- D4. WS routes under auth + `CheckOrigin` from `config.CORS.AllowedOrigins` + connection cap.
+- D5. Move `orbguard_auth_token`/`orbguard_refresh_token` to secure storage + `allowBackup="false"`.
+
+**Track E — other stores, start only after the Windows resubmission is filed**
+- E1. Android: `versionCode = flutter.versionCode`, bump to `1.0.0+8`, SMS section in `PLAY_PERMISSION_DECLARATIONS.md`, delete §4.
+- E2. iOS: `PrivacyInfo.xcprivacy` (UserDefaults only), fork the App Store description, trim NE entitlements + `NEProviderClasses` + delete `VPNManager.swift`, drop `NSContactsUsageDescription`.
+- E3. macOS: both entitlement files (`keychain-access-groups`, `files.user-selected.read-only`), then a signed sandboxed Release sign-in QA.
+- E4. Linux: snap `desktop:` key + icon, request auto-connect for `password-manager-service`/`camera`.
+- E5. CI hardening: fail-loud snap and MSIX steps, derive `msix_version` from `pubspec version` + `github.run_number`.
+
+**Parallelism summary:** Track 0 gates everything. Tracks A, B, C, D are mutually independent and can run concurrently with four owners; A and B both touch `app/lib/main.dart` (A at :408/:439, B at :399/:585/:675) — coordinate that one file or land B2/B3's `main.dart` edits immediately after A4. Track E is deliberately sequenced last so it cannot delay the Windows resubmission.

@@ -9,33 +9,63 @@
 // another app's VPN — detect and guide only.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../providers/network_firewall_provider.dart';
 import '../../services/security/vpn_proxy_detector.dart';
+import '../../services/security/vpn_watch.dart';
 import '../../utils/platform_info.dart';
 
 class HiddenVpnProxyScreen extends StatefulWidget {
-  const HiddenVpnProxyScreen({super.key, VpnProxyDetector? detector})
-      : _detector = detector;
+  const HiddenVpnProxyScreen({
+    super.key,
+    VpnProxyDetector? detector,
+    VpnWatch? watch,
+    this.ownFirewallOn,
+  })  : _detector = detector,
+        _watch = watch;
 
-  /// Injectable for tests/previews; defaults to the real detector.
+  /// Injectable for tests/previews. A [detector] alone gets a watch of its
+  /// own; with neither, the screen answers [VpnWatch.shared], the same watch
+  /// Home reads.
   final VpnProxyDetector? _detector;
+  final VpnWatch? _watch;
+
+  /// Whether OrbGuard's own tracker firewall is running now. Defaults to the
+  /// [NetworkFirewallProvider] above the screen, then to what Home last told
+  /// the watch, then to false.
+  final bool Function()? ownFirewallOn;
 
   @override
   State<HiddenVpnProxyScreen> createState() => _HiddenVpnProxyScreenState();
 }
 
 class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
-  late final VpnProxyDetector _detector =
-      widget._detector ?? VpnProxyDetector();
+  late final VpnWatch _watch = widget._watch ??
+      (widget._detector != null
+          ? VpnWatch(detector: widget._detector)
+          : VpnWatch.shared);
 
   VpnProxyStatus? _status;
   bool _loading = true;
   bool _showGuide = false;
+
+  /// The watch's answer behind [_status]: true when something active is
+  /// neither OrbGuard's firewall nor the person's own.
+  bool? _unknown;
+  bool _mine = false;
+
+  /// The tunnel is OrbGuard's own firewall (native fact, else the flag).
+  bool _firewall = false;
+
+  /// The tunnel is treated as the person's own because genuine OrbVPN is
+  /// installed (Android, signature checked natively).
+  bool _orbVpn = false;
 
   @override
   void initState() {
@@ -43,18 +73,55 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
     _check();
   }
 
+  bool _firewallOn() {
+    final injected = widget.ownFirewallOn;
+    if (injected != null) return injected();
+    final provider =
+        Provider.of<NetworkFirewallProvider?>(context, listen: false);
+    return provider?.isEnabled ?? _watch.lastOwnFirewallOn ?? false;
+  }
+
   Future<void> _check() async {
     setState(() => _loading = true);
-    final status = await _detector.detect();
+    final firewall = _firewallOn();
+    final unknown =
+        await _watch.unknownVpnActive(ownFirewallOn: firewall, force: true);
+    await _readAnswer(unknown);
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  /// Re-reads the answer from the cached scan (no new scan).
+  Future<void> _reanswer() async {
+    final firewall = _firewallOn();
+    final unknown = await _watch.unknownVpnActive(ownFirewallOn: firewall);
+    await _readAnswer(unknown);
+  }
+
+  Future<void> _readAnswer(bool? unknown) async {
+    final mine = await _watch.saidItIsMine;
     if (!mounted) return;
     setState(() {
-      _status = status;
-      _loading = false;
+      _status = _watch.lastStatus;
+      _unknown = unknown;
+      _mine = mine;
+      _firewall = _watch.lastTunnelIsOwnFirewall;
+      _orbVpn = _watch.lastTunnelTreatedAsOrbVpn;
     });
   }
 
+  Future<void> _markMine() async {
+    await _watch.markAsMine();
+    await _reanswer();
+  }
+
+  Future<void> _forgetMine() async {
+    await _watch.forgetMine();
+    await _reanswer();
+  }
+
   Future<void> _openVpnSettings() async {
-    final opened = await _detector.openSystemVpnSettings();
+    final opened = await _watch.detector.openSystemVpnSettings();
     if (!mounted) return;
     if (opened) return;
     // No settings deep-link on this build — reveal the written steps instead of
@@ -94,7 +161,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
 
   Widget _buildResult(BuildContext context, VpnProxyStatus s) {
     final cs = Theme.of(context).colorScheme;
-    final v = _visuals(context, s.verdict);
+    final v = _visuals(context, s.verdict, calm: _calm(s));
 
     return RefreshIndicator(
       color: AppColors.accentInk,
@@ -132,6 +199,8 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
             textAlign: TextAlign.center,
             style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
           ),
+          if (s.verdict == RerouteVerdict.active)
+            ..._buildOwnership(context, s),
           const SizedBox(height: 24),
 
           // ── The two core signals ────────────────────────────────────────
@@ -151,7 +220,9 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
                   icon: AppIcons.global,
                   label: 'System proxy',
                   state: s.systemProxy,
-                  activeText: s.proxyHost == null ? 'Active' : 'Active · ${s.proxyHost}',
+                  activeText: s.proxyHost == null
+                      ? 'Active'
+                      : 'Active at ${s.proxyHost}',
                   clearText: 'Not detected',
                 ),
               ],
@@ -184,6 +255,81 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
         ],
       ),
     );
+  }
+
+  /// Only OrbGuard's own firewall is active: nothing for the person to answer.
+  bool _firewallOnly(VpnProxyStatus s) =>
+      _firewall &&
+      s.activeTunnel == TriState.yes &&
+      s.systemProxy != TriState.yes;
+
+  /// Only a tunnel is active and genuine OrbVPN is installed: treated as
+  /// theirs, so nothing is asked, and the screen says why.
+  bool _orbVpnOnly(VpnProxyStatus s) =>
+      _orbVpn &&
+      s.activeTunnel == TriState.yes &&
+      s.systemProxy != TriState.yes;
+
+  /// Everything active is accounted for (OrbGuard's firewall, OrbVPN, or
+  /// what the person said is theirs): no amber alarm.
+  bool _calm(VpnProxyStatus s) =>
+      s.verdict == RerouteVerdict.active && _unknown == false;
+
+  /// Under the explanation: ask once whether what is active is theirs, or
+  /// say what they answered, with a way to take it back.
+  List<Widget> _buildOwnership(BuildContext context, VpnProxyStatus s) {
+    final cs = Theme.of(context).colorScheme;
+    final line = BrandText.body(color: cs.onSurface, size: 14);
+    if (_firewallOnly(s)) {
+      return [
+        const SizedBox(height: 14),
+        Text('This tunnel is OrbGuard’s own tracker firewall.',
+            textAlign: TextAlign.center, style: line),
+      ];
+    }
+    if (_orbVpnOnly(s)) {
+      return [
+        const SizedBox(height: 14),
+        Text(
+            'A VPN is active. OrbVPN is installed on this phone, so OrbGuard '
+            'treats it as yours. Android does not tell any app which app runs '
+            'a VPN.',
+            textAlign: TextAlign.center,
+            style: line),
+      ];
+    }
+    if (_mine) {
+      return [
+        const SizedBox(height: 14),
+        Text('You told OrbGuard this one is yours.',
+            textAlign: TextAlign.center, style: line),
+        const SizedBox(height: 2),
+        Center(
+          child: TextButton(
+            onPressed: _forgetMine,
+            style: TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+            child: Text('It is not mine any more',
+                style: BrandText.title(
+                    size: 14,
+                    weight: FontWeight.w500,
+                    color: cs.onSurfaceVariant)),
+          ),
+        ),
+      ];
+    }
+    if (_unknown != true) return const [];
+    // Name what is still unanswered: the tunnel unless the firewall or
+    // OrbVPN accounts for it.
+    final onlyProxy = s.systemProxy == TriState.yes &&
+        (s.activeTunnel != TriState.yes || _firewall || _orbVpn);
+    return [
+      const SizedBox(height: 16),
+      BrandButton.secondary(
+        label: onlyProxy ? 'This proxy is mine' : 'This VPN is mine',
+        expand: true,
+        onPressed: _markMine,
+      ),
+    ];
   }
 
   Widget _buildInstalledApps(BuildContext context, VpnProxyStatus s) {
@@ -273,7 +419,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
               style: BrandText.title(color: cs.onSurface, size: 15)),
           const SizedBox(height: 6),
           Text(
-            'OrbGuard never switches off another app’s VPN for you — you stay in '
+            'OrbGuard never switches off another app’s VPN for you. You stay in '
             'control. Open your system settings to review or disconnect it.',
             style: BrandText.body(color: cs.onSurfaceVariant, size: 12.5),
           ),
@@ -325,7 +471,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
             'the internet right now.';
       case RerouteVerdict.inconclusive:
         return 'No active VPN or proxy was found, but some checks aren’t '
-            'available on ${s.platformLabel.toLowerCase()} — see below.';
+            'available on ${s.platformLabel.toLowerCase()}. See below.';
       case RerouteVerdict.unavailable:
         return 'This check isn’t available on ${s.platformLabel.toLowerCase()}.';
     }
@@ -346,27 +492,37 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
 
   String _settingsHint() {
     if (PlatformInfo.isAndroid) {
-      return 'Open Settings → Network & internet → VPN, then disconnect or '
-          'remove any VPN you don’t recognise. For a proxy: Settings → Wi-Fi → '
-          'your network → Proxy.';
+      return 'Open Settings, then Network & internet, then VPN, and disconnect '
+          'or remove any VPN you don’t recognise. For a proxy: open Settings, '
+          'then Wi-Fi, then your network, then Proxy.';
     }
     if (PlatformInfo.isIOS) {
-      return 'Open Settings → General → VPN & Device Management, then review or '
-          'delete any VPN profile you don’t recognise.';
+      return 'Open Settings, then General, then VPN & Device Management, and '
+          'review or delete any VPN profile you don’t recognise.';
     }
     if (PlatformInfo.isMacOS) {
-      return 'Open System Settings → Network → VPN, then disconnect any VPN you '
-          'don’t recognise.';
+      return 'Open System Settings, then Network, then VPN, and disconnect any '
+          'VPN you don’t recognise.';
     }
     if (PlatformInfo.isWindows) {
-      return 'Open Settings → Network & internet → VPN & proxy, then disconnect '
-          'anything you don’t recognise.';
+      return 'Open Settings, then Network & internet, then VPN & proxy, and '
+          'disconnect anything you don’t recognise.';
     }
-    return 'Open your system network settings → VPN, then disconnect any VPN '
-        'you don’t recognise.';
+    return 'Open your system network settings, then VPN, and disconnect any '
+        'VPN you don’t recognise.';
   }
 
-  _VerdictVisuals _visuals(BuildContext context, RerouteVerdict verdict) {
+  _VerdictVisuals _visuals(BuildContext context, RerouteVerdict verdict,
+      {bool calm = false}) {
+    if (calm && verdict == RerouteVerdict.active) {
+      // Still active (the headline says so), drawn in the calm tone.
+      return _VerdictVisuals(
+        ring: AppColors.success,
+        ink: AppColors.accentInk,
+        icon: AppIcons.route,
+        headline: 'A VPN or proxy is active',
+      );
+    }
     switch (verdict) {
       case RerouteVerdict.clear:
         return _VerdictVisuals(
@@ -504,7 +660,7 @@ class _VpnAppRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
             ),
             child: Text(
-              app.isOrbVpn ? 'Your OrbVPN · trusted' : 'VPN app',
+              app.isOrbVpn ? 'Your OrbVPN, trusted' : 'VPN app',
               style: BrandText.label(color: ink, size: 10.5),
             ),
           ),

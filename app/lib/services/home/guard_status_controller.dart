@@ -11,6 +11,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../../utils/platform_info.dart';
+
 enum GuardState { active, actionNeeded, unavailable }
 
 class GuardStatus {
@@ -67,7 +69,7 @@ class GuardStatusController extends ChangeNotifier {
           id: 'unknown',
           name: 'Protection check',
           state: GuardState.actionNeeded,
-          detail: "Couldn't verify — tap to check",
+          detail: "Couldn't verify. Tap to check",
         );
       }
     }));
@@ -118,9 +120,10 @@ class GuardProbes {
         );
       };
 
-  /// Scam-text filter: active when the SMS permission is genuinely granted
-  /// (Android). iOS enablement lives in Settings and can't be queried —
-  /// pass [supported] false there rather than pretending.
+  /// Scam-text check: OrbGuard never reads the SMS inbox (no SMS
+  /// permission — Google Play policy); the checker analyses text the user
+  /// pastes or shares to the app. [granted] reports whether the user has
+  /// left the feature switched on.
   static GuardProbe smsFilter({
     required bool supported,
     required Future<bool> Function() granted,
@@ -129,7 +132,7 @@ class GuardProbes {
         if (!supported) {
           return const GuardStatus(
             id: 'sms_filter',
-            name: 'Scam text filter',
+            name: 'Scam text check',
             state: GuardState.unavailable,
             detail: 'Not available on this device',
           );
@@ -137,15 +140,32 @@ class GuardProbes {
         final ok = await granted();
         return GuardStatus(
           id: 'sms_filter',
-          name: 'Scam text filter',
+          name: 'Scam text check',
           state: ok ? GuardState.active : GuardState.actionNeeded,
-          detail: ok ? 'Screening incoming texts' : 'Allow SMS access to enable',
+          detail: ok ? 'Paste or share a text to check it' : 'Turned off in Settings',
         );
       };
 
-  /// Threat alerts: active when notification permission is granted.
-  static GuardProbe alerts({required Future<bool> Function() granted}) =>
+  /// Threat alerts: active when notification permission is genuinely granted.
+  ///
+  /// [supported] must be false where no notification backend exists —
+  /// permission_handler_windows answers "granted" to every query, so without
+  /// this gate Windows reported "Instant alerts — Armed" while
+  /// flutter_local_notifications (Android/iOS/macOS/Linux only) could never
+  /// deliver one.
+  static GuardProbe alerts({
+    required bool supported,
+    required Future<bool> Function() granted,
+  }) =>
       () async {
+        if (!supported) {
+          return const GuardStatus(
+            id: 'alerts',
+            name: 'Instant alerts',
+            state: GuardState.unavailable,
+            detail: 'Not available on this device',
+          );
+        }
         final ok = await granted();
         return GuardStatus(
           id: 'alerts',
@@ -187,11 +207,15 @@ class GuardProbes {
   }) =>
       () async {
         if (!supported) {
-          return const GuardStatus(
+          return GuardStatus(
             id: 'malware_scan',
             name: 'App malware scan',
             state: GuardState.unavailable,
-            detail: 'iPhone blocks scanning other apps',
+            // Only iOS is an iPhone. Windows/macOS/Linux users were being told
+            // about a device they are not using.
+            detail: PlatformInfo.isIOS
+                ? 'iPhone blocks scanning other apps'
+                : 'This platform blocks scanning other apps',
           );
         }
         final detail = (await lastResult?.call()) ?? 'Tap Run check to scan apps';
@@ -223,9 +247,21 @@ class GuardProbes {
         );
       };
 
-  /// Hidden-VPN watch: reflects the latest real check.
-  static GuardProbe hiddenVpn({required Future<bool?> Function() unknownVpnActive}) =>
+  /// Hidden-VPN watch: reflects the latest real check. [supported] is false
+  /// where the app has no way to see a VPN or proxy (a desktop build today).
+  static GuardProbe hiddenVpn({
+    required Future<bool?> Function() unknownVpnActive,
+    bool supported = true,
+  }) =>
       () async {
+        if (!supported) {
+          return const GuardStatus(
+            id: 'hidden_vpn',
+            name: 'Hidden VPN watch',
+            state: GuardState.unavailable,
+            detail: 'Not available on this device',
+          );
+        }
         final active = await unknownVpnActive();
         if (active == null) {
           return const GuardStatus(
@@ -239,7 +275,12 @@ class GuardProbes {
           id: 'hidden_vpn',
           name: 'Hidden VPN watch',
           state: GuardState.active,
-          detail: active ? 'Unknown VPN detected — review it' : 'Traffic looks clean',
+          // Only what is known: false means nothing unknown that THIS device
+          // can see (Android cannot read proxies; iPhone sees only a plain
+          // HTTP proxy), and an active one may well be the person's own.
+          detail: active
+              ? 'A VPN or proxy is active. Is it yours?'
+              : 'No unknown VPN or proxy seen',
         );
       };
 }

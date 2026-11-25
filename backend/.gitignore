@@ -23,9 +23,13 @@
 Thumbs.db
 
 # Environment
+# NOTE: `.env` and `*.env` do NOT match `.env.production.local` — that gap let a
+# live ORBGUARD_ADMIN_TOKEN get committed to this public repo. Match every
+# variant, and keep .env.example (the only one that may be tracked) exempt.
 .env
-.env.local
+.env.*
 *.env
+!.env.example
 
 # Logs
 *.log

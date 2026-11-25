@@ -30,19 +30,24 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Export compliance: OrbGuard only uses standard encryption (HTTPS/TLS) via
+	     the OS, which is exempt. Declaring this skips the per-upload encryption
+	     prompt. If you ever add non-standard/proprietary crypto, remove this. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>orbvpn</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NEProviderClasses</key>
-	<dict>
-		<key>com.apple.networkextension.dns-proxy</key>
-		<string>$(PRODUCT_MODULE_NAME).DNSProxyProvider</string>
-		<key>com.apple.networkextension.packet-tunnel</key>
-		<string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
-	</dict>
+	<!-- NEProviderClasses intentionally absent. It named
+	     $(PRODUCT_MODULE_NAME).DNSProxyProvider and .PacketTunnelProvider —
+	     DNSProxyProvider does not exist anywhere, and PacketTunnelProvider.swift
+	     is compiled into no target. A NEProviderClasses entry also belongs in an
+	     EXTENSION's Info.plist, not the host app's; OrbGuardFilter declares its
+	     own. Declaring tunnel/proxy providers here is what made App Review's
+	     automated analysis classify OrbGuard as a VPN app. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -72,6 +77,31 @@
 	<string>Required for location-based threat analysis and anti-theft features</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required for file system scanning</string>
+	<!-- The UIScene lifecycle. An app built with the iOS 27 SDK that does not
+	     declare it is killed at launch. FlutterSceneDelegate is Flutter's own
+	     delegate: it hands scene events (URLs, universal links, foreground and
+	     background) on to the plugins. One scene only. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -96,6 +126,30 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Google Sign-In: the iOS OAuth client's reversed client ID must be a URL
+	     scheme so Google can return to the app (client 428639254932-69dmmhiju98…,
+	     bundle com.orb.guard, project orbvpn-f8292). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.orb.guard.magiclink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>orbguard</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

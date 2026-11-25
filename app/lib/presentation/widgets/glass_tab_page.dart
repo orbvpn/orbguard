@@ -288,6 +288,8 @@ class GlassTabPageState extends State<GlassTabPage>
   }
 
   Widget _buildTabsContainer(bool isDark, Color textColor) {
+    // OrbX-style glass frame: translucent fill + border + blur — the page
+    // scrolls behind it and shows through, frosted.
     return Container(
       height: 60,
       decoration: BoxDecoration(

@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img "OrbVPN" [ref=e6]
+      - generic [ref=e7]: OrbNET
+      - generic [ref=e8]: Enter your credentials to access the panel
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - tablist [ref=e11]:
+          - tab "Magic Link" [selected] [ref=e12]
+          - tab "Email" [ref=e13]
+          - tab "QR Code" [ref=e14]
+        - tabpanel "Magic Link" [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]:
+              - generic [ref=e18]: Email
+              - textbox "Email" [ref=e19]:
+                - /placeholder: Enter your email
+            - button "Send Magic Link" [disabled]
+      - generic [ref=e20]: Or continue with
+      - generic [ref=e24]:
+        - button "Google" [ref=e25]
+        - button "Apple" [ref=e27]
+  - region "Notifications alt+T"
+  - alert [ref=e29]

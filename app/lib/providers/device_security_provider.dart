@@ -394,9 +394,15 @@ class DeviceSecurityProvider extends ChangeNotifier {
   bool _isSendingCommand = false;
   String? _error;
 
-  DeviceSecurityProvider() {
+  /// [requestLocationAccess] is what puts the system's location question on
+  /// screen. It is a parameter so a test can answer for the person.
+  DeviceSecurityProvider({Future<bool> Function()? requestLocationAccess})
+      : _requestLocationAccess = requestLocationAccess ??
+            DeviceAgent.instance.requestLocationAccess {
     _agent.addListener(_onAgentChanged);
   }
+
+  final Future<bool> Function() _requestLocationAccess;
 
   void _onAgentChanged() {
     _refreshIssuedCommandStates();
@@ -653,6 +659,20 @@ class DeviceSecurityProvider extends ChangeNotifier {
   /// persists the local-only ones, and re-policies the agent.
   Future<void> updateSettings(AntiTheftSettings newSettings) async {
     final previous = _settings;
+
+    // Switching remote locate on is something the person just did, so this
+    // is a moment the system may ask for location. Refused, the switch stays
+    // off: a switch that reads "on" for a thing that cannot work is a lie.
+    if (newSettings.locateEnabled && !previous.locateEnabled) {
+      if (!await _requestLocationAccess()) {
+        _error = 'Remote locate needs location access. Allow location for '
+            'OrbGuard in system settings, then switch it on again.';
+        notifyListeners();
+        return;
+      }
+      _error = null;
+    }
+
     _settings = newSettings;
     notifyListeners();
 
@@ -694,6 +714,15 @@ class DeviceSecurityProvider extends ChangeNotifier {
   /// history.
   Future<DeviceLocation?> locateDevice() async {
     if (_deviceId == null) return null;
+
+    // The person pressed Locate, so the system may ask for location now.
+    // The agent that carries the command out never asks by itself.
+    if (!await _requestLocationAccess()) {
+      _error = 'OrbGuard needs location access to find this device. Allow '
+          'location for OrbGuard in system settings.';
+      notifyListeners();
+      return null;
+    }
 
     _isLocating = true;
     _error = null;

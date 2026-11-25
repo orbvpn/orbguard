@@ -10,6 +10,7 @@ import (
 
 	"orbguard-lab/internal/api/handlers"
 	apimiddleware "orbguard-lab/internal/api/middleware"
+	"orbguard-lab/internal/api/site"
 	"orbguard-lab/internal/config"
 	"orbguard-lab/internal/infrastructure/cache"
 	"orbguard-lab/pkg/logger"
@@ -33,12 +34,25 @@ func NewRouter(cfg config.Config, h *handlers.Handlers, c *cache.RedisCache, log
 	}
 }
 
+// passwordRangePerMinute is the per-address limit of the password range route:
+// the configured global limit when lower, otherwise 30.
+func (r *Router) passwordRangePerMinute() int64 {
+	const routeLimit = 30
+	if configured := r.config.RateLimit.RequestsPerMinute; r.config.RateLimit.Enabled && configured > 0 && configured < routeLimit {
+		return int64(configured)
+	}
+	return routeLimit
+}
+
 // Setup sets up the Chi router with all routes and middleware
 func (r *Router) Setup() http.Handler {
 	router := chi.NewRouter()
 
-	// Core middleware
+	// Core middleware. PeerAddress must run before RealIP: it keeps the TCP
+	// peer the admin lockout keys on, which RealIP is about to overwrite
+	// with client-supplied headers.
 	router.Use(middleware.RequestID)
+	router.Use(apimiddleware.PeerAddress)
 	router.Use(middleware.RealIP)
 	router.Use(apimiddleware.Logger(r.logger))
 	router.Use(middleware.Recoverer)
@@ -67,6 +81,11 @@ func (r *Router) Setup() http.Handler {
 
 	// Public routes
 	router.Group(func(pub chi.Router) {
+		// Public legal & pricing pages (payment-provider / consumer-law
+		// requirement: Terms naming the legal entity, Privacy Policy, and the
+		// subscription plans must be viewable outside the app).
+		site.Register(pub)
+
 		// Health check
 		pub.Get("/health", r.handlers.Health.Check)
 		pub.Get("/ready", r.handlers.Health.Ready)
@@ -128,10 +147,11 @@ func (r *Router) Setup() http.Handler {
 
 		// Sources endpoints
 		api.Route("/sources", func(sources chi.Router) {
-			sources.Get("/", r.handlers.Sources.List)
-			sources.Post("/", r.handlers.Sources.Create)
-			sources.Get("/{slug}", r.handlers.Sources.Get)
-			sources.Patch("/{slug}", r.handlers.Sources.Update)
+			// last_error is served to admins only (OptionalAdmin).
+			sources.With(apimiddleware.OptionalAdmin).Get("/", r.handlers.Sources.List)
+			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/", r.handlers.Sources.Create)
+			sources.With(apimiddleware.OptionalAdmin).Get("/{slug}", r.handlers.Sources.Get)
+			sources.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/{slug}", r.handlers.Sources.Update)
 		})
 
 		// Alerts endpoints
@@ -170,10 +190,10 @@ func (r *Router) Setup() http.Handler {
 		api.Get("/indicators/{id}", r.handlers.Indicators.GetByID)
 
 		// Path aliases: /api/v1/intel/sources -> /api/v1/sources (Flutter compatibility)
-		api.Get("/intel/sources", r.handlers.Sources.List)
-		api.Get("/intel/sources/{slug}", r.handlers.Sources.Get)
-		api.Post("/intel/sources", r.handlers.Sources.Create)
-		api.Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
+		api.With(apimiddleware.OptionalAdmin).Get("/intel/sources", r.handlers.Sources.List)
+		api.With(apimiddleware.OptionalAdmin).Get("/intel/sources/{slug}", r.handlers.Sources.Get)
+		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/intel/sources", r.handlers.Sources.Create)
+		api.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Patch("/intel/sources/{slug}", r.handlers.Sources.Update)
 
 		// URL/Safe Web protection endpoints
 		api.Route("/url", func(url chi.Router) {
@@ -209,6 +229,8 @@ func (r *Router) Setup() http.Handler {
 			// Breach checking
 			dw.Post("/check/email", r.handlers.DarkWeb.CheckEmail)
 			dw.Post("/check/password", r.handlers.DarkWeb.CheckPassword)
+			dw.With(apimiddleware.TrustedAddressRateLimit(r.cache, "darkweb-password-range", r.passwordRangePerMinute())).
+				Post("/password/range", r.handlers.DarkWeb.PasswordRange)
 
 			// Asset monitoring
 			dw.Get("/monitor", r.handlers.DarkWeb.GetMonitoredAssets)
@@ -226,7 +248,7 @@ func (r *Router) Setup() http.Handler {
 
 			// Stats and refresh
 			dw.Get("/stats", r.handlers.DarkWeb.GetStats)
-			dw.Post("/refresh", r.handlers.DarkWeb.RefreshMonitoring)
+			dw.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/refresh", r.handlers.DarkWeb.RefreshMonitoring)
 		})
 
 		// App Security Suite endpoints
@@ -324,11 +346,16 @@ func (r *Router) Setup() http.Handler {
 			yara.Post("/scan/ipa", r.handlers.YARA.ScanIPA)
 			yara.Post("/quick-scan", r.handlers.YARA.QuickScan)
 
-			// Rule management
+			// Rule management. Reading is open to every authenticated client
+			// (the app lists rules); changing the GLOBAL rule set is admin
+			// only — a device key is minted anonymously, and a rule it adds,
+			// deletes or reloads would hit every OrbGuard user. The original
+			// paths stay admin-gated so no client 404s; the same handlers are
+			// also mounted under /admin/yara below.
 			yara.Get("/rules", r.handlers.YARA.ListRules)
 			yara.Get("/rules/{id}", r.handlers.YARA.GetRule)
-			yara.Post("/rules", r.handlers.YARA.AddRule)
-			yara.Delete("/rules/{id}", r.handlers.YARA.DeleteRule)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/rules", r.handlers.YARA.AddRule)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Delete("/rules/{id}", r.handlers.YARA.DeleteRule)
 
 			// Parsing and validation
 			yara.Post("/parse", r.handlers.YARA.ParseRule)
@@ -341,7 +368,7 @@ func (r *Router) Setup() http.Handler {
 			yara.Get("/stats", r.handlers.YARA.GetStats)
 
 			// Admin
-			yara.Post("/reload", r.handlers.YARA.ReloadRules)
+			yara.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/reload", r.handlers.YARA.ReloadRules)
 		})
 
 		// Correlation Engine endpoints
@@ -637,16 +664,16 @@ func (r *Router) Setup() http.Handler {
 
 			// Block Rules
 			orbnet.Get("/rules", r.handlers.OrbNet.ListBlockRules)
-			orbnet.Post("/rules", r.handlers.OrbNet.AddBlockRule)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/rules", r.handlers.OrbNet.AddBlockRule)
 			orbnet.Get("/rules/{id}", r.handlers.OrbNet.GetBlockRule)
-			orbnet.Delete("/rules/{id}", r.handlers.OrbNet.RemoveBlockRule)
-			orbnet.Post("/emergency-block", r.handlers.OrbNet.EmergencyBlock)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Delete("/rules/{id}", r.handlers.OrbNet.RemoveBlockRule)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/emergency-block", r.handlers.OrbNet.EmergencyBlock)
 
 			// Servers
 			orbnet.Get("/servers", r.handlers.OrbNet.ListServers)
-			orbnet.Post("/servers", r.handlers.OrbNet.RegisterServer)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Post("/servers", r.handlers.OrbNet.RegisterServer)
 			orbnet.Get("/servers/{id}", r.handlers.OrbNet.GetServer)
-			orbnet.Put("/servers/{id}/status", r.handlers.OrbNet.UpdateServerStatus)
+			orbnet.With(apimiddleware.AdminAuth(r.config.JWT.Secret)).Put("/servers/{id}/status", r.handlers.OrbNet.UpdateServerStatus)
 
 			// Threat Sync
 			orbnet.Post("/sync", r.handlers.OrbNet.SyncThreatData)
@@ -737,6 +764,9 @@ func (r *Router) Setup() http.Handler {
 
 		// Playbooks endpoints
 		api.Route("/playbooks", func(pb chi.Router) {
+			// The store is global and has no owner field, so no route is safe
+			// for a device key.
+			pb.Use(apimiddleware.AdminAuth(r.config.JWT.Secret))
 			pb.Get("/", r.handlers.Playbooks.List)
 			pb.Post("/", r.handlers.Playbooks.Create)
 			pb.Get("/executions", r.handlers.Playbooks.GetExecutions)
@@ -756,7 +786,7 @@ func (r *Router) Setup() http.Handler {
 			an.Get("/threats", r.handlers.Analytics.GetThreatAnalytics)
 			an.Get("/alerts", r.handlers.Analytics.GetAlertMetrics)
 			an.Get("/detections", r.handlers.Analytics.GetDetectionMetrics)
-			an.Get("/sources", r.handlers.Analytics.GetSourceHealth)
+			an.With(apimiddleware.OptionalAdmin).Get("/sources", r.handlers.Analytics.GetSourceHealth)
 			an.Get("/geo", r.handlers.Analytics.GetGeoDistribution)
 			an.Get("/dashboard", r.handlers.Analytics.GetDashboard)
 			an.Get("/reports", r.handlers.Analytics.ListReports)
@@ -824,6 +854,12 @@ func (r *Router) Setup() http.Handler {
 			admin.Post("/yara/submissions/{id}/approve", r.handlers.YARA.ApproveSubmission)
 			admin.Post("/yara/submissions/{id}/reject", r.handlers.YARA.RejectSubmission)
 
+			// Global YARA rule management (canonical admin paths; the
+			// /yara/rules and /yara/reload originals are admin-gated aliases)
+			admin.Post("/yara/rules", r.handlers.YARA.AddRule)
+			admin.Delete("/yara/rules/{id}", r.handlers.YARA.DeleteRule)
+			admin.Post("/yara/reload", r.handlers.YARA.ReloadRules)
+
 			// Stats
 			admin.Get("/stats/detailed", r.handlers.Admin.DetailedStats)
 		})
@@ -836,7 +872,12 @@ func (r *Router) Setup() http.Handler {
 			taxii.Get("/collections", r.handlers.TAXII.ListCollections)
 			taxii.Get("/collections/{id}", r.handlers.TAXII.GetCollection)
 			taxii.Get("/collections/{id}/objects", r.handlers.TAXII.GetObjects)
-			taxii.Post("/collections/{id}/objects", r.handlers.TAXII.AddObjects)
+			// Outside the /api/v1 group, so the bearer check AdminAuth relies on
+			// is applied here. Reads stay public.
+			taxii.With(
+				apimiddleware.APIKeyAuth(r.config.JWT.Secret),
+				apimiddleware.AdminAuth(r.config.JWT.Secret),
+			).Post("/collections/{id}/objects", r.handlers.TAXII.AddObjects)
 		})
 	}
 

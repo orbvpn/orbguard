@@ -10,7 +10,6 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -161,10 +160,10 @@ class _EnterpriseOverviewScreenState extends State<EnterpriseOverviewScreen> {
     );
   }
 
-  String _fmt(num? value) => value?.toString() ?? '—';
+  String _fmt(num? value) => value?.toString() ?? '-';
 
   String _fmtScore(double? value) =>
-      value != null ? value.toStringAsFixed(1) : '—';
+      value != null ? value.toStringAsFixed(1) : '-';
 
   Widget _buildZeroTrustSection() {
     return Column(

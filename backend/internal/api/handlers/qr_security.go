@@ -166,7 +166,7 @@ func (h *QRSecurityHandler) ScanBatch(w http.ResponseWriter, r *http.Request) {
 	for _, item := range req.Items {
 		result, err := h.service.AnalyzeQRCode(r.Context(), &item)
 		if err != nil {
-			h.logger.Warn().Err(err).Str("content", item.Content[:min(50, len(item.Content))]).Msg("failed to analyze QR code in batch")
+			h.logger.Warn().Err(err).Int("content_length", len(item.Content)).Msg("failed to analyze QR code in batch")
 			continue
 		}
 		results = append(results, result)

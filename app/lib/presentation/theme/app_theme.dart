@@ -42,7 +42,7 @@ class AppTheme {
       dark ? const Color(0xFFFF6CC0) : const Color(0xFFD81B86);
   // Active accent as INK (icons/labels/indicators): raw lime fails contrast on
   // white, so light uses deep lime.
-  static Color _activeInk(bool dark) => dark ? _lime : const Color(0xFF5C8A00);
+  static Color _activeInk(bool dark) => dark ? _lime : const Color(0xFF4A7000);
   static Color _activePill(bool dark) => dark
       ? _lime.withValues(alpha: 0.14)
       : const Color(0xFF96C414).withValues(alpha: 0.20);
@@ -50,12 +50,13 @@ class AppTheme {
   /// Brand type stack (bundled — no runtime font fetch).
   /// Display/headlines = Archivo; body/UI = IBM Plex Sans; data labels = Mono.
   static TextTheme _textTheme(Color onSurface, Color muted) {
-    TextStyle d(double size, FontWeight w, {double? h, Color? c}) => TextStyle(
-          fontFamily: Brand.fontDisplay,
-          fontSize: size,
-          fontWeight: w,
+    // Display face at the step of the brand voice its size belongs to, so a
+    // themed headline matches a BrandText one (wide Archivo, see BrandVoice).
+    TextStyle d(double size, FontWeight w, {double? h, Color? c}) =>
+        BrandVoice.forSize(size).style(
+          size: size,
+          legacyWeight: w,
           height: h,
-          letterSpacing: size * -0.02,
           color: c ?? onSurface,
         );
     TextStyle s(double size, FontWeight w, {double? h, double? ls, Color? c}) =>
@@ -253,10 +254,9 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         // Dialog titles carry the display face (kit).
-        titleTextStyle: TextStyle(
-          fontFamily: Brand.fontDisplay,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: BrandVoice.heading.style(
+          size: 20,
+          legacyWeight: FontWeight.w700,
           color: onSurface,
         ),
         contentTextStyle: text.bodyMedium!.copyWith(color: muted),

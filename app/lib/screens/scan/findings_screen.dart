@@ -122,7 +122,9 @@ class FindingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                "— and here's how to fix each",
+                count == 1
+                    ? 'Here is how to fix it.'
+                    : 'Here is how to fix each one.',
                 style: BrandText.body(
                   size: 15,
                   color: scheme.onSurfaceVariant,
@@ -142,7 +144,10 @@ class FindingsScreen extends StatelessWidget {
           ),
           // The screen's single lime action.
           child: onFixAll != null
-              ? BrandButton(label: 'Fix these', onPressed: onFixAll)
+              ? BrandButton(
+                  label: count == 1 ? 'Fix this' : 'Fix these',
+                  onPressed: onFixAll,
+                )
               : BrandButton(
                   label: 'Done',
                   onPressed: () => Navigator.pop(context),

@@ -65,7 +65,7 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
         const SizedBox(height: 6),
         // Honest one-liner: we check the DEVICE, not the call.
         Text(
-          'This checks your device — not the call itself — for the conditions '
+          'This checks your device, not the call itself, for the conditions '
           'someone would need to listen in.',
           textAlign: TextAlign.center,
           style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
@@ -130,7 +130,7 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                "No app — including OrbGuard — can listen inside WhatsApp, "
+                "No app, including OrbGuard, can listen inside WhatsApp, "
                 "Signal, Telegram or a normal phone call, or tell you a "
                 "specific call is being tapped. End-to-end encryption and the "
                 "phone's app sandbox make that impossible.",

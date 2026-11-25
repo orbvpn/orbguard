@@ -252,7 +252,7 @@ class RogueAPProvider extends ChangeNotifier {
       // networks — say so honestly instead of reporting "Scan complete, 0 found".
       if (wifiScanUnsupported) {
         _scanStatus = 'Not available on this device';
-        _error = "Wi-Fi network scanning isn't available on this device — "
+        _error = "Wi-Fi network scanning isn't available on this device. "
             "Apple doesn't allow apps to scan nearby Wi-Fi on iPhone.";
         _scanProgress = 1.0;
         return;
@@ -326,7 +326,7 @@ class RogueAPProvider extends ChangeNotifier {
         final suffix =
             dangerous.length > 3 ? ' and ${dangerous.length - 3} more' : '';
         final action = _autoProtect
-            ? ' Auto-protection cannot switch your VPN on this build — '
+            ? ' Auto-protection cannot switch your VPN on this build. '
                 'connect your VPN or switch networks manually.'
             : '';
         try {

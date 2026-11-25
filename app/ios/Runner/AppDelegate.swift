@@ -20,7 +20,7 @@ import CFNetwork
 import MachO
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
 
     // MARK: - Properties
 
@@ -35,74 +35,19 @@ import MachO
     private let batterySampler = BatteryDrainSampler()
 
     // MARK: - App Lifecycle
+    //
+    // The app runs on the UIScene lifecycle (Info.plist's
+    // UIApplicationSceneManifest, with Flutter's own FlutterSceneDelegate). An
+    // app built with the iOS 27 SDK that has not adopted it is killed at launch.
+    // Under it there is no window, and so no FlutterViewController, while
+    // didFinishLaunching runs: everything that needs the engine lives in
+    // didInitializeImplicitFlutterEngine, and only what Apple wants done before
+    // launch finishes stays here.
 
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-
-        let controller: FlutterViewController = window?.rootViewController as! FlutterViewController
-        let channel = FlutterMethodChannel(
-            name: CHANNEL,
-            binaryMessenger: controller.binaryMessenger)
-
-        // Setup method channel handler
-        channel.setMethodCallHandler({
-            [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-            guard let self = self else { return }
-            self.handleMethodCall(call: call, result: result)
-        })
-
-        // WiFi channel (W5.1): current network via NEHotspotNetwork; scanning is
-        // not possible on iOS and reports UNSUPPORTED.
-        let wifiChannel = FlutterMethodChannel(
-            name: WIFI_CHANNEL,
-            binaryMessenger: controller.binaryMessenger)
-        let wifiHandler = WifiChannelHandler()
-        self.wifiHandler = wifiHandler
-        wifiChannel.setMethodCallHandler { call, result in
-            wifiHandler.handle(call: call, result: result)
-        }
-
-        // Supply-chain channel (W5.13): iOS sandboxing prevents enumerating or
-        // inspecting other installed applications — every method is UNSUPPORTED.
-        let supplyChainChannel = FlutterMethodChannel(
-            name: SUPPLY_CHAIN_CHANNEL,
-            binaryMessenger: controller.binaryMessenger)
-        supplyChainChannel.setMethodCallHandler { call, result in
-            result(FlutterError(
-                code: "UNSUPPORTED",
-                message: "iOS does not allow enumerating or inspecting other installed applications; supply-chain scanning is unavailable on this platform.",
-                details: ["method": call.method, "platform": "ios"]))
-        }
-
-        // Logs channel (W5.15): own-process log retrieval via OSLogStore (iOS 15+).
-        let logsChannel = FlutterMethodChannel(
-            name: LOGS_CHANNEL,
-            binaryMessenger: controller.binaryMessenger)
-        logsChannel.setMethodCallHandler { call, result in
-            AppLogStoreReader.handle(call: call, result: result)
-        }
-
-        // Content-filter blocklist bridge (com.orb.guard/content_filter): mirrors
-        // the Dart threat-intel domain block list into the shared App Group
-        // container that the OrbGuardFilter NEFilterDataProvider reads. This is a
-        // one-way DATA sync only — it does NOT start filtering and never reports
-        // enforcement as active. Apple only runs an NEFilterDataProvider on
-        // MDM-supervised devices; see ContentFilterChannelHandler for details.
-        let contentFilterHandler = ContentFilterChannelHandler()
-        self.contentFilterHandler = contentFilterHandler
-        contentFilterHandler.register(with: controller.binaryMessenger)
-
-        // Call-directory bridge (com.orb.guard/call_directory): writes the
-        // block/identify number lists into the shared App Group container that
-        // the OrbGuardCallDirectory CXCallDirectoryProvider extension reads, and
-        // asks iOS to reload it. DATA SYNC + reload only — actual blocking
-        // requires the user to enable it in Settings > Phone > Call Blocking &
-        // Identification; see CallDirectoryChannelHandler for details.
-        let callDirectoryHandler = CallDirectoryChannelHandler()
-        self.callDirectoryHandler = callDirectoryHandler
-        callDirectoryHandler.register(with: controller.binaryMessenger)
 
         // Start battery sampling so getBatteryDrain can report a measured rate.
         batterySampler.start()
@@ -117,15 +62,92 @@ import MachO
         BackgroundScanService.shared.register()
         BackgroundScanService.shared.submitNextRequestLoggingFailure()
 
-        GeneratedPluginRegistrant.register(with: self)
+        // Refresh the pending background-scan request whenever the app leaves
+        // the foreground, so a request generally exists for iOS to honor.
+        // UIKit no longer calls applicationDidEnterBackground on a scene-based
+        // app; it still posts this notification once the last scene is gone
+        // from the foreground.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshBackgroundScanRequest),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil)
+
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    override func applicationDidEnterBackground(_ application: UIApplication) {
-        // Refresh the pending background-scan request whenever the app leaves
-        // the foreground, so a request generally exists for iOS to honor.
+    @objc private func refreshBackgroundScanRequest() {
         BackgroundScanService.shared.submitNextRequestLoggingFailure()
-        super.applicationDidEnterBackground(application)
+    }
+
+    /// Called once the storyboard's FlutterViewController has made its engine.
+    /// Plugins and the app's own channels are registered against that engine.
+    func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+        let messenger = engineBridge.applicationRegistrar.messenger()
+
+        let channel = FlutterMethodChannel(
+            name: CHANNEL,
+            binaryMessenger: messenger)
+
+        // Setup method channel handler
+        channel.setMethodCallHandler({
+            [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+            guard let self = self else { return }
+            self.handleMethodCall(call: call, result: result)
+        })
+
+        // WiFi channel (W5.1): current network via NEHotspotNetwork; scanning is
+        // not possible on iOS and reports UNSUPPORTED.
+        let wifiChannel = FlutterMethodChannel(
+            name: WIFI_CHANNEL,
+            binaryMessenger: messenger)
+        let wifiHandler = WifiChannelHandler()
+        self.wifiHandler = wifiHandler
+        wifiChannel.setMethodCallHandler { call, result in
+            wifiHandler.handle(call: call, result: result)
+        }
+
+        // Supply-chain channel (W5.13): iOS sandboxing prevents enumerating or
+        // inspecting other installed applications — every method is UNSUPPORTED.
+        let supplyChainChannel = FlutterMethodChannel(
+            name: SUPPLY_CHAIN_CHANNEL,
+            binaryMessenger: messenger)
+        supplyChainChannel.setMethodCallHandler { call, result in
+            result(FlutterError(
+                code: "UNSUPPORTED",
+                message: "iOS does not allow enumerating or inspecting other installed applications; supply-chain scanning is unavailable on this platform.",
+                details: ["method": call.method, "platform": "ios"]))
+        }
+
+        // Logs channel (W5.15): own-process log retrieval via OSLogStore (iOS 15+).
+        let logsChannel = FlutterMethodChannel(
+            name: LOGS_CHANNEL,
+            binaryMessenger: messenger)
+        logsChannel.setMethodCallHandler { call, result in
+            AppLogStoreReader.handle(call: call, result: result)
+        }
+
+        // Content-filter blocklist bridge (com.orb.guard/content_filter): mirrors
+        // the Dart threat-intel domain block list into the shared App Group
+        // container that the OrbGuardFilter NEFilterDataProvider reads. This is a
+        // one-way DATA sync only — it does NOT start filtering and never reports
+        // enforcement as active. Apple only runs an NEFilterDataProvider on
+        // MDM-supervised devices; see ContentFilterChannelHandler for details.
+        let contentFilterHandler = ContentFilterChannelHandler()
+        self.contentFilterHandler = contentFilterHandler
+        contentFilterHandler.register(with: messenger)
+
+        // Call-directory bridge (com.orb.guard/call_directory): writes the
+        // block/identify number lists into the shared App Group container that
+        // the OrbGuardCallDirectory CXCallDirectoryProvider extension reads, and
+        // asks iOS to reload it. DATA SYNC + reload only — actual blocking
+        // requires the user to enable it in Settings > Phone > Call Blocking &
+        // Identification; see CallDirectoryChannelHandler for details.
+        let callDirectoryHandler = CallDirectoryChannelHandler()
+        self.callDirectoryHandler = callDirectoryHandler
+        callDirectoryHandler.register(with: messenger)
+
+        GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     }
 
     // MARK: - Method Channel Handler

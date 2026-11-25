@@ -22,7 +22,7 @@ void main() {
     await tester.pumpWidget(host(c, DateTime(2026, 7, 17)));
     await tester.pump();
 
-    expect(find.text('Start your streak — run a checkup'), findsOneWidget);
+    expect(find.text('Start your streak. Run a checkup'), findsOneWidget);
     expect(find.textContaining('protected'), findsNothing);
   });
 

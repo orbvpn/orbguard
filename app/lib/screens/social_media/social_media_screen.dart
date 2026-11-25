@@ -1102,7 +1102,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               const SizedBox(height: 8),
               Text(
                 'Check whether a username exists as a public profile across '
-                'popular platforms. This is a real check — each public profile '
+                'popular platforms. This is a real check: each public profile '
                 'URL is requested live. Platforms that block automated checks '
                 'are shown as "couldn\'t check", never as "not found".',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
@@ -1369,7 +1369,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   String _presenceLabel(PresenceStatus status) {
     switch (status) {
       case PresenceStatus.found:
-        return 'Profile found — tap to open';
+        return 'Profile found. Tap to open';
       case PresenceStatus.notFound:
         return 'No public profile';
       case PresenceStatus.unknown:

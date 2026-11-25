@@ -263,7 +263,9 @@ class CertificateAnalyzer {
   Future<List<Map<String, dynamic>>> _getInstalledCertificates() async {
     try {
       final result = await platform.invokeMethod('getInstalledCertificates');
-      return List<Map<String, dynamic>>.from(result['certificates'] ?? []);
+      return ((result as Map?)?['certificates'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -271,6 +273,13 @@ class CertificateAnalyzer {
       }
       debugPrint('Error getting certificates: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting certificates: $e');
       return [];
@@ -383,7 +392,9 @@ class PermissionAbuseDetector {
   Future<List<Map<String, dynamic>>> _getInstalledApps() async {
     try {
       final result = await platform.invokeMethod('getInstalledApps');
-      return List<Map<String, dynamic>>.from(result['apps'] ?? []);
+      return ((result as Map?)?['apps'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -391,6 +402,13 @@ class PermissionAbuseDetector {
       }
       debugPrint('Error getting installed apps: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting installed apps: $e');
       return [];
@@ -462,7 +480,9 @@ class AccessibilityAbuseDetector {
       final result = await platform.invokeMethod(
         'getEnabledAccessibilityServices',
       );
-      return List<Map<String, dynamic>>.from(result['services'] ?? []);
+      return ((result as Map?)?['services'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -470,6 +490,13 @@ class AccessibilityAbuseDetector {
       }
       debugPrint('Error getting accessibility services: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting accessibility services: $e');
       return [];
@@ -509,52 +536,68 @@ class AccessibilityAbuseDetector {
 class KeystrokeLoggerDetector {
   static const platform = MethodChannel('com.orb.guard/system');
 
-  /// Detect keyloggers by analyzing input methods and keyboard apps
+  /// Keyboards a person should take a look at.
+  ///
+  /// Nearly every keyboard can reach the internet, the phone's own included,
+  /// so that alone says nothing. A keyboard is reported only when all of this
+  /// is true: it was added to the phone rather than shipped with it, it is
+  /// turned on (a keyboard that is off receives nothing), it can reach the
+  /// internet, and it is not one of the widely used ones.
+  ///
+  /// What is known is that such a keyboard COULD send what is typed, not that
+  /// it does. So it is a thing to look at, never a critical alarm: medium for
+  /// the keyboard in use, low for one that is only switched on. Known
+  /// stalkerware is the malware scan's job, and that one does say critical.
   Future<List<Map<String, dynamic>>> detectKeyloggers() async {
     final threats = <Map<String, dynamic>>[];
 
-    // Check installed keyboards
-    final keyboards = await _getInstalledKeyboards();
+    for (final keyboard in await _getInstalledKeyboards()) {
+      final packageName = '${keyboard['packageName'] ?? ''}';
+      if (packageName.isEmpty) continue;
+      if (keyboard['isSystemApp'] == true) continue;
+      if (keyboard['isEnabled'] == false) continue;
+      final permissions = (keyboard['permissions'] as List?) ?? const [];
+      if (!permissions.contains('INTERNET')) continue;
+      if (_isWidelyUsedKeyboard(packageName)) continue;
 
-    for (final keyboard in keyboards) {
-      final packageName = keyboard['packageName'] as String;
-
-      // Check if keyboard requests internet permission (red flag)
-      final permissions = keyboard['permissions'] as List<dynamic>;
-      final hasInternet = permissions.contains('INTERNET');
-
-      if (hasInternet && !_isTrustedKeyboard(packageName)) {
-        threats.add({
-          'id': 'keyboard_$packageName',
-          'name': 'Suspicious Keyboard App',
-          'description':
-              'Keyboard with internet access: ${keyboard['appName']}',
-          'severity': 'CRITICAL',
-          'type': 'keylogger',
-          'path': packageName,
-          'requiresRoot': false,
-          'metadata': {
-            'packageName': packageName,
-            'appName': keyboard['appName'],
-            'permissions': permissions,
-            'isEnabled': keyboard['isEnabled'],
-            'isDefault': keyboard['isDefault'],
-          },
-        });
-      }
+      final appName = '${keyboard['appName'] ?? packageName}';
+      final inUse = keyboard['isDefault'] == true;
+      threats.add({
+        'id': 'keyboard_$packageName',
+        'name': 'A keyboard you added can send what you type',
+        'description': inUse
+            ? '$appName is the keyboard in use, and it can reach the '
+                'internet. A keyboard sees everything typed with it. Remove '
+                'it if you did not add it yourself.'
+            : '$appName is switched on as a keyboard, and it can reach the '
+                'internet. A keyboard sees everything typed with it. Remove '
+                'it if you did not add it yourself.',
+        'severity': inUse ? 'MEDIUM' : 'LOW',
+        'type': 'keylogger',
+        'path': packageName,
+        'requiresRoot': false,
+        'metadata': {
+          'packageName': packageName,
+          'appName': appName,
+          'permissions': permissions,
+          'isEnabled': keyboard['isEnabled'],
+          'isDefault': keyboard['isDefault'],
+        },
+      });
     }
 
-    // Check for input method editor (IME) abuse
-    final imeAbuse = await _detectIMEAbuse();
-    threats.addAll(imeAbuse);
-
+    // The native `detectIMEAbuse` call is not added on top any more: it
+    // applies this same test (added, switched on, internet) to the same list,
+    // so every keyboard came back twice, the second time as critical.
     return threats;
   }
 
   Future<List<Map<String, dynamic>>> _getInstalledKeyboards() async {
     try {
       final result = await platform.invokeMethod('getInstalledKeyboards');
-      return List<Map<String, dynamic>>.from(result['keyboards'] ?? []);
+      return ((result as Map?)?['keyboards'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } on PlatformException catch (e) {
       if (e.code == 'UNSUPPORTED') {
         throw DetectionUnsupportedException(
@@ -562,29 +605,32 @@ class KeystrokeLoggerDetector {
       }
       debugPrint('Error getting keyboards: $e');
       return [];
+    } on MissingPluginException {
+      // No native handler registered on this platform. That means the check
+      // COULD NOT RUN — it is not a clean result. Returning [] here let
+      // DeviceScanService count the stage as a success and print "checks ran
+      // clean" on a machine where nothing was inspected.
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       debugPrint('Error getting keyboards: $e');
       return [];
     }
   }
 
-  bool _isTrustedKeyboard(String packageName) {
-    const trustedKeyboards = [
+  /// Keyboards from the large, known makers. A person who chose one of these
+  /// is not helped by being asked about it after every check.
+  bool _isWidelyUsedKeyboard(String packageName) {
+    const widelyUsed = {
       'com.google.android.inputmethod.latin', // Gboard
-      'com.android.inputmethod.latin', // AOSP Keyboard
+      'com.google.android.tts', // Google voice typing
+      'com.google.android.googlequicksearchbox', // Google voice typing
+      'com.android.inputmethod.latin', // AOSP keyboard
       'com.samsung.android.honeyboard', // Samsung Keyboard
-      'com.microsoft.swiftkey.swiftkeyconfigurator', // SwiftKey
-    ];
-    return trustedKeyboards.contains(packageName);
-  }
-
-  Future<List<Map<String, dynamic>>> _detectIMEAbuse() async {
-    try {
-      final result = await platform.invokeMethod('detectIMEAbuse');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
-    } catch (e) {
-      return [];
-    }
+      'com.touchtype.swiftkey', // Microsoft SwiftKey
+      'com.microsoft.swiftkey.swiftkeyconfigurator', // SwiftKey, preinstalled
+    };
+    return widelyUsed.contains(packageName);
   }
 }
 
@@ -625,7 +671,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkSuspiciousRootBinaries() async {
     try {
       final result = await platform.invokeMethod('checkSuspiciousRootBinaries');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -634,7 +682,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkModifiedSystemFiles() async {
     try {
       final result = await platform.invokeMethod('checkModifiedSystemFiles');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -643,7 +693,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkMaliciousTweaks() async {
     try {
       final result = await platform.invokeMethod('checkMaliciousTweaks');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -652,7 +704,9 @@ class RootingMalwareDetector {
   Future<List<Map<String, dynamic>>> _checkMaliciousDaemons() async {
     try {
       final result = await platform.invokeMethod('checkMaliciousDaemons');
-      return List<Map<String, dynamic>>.from(result['threats'] ?? []);
+      return ((result as Map?)?['threats'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -720,7 +774,21 @@ class GeolocationStalkerDetector {
       final result = await platform.invokeMethod('getLocationAccessHistory', {
         'hours': hours,
       });
-      return List<Map<String, dynamic>>.from(result['accesses'] ?? []);
+      return ((result as Map?)?['accesses'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } on PlatformException catch (e) {
+      // An iPhone answers UNSUPPORTED: no app may read which apps used the
+      // location. That is "could not be checked", not "nothing found".
+      if (e.code == 'UNSUPPORTED') {
+        throw DetectionUnsupportedException(
+            e.message ?? 'not supported on this device');
+      }
+      debugPrint('Error getting location access history: $e');
+      return [];
+    } on MissingPluginException {
+      throw DetectionUnsupportedException(
+          'no native detection channel on this platform');
     } catch (e) {
       return [];
     }

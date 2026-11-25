@@ -25,15 +25,37 @@ import '../services/security/device_scan_service.dart';
 class ScanResult {
   final List<Map<String, dynamic>> threats;
 
-  /// Number of scan stages that genuinely ran. (The native scanners do not
-  /// report per-item counts, so no per-item number is fabricated here.)
+  /// Number of scan stages that genuinely ran clean. (The native scanners do
+  /// not report per-item counts, so no per-item number is fabricated here.)
+  /// Stages that errored or were unavailable are NOT counted here — they are
+  /// reported separately as [checksUnavailable].
   final int itemsScanned;
+
+  /// Stages that could not run on this platform/build. Surfaced verbatim on
+  /// the all-clear screen so "all clear" never overstates its coverage — on
+  /// desktop most native stages are unavailable.
+  final int checksUnavailable;
   final Duration scanDuration;
+
+  /// The stages that ran, by the engine's stage names (`CheckPlan.byStage`
+  /// has the words). Null when the runner did not say, which is "not known"
+  /// and never "none".
+  final List<String>? stagesRan;
+
+  /// Stages this device or build does not let run.
+  final List<String> stagesNotPossible;
+
+  /// Stages that should have run and broke.
+  final List<String> stagesFailed;
 
   ScanResult({
     required this.threats,
     required this.itemsScanned,
     required this.scanDuration,
+    this.checksUnavailable = 0,
+    this.stagesRan,
+    this.stagesNotPossible = const [],
+    this.stagesFailed = const [],
   });
 }
 
@@ -177,7 +199,10 @@ class _ScanningScreenState extends State<ScanningScreen>
         context,
         ScanResult(
           threats: _threats,
-          itemsScanned: _stagesCompleted,
+          // Only stages that actually ran count as "ran clean"; the rest are
+          // reported as unavailable rather than padding the clean total.
+          itemsScanned: _stagesCompleted - _stageWarnings.length,
+          checksUnavailable: _stageWarnings.length,
           scanDuration: scanDuration,
         ),
       );
@@ -461,7 +486,7 @@ class _ScanningScreenState extends State<ScanningScreen>
                   _threats.isNotEmpty
                       ? '${_threats.length} threat${_threats.length == 1 ? '' : 's'} found'
                       : (_stageWarnings.isEmpty
-                          ? "You're protected — no threats found"
+                          ? "You're protected. No threats found"
                           : 'No threats found in the checks we ran'),
                   style: TextStyle(
                     color: _threats.isEmpty

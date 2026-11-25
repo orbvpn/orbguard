@@ -293,8 +293,8 @@ class SecureCallCheck {
     return _warn(
       id,
       'high',
-      'Code injection or a debugger is attached to this app — a sign the '
-      'device is compromised or the app was tampered with.',
+      'Code injection or a debugger is attached to this app, a sign the '
+          'device is compromised or the app was tampered with.',
       names.toList(),
     );
   }
@@ -319,7 +319,7 @@ class SecureCallCheck {
       _androidAccessibility(a11y),
       _unavailable(
         CallCheckId.trafficProxy,
-        "OrbGuard can't read the system proxy on Android — the certificate "
+        "OrbGuard can't read the system proxy on Android. The certificate "
         'check below covers HTTPS interception.',
       ),
       _androidCerts(certs),
@@ -352,8 +352,8 @@ class SecureCallCheck {
       id,
       'high',
       'An app is using Accessibility, which can read everything on your '
-      "screen — including during a call. Turn it off if you don't recognise "
-      'it.',
+          "screen, including during a call. Turn it off if you don't recognise "
+          'it.',
       names,
     );
   }
@@ -371,8 +371,8 @@ class SecureCallCheck {
       id,
       'high',
       'A user-installed certificate authority can let its owner decrypt your '
-      'HTTPS traffic. If your workplace manages this phone this can be '
-      'expected — otherwise remove it in Settings > Security.',
+          'HTTPS traffic. If your workplace manages this phone this can be '
+          'expected. Otherwise remove it in Settings > Security.',
       names,
     );
   }
@@ -397,7 +397,7 @@ class SecureCallCheck {
     return _info(
       id,
       '$n app${n == 1 ? '' : 's'} can use the microphone. This is normal for '
-      "calls, messaging and voice apps — review anything you don't recognise.",
+      "calls, messaging and voice apps. Review anything you don't recognise.",
       names,
     );
   }

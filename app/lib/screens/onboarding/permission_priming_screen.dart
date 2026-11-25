@@ -21,16 +21,14 @@
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../permissions/permission_manager.dart';
 import '../../permissions/special_permissions_manager.dart';
+import '../../permissions/universal_permissions.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
-import '../../services/notifications/notification_service.dart';
 import 'priming_copy.dart';
 
 /// Prefs flag set (true) before [PermissionPrimingScreen.onDone] fires — the
@@ -41,75 +39,36 @@ const String kPermissionsPrimedPrefsKey = 'permissions_primed';
 /// fires. Production wiring comes from [PrimingRequests.production]; tests
 /// inject fakes so no platform channel is ever touched.
 ///
-/// The four `request*` functions must return the REAL post-request granted
-/// state — the screen renders exactly what they report. The two `open*`
-/// functions only deep-link into system Settings (their outcome cannot be
+/// The `request*` functions must return the REAL post-request granted
+/// state — the screen renders exactly what they report. The `open*`
+/// function only deep-links into system Settings (its outcome cannot be
 /// confirmed from here, and the UI says so).
 class PrimingRequests {
   final Future<bool> Function() requestNotifications;
-  final Future<bool> Function() requestStorage;
-  final Future<bool> Function() requestSms;
   final Future<bool> Function() requestLocation;
   final Future<void> Function() openUsageAccess;
-  final Future<void> Function() openAccessibility;
 
   const PrimingRequests({
     required this.requestNotifications,
-    required this.requestStorage,
-    required this.requestSms,
     required this.requestLocation,
     required this.openUsageAccess,
-    required this.openAccessibility,
   });
 
   /// Default wiring onto the app's existing permission plumbing:
   ///
-  ///  • notifications — [NotificationService.requestPermissions] fires the OS
-  ///    prompt (its own bool only reflects the plugin call), then
-  ///    `Permission.notification.isGranted` is read back as the source of
-  ///    truth for what the chip may claim;
-  ///  • storage — [PermissionManager.requestStoragePermission] (native path,
-  ///    handles Android 11+ "All files access"), then the manager's own
-  ///    check reports the real state (mirrors PermissionSetupScreen's
-  ///    request-wait-recheck pattern);
-  ///  • SMS / location — permission_handler requests, status read from the
-  ///    returned [PermissionStatus];
-  ///  • usage access / accessibility — [SpecialPermissionsManager] deep-links
-  ///    into system Settings.
+  ///  • notifications / location — [UniversalPermissions], which fires the OS
+  ///    prompt through a plugin that actually implements the current platform
+  ///    (permission_handler has no macOS implementation) and reads back the
+  ///    REAL post-request state as the source of truth for what the chip may
+  ///    claim;
+  ///  • usage access — [SpecialPermissionsManager] deep-links into system
+  ///    Settings.
   factory PrimingRequests.production() {
-    final permissionManager = PermissionManager();
     final specialPermissions = SpecialPermissionsManager();
     return PrimingRequests(
-      requestNotifications: () async {
-        try {
-          await NotificationService.instance.requestPermissions();
-        } catch (_) {
-          // Service plugin unavailable — fall back so first run still asks.
-          try {
-            await Permission.notification.request();
-          } catch (_) {}
-        }
-        // Honesty: report the real post-request state, not the call result.
-        try {
-          return await Permission.notification.isGranted;
-        } catch (_) {
-          return false;
-        }
-      },
-      requestStorage: () async {
-        await permissionManager.requestStoragePermission();
-        // Give the system UI a beat (Android 11+ deep-links to "All files
-        // access"), then read the manager's native source of truth. Same
-        // pattern PermissionSetupScreen uses after this request.
-        await Future<void>.delayed(const Duration(seconds: 2));
-        final result = await permissionManager.checkAllPermissions();
-        return result.granted.contains('Storage Access');
-      },
-      requestSms: () async => (await Permission.sms.request()).isGranted,
-      requestLocation: () async =>
-          (await Permission.location.request()).isGranted,
+      requestNotifications: UniversalPermissions.requestNotifications,
+      requestLocation: UniversalPermissions.requestLocation,
       openUsageAccess: specialPermissions.requestUsageStatsPermission,
-      openAccessibility: specialPermissions.requestAccessibilityPermission,
     );
   }
 }
@@ -209,18 +168,11 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
     switch (step.id) {
       case PrimingStepIds.notifications:
         return _requests.requestNotifications();
-      case PrimingStepIds.storage:
-        return _requests.requestStorage();
-      case PrimingStepIds.sms:
-        return _requests.requestSms();
       case PrimingStepIds.location:
         return _requests.requestLocation();
       case PrimingStepIds.usageAccess:
         await _requests.openUsageAccess();
         return false; // Unverifiable — card shows the "opened" state instead.
-      case PrimingStepIds.accessibility:
-        await _requests.openAccessibility();
-        return false;
     }
     return false;
   }
@@ -275,11 +227,11 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
                   for (final step in _coreSteps) _buildStep(step),
                   if (advanced.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    const GlassSectionHeader(title: 'Advanced — optional'),
+                    const GlassSectionHeader(title: 'Advanced (optional)'),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
                       child: Text(
-                        'These two open system Settings — you finish '
+                        'These two open system Settings. You finish '
                         'turning them on there.',
                         style:
                             BrandText.body(color: cs.onSurfaceVariant, size: 13),
@@ -305,8 +257,8 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
             style: BrandText.display(color: cs.onSurface, size: 30)),
         const SizedBox(height: 10),
         Text(
-          'Each permission unlocks part of your first checkup. Allow what '
-          "you're comfortable with — skip anything, and change your mind "
+          'Each permission unlocks part of your first checkup. Turn on what '
+          "you're comfortable with. Skip anything, and change your mind "
           'later in Settings.',
           style: BrandText.body(color: cs.onSurfaceVariant, size: 15),
         ),
@@ -460,11 +412,11 @@ class _StepCard extends StatelessWidget {
           ),
         );
       case _StepState.skipped:
-        return Text('Skipped — you can enable later in Settings',
+        return Text('Skipped. You can enable later in Settings',
             style: BrandText.label(color: cs.onSurfaceVariant));
       case _StepState.openedSettings:
         // Honest: we cannot confirm these from here, so never claim "On".
-        return Text('Opened system Settings — finish turning it on there.',
+        return Text('Opened system Settings. Finish turning it on there.',
             style: BrandText.label(color: cs.onSurfaceVariant));
     }
   }

@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -21,6 +20,7 @@ class PlaybooksScreen extends StatefulWidget {
 class _PlaybooksScreenState extends State<PlaybooksScreen> {
   final OrbGuardApiClient _apiClient = OrbGuardApiClient.instance;
   bool _isLoading = false;
+  bool _loadFailed = false;
   final List<Playbook> _playbooks = [];
   final List<PlaybookExecution> _executions = [];
 
@@ -48,10 +48,12 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
         _executions.addAll(executionsData.map((json) => PlaybookExecution.fromJson(json)));
 
         _isLoading = false;
+        _loadFailed = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _loadFailed = true;
       });
     }
   }
@@ -109,8 +111,17 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
     return _buildExecutionsTab();
   }
 
+  Widget _buildLoadFailedState() {
+    return _buildEmptyState(
+      icon: AppIcons.playCircle,
+      title: 'Playbooks Unavailable',
+      subtitle: 'Could not load playbooks. Check your connection or account access.',
+    );
+  }
+
   Widget _buildPlaybooksTab() {
     if (_playbooks.isEmpty) {
+      if (_loadFailed) return _buildLoadFailedState();
       return _buildEmptyState(
         icon: AppIcons.playCircle,
         title: 'No Playbooks',
@@ -212,6 +223,7 @@ class _PlaybooksScreenState extends State<PlaybooksScreen> {
 
   Widget _buildExecutionsTab() {
     if (_executions.isEmpty) {
+      if (_loadFailed) return _buildLoadFailedState();
       return _buildEmptyState(
         icon: AppIcons.timer,
         title: 'No Executions',

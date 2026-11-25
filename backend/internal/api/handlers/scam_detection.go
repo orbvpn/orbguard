@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"orbguard-lab/internal/api/middleware"
 	"orbguard-lab/internal/domain/models"
 	"orbguard-lab/internal/domain/services/ai"
 	"orbguard-lab/pkg/logger"
@@ -131,7 +132,7 @@ func (h *ScamDetectionHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().
 		Bool("is_scam", result.IsScam).
 		Float64("score", result.RiskScore).
-		Str("type", string(result.ScamType)).
+		Str("type", result.ScamType.LogLabel()).
 		Msg("scam analyzed")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -195,6 +196,9 @@ func (h *ScamDetectionHandler) Report(w http.ResponseWriter, r *http.Request) {
 		ScamType:    models.ScamType(req.ScamType),
 		Description: req.Description,
 		ReportedAt:  time.Now(),
+
+		ReporterNetwork: middleware.ClientNetwork(r),
+		ReporterKey:     middleware.CallerIdentity(r.Context()),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
@@ -206,8 +210,8 @@ func (h *ScamDetectionHandler) Report(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info().
-		Str("content_type", req.ContentType).
-		Str("scam_type", req.ScamType).
+		Str("content_type", models.ContentType(req.ContentType).LogLabel()).
+		Str("scam_type", models.ScamType(req.ScamType).LogLabel()).
 		Msg("scam reported")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -237,7 +241,7 @@ func (h *ScamDetectionHandler) GetPhoneReputation(w http.ResponseWriter, r *http
 
 	result, err := h.detector.Analyze(r.Context(), analysisReq)
 	if err != nil {
-		h.logger.Error().Err(err).Str("number", number).Msg("phone reputation lookup failed")
+		h.logger.Error().Err(err).Msg("phone reputation lookup failed")
 		// Do NOT fabricate a clean reputation on failure — surface the error
 		// so clients can show an error state instead of a false "clean".
 		w.Header().Set("Content-Type", "application/json")
@@ -248,6 +252,12 @@ func (h *ScamDetectionHandler) GetPhoneReputation(w http.ResponseWriter, r *http
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(phoneReputationBody(number, result))
+}
+
+// phoneReputationBody is the answer of GET /api/v1/scam/phone/{number}.
+func phoneReputationBody(number string, result *models.ScamAnalysisResult) map[string]interface{} {
 	resp := map[string]interface{}{
 		"phone_number":     number,
 		"reputation_score": 100 - (result.RiskScore * 100),
@@ -259,9 +269,10 @@ func (h *ScamDetectionHandler) GetPhoneReputation(w http.ResponseWriter, r *http
 		"explanation":      result.Explanation,
 		"indicators":       result.Indicators,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if len(result.UnavailableSources) > 0 {
+		resp["unavailable_sources"] = result.UnavailableSources
+	}
+	return resp
 }
 
 // ReportPhone handles POST /api/v1/scam/phone/report
@@ -290,6 +301,9 @@ func (h *ScamDetectionHandler) ReportPhone(w http.ResponseWriter, r *http.Reques
 		ScamType:    models.ScamType(req.ScamType),
 		Description: req.Description,
 		ReportedAt:  time.Now(),
+
+		ReporterNetwork: middleware.ClientNetwork(r),
+		ReporterKey:     middleware.CallerIdentity(r.Context()),
 	}
 
 	if err := h.detector.ReportScam(r.Context(), report); err != nil {
@@ -301,8 +315,7 @@ func (h *ScamDetectionHandler) ReportPhone(w http.ResponseWriter, r *http.Reques
 	}
 
 	h.logger.Info().
-		Str("phone", req.PhoneNumber).
-		Str("scam_type", req.ScamType).
+		Str("scam_type", models.ScamType(req.ScamType).LogLabel()).
 		Msg("phone number reported as scam")
 
 	w.Header().Set("Content-Type", "application/json")

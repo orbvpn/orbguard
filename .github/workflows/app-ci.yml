@@ -30,7 +30,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           # Pin to the Flutter version this project is developed against.
-          flutter-version: 3.41.5
+          # 3.44.x ships Dart >=3.12, required by in_app_purchase_android 0.5.x.
+          flutter-version: 3.44.4
           channel: stable
           cache: true
 

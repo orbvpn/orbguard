@@ -510,7 +510,7 @@ class GlassPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button (round glass, 50x50)
+          // Back button — OrbX round glass (translucent + blur).
           if (showBackButton)
             _TapFeedbackButton(
               onTap: onBack ?? () => Navigator.pop(context),
@@ -533,7 +533,7 @@ class GlassPage extends StatelessWidget {
               ),
             ),
           if (showBackButton) const SizedBox(width: 12),
-          // Title container (pill-shaped)
+          // Title pill — OrbX glass frame (translucent fill + border + blur).
           Expanded(
             child: Container(
               height: 50,

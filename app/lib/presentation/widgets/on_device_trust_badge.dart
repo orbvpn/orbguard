@@ -13,13 +13,13 @@ import '../theme/brand.dart';
 import '../theme/colors.dart';
 import 'duotone_icon.dart';
 
-/// A small glass pill: keyhole-shield icon + "On-device · Private" label.
+/// A small glass pill: keyhole-shield icon + "Private, on your device" label.
 class OnDeviceTrustBadge extends StatelessWidget {
   /// Override only if a screen needs slightly different wording; defaults to
   /// the app-wide trust phrase so the promise reads identically everywhere.
   final String label;
 
-  const OnDeviceTrustBadge({super.key, this.label = 'On-device · Private'});
+  const OnDeviceTrustBadge({super.key, this.label = 'Private, on your device'});
 
   @override
   Widget build(BuildContext context) {

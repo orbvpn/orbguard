@@ -1,10 +1,13 @@
 // lib/permissions/special_permissions_manager.dart
-// Handles Usage Stats and Accessibility permissions
+// Handles the Usage Stats special permission (Settings deep-link).
+// There is deliberately NO accessibility permission: OrbGuard ships no
+// AccessibilityService (Google Play Accessibility API policy).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../presentation/theme/brand.dart';
 import '../presentation/theme/colors.dart';
+import '../presentation/theme/app_snack.dart';
 import '../presentation/widgets/app_sheet.dart';
 import '../presentation/widgets/brand_button.dart';
 import '../presentation/widgets/duotone_icon.dart';
@@ -15,22 +18,16 @@ class SpecialPermissionsManager {
 
   // Permission status
   bool _hasUsageStats = false;
-  bool _hasAccessibility = false;
 
   bool get hasUsageStats => _hasUsageStats;
-  bool get hasAccessibility => _hasAccessibility;
-  bool get hasAllSpecialPermissions => _hasUsageStats && _hasAccessibility;
+  bool get hasAllSpecialPermissions => _hasUsageStats;
 
   /// Check all special permissions status
   Future<void> checkPermissions() async {
     if (PlatformInfo.isAndroid) {
       _hasUsageStats = await checkUsageStatsPermission();
-      _hasAccessibility = await checkAccessibilityPermission();
     } else if (PlatformInfo.isIOS) {
-      // iOS doesn't have these exact permissions
-      // We check for equivalent capabilities
       _hasUsageStats = false; // Not available on iOS
-      _hasAccessibility = false; // Limited on iOS
     }
   }
 
@@ -47,20 +44,6 @@ class SpecialPermissionsManager {
     }
   }
 
-  /// Check if Accessibility permission is granted
-  Future<bool> checkAccessibilityPermission() async {
-    if (!PlatformInfo.isAndroid) return false;
-
-    try {
-      final result =
-          await platform.invokeMethod('checkAccessibilityPermission');
-      return result['hasPermission'] ?? false;
-    } catch (e) {
-      debugPrint('Error checking accessibility permission: $e');
-      return false;
-    }
-  }
-
   /// Request Usage Stats permission (opens Settings)
   Future<bool> requestUsageStatsPermission() async {
     if (!PlatformInfo.isAndroid) return false;
@@ -73,20 +56,6 @@ class SpecialPermissionsManager {
       return await checkUsageStatsPermission();
     } catch (e) {
       debugPrint('Error requesting usage stats permission: $e');
-      return false;
-    }
-  }
-
-  /// Request Accessibility permission (opens Settings)
-  Future<bool> requestAccessibilityPermission() async {
-    if (!PlatformInfo.isAndroid) return false;
-
-    try {
-      await platform.invokeMethod('requestAccessibilityPermission');
-      await Future.delayed(const Duration(seconds: 1));
-      return await checkAccessibilityPermission();
-    } catch (e) {
-      debugPrint('Error requesting accessibility permission: $e');
       return false;
     }
   }
@@ -111,19 +80,6 @@ class SpecialPermissionsManager {
           '✓ Monitor suspicious data usage',
           '✓ Track screen-on time anomalies',
           '✓ Detect behavioral deviations from baseline',
-        ];
-        break;
-
-      case SpecialPermissionType.accessibility:
-        title = 'Accessibility Detection';
-        description =
-            'OrbGuard needs to check for malicious accessibility services that could be used for spyware.';
-        capabilities = [
-          '✓ Detect unauthorized accessibility services',
-          '✓ Identify keylogger attempts',
-          '✓ Find screen capture malware',
-          '✓ Detect click injection attacks',
-          '✓ Monitor for overlay attacks',
         ];
         break;
     }
@@ -188,14 +144,12 @@ class SpecialPermissionsManager {
   List<SpecialPermissionType> getMissingPermissions() {
     final missing = <SpecialPermissionType>[];
     if (!_hasUsageStats) missing.add(SpecialPermissionType.usageStats);
-    if (!_hasAccessibility) missing.add(SpecialPermissionType.accessibility);
     return missing;
   }
 }
 
 enum SpecialPermissionType {
   usageStats,
-  accessibility,
 }
 
 // Permission request screen
@@ -263,7 +217,7 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'For comprehensive spyware detection, OrbGuard needs additional permissions to analyze behavioral patterns and detect malicious accessibility services.',
+                          'For comprehensive spyware detection, OrbGuard needs Usage Access to analyze app behaviour patterns.',
                           style: TextStyle(fontSize: 14),
                         ),
                       ],
@@ -284,23 +238,6 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
                     'Identify unusual battery drain',
                     'Monitor suspicious data usage',
                     'Track behavioral anomalies',
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Accessibility Permission
-                _buildPermissionCard(
-                  type: SpecialPermissionType.accessibility,
-                  title: 'Accessibility Detection',
-                  description: 'Scan for malicious accessibility services',
-                  icon: AppIcons.user,
-                  isGranted: widget.permissionManager.hasAccessibility,
-                  benefits: [
-                    'Detect keylogger attempts',
-                    'Find screen capture malware',
-                    'Identify overlay attacks',
-                    'Block click injection',
                   ],
                 ),
 
@@ -498,21 +435,16 @@ class _SpecialPermissionsScreenState extends State<SpecialPermissionsScreen> {
       case SpecialPermissionType.usageStats:
         granted = await widget.permissionManager.requestUsageStatsPermission();
         break;
-      case SpecialPermissionType.accessibility:
-        granted =
-            await widget.permissionManager.requestAccessibilityPermission();
-        break;
     }
 
     // Refresh UI
     await _checkPermissions();
 
     if (granted && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Permission granted successfully'),
-          backgroundColor: AppColors.success,
-        ),
+      showResultSnackBar(
+        context,
+        'Permission granted successfully',
+        background: AppColors.success,
       );
     }
   }

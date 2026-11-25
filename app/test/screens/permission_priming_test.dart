@@ -16,8 +16,6 @@ import 'package:orbguard/screens/onboarding/permission_priming_screen.dart';
 /// Injected fakes — no platform channels, every call logged.
 PrimingRequests fakeRequests({
   bool notifications = true,
-  bool storage = true,
-  bool sms = true,
   bool location = true,
   List<String>? log,
 }) {
@@ -26,23 +24,12 @@ PrimingRequests fakeRequests({
       log?.add('notifications');
       return notifications;
     },
-    requestStorage: () async {
-      log?.add('storage');
-      return storage;
-    },
-    requestSms: () async {
-      log?.add('sms');
-      return sms;
-    },
     requestLocation: () async {
       log?.add('location');
       return location;
     },
     openUsageAccess: () async {
       log?.add('usage_access');
-    },
-    openAccessibility: () async {
-      log?.add('accessibility');
     },
   );
 }
@@ -53,7 +40,7 @@ Finder inStep(String stepId, Finder matching) => find.descendant(
       matching: matching,
     );
 
-const String kSkippedCopy = 'Skipped — you can enable later in Settings';
+const String kSkippedCopy = 'Skipped. You can enable later in Settings';
 
 Future<void> pumpPriming(
   WidgetTester tester, {
@@ -61,7 +48,7 @@ Future<void> pumpPriming(
   PrimingRequests? requests,
   VoidCallback? onDone,
 }) async {
-  // The Android checklist (header + 6 cards + footer) runs far taller than
+  // The Android checklist (header + cards + footer) runs far taller than
   // the default 800×600 surface, and ListView only builds children near the
   // viewport — a tall virtual viewport builds every card without scrolling.
   tester.view.physicalSize = const Size(900, 2800);
@@ -85,7 +72,7 @@ void main() {
   });
 
   group('Android priming flow', () {
-    testWidgets('renders all five step groups with their value copy',
+    testWidgets('renders all step groups with their value copy',
         (tester) async {
       await pumpPriming(tester, platform: TargetPlatform.android);
 
@@ -93,26 +80,23 @@ void main() {
       expect(find.text('Notifications'), findsOneWidget);
       expect(
           find.text('Get alerted the moment we spot a threat.'), findsOneWidget);
-      // 2. Storage
-      expect(find.text('Storage'), findsOneWidget);
-      expect(find.text('Let OrbGuard check files and apps for spyware.'),
-          findsOneWidget);
-      // 3. SMS
-      expect(find.text('SMS'), findsOneWidget);
-      expect(find.text('Catch scam texts before you tap them.'), findsOneWidget);
-      // 4. Location
+      // (No Storage step: file scanning is SAF-picker based — nothing to ask.)
+      expect(find.text('Storage'), findsNothing);
+      // (No SMS step: OrbGuard holds no SMS permission — Play policy. No
+      // Accessibility step: the app ships no AccessibilityService.)
+      expect(find.text('SMS'), findsNothing);
+      expect(find.text('Accessibility'), findsNothing);
+      // 2. Location
       expect(find.text('Location'), findsOneWidget);
       expect(
           find.text(
               'Spot apps secretly tracking where you go, and test Wi-Fi safety.'),
           findsOneWidget);
-      // 5. Advanced (visually separated, labeled as Settings deep-links)
+      // 3. Advanced (visually separated, labeled as a Settings deep-link)
       expect(find.text('Usage access'), findsOneWidget);
       expect(find.text('See which apps watch you in the background.'),
           findsOneWidget);
-      expect(find.text('Accessibility'), findsOneWidget);
-      expect(find.text('Detect stalkerware screen-readers.'), findsOneWidget);
-      expect(find.text('Opens system Settings'), findsNWidgets(2));
+      expect(find.text('Opens system Settings'), findsOneWidget);
       expect(find.textContaining('ADVANCED'), findsOneWidget);
 
       // Skippable from the start; CTA only appears once steps are decided.
@@ -127,26 +111,27 @@ void main() {
           platform: TargetPlatform.android,
           requests: fakeRequests(notifications: true, log: log));
 
-      await tester.tap(inStep('notifications', find.text('Allow')));
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
 
       expect(log, contains('notifications'));
       expect(inStep('notifications', find.text('On')), findsOneWidget);
-      expect(inStep('notifications', find.text('Allow')), findsNothing);
+      expect(inStep('notifications', find.text('Continue')), findsNothing);
       expect(inStep('notifications', find.text(kSkippedCopy)), findsNothing);
     });
 
     testWidgets('Allow shows the honest Skipped state when the OS denies',
         (tester) async {
       await pumpPriming(tester,
-          platform: TargetPlatform.android, requests: fakeRequests(sms: false));
+          platform: TargetPlatform.android,
+          requests: fakeRequests(location: false));
 
-      await tester.tap(inStep('sms', find.text('Allow')));
+      await tester.tap(inStep('location', find.text('Continue')));
       await tester.pumpAndSettle();
 
       // Never claims On when the permission is not actually granted.
-      expect(inStep('sms', find.text('On')), findsNothing);
-      expect(inStep('sms', find.text(kSkippedCopy)), findsOneWidget);
+      expect(inStep('location', find.text('On')), findsNothing);
+      expect(inStep('location', find.text(kSkippedCopy)), findsOneWidget);
     });
 
     testWidgets('per-step Skip resolves the step without firing any request',
@@ -155,10 +140,10 @@ void main() {
       await pumpPriming(tester,
           platform: TargetPlatform.android, requests: fakeRequests(log: log));
 
-      await tester.tap(inStep('storage', find.text('Skip')));
+      await tester.tap(inStep('location', find.text('Skip')));
       await tester.pumpAndSettle();
 
-      expect(inStep('storage', find.text(kSkippedCopy)), findsOneWidget);
+      expect(inStep('location', find.text(kSkippedCopy)), findsOneWidget);
       expect(log, isEmpty);
     });
 
@@ -174,7 +159,7 @@ void main() {
       expect(log, ['usage_access']);
       expect(
           inStep('usage_access',
-              find.text('Opened system Settings — finish turning it on there.')),
+              find.text('Opened system Settings. Finish turning it on there.')),
           findsOneWidget);
       expect(inStep('usage_access', find.text('On')), findsNothing);
     });
@@ -188,18 +173,14 @@ void main() {
           requests: fakeRequests(location: false),
           onDone: () => done = true);
 
-      // Decide all four one-tap steps (mix of grant / deny / skip).
-      await tester.tap(inStep('notifications', find.text('Allow')));
-      await tester.pumpAndSettle();
-      await tester.tap(inStep('storage', find.text('Allow')));
-      await tester.pumpAndSettle();
-      await tester.tap(inStep('sms', find.text('Skip')));
+      // Decide both one-tap steps (grant, then deny).
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
       expect(find.text('Run my first check'), findsNothing);
-      await tester.tap(inStep('location', find.text('Allow')));
+      await tester.tap(inStep('location', find.text('Continue')));
       await tester.pumpAndSettle();
 
-      // Advanced steps stay undecided — they must not gate the CTA.
+      // The advanced step stays undecided — it must not gate the CTA.
       final cta = find.text('Run my first check');
       expect(cta, findsOneWidget);
 
@@ -262,7 +243,7 @@ void main() {
 
       expect(find.text('Run my first check'), findsNothing);
 
-      await tester.tap(inStep('notifications', find.text('Allow')));
+      await tester.tap(inStep('notifications', find.text('Continue')));
       await tester.pumpAndSettle();
       await tester.tap(inStep('location', find.text('Skip')));
       await tester.pumpAndSettle();

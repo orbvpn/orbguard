@@ -52,7 +52,7 @@ WHERE id = $1;
 UPDATE sources
 SET
     last_fetched = NOW(),
-    next_fetch = NOW() + update_interval,
+    next_fetch = NOW() + COALESCE(NULLIF(btrim(update_interval::text), '')::interval, interval '1 hour'),
     last_error = NULL,
     error_count = 0,
     updated_at = NOW()
@@ -63,7 +63,7 @@ UPDATE sources
 SET
     last_error = $2,
     error_count = error_count + 1,
-    next_fetch = NOW() + update_interval,
+    next_fetch = NOW() + COALESCE(NULLIF(btrim(update_interval::text), '')::interval, interval '1 hour'),
     status = CASE WHEN error_count >= 5 THEN 'error'::source_status ELSE status END,
     updated_at = NOW()
 WHERE id = $1;

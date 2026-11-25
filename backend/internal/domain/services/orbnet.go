@@ -66,6 +66,12 @@ func NewOrbNetService(repos *repository.Repositories, cache *cache.RedisCache, l
 	return svc
 }
 
+// dnsRuleExcludedURLSources are feeds whose URL indicators never become a DNS
+// rule. A URLhaus row names one bad file, often on a host shared with innocent
+// sites, so it must not block the whole host. The filter is applied in the
+// query so these rows also do not use up the loader's row limit.
+var dnsRuleExcludedURLSources = []string{"urlhaus"}
+
 // loadThreatIntelRules loads indicators from database into block rules
 func (s *OrbNetService) loadThreatIntelRules() {
 	ctx := context.Background()
@@ -99,6 +105,7 @@ func (s *OrbNetService) loadThreatIntelRules() {
 
 	// Also load URL indicators and extract domains
 	filter.Types = []models.IndicatorType{models.IndicatorTypeURL}
+	filter.ExcludeSourceIDs = dnsRuleExcludedURLSources
 	urlIndicators, _, err := s.repos.Indicators.List(ctx, filter)
 	if err == nil {
 		for _, ind := range urlIndicators {
@@ -709,17 +716,28 @@ func (s *OrbNetService) categoryToSeverity(category string) models.Severity {
 	}
 }
 
+// extractDomainFromURL returns the text the DNS rule loader treats as the host
+// of a stored URL. Rows already in the database depend on this exact reading,
+// including http://https://host/ for a value first seen with a mixed-case
+// scheme, so it only refuses an authority that carries user info. URLhaus rows
+// never get here: see dnsRuleExcludedURLSources.
 func extractDomainFromURL(urlStr string) string {
-	// Simple domain extraction
 	urlStr = strings.TrimPrefix(urlStr, "http://")
 	urlStr = strings.TrimPrefix(urlStr, "https://")
-	parts := strings.Split(urlStr, "/")
-	if len(parts) > 0 {
-		// Remove port if present
-		hostParts := strings.Split(parts[0], ":")
-		return strings.ToLower(hostParts[0])
+	first, _, _ := strings.Cut(urlStr, "/")
+
+	// User info makes the text before the first colon something other than
+	// the host: http://github.com:80@evil.example/ is served by evil.example.
+	authority := first
+	if end := strings.IndexAny(authority, "?#"); end >= 0 {
+		authority = authority[:end]
 	}
-	return ""
+	if strings.Contains(authority, "@") {
+		return ""
+	}
+
+	host, _, _ := strings.Cut(first, ":")
+	return strings.ToLower(host)
 }
 
 func generateSyncID() string {

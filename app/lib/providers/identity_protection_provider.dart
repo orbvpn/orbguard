@@ -158,8 +158,7 @@ class IdentityProtectionProvider extends ChangeNotifier {
     try {
       await _service.scanAllAssets();
       if (_service.lastScanErrors.isNotEmpty) {
-        _error =
-            '${_service.lastScanErrors.length} asset scan(s) failed — '
+        _error = '${_service.lastScanErrors.length} asset scan(s) failed, '
             'results may be incomplete';
       }
     } catch (e) {

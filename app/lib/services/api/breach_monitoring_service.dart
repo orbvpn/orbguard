@@ -11,12 +11,11 @@
 // (k-anonymity prefix) are sent to the backend.
 
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/api/sms_analysis.dart';
+import '../security/password_k_anonymity.dart';
 import 'api_interceptors.dart';
 import 'orbguard_api_client.dart';
 
@@ -103,19 +102,19 @@ class BreachMonitoringService {
   }
 
   /// Check a password using SHA-1 k-anonymity
-  /// (POST /api/v1/darkweb/check/password). Only the first five hex
-  /// characters of the SHA-1 hash leave the device; the backend proxies
-  /// the range query so no third-party endpoint is contacted directly.
+  /// (POST /api/v1/darkweb/password/range). Only the first five hex
+  /// characters of the SHA-1 hash leave the device; the suffix is compared
+  /// here against the list the backend returns.
   Future<PasswordBreachResult> checkPassword(String password) async {
     if (password.isEmpty) {
       throw ArgumentError.value('<redacted>', 'password', 'must not be empty');
     }
 
-    final hash = sha1.convert(utf8.encode(password)).toString().toUpperCase();
-    final hashPrefix = hash.substring(0, 5);
+    final query = PasswordRangeQuery.fromPassword(password);
 
     try {
-      return await _api.checkPasswordBreaches(hashPrefix);
+      final range = await _api.getPasswordRange(query.prefix);
+      return evaluatePasswordRange(query, range);
     } on ApiError catch (e) {
       debugPrint(
         'BreachMonitoringService: password breach check failed '
@@ -148,7 +147,7 @@ class BreachMonitoringService {
   ) async {
     debugPrint(
       'BreachMonitoringService: domain breach check for "$domain" is '
-      'disabled — backend endpoint /api/v1/darkweb/check/domain is not '
+      'disabled: backend endpoint /api/v1/darkweb/check/domain is not '
       'available yet.',
     );
     return BreachCapabilityResult.pendingBackendSupport(
@@ -166,7 +165,7 @@ class BreachMonitoringService {
   /// returning an empty catalog as if it were real.
   Future<BreachCapabilityResult<List<BreachInfo>>> getAllBreaches() async {
     debugPrint(
-      'BreachMonitoringService: known-breach catalog is disabled — '
+      'BreachMonitoringService: known-breach catalog is disabled: '
       'GET /api/v1/darkweb/breaches does not serve catalog data yet.',
     );
     return BreachCapabilityResult.pendingBackendSupport(
@@ -182,7 +181,7 @@ class BreachMonitoringService {
   /// catalog, which the backend does not serve yet.
   Future<BreachCapabilityResult<BreachStats>> getStats() async {
     debugPrint(
-      'BreachMonitoringService: breach corpus statistics are disabled — '
+      'BreachMonitoringService: breach corpus statistics are disabled: '
       'they depend on the breach catalog endpoint, which is not served '
       'by the backend yet.',
     );

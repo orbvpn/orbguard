@@ -116,7 +116,9 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         ..addAll(insights);
       _modelsNotTrained = modelsNotTrained;
       _modelsNotTrainedMessage = modelsNotTrainedMessage;
-      _error = errors.isEmpty ? null : 'Failed to load ML data — ${errors.join('; ')}';
+      _error = errors.isEmpty
+          ? null
+          : 'Failed to load ML data: ${errors.join('; ')}';
       _isLoading = false;
     });
   }
@@ -143,8 +145,8 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
         SnackBar(
           content: Text(
             _anomalies.isEmpty
-                ? 'Analysis complete — no anomalies detected'
-                : 'Analysis complete — ${_anomalies.length} '
+                ? 'Analysis complete. No anomalies detected'
+                : 'Analysis complete. ${_anomalies.length} '
                     'anomal${_anomalies.length == 1 ? 'y' : 'ies'} detected',
           ),
         ),
@@ -558,7 +560,7 @@ class _MLAnalysisScreenState extends State<MLAnalysisScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
-                    'No insights yet — insights are derived from collected '
+                    'No insights yet. Insights are derived from collected '
                     'indicators and model state, and the store is empty',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: cs.onSurfaceVariant),

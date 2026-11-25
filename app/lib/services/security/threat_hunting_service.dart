@@ -954,7 +954,7 @@ class ThreatHuntingService {
         evidence: 'Package: $packageName, Permissions: '
             '${permissionTokens.join(', ')}'
             '${runtimeTokens.isEmpty ? '' : ' (runtime signals '
-                '${runtimeTokens.join(', ')} not evaluated — '
+                '${runtimeTokens.join(', ')} not evaluated, '
                 'no runtime telemetry available)'}',
         context: app,
         mitreAttackIds: hunt.mitreAttackIds,
@@ -1263,7 +1263,7 @@ class ThreatHuntingService {
         findings: findings,
         itemsScanned: urls.length,
         unavailableReason:
-            'URL reputation check (/url/check) failed: $e — only the local '
+            'URL reputation check (/url/check) failed: $e. Only the local '
             'pattern match was evaluated',
       );
     }
@@ -1319,7 +1319,7 @@ class ThreatHuntingService {
 
     if (findings.isEmpty) {
       if (unavailableRules.length == hunt.rules.length) {
-        return '${hunt.name}: no rules could be evaluated on this device — '
+        return '${hunt.name}: no rules could be evaluated on this device: '
             'result is inconclusive, not clean.$unavailableNote';
       }
       return 'No threats detected during ${hunt.name}.$unavailableNote';

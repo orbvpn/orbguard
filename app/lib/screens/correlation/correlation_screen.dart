@@ -13,7 +13,6 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -385,8 +384,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         SnackBar(
           content: Text(
             found == 0
-                ? 'Correlation run complete — no new correlations found'
-                : 'Correlation run complete — $found correlation'
+                ? 'Correlation run complete. No new correlations found'
+                : 'Correlation run complete. $found correlation'
                     '${found == 1 ? '' : 's'} found',
           ),
         ),

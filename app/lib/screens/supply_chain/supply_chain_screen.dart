@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -204,7 +203,7 @@ class _SupplyChainScreenState extends State<SupplyChainScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '${vuln.cveId} — CVSS '
+                            '${vuln.cveId}: CVSS '
                             '${vuln.cvssScore.toStringAsFixed(1)}',
                             style: TextStyle(
                               color: cs.onSurface,

@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 import 'api_interceptors.dart';
+import '../security/password_k_anonymity.dart';
 import '../../models/api/threat_indicator.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../models/api/url_reputation.dart';
@@ -110,7 +111,9 @@ class OrbGuardApiClient {
     if (PlatformInfo.isAndroid) {
       final info = await deviceInfo.androidInfo;
       return {
-        'device_id': info.id,
+        // NOT info.id — that is Build.ID, shared by every device on this OS
+        // build. See _installId().
+        'device_id': await _installId('android'),
         'device_name': '${info.manufacturer} ${info.model}',
         'platform': 'android',
         'os_version': info.version.release,
@@ -165,7 +168,10 @@ class OrbGuardApiClient {
     }
 
     return {
-      'device_id': '',
+      // An empty device_id is a hard 400 from the backend, so registration
+      // could never succeed on an unrecognised platform. Fall back to a
+      // persisted install id like every other branch.
+      'device_id': await _installId('device'),
       'device_name': PlatformInfo.localHostname,
       'platform': PlatformInfo.operatingSystem,
       'os_version': PlatformInfo.operatingSystemVersion,
@@ -177,19 +183,32 @@ class OrbGuardApiClient {
 
   /// Stable per-browser-install device ID: generated once with a secure RNG
   /// and persisted, so re-registration on every page load is avoided.
-  Future<String> _webInstallId() async {
-    const key = 'orbguard_web_install_id';
+  Future<String> _webInstallId() => _installId('web');
+
+  /// Stable per-install device ID: generated once with a secure RNG and
+  /// persisted under a [prefix]-scoped key.
+  ///
+  /// Used wherever the platform exposes no genuinely per-device identifier.
+  /// Android is the important case: `AndroidDeviceInfo.id` is `Build.ID`, the
+  /// OS *build* label (e.g. "TQ3A.230805.001") — the SAME string on every
+  /// handset running that build. Sending it as `device_id` meant every such
+  /// device collided onto one backend device row, and since
+  /// POST /api/v1/auth/device is public and takes the id on trust, anyone
+  /// could mint an API key for it by guessing a public build number.
+  Future<String> _installId(String prefix) async {
+    final key = 'orbguard_${prefix}_install_id';
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getString(key);
       if (existing != null && existing.isNotEmpty) return existing;
       final rng = Random.secure();
-      final id = 'web-${List.generate(16, (_) => rng.nextInt(16).toRadixString(16)).join()}';
+      final id =
+          '$prefix-${List.generate(32, (_) => rng.nextInt(16).toRadixString(16)).join()}';
       await prefs.setString(key, id);
       return id;
     } catch (_) {
       // Storage unavailable (private mode) — session-scoped fallback.
-      return 'web-${DateTime.now().millisecondsSinceEpoch}';
+      return '$prefix-${DateTime.now().millisecondsSinceEpoch}';
     }
   }
 
@@ -1186,18 +1205,16 @@ class OrbGuardApiClient {
     }
   }
 
-  /// Check password for breaches (k-anonymity)
-  Future<PasswordBreachResult> checkPasswordBreaches(
-    String passwordHashPrefix,
-  ) async {
+  /// Known hash suffixes for a five character SHA-1 prefix (k-anonymity).
+  /// The caller compares its own suffix on the device.
+  Future<Map<String, int>> getPasswordRange(String prefix) async {
     try {
       final response = await _dio.post(
-        ApiEndpoints.darkwebCheckPassword,
-        data: {'password_hash_prefix': passwordHashPrefix},
+        ApiEndpoints.darkwebPasswordRange,
+        data: {'prefix': prefix},
+        options: Options(extra: {'sensitiveBody': true}),
       );
-      return PasswordBreachResult.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      return parsePasswordRange(response.data);
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }

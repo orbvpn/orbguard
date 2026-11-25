@@ -2,12 +2,12 @@
 // Anti-theft features: locate, lock, wipe, ring, SIM monitoring
 
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../presentation/theme/app_theme.dart';
-import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
@@ -15,6 +15,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/victim_safety_notice.dart';
 import '../../providers/device_security_provider.dart';
+import '../../services/device_agent/device_admin.dart';
 import '../../services/device_agent/device_agent.dart' show AgentDisplayMessage;
 
 class DeviceSecurityScreen extends StatefulWidget {
@@ -25,12 +26,42 @@ class DeviceSecurityScreen extends StatefulWidget {
 }
 
 class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
+  // Native device-admin state (Android only): remote lock/wipe cannot work
+  // until the user grants device-administrator to OrbGuard.
+  final DeviceAdminBridge _deviceAdmin = DeviceAdminBridge();
+  bool _adminActive = false;
+  bool _requestingAdmin = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeviceSecurityProvider>().init();
     });
+    _refreshAdminStatus();
+  }
+
+  Future<void> _refreshAdminStatus() async {
+    if (!Platform.isAndroid) return;
+    final active = await _deviceAdmin.isAdminActive();
+    if (mounted) setState(() => _adminActive = active);
+  }
+
+  Future<void> _enableDeviceAdmin() async {
+    if (_requestingAdmin) return;
+    setState(() => _requestingAdmin = true);
+    // Launches the Android system consent screen; returns once the user
+    // grants (or declines) — we then re-read the real state, never assume.
+    final res = await _deviceAdmin.requestAdmin();
+    if (!mounted) return;
+    setState(() => _requestingAdmin = false);
+    await _refreshAdminStatus();
+    if (!mounted) return;
+    if (!res.ok && res.failureReason != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.failureReason!)),
+      );
+    }
   }
 
   @override
@@ -324,7 +355,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
-                  score == null ? '—' : '$score',
+                  score == null ? '-' : '$score',
                   style: BrandText.heading(size: 20, color: ink),
                 ),
               ],
@@ -342,7 +373,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
                 const SizedBox(height: 4),
                 Text(
                   score == null
-                      ? 'Not assessed yet — run a scan'
+                      ? 'Not assessed yet. Run a scan'
                       : score >= 80
                           ? 'Your device is well protected'
                           : score >= 50
@@ -564,6 +595,85 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
     );
   }
 
+  /// Device-administrator status + enable action. Remote lock and wipe (from
+  /// the app OR the web panel) only take effect once the user grants OrbGuard
+  /// device-administrator on this phone — this makes that honest and actionable.
+  Widget _buildDeviceAdminCard() {
+    if (_adminActive) {
+      return GlassCard(
+        child: Row(
+          children: [
+            DuotoneIcon('verified_check', color: AppColors.accentInk, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Device administrator enabled',
+                      style: BrandText.title(size: 14.5)),
+                  const SizedBox(height: 2),
+                  Text('Remote lock and wipe are ready.',
+                      style: BrandText.body(
+                          color: context.colors.onSurfaceVariant, size: 12.5)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              DuotoneIcon('shield_warning',
+                  color: GlassTheme.warningColor, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Turn on remote lock & wipe',
+                    style: BrandText.title(size: 14.5)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Remote lock and wipe need device-administrator permission. '
+            'Until you enable it, those commands will safely do nothing.',
+            style: BrandText.body(
+                color: context.colors.onSurfaceVariant, size: 12.5),
+          ),
+          const SizedBox(height: 12),
+          GlassContainer(
+            onTap: _requestingAdmin ? null : _enableDeviceAdmin,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_requestingAdmin)
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.accentInk),
+                  )
+                else
+                  DuotoneIcon('shield_keyhole',
+                      color: AppColors.accentInk, size: 20),
+                const SizedBox(width: 8),
+                Text('Enable device administrator',
+                    style: BrandText.title(
+                        color: AppColors.accentInk, size: 13.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVulnerabilityCard(OSVulnerability vuln) {
     final severityColor = vuln.severity == 'critical'
         ? AppColors.severityCritical
@@ -657,6 +767,13 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             style: BrandText.title(size: 18),
           ),
           const SizedBox(height: 12),
+
+          // Device-administrator grant — the prerequisite for remote lock/wipe
+          // to actually take effect (Android only). Honest about state.
+          if (Platform.isAndroid) ...[
+            _buildDeviceAdminCard(),
+            const SizedBox(height: 12),
+          ],
 
           _buildSettingsTile(
             svgIcon: 'map_point',
@@ -980,7 +1097,7 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Android does not expose real ICCIDs to apps — entries marked '
+              'Android does not expose real ICCIDs to apps. Entries marked '
               '"sub:" are stable subscription fingerprints used for change '
               'detection.',
               style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 11),
@@ -1371,8 +1488,8 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
       }
     }
     return Text(
-      'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}) '
-      '— cannot be rendered inline',
+      'Image stored remotely (${selfie.imageUrl.length > 60 ? '${selfie.imageUrl.substring(0, 60)}…' : selfie.imageUrl}). '
+      'It cannot be rendered inline.',
       style: TextStyle(color: context.colors.onSurfaceVariant, fontSize: 12),
     );
   }

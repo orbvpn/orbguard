@@ -364,7 +364,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
             Text(
               'OrbGuard cannot freeze credit on your behalf. Use each '
               'bureau\'s official freeze page, then record your status '
-              'here — it is stored as self-reported and is not verified.',
+              'here. It is stored as self-reported and is not verified.',
               style: TextStyle(
                 color: context.colors.onSurfaceVariant,
                 fontSize: 12,
@@ -625,7 +625,7 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
             Flexible(
               child: Text(
                 asset.status == MonitoringStatus.unavailable
-                    ? '${asset.status.displayName} — no live data source'
+                    ? '${asset.status.displayName}: no live data source'
                     : asset.status.displayName,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

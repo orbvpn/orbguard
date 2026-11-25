@@ -2,9 +2,13 @@ package cache
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -266,6 +270,144 @@ func (c *RedisCache) ReleaseLock(ctx context.Context, lockKey string) error {
 	return c.Delete(ctx, KeySchedulerLock+lockKey)
 }
 
+// releaseOwnedLockScript deletes the lock only while it still holds the
+// caller's owner value; GET and DEL as two commands could delete a lock another
+// holder took between them.
+var releaseOwnedLockScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`)
+
+// AcquireOwnedLock takes a distributed lock under a fresh random owner value
+// and returns that value for ReleaseOwnedLock.
+func (c *RedisCache) AcquireOwnedLock(ctx context.Context, lockKey string, ttl time.Duration) (string, bool, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", false, fmt.Errorf("failed to generate lock owner: %w", err)
+	}
+	owner := hex.EncodeToString(raw)
+	acquired, err := c.SetNX(ctx, KeySchedulerLock+lockKey, owner, ttl)
+	if err != nil || !acquired {
+		return "", false, err
+	}
+	return owner, true, nil
+}
+
+// ReleaseOwnedLock releases the lock only if owner still holds it. It reports
+// whether a lock was released: false means the lock expired or has a new holder,
+// whose lock is left in place.
+func (c *RedisCache) ReleaseOwnedLock(ctx context.Context, lockKey, owner string) (bool, error) {
+	deleted, err := releaseOwnedLockScript.Run(ctx, c.client, []string{c.key(KeySchedulerLock + lockKey)}, owner).Int64()
+	if err != nil {
+		return false, err
+	}
+	return deleted == 1, nil
+}
+
+// reserveQuotaScript adds one to every key, or to none when any key is at its
+// limit, so a refused request consumes nothing. ARGV[1] is the TTL in seconds
+// and ARGV[i+1] the limit of KEYS[i]. It returns the 1-based index of the key
+// at its limit, or 0 when reserved.
+var reserveQuotaScript = redis.NewScript(`
+for i, key in ipairs(KEYS) do
+  if tonumber(redis.call('GET', key) or '0') >= tonumber(ARGV[i + 1]) then
+    return i
+  end
+end
+for _, key in ipairs(KEYS) do
+  redis.call('INCR', key)
+  redis.call('EXPIRE', key, ARGV[1])
+end
+return 0
+`)
+
+// ReserveQuota atomically reserves one unit on every key. It returns 0 when
+// reserved, or the 1-based index of the first key already at its limit.
+func (c *RedisCache) ReserveQuota(ctx context.Context, keys []string, limits []int64, ttl time.Duration) (int, error) {
+	if len(keys) == 0 || len(keys) != len(limits) {
+		return 0, errors.New("reserve quota: keys and limits must match")
+	}
+	prefixed := make([]string, len(keys))
+	args := make([]any, 0, len(limits)+1)
+	args = append(args, int64(ttl/time.Second))
+	for i, key := range keys {
+		prefixed[i] = c.key(key)
+		args = append(args, limits[i])
+	}
+	exhausted, err := reserveQuotaScript.Run(ctx, c.client, prefixed, args...).Int()
+	if err != nil {
+		return 0, err
+	}
+	return exhausted, nil
+}
+
+// releaseQuotaScript gives one unit back on every key, never going below zero.
+var releaseQuotaScript = redis.NewScript(`
+for _, key in ipairs(KEYS) do
+  if tonumber(redis.call('GET', key) or '0') > 0 then
+    redis.call('DECR', key)
+  end
+end
+return 0
+`)
+
+// ReleaseQuota returns the unit a ReserveQuota took on keys.
+func (c *RedisCache) ReleaseQuota(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	prefixed := make([]string, len(keys))
+	for i, key := range keys {
+		prefixed[i] = c.key(key)
+	}
+	return releaseQuotaScript.Run(ctx, c.client, prefixed).Err()
+}
+
+// recordDistinctReportScript adds one reporter to two per-subject sets, each
+// capped at ARGV[4] members. A subject not seen before also takes one unit of
+// the daily counter KEYS[3], so reports cannot grow Redis without bound.
+var recordDistinctReportScript = redis.NewScript(`
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[2])
+if redis.call('EXISTS', KEYS[1], KEYS[2]) == 0 then
+  if tonumber(redis.call('GET', KEYS[3]) or '0') >= tonumber(ARGV[5]) then
+    return 0
+  end
+  redis.call('INCR', KEYS[3])
+  redis.call('EXPIRE', KEYS[3], 172800)
+end
+for i = 1, 2 do
+  local member = ARGV[5 + i]
+  if redis.call('ZSCORE', KEYS[i], member) or redis.call('ZCARD', KEYS[i]) < tonumber(ARGV[4]) then
+    redis.call('ZADD', KEYS[i], ARGV[1], member)
+  end
+  redis.call('EXPIRE', KEYS[i], ARGV[3])
+end
+return 1
+`)
+
+// RecordDistinctReport records one reporter and one network for a subject.
+func (c *RedisCache) RecordDistinctReport(ctx context.Context, keysKey, networksKey, dayKey, reporter, network string, now time.Time, window time.Duration, maxPerSet, maxNewPerDay int64) error {
+	return recordDistinctReportScript.Run(ctx, c.client,
+		[]string{c.key(keysKey), c.key(networksKey), c.key(dayKey)},
+		now.Unix(), now.Add(-window).Unix(), int64(window/time.Second), maxPerSet, maxNewPerDay, reporter, network,
+	).Err()
+}
+
+// CountDistinctReporters counts the reporters and networks seen after since.
+func (c *RedisCache) CountDistinctReporters(ctx context.Context, keysKey, networksKey string, since time.Time) (int64, int64, error) {
+	floor := "(" + strconv.FormatInt(since.Unix(), 10)
+	pipe := c.client.Pipeline()
+	keys := pipe.ZCount(ctx, c.key(keysKey), floor, "+inf")
+	networks := pipe.ZCount(ctx, c.key(networksKey), floor, "+inf")
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, 0, err
+	}
+	return keys.Val(), networks.Val(), nil
+}
+
 // CheckRateLimit checks and increments the rate limit counter
 // Returns (allowed, remaining, resetTime, error)
 func (c *RedisCache) CheckRateLimit(ctx context.Context, key string, limit int64, window time.Duration) (bool, int64, time.Time, error) {
@@ -289,4 +431,60 @@ func (c *RedisCache) CheckRateLimit(ctx context.Context, key string, limit int64
 	resetTime := now.Add(window)
 
 	return count <= limit, remaining, resetTime, nil
+}
+
+// RecordFailure counts one failure against key and (re)arms its window, so a
+// lock holds for `window` after the LAST failure rather than the first. INCR
+// and EXPIRE run in one MULTI/EXEC transaction: a plain pipeline could apply
+// the INCR and lose the EXPIRE on a dropped connection, leaving a counter
+// with no expiry, and a locked counter that never expires locks its address
+// for good. Unlike CheckRateLimit the key has no fixed-window alignment: a
+// lockout must not lapse just because the clock crossed a boundary. Returns
+// the new count.
+func (c *RedisCache) RecordFailure(ctx context.Context, key string, window time.Duration) (int64, error) {
+	pipe := c.TxPipeline()
+	incr := pipe.Incr(ctx, c.key(key))
+	pipe.Expire(ctx, c.key(key), window)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// FailureCount returns the failures recorded against key in its live window
+// and how long that window still has to run. A key that was never set, or
+// has expired, reports (0, 0, nil). A key that exists WITHOUT an expiry
+// reports its count with a negative duration so the caller can tell a
+// damaged counter from one about to lapse; the two reads share a MULTI/EXEC
+// so the count and the TTL describe the same moment.
+func (c *RedisCache) FailureCount(ctx context.Context, key string) (int64, time.Duration, error) {
+	pipe := c.TxPipeline()
+	get := pipe.Get(ctx, c.key(key))
+	ttl := pipe.TTL(ctx, c.key(key))
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return 0, 0, err
+	}
+	count, err := get.Int64()
+	if errors.Is(err, redis.Nil) {
+		return 0, 0, nil
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	remaining := ttl.Val()
+	switch remaining {
+	case -2:
+		// Gone between the two commands; a transaction makes that
+		// unreachable, but the answer is still "no counter".
+		return 0, 0, nil
+	case -1:
+		// Exists with no expiry: go-redis reports -1ns for a persistent key.
+		return count, -1, nil
+	}
+	return count, remaining, nil
+}
+
+// ClearFailures forgets the failures recorded against key.
+func (c *RedisCache) ClearFailures(ctx context.Context, key string) error {
+	return c.Delete(ctx, key)
 }

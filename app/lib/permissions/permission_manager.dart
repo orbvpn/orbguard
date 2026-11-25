@@ -26,12 +26,10 @@ class PermissionManager {
       description: 'Required for basic threat detection',
       icon: AppIcons.shieldCheck,
       permissions: [
-        PermissionInfo(
-          permission: Permission.storage,
-          name: 'Storage Access',
-          reason: 'Scan files for malware and suspicious modifications',
-          impact: 'Enables file system threat detection',
-        ),
+        // NOTE: no storage permission here. File/APK scanning uses the system
+        // file picker (SAF) and needs NO storage permission; the old
+        // MANAGE_EXTERNAL_STORAGE-based "Storage Access" entry was structurally
+        // un-grantable after that permission was dropped for Play compliance.
         PermissionInfo(
           permission: Permission.phone,
           name: 'Phone State',
@@ -45,18 +43,6 @@ class PermissionManager {
       description: 'Enables deep threat analysis',
       icon: AppIcons.search,
       permissions: [
-        PermissionInfo(
-          permission: Permission.sms,
-          name: 'SMS Access',
-          reason: 'Detect SMS-based exploits (Pegasus uses SMS)',
-          impact: 'Critical for zero-click exploit detection',
-        ),
-        PermissionInfo(
-          permission: Permission.phone,
-          name: 'Call Logs',
-          reason: 'Identify suspicious call patterns',
-          impact: 'Detects communication monitoring malware',
-        ),
         PermissionInfo(
           permission: Permission.location,
           name: 'Location',
@@ -76,7 +62,6 @@ class PermissionManager {
   // Current permission states
   final Map<Permission, PermissionStatus> _permissionStates = {};
   bool _hasUsageStats = false;
-  bool _hasAccessibility = false;
   bool _hasRootAccess = false;
   String _accessMethod = 'Standard';
 
@@ -102,7 +87,15 @@ class PermissionManager {
             _permissionStates[permInfo.permission] = PermissionStatus.denied;
           }
         } else {
-          final status = await permInfo.permission.status;
+          // A platform without an implementation for this permission
+          // (MissingPluginException) reads as denied — one bad probe must
+          // never abort the whole check and strand the screen on its spinner.
+          PermissionStatus status;
+          try {
+            status = await permInfo.permission.status;
+          } catch (_) {
+            status = PermissionStatus.denied;
+          }
           _permissionStates[permInfo.permission] = status;
 
           if (status.isGranted) {
@@ -118,10 +111,8 @@ class PermissionManager {
 
     // Check special permissions
     _hasUsageStats = await _checkUsageStatsPermission();
-    _hasAccessibility = await _checkAccessibilityPermission();
 
     if (_hasUsageStats) result.granted.add('Usage Stats');
-    if (_hasAccessibility) result.granted.add('Accessibility');
 
     // Check root/shell access
     await _checkSystemAccess();
@@ -159,19 +150,15 @@ class PermissionManager {
     if (_permissionStates[Permission.phone]?.isGranted ?? false) {
       capability += 5;
     }
-    if (_permissionStates[Permission.sms]?.isGranted ?? false) {
-      capability += 10;
-    }
     if (_permissionStates[Permission.location]?.isGranted ?? false) {
       capability += 5;
     }
-    if (_permissionStates[Permission.storage]?.isGranted ?? false) {
-      capability += 10;
-    }
+    // File/APK scanning always works via the system file picker (SAF) — no
+    // storage permission exists to gate it, so the capability is constant.
+    capability += 10;
 
     // Special permissions (25% total)
     if (_hasUsageStats) capability += 15;
-    if (_hasAccessibility) capability += 10;
 
     // Enhanced/Root access (15% total)
     if (_hasRootAccess) {
@@ -192,14 +179,7 @@ class PermissionManager {
       requestEssentialPermissions() async {
     final results = <Permission, PermissionStatus>{};
 
-    // Request storage permission via native method (Android 11+)
-    if (PlatformInfo.isAndroid) {
-      await requestStoragePermission();
-      final hasStorage = await _checkStoragePermission();
-      results[Permission.storage] = hasStorage
-          ? PermissionStatus.granted
-          : PermissionStatus.denied;
-    }
+    // (No storage request: file scanning is SAF-picker based — nothing to grant.)
 
     // Request phone permission
     final phoneStatus = await Permission.phone.request();
@@ -211,7 +191,6 @@ class PermissionManager {
   /// Request advanced permissions
   Future<Map<Permission, PermissionStatus>> requestAdvancedPermissions() async {
     final permissions = [
-      Permission.sms,
       Permission.location,
       Permission.phone,
     ];
@@ -346,19 +325,6 @@ class PermissionManager {
     }
   }
 
-  /// Check if Accessibility permission is granted
-  Future<bool> _checkAccessibilityPermission() async {
-    if (!PlatformInfo.isAndroid) return false;
-
-    try {
-      final result =
-          await platform.invokeMethod('checkAccessibilityPermission');
-      return result['hasPermission'] ?? false;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Request Usage Stats permission (navigates to Settings)
   Future<bool> requestUsageStatsPermission(BuildContext context) async {
     final shouldOpen = await showAppSheet<bool>(
@@ -413,60 +379,6 @@ class PermissionManager {
     return false;
   }
 
-  /// Request Accessibility permission (navigates to Settings)
-  Future<bool> requestAccessibilityPermission(BuildContext context) async {
-    final shouldOpen = await showAppSheet<bool>(
-      context,
-      child: _ConfirmSheet(
-        title: 'Enable Accessibility Service',
-        secondaryLabel: 'Cancel',
-        primaryLabel: 'Open Settings',
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('This permission allows OrbGuard to:\n\n'
-                '• Detect malicious accessibility services\n'
-                '• Monitor screen content for threats\n'
-                '• Identify keylogger attempts\n\n'
-                'This helps detect spyware that uses accessibility features.'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  DuotoneIcon(AppIcons.dangerTriangle, color: AppColors.secondaryInk),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'OrbGuard will NOT read your screen content. This permission is only used to detect malicious services.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (shouldOpen ?? false) {
-      try {
-        await platform.invokeMethod('openAccessibilitySettings');
-        return true;
-      } catch (e) {
-        debugPrint('Error opening accessibility settings: $e');
-        return false;
-      }
-    }
-
-    return false;
-  }
-
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
@@ -504,7 +416,6 @@ class PermissionManager {
     final permissionMap = {
       Permission.storage: 'Storage',
       Permission.phone: 'Phone',
-      Permission.sms: 'SMS',
       Permission.location: 'Location',
       Permission.locationAlways: 'Background Location',
     };
@@ -553,14 +464,11 @@ class PermissionScanResult {
   int get totalPermissions =>
       granted.length + denied.length + permanentlyDenied.length;
 
-  bool get hasAllEssential =>
-      granted.contains('Storage Access') && granted.contains('Phone State');
+  bool get hasAllEssential => granted.contains('Phone State');
 
-  bool get hasAllAdvanced =>
-      granted.contains('SMS Access') && granted.contains('Location');
+  bool get hasAllAdvanced => granted.contains('Location');
 
-  bool get hasSpecialPermissions =>
-      granted.contains('Usage Stats') || granted.contains('Accessibility');
+  bool get hasSpecialPermissions => granted.contains('Usage Stats');
 }
 
 /// A branded confirm sheet that mirrors [SheetPanel] but completes the

@@ -13,6 +13,30 @@ import (
 	"orbguard-lab/internal/domain/models"
 )
 
+// updateIntervalSQL reads sources.update_interval as an interval whatever
+// type the column has in the database at hand. The migrations declare it
+// INTERVAL, but production's sources table returns it as text (OID 25): every
+// read there failed with "cannot scan text (OID 25) in text format into
+// *time.Duration", and NOW() + update_interval has no operator for text.
+// Going through text works for both types: an INTERVAL column round-trips,
+// and a TEXT one is parsed ('15 minutes', '01:00:00', '4h', '15m0s' and '900'
+// all parse). A NULL or a blank string, which a hand-made table may hold,
+// reads as the migration's default of one hour instead of failing the whole
+// query.
+const updateIntervalSQL = `COALESCE(NULLIF(btrim(update_interval::text), '')::interval, interval '1 hour')`
+
+// fetchResultStatuses guards every write of a fetch outcome: a row an
+// operator paused or disabled after the fetch read it keeps that status.
+const fetchResultStatuses = `status IN ('active', 'error')`
+
+// sourceColumns is the column list every source read scans with scanSource
+// and scanSourceFromRows, in their order.
+const sourceColumns = `id, slug, name, description, category, type, status,
+			   api_url, feed_url, github_urls, requires_api_key,
+			   reliability, weight, ` + updateIntervalSQL + ` AS update_interval,
+			   last_fetched, next_fetch, last_error, error_count,
+			   indicator_count, created_at, updated_at`
+
 // SourceRepository handles source persistence
 type SourceRepository struct {
 	pool *pgxpool.Pool
@@ -40,7 +64,7 @@ func (r *SourceRepository) Create(ctx context.Context, s *models.Source) (*model
 			last_fetched, next_fetch, last_error, error_count,
 			indicator_count, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::interval, $15, $16, $17, $18, $19, $20, $21
 		) RETURNING id, created_at, updated_at`
 
 	err := r.pool.QueryRow(ctx, query,
@@ -74,7 +98,7 @@ func (r *SourceRepository) Update(ctx context.Context, s *models.Source) (*model
 			requires_api_key = $10,
 			reliability = $11,
 			weight = $12,
-			update_interval = $13,
+			update_interval = $13::interval,
 			updated_at = NOW()
 		WHERE id = $1
 		RETURNING updated_at`
@@ -98,11 +122,7 @@ func (r *SourceRepository) Update(ctx context.Context, s *models.Source) (*model
 // GetByID retrieves a source by ID
 func (r *SourceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Source, error) {
 	query := `
-		SELECT id, slug, name, description, category, type, status,
-			   api_url, feed_url, github_urls, requires_api_key,
-			   reliability, weight, update_interval,
-			   last_fetched, next_fetch, last_error, error_count,
-			   indicator_count, created_at, updated_at
+		SELECT ` + sourceColumns + `
 		FROM sources
 		WHERE id = $1`
 
@@ -112,11 +132,7 @@ func (r *SourceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.S
 // GetBySlug retrieves a source by its slug
 func (r *SourceRepository) GetBySlug(ctx context.Context, slug string) (*models.Source, error) {
 	query := `
-		SELECT id, slug, name, description, category, type, status,
-			   api_url, feed_url, github_urls, requires_api_key,
-			   reliability, weight, update_interval,
-			   last_fetched, next_fetch, last_error, error_count,
-			   indicator_count, created_at, updated_at
+		SELECT ` + sourceColumns + `
 		FROM sources
 		WHERE slug = $1`
 
@@ -126,11 +142,7 @@ func (r *SourceRepository) GetBySlug(ctx context.Context, slug string) (*models.
 // List retrieves all sources
 func (r *SourceRepository) List(ctx context.Context) ([]*models.Source, error) {
 	query := `
-		SELECT id, slug, name, description, category, type, status,
-			   api_url, feed_url, github_urls, requires_api_key,
-			   reliability, weight, update_interval,
-			   last_fetched, next_fetch, last_error, error_count,
-			   indicator_count, created_at, updated_at
+		SELECT ` + sourceColumns + `
 		FROM sources
 		ORDER BY name`
 
@@ -155,11 +167,7 @@ func (r *SourceRepository) List(ctx context.Context) ([]*models.Source, error) {
 // ListActive retrieves all active sources
 func (r *SourceRepository) ListActive(ctx context.Context) ([]*models.Source, error) {
 	query := `
-		SELECT id, slug, name, description, category, type, status,
-			   api_url, feed_url, github_urls, requires_api_key,
-			   reliability, weight, update_interval,
-			   last_fetched, next_fetch, last_error, error_count,
-			   indicator_count, created_at, updated_at
+		SELECT ` + sourceColumns + `
 		FROM sources
 		WHERE status = 'active'
 		ORDER BY weight DESC, name`
@@ -185,11 +193,7 @@ func (r *SourceRepository) ListActive(ctx context.Context) ([]*models.Source, er
 // ListDue retrieves sources that are due for update
 func (r *SourceRepository) ListDue(ctx context.Context) ([]*models.Source, error) {
 	query := `
-		SELECT id, slug, name, description, category, type, status,
-			   api_url, feed_url, github_urls, requires_api_key,
-			   reliability, weight, update_interval,
-			   last_fetched, next_fetch, last_error, error_count,
-			   indicator_count, created_at, updated_at
+		SELECT ` + sourceColumns + `
 		FROM sources
 		WHERE status = 'active' AND (next_fetch IS NULL OR next_fetch <= NOW())
 		ORDER BY weight DESC, name`
@@ -217,13 +221,13 @@ func (r *SourceRepository) UpdateAfterFetch(ctx context.Context, id uuid.UUID, i
 	query := `
 		UPDATE sources SET
 			last_fetched = NOW(),
-			next_fetch = NOW() + update_interval,
+			next_fetch = NOW() + ` + updateIntervalSQL + `,
 			last_error = NULL,
 			error_count = 0,
 			indicator_count = indicator_count + $2,
 			status = 'active',
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
 	_, err := r.pool.Exec(ctx, query, id, indicatorCount)
 	if err != nil {
@@ -238,14 +242,14 @@ func (r *SourceRepository) UpdateAfterError(ctx context.Context, id uuid.UUID, e
 	query := `
 		UPDATE sources SET
 			last_fetched = NOW(),
-			next_fetch = NOW() + (update_interval * LEAST(error_count + 1, 4)),
+			next_fetch = NOW() + (` + updateIntervalSQL + ` * LEAST(error_count + 1, 4)),
 			last_error = $2,
 			error_count = error_count + 1,
 			status = CASE WHEN error_count >= 3 THEN 'error' ELSE status END,
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
-	_, err := r.pool.Exec(ctx, query, id, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to update source after error: %w", err)
 	}
@@ -266,7 +270,7 @@ func (r *SourceRepository) UpdateAfterRateLimit(ctx context.Context, id uuid.UUI
 			updated_at = NOW()
 		WHERE id = $1`
 
-	_, err := r.pool.Exec(ctx, query, id, nextFetch, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, nextFetch, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to update source after rate limit: %w", err)
 	}
@@ -283,14 +287,14 @@ func (r *SourceRepository) MarkPlanLimited(ctx context.Context, id uuid.UUID, er
 	query := `
 		UPDATE sources SET
 			last_fetched = NOW(),
-			next_fetch = NOW() + GREATEST(update_interval, interval '24 hours'),
+			next_fetch = NOW() + GREATEST(` + updateIntervalSQL + `, interval '24 hours'),
 			last_error = $2,
 			error_count = error_count + 1,
 			status = 'error',
 			updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND ` + fetchResultStatuses
 
-	_, err := r.pool.Exec(ctx, query, id, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, cleanFetchError(errMsg))
 	if err != nil {
 		return fmt.Errorf("failed to mark source plan limited: %w", err)
 	}

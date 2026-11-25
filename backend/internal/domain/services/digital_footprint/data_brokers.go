@@ -104,7 +104,7 @@ func (s *BrokerScanner) Scan(ctx context.Context, req BrokerScanRequest) ([]mode
 			finding, brokerExposures, err := s.checkBroker(ctx, broker, req)
 			if err != nil {
 				s.logger.Debug().
-					Err(err).
+					Str("reason", lookupFailure(err)).
 					Str("broker", broker.Name).
 					Msg("broker check failed")
 				return

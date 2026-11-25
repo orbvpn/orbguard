@@ -12,12 +12,24 @@ import 'screens/scanning_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/permission_priming_screen.dart';
-import 'screens/home/control_panel_home_screen.dart';
+import 'screens/home/orb_home_screen.dart';
+import 'screens/check/check_tab_screen.dart';
+import 'screens/scan/apk_scan_screen.dart';
 import 'screens/scan/privacy_check_screen.dart';
 import 'screens/scan/findings_screen.dart';
 import 'services/habit/protection_streak_controller.dart';
 import 'services/home/last_scan_verdict_controller.dart';
 import 'services/home/guard_status_controller.dart';
+import 'services/home/home_brief.dart';
+import 'services/home/check_plan.dart';
+import 'services/home/check_results.dart';
+import 'services/home/check_run.dart';
+import 'services/home/home_reading.dart';
+import 'services/security/vpn_watch.dart';
+import 'utils/device_words.dart';
+import 'utils/host_platform.dart';
+import 'widgets/home/results_sheet.dart';
+import 'widgets/shields/breach_fix_sheet.dart';
 import 'services/security/firewall_realtime.dart';
 import 'services/security/remediation.dart';
 import 'presentation/widgets/app_sheet.dart';
@@ -31,13 +43,13 @@ import 'screens/app_security/app_security_screen.dart';
 import 'screens/network/network_security_screen.dart';
 import 'screens/mitre/mitre_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/settings/notification_discipline_screen.dart';
+import 'screens/trust/privacy_explainer_screen.dart';
 import 'screens/identity/identity_protection_screen.dart';
 import 'screens/enterprise/executive_protection_screen.dart';
 import 'screens/security/threat_hunting_screen.dart';
 import 'screens/supply_chain/supply_chain_screen.dart';
 import 'screens/network/network_firewall_screen.dart';
-import 'screens/shields/hidden_vpn_proxy_screen.dart';
-import 'screens/shields/secure_call_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
 import 'screens/rogue_ap/rogue_ap_screen.dart';
 import 'screens/enterprise/enterprise_policy_screen.dart';
@@ -65,6 +77,7 @@ import 'detection/advanced_detection_modules.dart';
 import 'intelligence/cloud_threat_intelligence.dart';
 
 // Glass Theme & Colors
+import 'presentation/theme/brand.dart';
 import 'presentation/theme/glass_theme.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/theme/colors.dart';
@@ -100,6 +113,16 @@ import 'providers/digital_footprint_provider.dart';
 import 'providers/forensics_provider.dart';
 import 'providers/privacy_provider.dart';
 import 'providers/scam_detection_provider.dart';
+import 'providers/account_provider.dart';
+import 'screens/account/two_factor_resume.dart';
+import 'services/orbnet/magic_link_deep_link.dart';
+import 'providers/scan_credit_provider.dart';
+import 'services/ads/rewarded_ad_service.dart';
+import 'services/orbnet/ad_api.dart';
+import 'services/orbnet/scan_credit_api.dart';
+import 'services/iap/iap_service.dart';
+import 'widgets/scan_credits/scan_gate.dart';
+import 'models/app_mode.dart';
 
 // API Client
 import 'services/api/orbguard_api_client.dart';
@@ -117,6 +140,11 @@ import 'services/device_agent/push_service.dart';
 late ThreatIntelligenceManager threatIntel;
 late AdvancedDetectionManager advancedDetection;
 late SpecialPermissionsManager specialPermissions;
+
+/// The root navigator. [TwoFactorResume] wraps it in MaterialApp.builder, so
+/// this key is how it opens the sign-in screen for a pending two-factor code
+/// step.
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -235,50 +263,232 @@ class AntiSpywareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ForensicsProvider()),
         ChangeNotifierProvider(create: (_) => PrivacyProvider()),
         ChangeNotifierProvider(create: (_) => ScamDetectionProvider()),
-      ],
-      child: Consumer<SettingsProvider>(
-        builder: (context, settings, _) => MaterialApp(
-          title: 'OrbGuard',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: settings.themeMode,
-          // Automatic screen-view analytics (no-op when analytics is disabled).
-          navigatorObservers: [
-            if (TelemetryService.instance.navigatorObserver != null)
-              TelemetryService.instance.navigatorObserver!,
-          ],
-          builder: (context, child) {
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            // Sync the brand token system with the active theme BEFORE any
-            // Brand.*/AppColors.* getter resolves — this is what flips every
-            // glass/ink token between light and dark.
-            AppColors.uiBrightness =
-                isDark ? Brightness.dark : Brightness.light;
-            return GlassGradientBackground(
-              isDark: isDark,
-              child: AppLockGate(child: child ?? const SizedBox.shrink()),
+        // Shared OrbVPN/OrbNet account state. Hydrates from secure storage on
+        // start (login is optional; anonymous device registration is untouched).
+        ChangeNotifierProvider(create: (_) => AccountProvider()..init()),
+        // Scan credits: earn by watching a rewarded ad, spend one per scan.
+        // Uses the shared authenticated OrbNet client; reads the account for the
+        // "sign in to earn/use credits" rule (registered AFTER AccountProvider
+        // so it's resolvable here).
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final account = ctx.read<AccountProvider>();
+            return ScanCreditProvider(
+              adApi: AdApi(),
+              scanCreditApi: ScanCreditApi(),
+              adService: DefaultRewardedAdService(),
+              isLoggedIn: () => account.isLoggedIn,
             );
           },
-          home: settings.isLoading
-              // Prefs still loading — the ambient gradient shows briefly; avoids
-              // flashing onboarding at returning users before the flag loads.
-              ? const SizedBox.shrink()
-              : !settings.hasSeenOnboarding
-                  ? OnboardingScreen(onDone: settings.completeOnboarding)
-                  : !settings.permissionsPrimed
-                      // First-run permission priming: value-first, staged,
-                      // skippable — the app finally asks for what it needs.
-                      ? PermissionPrimingScreen(onDone: settings.completePriming)
-                      : const HomeScreen(),
+        ),
+        // In-app purchases (subscriptions). The singleton IapService connects to
+        // the store, loads the real localized prices, and — on a verified
+        // purchase — refreshes the account session so the shared entitlement
+        // unlocks. Registered AFTER AccountProvider so it can wire the session
+        // refresh + login probe. initialize() also replays any purchase left
+        // unfinished on a previous run (money-safe retry).
+        ChangeNotifierProvider<IapService>(
+          // Eager (not lazy): initialize() must run at startup — it subscribes to
+          // the store purchase stream, which REPLAYS any purchase left unfinished on
+          // a previous run (e.g. app killed after paying, before verify). A lazy
+          // provider would only run this when the paywall first opens, so a
+          // crash-interrupted purchase would sit unverified until then.
+          lazy: false,
+          create: (ctx) {
+            final account = ctx.read<AccountProvider>();
+            final iap = IapService.instance
+              ..configure(
+                onEntitlementRefresh: account.refreshEntitlement,
+                isLoggedIn: () => account.isLoggedIn,
+              );
+            unawaited(iap.initialize());
+            return iap;
+          },
+        ),
+      ],
+      child: _PremiumModeSync(
+        child: Consumer<SettingsProvider>(
+          builder: (context, settings, _) => MaterialApp(
+            navigatorKey: _rootNavigatorKey,
+            title: 'OrbGuard',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: settings.themeMode,
+            // Automatic screen-view analytics (no-op when analytics is disabled).
+            navigatorObservers: [
+              if (TelemetryService.instance.navigatorObserver != null)
+                TelemetryService.instance.navigatorObserver!,
+            ],
+            builder: (context, child) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              // Sync the brand token system with the active theme BEFORE any
+              // Brand.*/AppColors.* getter resolves. This is what flips every
+              // glass/ink token between light and dark, const widgets too.
+              AppColors.syncWith(context);
+              return GlassGradientBackground(
+                isDark: isDark,
+                child: _MagicLinkGate(
+                  // Inside the lock, so the code-step check reruns whenever
+                  // an unlock rebuilds the navigator the lock tore down.
+                  child: AppLockGate(
+                    child: TwoFactorResume(
+                      navigatorKey: _rootNavigatorKey,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              );
+            },
+            home: settings.isLoading
+                // Prefs still loading — the ambient gradient shows briefly; avoids
+                // flashing onboarding at returning users before the flag loads.
+                ? const SizedBox.shrink()
+                : !settings.hasSeenOnboarding
+                    ? OnboardingScreen(onDone: settings.completeOnboarding)
+                    : !settings.permissionsPrimed
+                        // First-run permission priming: value-first, staged,
+                        // skippable — the app finally asks for what it needs.
+                        ? PermissionPrimingScreen(
+                            onDone: settings.completePriming)
+                        : const HomeScreen(),
+          ),
         ),
       ),
     );
   }
 }
 
+/// Listens for the `orbguard://login?code=…` magic link and completes sign-in.
+///
+/// This lives in `MaterialApp.builder` rather than on HomeScreen deliberately.
+/// HomeScreen only mounts after onboarding AND permission priming, so a link
+/// tapped during first run reached a process with no listener attached — on
+/// Windows the forwarded link is delivered once into the plugin's event sink
+/// and is simply dropped if nothing is listening. Mounting here attaches the
+/// listener for the whole app lifetime, on every platform and every screen,
+/// while still sitting below MaterialApp's ScaffoldMessenger.
+class _MagicLinkGate extends StatefulWidget {
+  const _MagicLinkGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_MagicLinkGate> createState() => _MagicLinkGateState();
+}
+
+class _MagicLinkGateState extends State<_MagicLinkGate> {
+  late final MagicLinkDeepLinkHandler _magicLink =
+      MagicLinkDeepLinkHandler(_signInWithMagicCode);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_magicLink.start());
+    });
+  }
+
+  // Exchange a magic-link code for a session. The backend token is
+  // self-contained, so no email is needed (the field is unused there).
+  Future<void> _signInWithMagicCode(String code) async {
+    if (!mounted) return;
+    final account = context.read<AccountProvider>();
+    if (account.isLoggedIn) return; // already signed in — ignore stale links
+    // Capture across the async gap so we don't touch context after await.
+    final messenger = ScaffoldMessenger.of(context);
+    // Only consume a code this device actually asked for. An orbguard://login
+    // URL can be sent by anyone; auto-redeeming an unsolicited one signs the
+    // user into the SENDER's account and binds this device to it.
+    if (!await account.hasPendingMagicRequest()) {
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Open Sign in and request a link first, then tap the link we email '
+            'you.'),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    final ok = await account.verifyMagicCode('', code);
+    if (!mounted) return;
+    if (!ok && account.hasPendingTwoFactor) {
+      // The link was good, but the account has two-factor authentication on
+      // and the sign-in now waits for its code. That step lives on the
+      // sign-in screen, which TwoFactorResume opens if none is: right away,
+      // or after unlock when the app lock covers the app.
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Enter the code from your authenticator app to finish signing in.'),
+      ));
+      return;
+    }
+    // No popUntil here: LoginScreen closes itself with pop(true) when the
+    // account flips to logged-in. popUntil(isFirst) resolved that awaited
+    // push with null — so callers that gate on the result (scan_gate,
+    // pricing_screen) silently abandoned the action the user signed in for —
+    // and it also tore down any intermediate routes.
+    messenger.showSnackBar(SnackBar(
+      content:
+          Text(ok ? 'Signed in' : 'That sign-in link is invalid or expired'),
+    ));
+  }
+
+  @override
+  void dispose() {
+    _magicLink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Keeps the persisted experience mode honest: Pro/expert is premium-only, so
+/// if the account loses entitlement (sign-out or a lapsed subscription) while
+/// Pro is still on, revert to the always-free Guard. Watches both providers,
+/// reverts on the next frame (guarded on [AccountProvider.isInitialized] so a
+/// premium user is never bounced to Guard during the brief startup window
+/// before the saved session hydrates), and returns [child] untouched.
+class _PremiumModeSync extends StatelessWidget {
+  final Widget child;
+  const _PremiumModeSync({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final account = context.watch<AccountProvider>();
+    if (account.isInitialized && settings.isProMode && !account.hasPremium) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (settings.isProMode && !account.hasPremium) {
+          settings.setAppMode(AppMode.guard);
+        }
+      });
+    }
+    return child;
+  }
+}
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.platform,
+    this.checkRunner,
+    this.vpnWatch,
+  });
+
+  /// The device the shell is drawn for. Null is the one this runs on; tests
+  /// name one.
+  final TargetPlatform? platform;
+
+  /// Stands in for the scan engine, for tests.
+  @visibleForTesting
+  final CheckRunner? checkRunner;
+
+  /// The watch that answers whether an unconfirmed VPN or proxy is active.
+  /// Null is the one the app shares.
+  @visibleForTesting
+  final VpnWatch? vpnWatch;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -289,6 +499,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // Bottom navigation state
   int _currentNavIndex = 0;
+
+  /// The device the shell is drawn for.
+  late final TargetPlatform? _platform = widget.platform ?? hostPlatform();
+
+  bool get _onPhone => isPhonePlatform(_platform);
+  bool get _onComputer =>
+      _platform == TargetPlatform.macOS ||
+      _platform == TargetPlatform.windows ||
+      _platform == TargetPlatform.linux;
+
+  /// The check that runs on Home, in place: one step per check this device
+  /// can run.
+  late final CheckRun _check = CheckRun(
+      plan: CheckPlan.forDevice(android: _platform == TargetPlatform.android));
+
+  /// True while a finished check is being written down.
+  bool _recording = false;
+
+  /// Who answers whether an unconfirmed VPN or proxy is active, and that
+  /// answer as last heard. Null is "not known", never "none".
+  late final VpnWatch _vpnWatch = widget.vpnWatch ?? VpnWatch.shared;
+  bool? _unknownVpn;
+
+  /// The breach watch, and the count it last gave the guards.
+  DarkWebProvider? _darkWeb;
+  int? _breachesSeen;
+  bool _breachesRead = false;
 
   bool _hasRootAccess = false;
   String _accessMethod = 'Standard';
@@ -312,35 +549,130 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     GuardProbes.firewall(
         supported: PlatformInfo.isAndroid,
         enabled: () async => context.read<NetworkFirewallProvider>().isEnabled),
+    // Scam-text check: paste/share based on every platform (OrbGuard holds
+    // no SMS permission). "Active" == the user hasn't switched it off.
     GuardProbes.smsFilter(
-        supported: PlatformInfo.isAndroid,
-        granted: () async => await Permission.sms.isGranted),
+        supported: true,
+        granted: () async => context.read<SmsProvider>().protectionEnabled),
     GuardProbes.malwareScan(supported: PlatformInfo.isAndroid),
-    GuardProbes.alerts(granted: () async => await Permission.notification.isGranted),
-    GuardProbes.breachMonitor(breachedAccounts: () async => null),
-    GuardProbes.hiddenVpn(unknownVpnActive: () async => null),
+    GuardProbes.alerts(
+        // flutter_local_notifications has no Windows implementation.
+        supported: !PlatformInfo.isWindows,
+        granted: () async => await Permission.notification.isGranted),
+    GuardProbes.breachMonitor(
+        breachedAccounts: () async =>
+            context.read<DarkWebProvider>().openBreachedAccounts),
+    GuardProbes.hiddenVpn(
+        // A phone can see a tunnel (Android) or a proxy (iPhone). A computer
+        // build cannot see either yet.
+        supported: _onPhone,
+        unknownVpnActive: _askVpn),
     GuardProbes.secureCall(
         supported: PlatformInfo.isAndroid || PlatformInfo.isIOS),
   ]);
+
+  /// Completes once the device has said how much a check can see. No check is
+  /// judged, and no coverage figure quoted, before that.
+  late final Future<void> _ready;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A check the app runs by itself writes to the same record a check the
+    // person starts does, with the same coverage figure, so Home hears it.
+    AutoScanScheduler.instance
+      ..verdict = context.read<LastScanVerdictController>()
+      ..coverage = () => _detectionCapability.round();
+    _vpnWatch.addListener(_onVpnChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _watchBreaches();
       _guards.refresh();
       _refreshActivity();
-      _maybeRunFirstCheck();
     });
-    _initializeApp();
+    _ready = _initializeApp().catchError((Object e) {
+      debugPrint('[OrbGuard] Start-up probes failed: $e');
+    });
+    // The automatic first check waits for those answers. Started on the first
+    // frame it met a coverage of zero, said "coverage: 0%" and never ran.
+    _ready.then((_) => _maybeRunFirstCheck());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _vpnWatch.removeListener(_onVpnChanged);
+    _darkWeb?.removeListener(_onBreachesChanged);
+    AutoScanScheduler.instance
+      ..verdict = null
+      ..coverage = null;
+    _check.dispose();
     _guards.dispose();
     super.dispose();
   }
+
+  /// Starts the breach watch and follows it. It loads what it already knows
+  /// and asks the server for news, so Home can say whether a watched address
+  /// has a breach still open.
+  void _watchBreaches() {
+    final DarkWebProvider darkWeb = context.read<DarkWebProvider>();
+    _darkWeb = darkWeb..addListener(_onBreachesChanged);
+    unawaited(darkWeb.init().catchError((Object e) {
+      debugPrint('[OrbGuard] Breach watch did not load: $e');
+    }));
+  }
+
+  void _onBreachesChanged() {
+    if (!mounted) return;
+    // The watch reports every step of a load. The guards only need to hear
+    // when the number they read has changed.
+    final int? now = _darkWeb?.openBreachedAccounts;
+    if (_breachesRead && now == _breachesSeen) return;
+    _breachesRead = true;
+    _breachesSeen = now;
+    unawaited(_guards.refresh());
+  }
+
+  /// The watch saw a change, or the person said whose VPN it is.
+  void _onVpnChanged() {
+    if (!mounted) return;
+    unawaited(_guards.refresh());
+  }
+
+  /// Whether a VPN or proxy is active that the person has not confirmed as
+  /// theirs. Null when that cannot be known here. [force] looks again now
+  /// instead of answering from the last look.
+  Future<bool?> _askVpn({bool force = false}) async {
+    if (!mounted || !_onPhone) return null;
+    // Only used where the scan cannot say for itself whether a tunnel is
+    // OrbGuard's own firewall.
+    final bool firewallOn = _platform == TargetPlatform.android &&
+        context.read<NetworkFirewallProvider>().isEnabled;
+    bool? answer;
+    try {
+      answer = await _vpnWatch
+          .unknownVpnActive(ownFirewallOn: firewallOn, force: force)
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+    } on Object catch (e) {
+      debugPrint('[OrbGuard] Could not look for a VPN or proxy: $e');
+    }
+    if (mounted && answer != _unknownVpn) {
+      setState(() => _unknownVpn = answer);
+    }
+    return answer;
+  }
+
+  /// Everything Home knows right now, read the way Home reads it.
+  HomeReading _reading() => HomeReading.of(
+        verdict: context.read<LastScanVerdictController>(),
+        guards: _guards,
+        breachedAccounts: context.read<DarkWebProvider>().openBreachedAccounts,
+        unknownVpnActive: _unknownVpn,
+        platform: _platform,
+        now: DateTime.now(),
+        deviceNoun: DeviceWords.noun,
+      );
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -353,9 +685,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _refreshPermissions() async {
     await specialPermissions.checkPermissions();
     await _calculateDetectionCapability();
+    if (!mounted) return;
+    // A check that ran while the app was away wrote its record from another
+    // isolate. Read it again, unless a check is being written down now.
+    if (!_check.running && !_recording) {
+      unawaited(context.read<LastScanVerdictController>().load());
+    }
+    // A VPN may have gone up or down in the meantime.
+    await _askVpn(force: true);
     unawaited(_guards.refresh());
     unawaited(_refreshActivity());
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   /// Run the automatic first checkup once, right after first-run priming, so
@@ -365,8 +705,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     final s = context.read<SettingsProvider>();
     if (s.isProMode || !s.permissionsPrimed || s.firstCheckDone) return;
+    // A computer's check lives on the Check tab and is started by hand.
+    if (_onComputer) return;
     s.markFirstCheckDone();
-    _startScan();
+    // The onboarding "your first check found N things" moment is free — not
+    // user-initiated, and never an ad prompt on first run.
+    _startScan(userInitiated: false);
   }
 
   /// Pull the real "blocked today" count for the home's proof-of-work feed.
@@ -376,52 +720,68 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) setState(() => _blockedToday = n);
   }
 
-  /// Route a tapped guard tile straight to where it's actually set up or run —
-  /// not the generic Protect hub. Scan-based guards run a check; alerts asks
-  /// for the permission; each feature guard opens its own screen (as a sheet).
-  void _onGuardTap(String id) {
+  /// Open a shield's own screen as a sheet over Home. The Protect tab opens
+  /// the same screen for the same shield.
+  void _openShield(Shield shield) {
+    showAppSheet(context, heightFactor: 0.94, child: shieldScreen(shield));
+  }
+
+  /// Route a fix, chosen on Home's gap card or in the score sheet, to the
+  /// place that fixes it.
+  void _onFactorTap(String id) {
     switch (id) {
-      case 'alerts':
-        _requestAlerts();
-      case 'spyware_watch':
-      case 'malware_scan':
+      case 'resolve_threats':
+      case 'review_apps':
+        // What the last check found is kept, across restarts too: show it
+        // again. Only when no list could be kept is a fresh check the honest
+        // way to see what is there now.
+        if (context.read<LastScanVerdictController>().findings.isNotEmpty) {
+          _showResults();
+        } else {
+          _startScan();
+        }
+      case 'run_check':
         _startScan();
-      case 'firewall':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const NetworkFirewallScreen());
-      case 'sms_filter':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const SmsProtectionScreen());
-      case 'breach':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const DarkWebScreen());
-      case 'hidden_vpn':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const HiddenVpnProxyScreen());
-      case 'secure_call':
-        showAppSheet(context,
-            heightFactor: 0.94, child: const SecureCallScreen());
+      case 'enable_alerts':
+        _requestAlerts();
+      case 'fix_breaches':
+        showBreachFixSheet(context);
+      case 'check_breaches':
+        _openShield(Shield.identity);
+      case 'review_vpn':
+        _openShield(Shield.hiddenVpn);
       default:
         setState(() => _currentNavIndex = 4); // Protect hub
     }
   }
 
-  /// Route a "thing to fix" from the privacy-score card to its remedy.
-  void _onFactorTap(String id) {
-    switch (id) {
-      case 'run_check':
-      case 'resolve_threats':
-      case 'review_apps':
-        _startScan();
-      case 'enable_alerts':
-        _requestAlerts();
-      default:
-        setState(() => _currentNavIndex = 4); // Protect hub
+  /// Home's bell: ask for alerts while they are off; once they are on, show
+  /// what OrbGuard will and will not alert about.
+  void _onAlertsTap() {
+    final bool on = _guards.guards
+        .any((g) => g.id == 'alerts' && g.state == GuardState.active);
+    if (on) {
+      showAppSheet(context,
+          heightFactor: 0.94, child: const NotificationDisciplineScreen());
+    } else {
+      _requestAlerts();
     }
   }
 
   Future<void> _requestAlerts() async {
-    await Permission.notification.request();
+    try {
+      // Once refused, the system will not ask a second time. Its own settings
+      // page is then the only way left, so open that instead of doing nothing.
+      // (Checked BEFORE asking, so a person who has just said no is not sent
+      // to settings in the same breath.)
+      if (await Permission.notification.isPermanentlyDenied) {
+        await openAppSettings();
+      } else {
+        await Permission.notification.request();
+      }
+    } catch (e) {
+      debugPrint('[OrbGuard] Could not ask for alerts: $e');
+    }
     await _guards.refresh();
     if (mounted) setState(() {});
   }
@@ -470,23 +830,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Base capability from standard APIs
     double capability = 25.0;
 
-    // Add capability based on granted permissions (45% total)
-    if (await Permission.phone.isGranted) capability += 5;
-    if (await Permission.sms.isGranted) capability += 10;
-    if (await Permission.location.isGranted) capability += 5;
-
-    // Storage - check via native method for Android 11+
-    try {
-      final storageResult =
-          await platform.invokeMethod('checkStoragePermission');
-      if (storageResult['hasPermission'] == true) capability += 10;
-    } catch (e) {
-      if (await Permission.storage.isGranted) capability += 10;
+    // Add capability based on granted permissions (45% total).
+    // Mobile only: phone/SMS/location back Android+iOS detection paths, and
+    // permission_handler_windows answers GRANTED to every query regardless of
+    // reality — so on desktop these terms were inventing 20 points. That
+    // pushed Windows to 55, clearing the `< 50` gate below and making the
+    // whole scan flow reachable on a platform with no native scanner at all.
+    if (PlatformInfo.isAndroid || PlatformInfo.isIOS) {
+      if (await Permission.phone.isGranted) capability += 5;
+      if (await Permission.location.isGranted) capability += 5;
     }
+
+    // File/APK scanning always works via the system file picker (SAF) — no
+    // storage permission gates it any more (MANAGE_EXTERNAL_STORAGE dropped
+    // for Play compliance), so the capability is constant.
+    capability += 10;
 
     // Special permissions (25% total)
     if (specialPermissions.hasUsageStats) capability += 15;
-    if (specialPermissions.hasAccessibility) capability += 10;
 
     // Enhanced/Root access (15% total)
     if (_hasRootAccess) {
@@ -500,18 +861,111 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _startScan({bool? deepScan}) async {
+  Future<void> _startScan({bool? deepScan, bool userInitiated = true}) async {
+    // Coverage is only known once the device has answered.
+    await _ready;
+    if (!mounted) return;
+
+    final bool isPro = context.read<SettingsProvider>().isProMode;
+
+    // On a computer the check is the Check tab's own. Home leads there
+    // instead of starting a phone check that cannot run.
+    if (!isPro && _onComputer) {
+      if (userInitiated) setState(() => _currentNavIndex = 1);
+      return;
+    }
+
+    // One check at a time. Asked again while one runs, show the one running.
+    if (_check.running) {
+      setState(() => _currentNavIndex = 0);
+      return;
+    }
+
     // Check if we have enough permissions
     if (_detectionCapability < 50) {
       _showPermissionWarning();
       return;
     }
 
+    // Scan-credit gate: subscribers scan freely; free users spend one credit
+    // (earning more via a rewarded ad). Only checks a person starts are
+    // metered, and never their first: that one is free wherever it starts,
+    // because Home promises "One tap" and an account wall would break it.
+    // Background auto-scans are exempt too.
+    final bool metered =
+        userInitiated && context.read<LastScanVerdictController>().hasScanned;
+    if (metered && !await ensureScanCredit(context)) return;
+    if (!mounted) return;
+
     // Honor the Deep Scan setting unless a caller explicitly overrides it.
     final effectiveDeepScan =
         deepScan ?? context.read<SettingsProvider>().scan.deepScanEnabled;
 
-    // Navigate to scanning screen
+    if (isPro) {
+      await _runCheckOnItsPage(deep: effectiveDeepScan);
+    } else {
+      await _runCheckOnHome(deep: effectiveDeepScan);
+    }
+  }
+
+  /// Guard: the check runs on Home, where the ring is, and ends on a sheet
+  /// that says only what happened.
+  Future<void> _runCheckOnHome({required bool deep}) async {
+    setState(() => _currentNavIndex = 0);
+    final CheckRunner engine = widget.checkRunner ??
+        (onProgress) => DeviceScanService.instance.performScan(
+              deepScan: deep,
+              hasRoot: _hasRootAccess,
+              onProgress: onProgress,
+            );
+
+    final CheckOutcome? outcome = await _check.start((onProgress) async {
+      final List<Map<String, dynamic>> found = await engine(onProgress);
+      // The check never reports a tunnel or proxy itself: that answer has
+      // one owner. It is asked afresh here, while the ring settles, so the
+      // results agree with what is true now.
+      await _askVpn(force: true);
+      return found;
+    });
+    if (!mounted) return;
+
+    // Nothing ran: nothing is written down and nothing reads as clear.
+    if (outcome == null || outcome.ran.isEmpty) {
+      _showCheckFailed();
+      return;
+    }
+
+    final DateTime now = DateTime.now();
+    _recording = true;
+    // The record holds the new check from this call on; storing it takes a
+    // moment longer.
+    final Future<void> stored =
+        context.read<LastScanVerdictController>().recordScan(
+              threats: outcome.findings,
+              coveragePercent: _detectionCapability.round(),
+              now: now,
+              checksRun: outcome.ran.length,
+              stagesRan: outcome.ran,
+              stagesNotPossible: outcome.notPossible,
+              stagesFailed: outcome.failed,
+            );
+    context.read<ProtectionStreakController>().recordCheckup(now);
+    setState(() {
+      _threats
+        ..clear()
+        ..addAll(outcome.findings.map(ThreatDetection.fromJson));
+    });
+    unawaited(_guards.refresh());
+    _showResults();
+    try {
+      await stored;
+    } finally {
+      _recording = false;
+    }
+  }
+
+  /// Pro: the check keeps its own page and its fuller findings screen.
+  Future<void> _runCheckOnItsPage({required bool deep}) async {
     final scanResult = await Navigator.push<ScanResult>(
       context,
       PageRouteBuilder(
@@ -519,7 +973,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             PrivacyCheckScreen(
           onScanWithProgress: (onProgress) =>
               DeviceScanService.instance.performScan(
-            deepScan: effectiveDeepScan,
+            deepScan: deep,
             hasRoot: _hasRootAccess,
             onProgress: onProgress,
           ),
@@ -530,48 +984,150 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         transitionDuration: const Duration(milliseconds: 300),
       ),
     );
+    if (scanResult == null || !mounted) return;
 
-    // A completed checkup — clean or not — extends the "days protected" streak
-    // AND records the honest verdict the home reads (score from real findings
-    // + real coverage), so scanning genuinely moves the home status.
-    if (scanResult != null && mounted) {
-      context.read<ProtectionStreakController>().recordCheckup(DateTime.now());
-      context.read<LastScanVerdictController>().recordScan(
-            threats: scanResult.threats,
-            coveragePercent: _detectionCapability.round(),
-            now: DateTime.now(),
-          );
-    }
-
-    // The honest findings screen handles BOTH outcomes: a list of threats to
-    // fix, or a calm all-clear that states how many checks genuinely ran.
-    if (scanResult != null) {
-      setState(() {
-        _threats
-          ..clear()
-          ..addAll(scanResult.threats.map(ThreatDetection.fromJson));
-      });
-      debugPrint('[OrbGuard] Scan complete: ${_threats.length} threats');
-      if (mounted) {
-        // Results present as an iOS sheet (slides up over the home), not a
-        // full-screen push.
-        final threats = scanResult.threats;
-        showAppSheet(
-          context,
-          heightFactor: 0.94,
-          child: FindingsScreen(
-            threats: threats,
-            checksRun: scanResult.itemsScanned,
-            onOpenThreat: _remediate,
-            onFixAll: threats.isNotEmpty
-                ? () => _remediate(_mostSevere(threats))
-                : null,
-          ),
-        );
-      }
-    }
+    // A completed checkup, clean or not, extends the "days protected" streak
+    // and records the verdict Home reads: the score from real findings and
+    // real coverage, and the checks that ran, by name.
+    final DateTime now = DateTime.now();
+    context.read<ProtectionStreakController>().recordCheckup(now);
+    unawaited(context.read<LastScanVerdictController>().recordScan(
+          threats: scanResult.threats,
+          coveragePercent: _detectionCapability.round(),
+          now: now,
+          checksRun: scanResult.itemsScanned,
+          stagesRan: scanResult.stagesRan,
+          stagesNotPossible: scanResult.stagesNotPossible,
+          stagesFailed: scanResult.stagesFailed,
+        ));
+    setState(() {
+      _threats
+        ..clear()
+        ..addAll(scanResult.threats.map(ThreatDetection.fromJson));
+    });
+    debugPrint('[OrbGuard] Scan complete: ${_threats.length} threats');
+    unawaited(_askVpn(force: true));
+    // The findings screen handles both outcomes: a list of threats to fix,
+    // or an all-clear that states how many checks really ran.
+    _showFindings(
+      scanResult.threats,
+      checksRun: scanResult.itemsScanned,
+      checksUnavailable: scanResult.checksUnavailable,
+    );
   }
 
+  /// The latest check's results, as a sheet over Home: what it found, what
+  /// ran clean, what could not run, and the gaps still open.
+  void _showResults() {
+    ResultsSheet.show(
+      context,
+      results: _reading().results(context.read<LastScanVerdictController>()),
+      onOpenThing: _openThing,
+      onOpenGap: (gap) => _onFactorTap(gap.factor.id),
+      platform: _platform,
+    );
+  }
+
+  /// One thing a check found: what it is, and the one real step there is.
+  void _openThing(FoundThing thing) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final Map<String, dynamic> lead = thing.lead;
+    final RemediationKind kind = Remediation.kindFor(lead);
+    final (String step, String action) = switch (kind) {
+      RemediationKind.appInfo => (
+          'Open its settings to remove the app, or to take back the access.',
+          'Open app settings',
+        ),
+      RemediationKind.vpnSettings => (
+          'Open your VPN settings to see what is connected and turn it off.',
+          'Open VPN settings',
+        ),
+      RemediationKind.guidanceOnly => (
+          '${thing.shield.name} looks closer and says what to do next.',
+          'Open ${thing.shield.name}',
+        ),
+    };
+    final List<String> said = [
+      for (final Map<String, dynamic> f in thing.findings)
+        if ('${f['description'] ?? ''}'.trim().isNotEmpty)
+          '${f['description']}'.trim(),
+    ];
+    final TextStyle body =
+        TextStyle(fontSize: 14.5, height: 1.45, color: cs.onSurfaceVariant);
+
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: thing.title,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final String line in said.toSet())
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(line, style: body),
+              ),
+            Text(step, style: body.copyWith(color: cs.onSurface)),
+          ],
+        ),
+        secondaryLabel: 'Not now',
+        primaryLabel: action,
+        onPrimary: () async {
+          if (kind != RemediationKind.guidanceOnly &&
+              await _remediation.fix(lead)) {
+            return;
+          }
+          // No system screen to open, or it would not open: the shield that
+          // found it is the next place to look.
+          if (mounted) _openShield(thing.shield);
+        },
+      ),
+    );
+  }
+
+  /// The engine could not run at all. Said plainly, with nothing recorded.
+  void _showCheckFailed() {
+    showAppSheet(
+      context,
+      child: SheetPanel(
+        title: 'The check could not run',
+        body: Text(
+          'Nothing was checked, so nothing is reported as clear. '
+          'Try again in a moment.',
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.45,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        secondaryLabel: 'Not now',
+        primaryLabel: 'Try again',
+        // It never ran, so trying again is not a second check to pay for.
+        onPrimary: () => _startScan(userInitiated: false),
+      ),
+    );
+  }
+
+  /// A check's results as an iOS sheet (it slides up over Home), not a
+  /// full-screen push.
+  void _showFindings(
+    List<Map<String, dynamic>> threats, {
+    required int checksRun,
+    int? checksUnavailable,
+  }) {
+    showAppSheet(
+      context,
+      heightFactor: 0.94,
+      child: FindingsScreen(
+        threats: threats,
+        checksRun: checksRun,
+        checksUnavailable: checksUnavailable,
+        onOpenThreat: _remediate,
+        onFixAll:
+            threats.isNotEmpty ? () => _remediate(_mostSevere(threats)) : null,
+      ),
+    );
+  }
 
   final Remediation _remediation = Remediation();
 
@@ -601,7 +1157,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (opened || !mounted) return;
     final guidance = Remediation.kindFor(threat) == RemediationKind.guidanceOnly
         ? 'Open the Protect tab to review and resolve this.'
-        : "Couldn't open the system screen — resolve it manually in Settings.";
+        : "Couldn't open the system screen. Resolve it manually in Settings.";
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(guidance)));
   }
@@ -661,6 +1217,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Intel tab and drops the consumer Protect hub.
     final navDests = isPro ? const [0, 1, 2, 3] : const [0, 4, 1, 3];
     final effIndex = navDests.contains(_currentNavIndex) ? _currentNavIndex : 0;
+    // Guard's tabs carry their own tops: Home its row (trust, alerts,
+    // account), Protect, Check and Me a heading each. The shell's header
+    // steps aside there. A computer's Check tab is the one Guard page that
+    // still sits under it. The menu still opens with a swipe from the edge.
+    final homeOwnsTop = !isPro &&
+        (effIndex == 0 ||
+            effIndex == 3 ||
+            effIndex == 4 ||
+            (effIndex == 1 && _onPhone));
 
     // The Intel tab owns the whole screen: its Browse/Check/History selector is
     // the single bottom bar, with a Home button top-left (no shell header/nav) —
@@ -681,27 +1246,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       drawer: _buildNavigationDrawer(isPro),
       body: Stack(
         children: [
-          // Main content (constrained on wide screens, centered)
+          // Kit: glass sits on the bed's washes, never on flat.
+          const BrandBed(),
+          // Main content — FULL-BLEED: it runs to the bottom edge and under the
+          // floating header, so scrolling content passes BEHIND both bars
+          // (which are fully transparent). Tab bodies keep themselves readable
+          // at rest by padding their scrollables with
+          // GlassTheme.headerClearance (top) and bottomNavClearance (bottom).
           SafeArea(
+            bottom: false,
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints:
                     const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
-                child: Column(
-                  children: [
-                    // OrbX-style header
-                    _buildOrbXHeader(isDark, textColor, iconColor),
-                    // Body content — viewport ends above the floating nav
-                    Expanded(
-                      child: _buildCurrentScreen(effIndex),
-                    ),
-                    const SizedBox(height: GlassTheme.bottomNavClearance),
-                  ],
-                ),
+                child: _buildCurrentScreen(effIndex),
               ),
             ),
           ),
+          // Floating header — overlays the content, no background of its own.
+          if (!homeOwnsTop)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        maxWidth: GlassTheme.contentMaxWidth),
+                    child: _buildOrbXHeader(isDark, textColor, iconColor),
+                  ),
+                ),
+              ),
+            ),
           // Bottom navigation bar
           Positioned(
             bottom: 0,
@@ -718,7 +1297,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       _currentNavIndex = navDests[pos];
                     });
                   },
-                  items: navDests.map(_navItemFor).toList(),
+                  items: [
+                    for (final dest in navDests)
+                      _navItemFor(dest, isPro: isPro),
+                  ],
                 ),
               ),
             ),
@@ -734,7 +1316,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Menu button (round glass, 50x50)
+          // Menu button — OrbX round glass (translucent + blur; the page shows
+          // through, frosted).
           Builder(
             builder: (context) => GestureDetector(
               onTap: () => Scaffold.of(context).openDrawer(),
@@ -758,18 +1341,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           const SizedBox(width: 12),
-          // Title area — floats over the page with NO background bar.
+          // Title pill — OrbX glass frame (translucent fill + border + blur):
+          // the body scrolls behind it and shows through, frosted.
           Expanded(
-            child: SizedBox(
+            child: Container(
               height: 50,
-              child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: GlassTheme.glassColor(isDark),
+                border: Border.all(
+                  color: GlassTheme.glassBorderColor(isDark),
+                  width: GlassTheme.borderWidth,
+                ),
+                boxShadow: [GlassTheme.shadow(isDark)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: BackdropFilter(
+                  filter: GlassTheme.blurFilter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
                       children: [
                         // Title text
                         Expanded(
                           child: Text(
                             'OrbGuard',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -808,6 +1407,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+            ),
+          ),
         ],
       ),
     );
@@ -825,26 +1426,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 3:
         return _buildSettingsContent();
       case 4:
-        return const ShieldsScreen();
+        return ShieldsScreen(platform: _platform);
       default:
         return _buildHomeContent();
     }
   }
 
-  /// Bottom-nav item for a stable destination id (0=Home,1=Scan,2=Intel,3=Settings).
-  NavItem _navItemFor(int dest) {
+  /// Bottom-nav item for a stable destination id (0=Home, 1=Scan, 2=Intel,
+  /// 3=Settings, 4=Protect). Guard names its four tabs in the app's one
+  /// vocabulary: Home, Protect, Check, Me. Pro keeps the expert names.
+  NavItem _navItemFor(int dest, {required bool isPro}) {
     switch (dest) {
       case 1:
-        return NavItem(label: 'Scan', iconPath: AppIcons.search);
+        return NavItem(
+            label: isPro ? 'Scan' : 'Check', iconPath: AppIcons.search);
       case 2:
         return NavItem(label: 'Intel', iconPath: AppIcons.structure);
       case 3:
-        return NavItem(label: 'Settings', iconPath: AppIcons.settings);
+        return isPro
+            ? NavItem(label: 'Settings', iconPath: AppIcons.settings)
+            : NavItem(label: 'Me', iconPath: AppIcons.userRounded);
       case 4:
         return NavItem(label: 'Protect', iconPath: AppIcons.shieldCheck);
       case 0:
       default:
-        return NavItem(label: 'Home', iconPath: AppIcons.home);
+        return NavItem(
+            label: 'Home',
+            iconPath: isPro ? AppIcons.home : AppIcons.homeSmile);
     }
   }
 
@@ -855,59 +1463,121 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (context.watch<SettingsProvider>().isProMode) {
       return const SecurityCenterScreen();
     }
-    return ControlPanelHomeScreen(
+    // Home is drawn again when the breach watch's answers change, not on
+    // every step of its loading.
+    final int? breached = context
+        .select<DarkWebProvider, int?>((watch) => watch.openBreachedAccounts);
+    final DateTime? breachCheckedAt = context
+        .select<DarkWebProvider, DateTime?>((watch) => watch.lastBreachCheckAt);
+    return OrbHomeScreen(
       onRunCheck: () => _startScan(),
       verdict: context.watch<LastScanVerdictController>(),
       guardsController: _guards,
       streak: context.watch<ProtectionStreakController>(),
-      onGuardTap: _onGuardTap,
+      check: _check,
+      platform: _platform,
+      breachedAccounts: () => breached,
+      breachLastChecked: () => breachCheckedAt,
+      unknownVpnActive: () => _unknownVpn,
+      onResultsTap: _showResults,
+      onShieldTap: _openShield,
       onFactorTap: _onFactorTap,
+      onAlertsTap: _onAlertsTap,
+      onAccountTap: () => setState(() => _currentNavIndex = 3), // Me
+      onTrustTap: () => showAppSheet(context,
+          heightFactor: 0.94, child: const PrivacyExplainerScreen()),
+      accountInitial: _initialOf(context.watch<AccountProvider>()),
       blockedTodayCount: () => _blockedToday,
     );
+  }
+
+  /// First letter of the signed-in person's name, or of their email, for
+  /// Home's account button. Null when signed out.
+  static String? _initialOf(AccountProvider account) {
+    if (!account.isLoggedIn) return null;
+    final String name = (account.displayName ?? account.email ?? '').trim();
+    return name.isEmpty ? null : name.characters.first.toUpperCase();
   }
 
   /// Scan tab content
   Widget _buildScanContent() {
     // On desktop platforms, show the DesktopSecurityScreen directly (embedded mode)
-    if (PlatformInfo.isMacOS ||
-        PlatformInfo.isWindows ||
-        PlatformInfo.isLinux) {
+    if (_onComputer) {
       return const DesktopSecurityScreen(embedded: true);
     }
 
-    // On mobile, show the scan button UI
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          GlassCircleButton(
-            size: 120,
-            tintColor: AppColors.accent,
-            onTap: () => _startScan(),
-            child: DuotoneIcon(
-              AppIcons.search,
-              size: 56,
-              color: AppColors.accentInk,
+    // Guard on a phone: every check in one place, the full check first.
+    if (_onPhone && !context.watch<SettingsProvider>().isProMode) {
+      return CheckTabScreen(
+        onRunFullCheck: () => _startScan(),
+        fullCheckCount: _check.steps.length,
+        platform: _platform,
+      );
+    }
+
+    // Pro on a phone: the scan button UI. The shell overlays the transparent
+    // header + nav, so inset by their clearances to stay visually centered
+    // between them.
+    return Padding(
+      padding: EdgeInsets.only(
+        top: GlassTheme.headerClearance,
+        bottom: GlassTheme.bottomNavClearance +
+            MediaQuery.of(context).padding.bottom,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GlassCircleButton(
+              size: 120,
+              tintColor: AppColors.accent,
+              onTap: () => _startScan(),
+              child: DuotoneIcon(
+                AppIcons.search,
+                size: 56,
+                color: AppColors.accentInk,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Tap to Start Scan',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+            const SizedBox(height: 24),
+            Text(
+              context.watch<SettingsProvider>().isProMode
+                  ? 'Tap to Start Scan'
+                  : 'Tap to start a check',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Detection capability: ${_detectionCapability.round()}%',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Text(
+              context.watch<SettingsProvider>().isProMode
+                  ? 'Detection capability: ${_detectionCapability.round()}%'
+                  : 'Coverage: ${_detectionCapability.round()}%',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 28),
+            // Scoped file check — sideloaded APKs are the real Android malware
+            // vector, and this needs no storage permission (user picks the file).
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApkScanScreen()),
+              ),
+              child: Text(
+                'Check an app file (.apk)',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accentInk,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1057,19 +1727,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ));
                     },
                   ),
-                  _buildDrawerItem(
-                    svgIcon: 'qr_code',
-                    title: 'QR Scanner',
-                    subtitle: 'Safe QR code scanning',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const QrScannerScreen(),
-                          ));
-                    },
-                  ),
+                  // mobile_scanner ships no Windows/Linux implementation — the
+                  // camera view can never open there, so don't list it.
+                  if (!PlatformInfo.isWindows && !PlatformInfo.isLinux)
+                    _buildDrawerItem(
+                      svgIcon: 'qr_code',
+                      title: 'QR Scanner',
+                      subtitle: 'Safe QR code scanning',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const QrScannerScreen(),
+                            ));
+                      },
+                    ),
                   _buildDrawerItem(
                     svgIcon: 'danger_triangle',
                     title: 'Scam Detection',

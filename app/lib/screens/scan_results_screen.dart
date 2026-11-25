@@ -681,7 +681,7 @@ class _ScanResultsScreenState extends State<ScanResultsScreen>
               ),
             ] else ...[
               _buildGuidanceRow(
-                'Manual removal required — OrbGuard cannot remediate this '
+                'Manual removal required. OrbGuard cannot remediate this '
                 'threat type automatically. Follow the recommendation above, '
                 'then dismiss this warning.',
               ),

@@ -79,8 +79,9 @@ class ScamIndicator {
   }
 
   /// Single-line display form used by list UIs.
-  String get display =>
-      (evidence != null && evidence!.isNotEmpty) ? '$description — $evidence' : description;
+  String get display => (evidence != null && evidence!.isNotEmpty)
+      ? '$description: $evidence'
+      : description;
 }
 
 /// Analysis result

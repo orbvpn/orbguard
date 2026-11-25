@@ -1,6 +1,6 @@
 name: orbguard
 description: Anti-spyware defense system
-version: 1.0.0
+version: 1.0.0+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -22,6 +22,14 @@ dependencies:
   connectivity_plus: ^7.0.0
   web_socket_channel: ^2.4.0
   crypto: ^3.0.3
+  # Secure token storage for the shared OrbVPN/OrbNet account (auth foundation).
+  # Same keys as OrbVPN so an on-device session can be shared later.
+  flutter_secure_storage: ^10.3.1
+  # Social sign-in for the shared OrbVPN/OrbNet account. Native SDK flows that
+  # yield an OpenID idToken, exchanged for OrbNet JWTs via /auth/oauth/login.
+  # Versions matched to OrbVPN (orbx.flutter) so behaviour is identical.
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.1.0
      
   # Database
   sqflite: ^2.3.0
@@ -52,6 +60,18 @@ dependencies:
   audioplayers: ^6.1.0
   sim_card_info: ^1.0.2
   url_launcher: ^6.3.0
+  # Incoming deep links (orbguard://login?code=... from the magic-link email).
+  app_links: ^6.3.2
+  # Passkey (WebAuthn) sign-in — platform biometric auth, same as OrbVPN.
+  passkeys: ^2.21.0
+  # In-app purchases (subscriptions). Adds the Play Billing library, which is
+  # what unlocks subscription management in Play Console + enables purchases.
+  in_app_purchase: ^3.2.0
+  # Platform implementations, declared explicitly because IapService references
+  # their concrete types (GooglePlayPurchaseDetails for the Android purchase
+  # token; StoreKit types) — avoids the depend_on_referenced_packages lint.
+  in_app_purchase_android: ^0.5.1
+  in_app_purchase_storekit: ^0.4.10
   # Biometric app-lock — failed unlock attempts trigger a thief selfie.
   # On iOS this is the platform-supported "best extent" for the selfie
   # feature (the OS lock screen exposes no failed-attempt hooks to apps).
@@ -60,6 +80,16 @@ dependencies:
   firebase_messaging: ^16.3.0
   firebase_crashlytics: ^5.2.6
   firebase_analytics: ^12.4.5
+
+  # Rewarded ads → scan credits (Phase A3). EXACT pins shared with OrbVPN
+  # (orbx.flutter) so SDK behaviour is identical across the account universe.
+  # Unity = global; Adivery = Iran (Android-only); Yandex = Russia/CIS. Network
+  # IDs are supplied at build time via --dart-define (see RewardedAdService); a
+  # network with no configured ID is skipped, and with NONE configured the
+  # watch-ad flow honestly reports "unavailable" — it never fakes a reward.
+  unity_ads_plugin: ^0.4.0
+  adivery: ^4.9.0
+  yandex_mobileads: ^7.18.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +100,37 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
+  # Windows MSIX packaging for the Microsoft Store (built by the
+  # windows-msix.yml workflow on a Windows runner).
+  msix: ^3.16.8
+
+# Microsoft Store (MSIX) packaging. identity_name / publisher / publisher_display_name
+# MUST match the values Partner Center shows after reserving the app name
+# (Product management -> Product identity). Until then these placeholders make
+# `dart run msix:create --store` fail loudly rather than produce a mismatched
+# package the Store would reject.
+msix_config:
+  display_name: OrbGuard
+  publisher_display_name: ORB GLOBAL LTD
+  identity_name: ORBGROUP.OrbGuard
+  publisher: CN=2C449207-2B23-4797-AE9D-14ECBABB5966
+  msix_version: 1.0.7.0
+  logo_path: assets/branding/icon_master.png
+  # ONLY capabilities the Windows build actually exercises. geolocator_windows
+  # is registered (location); nothing on Windows opens a camera or a mic —
+  # mobile_scanner has no Windows implementation and audioplayers_windows is
+  # playback-only — so webcam/microphone were declared-but-unused, which is a
+  # rejection under Microsoft Store Policy 10.5.1 and forces an unnecessary
+  # consent prompt on first run.
+  capabilities: internetClient, location
+  # Registers orbguard:// with Windows so the emailed magic-link
+  # (orbguard://login?code=…) actually opens the app. Without this the Store
+  # reviewer clicks the sign-in link and Windows has no handler for it — the
+  # 10.1.2.10 "Unusable Feature: Sign in" rejection. Pairs with the
+  # SendAppLinkToInstance() forwarding in windows/runner/main.cpp, which hands
+  # the link to the ALREADY-RUNNING window instead of starting a second copy.
+  protocol_activation: orbguard
+  store: true
 
 # App launcher icons across every platform, generated from the OrbGuard brand
 # logo (assets/branding/). Regenerate with: dart run flutter_launcher_icons

@@ -85,22 +85,30 @@ class SpywareScanner(
             val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val networks = connectivityManager.allNetworks
 
-            // OrbVPN is our companion VPN — an active tunnel is expected and
-            // must NEVER be flagged. Android exposes no public API for the VPN
-            // owner, so we treat an active VPN as OrbVPN when the GENUINE OrbVPN
-            // is installed — verified by its SIGNING CERTIFICATE, not just its
-            // package name, so a sideloaded app spoofing `com.orbvpn.android`
-            // cannot slip a hostile VPN past this check. A non-OrbVPN VPN is
-            // still surfaced so the user can review/disconnect it.
-            val orbVpnTrusted = isGenuineOrbVpnInstalled()
+            // An active VPN tunnel is ALWAYS reported, as a fact, with two more
+            // facts beside it. Dart decides what it means (VpnWatch owns the
+            // reroute state; the device check drops these entries from its
+            // findings, so a tunnel is never counted as spyware):
+            //   ownFirewall     - OrbGuard's own DNS firewall VpnService is
+            //                     running right now (the live flag, cleared in
+            //                     onRevoke when another VPN takes the slot).
+            //                     Android runs one VPN at a time, so when this
+            //                     is true the tunnel is OrbGuard's own.
+            //   orbVpnInstalled - the GENUINE OrbVPN is installed, verified by
+            //                     its signing certificate, not its package name,
+            //                     so a sideloaded app spoofing com.orbvpn.android
+            //                     does not count.
+            // Android exposes no public API for which app owns a tunnel, so
+            // neither fact names the owner.
+            val orbVpnInstalled = isGenuineOrbVpnInstalled()
+            val ownFirewall = OrbFirewallVpnService.running
 
             for (network in networks) {
                 val capabilities = connectivityManager.getNetworkCapabilities(network)
 
                 if (capabilities != null) {
-                    // Check for VPN (could be a malicious proxy) — but never
-                    // flag our own genuine OrbVPN companion.
-                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && !orbVpnTrusted) {
+                    val isTunnel = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+                    if (isTunnel) {
                         threats.add(mapOf(
                             "id" to "network_vpn_${System.currentTimeMillis()}",
                             "name" to "Active VPN Connection Detected",
@@ -111,13 +119,20 @@ class SpywareScanner(
                             "requiresRoot" to false,
                             "metadata" to mapOf(
                                 "networkId" to network.toString(),
-                                "timestamp" to System.currentTimeMillis()
+                                "timestamp" to System.currentTimeMillis(),
+                                "ownFirewall" to ownFirewall,
+                                "orbVpnInstalled" to orbVpnInstalled
                             )
                         ))
                     }
-                    
-                    // Check network capabilities for suspicious patterns
-                    if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+
+                    // An unvalidated network can mean a captive portal or
+                    // interception on Wi-Fi or mobile data. A VPN tunnel's own
+                    // validation state says nothing about that (and with
+                    // OrbGuard's firewall on it would make every check find
+                    // something), so tunnels are skipped here.
+                    if (!isTunnel &&
+                        !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
                         // Get network type for better description
                         val networkType = when {
                             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"

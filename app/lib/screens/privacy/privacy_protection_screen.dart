@@ -22,7 +22,11 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/privacy_provider.dart';
 
 class PrivacyProtectionScreen extends StatefulWidget {
-  const PrivacyProtectionScreen({super.key});
+  const PrivacyProtectionScreen({super.key, this.title = 'Privacy Protection'});
+
+  /// The name in the header. A shield passes its own, so the sheet reads
+  /// the same as the moon or the card that opened it.
+  final String title;
 
   @override
   State<PrivacyProtectionScreen> createState() =>
@@ -43,7 +47,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
     return Consumer<PrivacyProvider>(
       builder: (context, provider, _) {
         return GlassTabPage(
-          title: 'Privacy Protection',
+          title: widget.title,
           tabs: [
             GlassTab(
               label: 'Trackers',
@@ -120,7 +124,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'A reference list of tracking SDKs and analytics services '
-                      'OrbGuard recognizes. This is informational — OrbGuard '
+                      'OrbGuard recognizes. This is informational. OrbGuard '
                       'does not intercept or block network traffic on this '
                       'device.',
                       style: TextStyle(
@@ -234,7 +238,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                   "iOS and Android deliberately do not expose other apps' "
                   'camera or microphone use to third-party apps like OrbGuard. '
                   'No API lets one app see when another app turns on the camera '
-                  'or mic, so OrbGuard cannot monitor this — and does not '
+                  'or mic, so OrbGuard cannot monitor this, and does not '
                   'pretend to.',
                   style: TextStyle(
                     color: context.colors.onSurfaceVariant,
@@ -245,7 +249,7 @@ class _PrivacyProtectionScreenState extends State<PrivacyProtectionScreen> {
                 const SizedBox(height: 10),
                 Text(
                   'The same applies to other apps’ clipboard, location, '
-                  'and contacts access — the OS keeps that private to each app.',
+                  'and contacts access. The OS keeps that private to each app.',
                   style: TextStyle(
                     color: context.colors.onSurfaceVariant,
                     fontSize: 13,

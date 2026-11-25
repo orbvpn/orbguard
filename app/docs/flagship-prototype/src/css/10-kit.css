@@ -1,0 +1,200 @@
+/* =====================================================================
+   THE APP SURFACE. Every value below is the OrbVPN 2026 kit as it exists in
+   app/lib/presentation/theme/brand.dart, so a screen here is a screen there.
+   Dark is the app default; [data-app="light"] is the kit's cloud theme.
+   ===================================================================== */
+.os{
+  --bg:#08080A; --surface:#131316; --surface2:#1C1C21;
+  --text:#F5F6F8; --text2:#9A9CA6; --text3:#6F717C;
+  --border:rgba(255,255,255,.10);
+  --lime:#C6FF3D; --on-lime:#08080A; --lime-ink:#C6FF3D; --lime-pill:rgba(198,255,61,.14);
+  --lime-glow:rgba(198,255,61,.26);
+  --pink:#FF3DA6; --pink-ink:#FF6CC0;
+  --amber:#FFB800; --amber-ink:#FFB800; --amber-pill:rgba(255,184,0,.12); --amber-line:rgba(255,184,0,.36);
+  --danger:#FF5C6C;
+  --glass:rgba(255,255,255,.08); --glass-br:rgba(255,255,255,.18); --glass-hi:rgba(255,255,255,.35);
+  --glass-top:rgba(255,255,255,.17);
+  --blur:24px; --sat:1.55;
+  --shadow:0 24px 50px rgba(0,0,0,.45);
+  --bed-lime:rgba(198,255,61,.15); --bed-pink:rgba(255,61,166,.16);
+  --orb-0:#F6FFDA; --orb-1:#E6FBAE; --orb-2:#CDF57A; --orb-3:#A9E36C; --orb-4:#86CB6B; --orb-5:#63AD5C;
+  --orb-glow:rgba(190,250,80,.30); --orb-shadow:rgba(106,152,88,.45);
+  --track:rgba(255,255,255,.065); --seg-off:rgba(255,255,255,.11);
+  --scrim:rgba(4,4,6,.6); --sheet:#131316;
+  --hairline:rgba(255,255,255,.08);
+  color:var(--text); font-family:var(--f-sans); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+.os[data-app="light"]{
+  --bg:#F4F5F1; --surface:#FFFFFF; --surface2:#ECEDE7;
+  --text:#0B0B0E; --text2:#5A5C66; --text3:#8A8C96;
+  --border:rgba(18,18,28,.10);
+  --lime-ink:#5C8A00; --lime-pill:rgba(150,196,20,.20); --lime-glow:rgba(150,196,20,.30);
+  --pink-ink:#D81B86;
+  --amber-ink:#8A6500; --amber-pill:rgba(255,184,0,.16); --amber-line:rgba(190,140,0,.34);
+  --danger:#E0354A;
+  --glass:rgba(255,255,255,.55); --glass-br:rgba(18,18,28,.08); --glass-hi:rgba(255,255,255,.9);
+  --glass-top:rgba(255,255,255,.8);
+  --blur:22px; --sat:1.5;
+  --shadow:0 18px 40px rgba(20,20,45,.12);
+  --bed-lime:rgba(198,255,61,.30); --bed-pink:rgba(255,61,166,.26);
+  --orb-0:#F2FCD0; --orb-1:#E0F4B0; --orb-2:#C4E896; --orb-3:#A0D87C; --orb-4:#84C86C; --orb-5:#68B060;
+  --orb-glow:rgba(150,210,90,.34); --orb-shadow:rgba(106,152,88,.42);
+  --track:rgba(18,18,28,.06); --seg-off:rgba(18,18,28,.10);
+  --scrim:rgba(20,20,28,.32); --sheet:#FFFFFF;
+  --hairline:rgba(18,18,28,.07);
+}
+.os *,.os *::before,.os *::after{box-sizing:border-box}
+:where(.os) button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit;-webkit-tap-highlight-color:transparent}
+.os button:focus-visible,.os [tabindex]:focus-visible,.os input:focus-visible{outline:2px solid var(--lime-ink);outline-offset:3px}
+.os input{caret-color:var(--lime-ink)}
+.os ::selection{background:var(--lime);color:var(--on-lime)}
+:where(.os) p,:where(.os) h1,:where(.os) h2,:where(.os) h3,:where(.os) ol,:where(.os) ul{margin:0;padding:0}
+:where(.ic){width:20px;height:20px;flex:0 0 auto;display:block}
+
+/* the kit's colour bed (BrandBed): lime from the top left, pink from the bottom right,
+   each a circle that fades out at 1.7 x 0.95 of the shortest side, as in brand.dart */
+.bed{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(circle var(--bed-r,635px) at 15% 2.5%,var(--bed-lime),transparent),
+    radial-gradient(circle var(--bed-r,635px) at 95% 97.5%,var(--bed-pink),transparent),
+    var(--bg)}
+
+/* ---- type recipes (BrandText) ---- */
+/* The display voice is declared once, here, for every surface on the page.
+   Five steps of one rule: the bigger the type, the wider and lighter Archivo runs.
+   Each is BrandText.display / h2 / heading with a wdth FontVariation added. */
+.p-h1,.t-xl,.ad-h,.shot-h,.web-copy h3{font-family:var(--f-display);font-weight:var(--xl-g);font-stretch:var(--xl-w);letter-spacing:var(--xl-t)}
+.t-display,.p-h2{font-family:var(--f-display);font-weight:var(--d-g);font-stretch:var(--d-w);letter-spacing:var(--d-t)}
+.t-h2{font-family:var(--f-display);font-weight:var(--h2-g);font-stretch:var(--h2-w);letter-spacing:var(--h2-t)}
+.t-head,.p-h3,.p-lockup,.ad-lock,.brandrow,.wg b,.p-dest-h,.p-phases b,.sc-q,.avatar{font-family:var(--f-display);font-weight:var(--h-g);font-stretch:var(--h-w);letter-spacing:var(--h-t)}
+.orb-num,.big-num,.price b,.p-finds b{font-family:var(--f-display);font-weight:var(--n-g);font-stretch:var(--n-w);letter-spacing:var(--n-t);font-variant-numeric:lining-nums}
+.t-display{font-size:28px;line-height:1.12;text-wrap:balance}
+.t-h2{font-size:23px;line-height:1.18;text-wrap:balance}
+.t-head{font-size:18px;line-height:1.22}
+/* text is IBM Plex Sans. Mono keeps the one job the kit gives it: labels and data, never sentences */
+.t-title{font:600 16px/1.3 var(--f-sans);letter-spacing:-.2px}
+.t-body{font:400 15px/1.5 var(--f-sans);color:var(--text2)}
+.t-small{font:400 13.5px/1.45 var(--f-sans);color:var(--text2)}
+.t-label{font:500 11.5px/1.2 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text2)}
+.t-mono{font:500 12.5px/1.3 var(--f-mono);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--text2)}
+.ink-lime{color:var(--lime-ink)}.ink-amber{color:var(--amber-ink)}.ink-pink{color:var(--pink-ink)}.ink-2{color:var(--text2)}.ink-3{color:var(--text3)}
+
+/* ---- liquid glass (BrandGlass): fill, hairline, top rim, blur + saturate ---- */
+.glass{position:relative;border-radius:24px;border:1px solid var(--glass-br);
+  background:linear-gradient(180deg,var(--glass-top) 0,var(--glass) 15px,var(--glass) 100%);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat));backdrop-filter:blur(var(--blur)) saturate(var(--sat));
+  box-shadow:inset 0 1px 0 var(--glass-hi)}
+.glass.lift{box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow)}
+.glass.amber{border-color:var(--amber-line);background:linear-gradient(180deg,var(--glass-top) 0,var(--amber-pill) 15px),var(--glass)}
+.glass.pad{padding:18px}
+.os[data-app="light"] .glass{box-shadow:inset 0 1px 0 var(--glass-hi),0 10px 26px rgba(20,20,45,.07)}
+.os[data-app="light"] .glass.lift{box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow)}
+
+/* ---- buttons: exactly one lime action on a screen ---- */
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:56px;padding:0 20px;border-radius:16px;
+  font:600 17px/1 var(--f-sans);letter-spacing:-.2px;transition:transform .12s ease,filter .12s ease}
+.os .btn.lime{background:var(--lime);color:var(--on-lime);box-shadow:0 10px 28px -8px var(--lime-glow)}
+.os .btn.lime:active{transform:scale(.975);filter:brightness(.92)}
+.os .btn.plain{background:var(--glass);border:1px solid var(--glass-br);color:var(--text);
+  -webkit-backdrop-filter:blur(12px) saturate(var(--sat));backdrop-filter:blur(12px) saturate(var(--sat));box-shadow:inset 0 1px 0 var(--glass-hi)}
+.os .btn.plain:active{transform:scale(.975)}
+.os .btn.text{height:44px;color:var(--text2);font-weight:500;font-size:15px}
+.btn.sm{height:44px;font-size:15px;border-radius:14px}
+.btn .ic{width:19px;height:19px}
+.btn-row{display:flex;gap:10px}
+
+/* ---- small parts ---- */
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font:600 12px/1 var(--f-sans);letter-spacing:0;white-space:nowrap}
+.chip.on{background:var(--lime-pill);color:var(--lime-ink)}
+.chip.care{background:var(--amber-pill);color:var(--amber-ink)}
+.chip.mute{background:var(--hairline);color:var(--text2)}
+.chip.pink{background:rgba(255,61,166,.14);color:var(--pink-ink)}
+.chip i,.live{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.live{color:var(--lime-ink);box-shadow:0 0 0 0 currentColor;animation:live 2.4s ease-in-out infinite}
+.tile{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--hairline);color:var(--lime-ink);flex:0 0 auto}
+.tile.amber{color:var(--amber-ink);background:var(--amber-pill)}
+.tile.mute{color:var(--text3)}
+.tile.sm{width:32px;height:32px;border-radius:10px}.tile.sm .ic{width:17px;height:17px}
+.circ{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;flex:0 0 auto;background:var(--glass);border:1px solid var(--glass-br);
+  -webkit-backdrop-filter:blur(12px) saturate(var(--sat));backdrop-filter:blur(12px) saturate(var(--sat));box-shadow:inset 0 1px 0 var(--glass-hi);color:var(--text)}
+.circ .ic{width:19px;height:19px}
+/* the account is not an action, so it is glass like the bell. Lime stays with the one button */
+.avatar{font-size:15px;line-height:1}
+.grow{flex:1 1 auto;min-width:0}
+.nb{white-space:nowrap}
+.stack{display:flex;flex-direction:column}
+.line{display:flex;align-items:center}
+
+/* ---- grouped rows inside one glass card ---- */
+.rows{padding:4px 0}
+.row{display:flex;align-items:center;gap:13px;width:100%;padding:12px 16px;min-height:64px;position:relative}
+.row + .row::before{content:"";position:absolute;left:69px;right:16px;top:0;height:1px;background:var(--hairline)}
+.row.flat + .row.flat::before{left:16px}
+.row .t-title{display:block}
+/* a second line that wraps is split evenly, so no row ends on one stray word */
+.row .sub{display:block;font:400 13.5px/1.35 var(--f-sans);color:var(--text2);margin-top:1px;text-wrap:balance}
+.row .end{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto;color:var(--text3)}
+.row .end .ic{width:17px;height:17px}
+/* a row that does not navigate keeps the chevron slot, so every chip ends on one line */
+.row .end .nochev{width:17px}
+button.row:active{background:var(--hairline)}
+.sect{display:flex;align-items:baseline;justify-content:space-between;margin:28px 0 12px}
+.sect:first-child{margin-top:0}
+
+/* ---- device chrome ---- */
+.phone{position:relative;width:413px;height:872px;border-radius:60px;padding:10px;flex:0 0 auto;
+  background:linear-gradient(145deg,#33353d 0%,#101014 42%,#08080a 60%,#26272e 100%);
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.09),0 60px 90px -34px rgba(0,0,0,.62),0 26px 46px -22px rgba(0,0,0,.42)}
+.phone > .os{position:relative;width:393px;height:852px;border-radius:50px;overflow:hidden;isolation:isolate;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;width:122px;height:35px;margin-left:-61px;border-radius:20px;background:#000;z-index:70}
+.sbar{position:absolute;inset:0 0 auto 0;height:54px;z-index:65;display:flex;align-items:center;justify-content:space-between;
+  padding:8px 31px 0 36px;font:600 16px/1 var(--f-sans);letter-spacing:-.2px;color:var(--text);pointer-events:none}
+.sys{display:flex;align-items:center;gap:6px}
+.sys svg{display:block;fill:currentColor}
+.homebar{position:absolute;bottom:8px;left:50%;width:138px;height:5px;margin-left:-69px;border-radius:3px;background:var(--text);opacity:.9;z-index:70;pointer-events:none}
+.fit{flex:0 0 auto;width:calc(var(--w,413px) * var(--s,1));height:calc(var(--h,872px) * var(--s,1))}
+.fit > *{transform:scale(var(--s,1));transform-origin:0 0}
+
+/* ---- screens ---- */
+.view{position:absolute;inset:0;z-index:1;display:none;flex-direction:column}
+.view.on{display:flex}
+.scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding:58px 20px 124px}
+.scroll::-webkit-scrollbar{display:none}
+.os:not(.scanning):has(> .nav) > .view > .scroll{-webkit-mask-image:linear-gradient(#000 calc(100% - 104px),transparent calc(100% - 46px));mask-image:linear-gradient(#000 calc(100% - 104px),transparent calc(100% - 46px))}
+.topbar{display:flex;align-items:center;gap:10px;height:44px}
+.trust{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px 0 10px;border-radius:999px;border:1px solid var(--border);
+  font:500 12px/1 var(--f-sans);color:var(--text2)}
+.trust .ic{width:15px;height:15px;color:var(--lime-ink)}
+.pagehead{display:flex;align-items:center;gap:12px;min-height:44px;margin-bottom:18px}
+
+/* ---- floating glass nav: only the active item takes lime ---- */
+.nav{position:absolute;left:14px;right:14px;bottom:24px;height:66px;z-index:40;display:flex;align-items:stretch;gap:2px;padding:6px;border-radius:38px;
+  background:var(--glass);border:1px solid var(--glass-br);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat));backdrop-filter:blur(var(--blur)) saturate(var(--sat));
+  box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow)}
+.os .nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:32px;
+  font:500 11px/1 var(--f-sans);color:var(--text2);transition:background .2s,color .2s}
+.nav button .ic{width:23px;height:23px}
+.os .nav button.on{background:var(--lime-pill);color:var(--lime-ink);font-weight:600}
+
+/* ---- sheets: every pop-up is a sheet ---- */
+.scrim{position:absolute;inset:0;z-index:80;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .28s ease;
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:85;max-height:88%;display:flex;flex-direction:column;border-radius:30px 30px 0 0;
+  background:var(--sheet);border-top:1px solid var(--glass-br);box-shadow:0 -24px 60px rgba(0,0,0,.35);
+  transform:translateY(104%);transition:transform .42s cubic-bezier(.22,1,.36,1);pointer-events:none}
+.sheet::before{content:"";align-self:center;flex:0 0 auto;width:38px;height:5px;border-radius:3px;background:var(--text3);opacity:.5;margin:9px 0 2px}
+.sheet .inner{overflow-y:auto;scrollbar-width:none;padding:14px 20px 34px}
+.sheet .inner::-webkit-scrollbar{display:none}
+.os.sheet-open .scrim{opacity:1;pointer-events:auto}
+.sheet.open{transform:none;pointer-events:auto}
+
+/* ---- toast ---- */
+.toast{position:absolute;left:50%;bottom:108px;z-index:90;transform:translate(-50%,16px);opacity:0;pointer-events:none;white-space:nowrap;
+  display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 12px;border-radius:999px;background:var(--text);color:var(--bg);
+  font:600 13.5px/1 var(--f-sans);transition:opacity .25s,transform .35s cubic-bezier(.22,1,.36,1)}
+.toast .ic{width:17px;height:17px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@keyframes live{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 55%,transparent)}55%{box-shadow:0 0 0 5px transparent}}

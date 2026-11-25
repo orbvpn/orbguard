@@ -331,7 +331,8 @@ func (r *ForensicResult) generateRecommendations() {
 		)
 	} else {
 		r.Recommendations = append(r.Recommendations,
-			"No significant threats detected",
+			"No significant threats detected in the supplied file",
+			"This covers only the supplied file and does not show that the device is clean",
 			"Continue regular security hygiene practices",
 			"Keep device updated with latest security patches",
 		)
@@ -366,6 +367,21 @@ func (r *ForensicResult) AddAnomaly(anomaly Anomaly) {
 		anomaly.ID = uuid.New().String()
 	}
 	r.Anomalies = append(r.Anomalies, anomaly)
+}
+
+// HasHighFinding reports whether the result holds a high or critical finding.
+func (r *ForensicResult) HasHighFinding() bool {
+	for _, a := range r.Anomalies {
+		if a.Severity == ForensicSeverityCritical || a.Severity == ForensicSeverityHigh {
+			return true
+		}
+	}
+	for _, t := range r.DetectedThreats {
+		if t.Severity == ForensicSeverityCritical || t.Severity == ForensicSeverityHigh {
+			return true
+		}
+	}
+	return false
 }
 
 // AddThreat adds a detected threat to the result

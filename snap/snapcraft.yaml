@@ -1,0 +1,30 @@
+name: orbguard
+base: core22
+version: '1.0.0'
+summary: Know if you're being watched — anti-spyware & scam protection
+description: |
+  OrbGuard checks your device for spyware and stalkerware, analyses scam
+  links and QR codes, and adds anti-theft protection. One subscription is
+  shared with OrbVPN and OrbBrowser (sign in with your Orb account).
+license: Proprietary
+grade: stable
+confinement: strict
+
+apps:
+  orbguard:
+    command: orbguard
+    extensions: [gnome]
+    plugs:
+      - network
+      - home
+      - camera
+      - audio-playback
+      - password-manager-service
+
+parts:
+  orbguard:
+    # Package the release bundle the workflow already built (flutter build
+    # linux runs before snapcraft in linux-build.yml) — the snapcraft flutter
+    # plugin's own in-container Flutter rebuild is redundant and crashes.
+    plugin: dump
+    source: app/build/linux/x64/release/bundle

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -133,10 +134,12 @@ func (c *LeakCheckClient) CheckEmail(ctx context.Context, email string) ([]model
 	}
 
 	if !lcResp.Success {
-		if lcResp.Error == "Not found" {
+		// Only the 404 status means not found. The provider's error text is
+		// not repeated: it could echo the address.
+		if resp.StatusCode == http.StatusNotFound {
 			return []models.Breach{}, nil
 		}
-		return nil, fmt.Errorf("leakcheck: API error: %s", lcResp.Error)
+		return nil, errors.New("leakcheck: API reported an error")
 	}
 
 	breaches := make([]models.Breach, 0, len(lcResp.Result))

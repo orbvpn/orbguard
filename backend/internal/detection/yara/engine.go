@@ -2,6 +2,7 @@ package yara
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -13,8 +14,8 @@ import (
 
 // Engine is a pure Go YARA rule engine
 type Engine struct {
-	rules    map[string]*CompiledRule
-	rulesMu  sync.RWMutex
+	rules   map[string]*CompiledRule
+	rulesMu sync.RWMutex
 }
 
 // CompiledRule represents a compiled YARA rule ready for matching
@@ -45,13 +46,26 @@ func NewEngine() *Engine {
 
 // CompileRule compiles a YARA rule for matching
 func (e *Engine) CompileRule(rule *models.YARARule) (*CompiledRule, error) {
+	return e.CompileRuleContext(context.Background(), rule)
+}
+
+// CompileRuleContext is CompileRule with cooperative cancellation: ctx is
+// checked before every string pattern. Rule text reaches the compiler from
+// any device key (POST /yara/parse, /yara/submit), so a request deadline has
+// to be able to stop a submission mid-rule; the most it can still cost past
+// the deadline is the compile of one pattern.
+func (e *Engine) CompileRuleContext(ctx context.Context, rule *models.YARARule) (*CompiledRule, error) {
 	compiled := &CompiledRule{
 		Rule:     rule,
 		Patterns: make([]*CompiledPattern, 0, len(rule.Strings)),
 	}
 
-	for _, str := range rule.Strings {
-		pattern, err := e.compilePattern(&str)
+	for i := range rule.Strings {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		str := &rule.Strings[i]
+		pattern, err := e.compilePattern(str)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile pattern %s: %w", str.ID, err)
 		}
@@ -129,26 +143,29 @@ func (e *Engine) compileHexPattern(pattern *CompiledPattern, value string) (*Com
 
 	// Check for wildcards (?) - convert to regex if present
 	if strings.Contains(cleaned, "?") {
-		// Convert hex with wildcards to regex
-		regexStr := ""
+		// Convert hex with wildcards to regex. Built with a Builder, not
+		// string concatenation: a submitted pattern can be hundreds of KiB,
+		// and += made that quadratic (seconds of CPU per request).
+		var regexStr strings.Builder
+		regexStr.Grow(len(cleaned))
 		for i := 0; i < len(cleaned); i += 2 {
 			if i+1 < len(cleaned) {
 				pair := cleaned[i : i+2]
 				if pair == "??" {
-					regexStr += "."
+					regexStr.WriteByte('.')
 				} else if strings.Contains(pair, "?") {
 					// Single nibble wildcard
-					regexStr += "."
+					regexStr.WriteByte('.')
 				} else {
 					b, err := hex.DecodeString(pair)
 					if err != nil {
 						return nil, fmt.Errorf("invalid hex pair: %s", pair)
 					}
-					regexStr += regexp.QuoteMeta(string(b))
+					regexStr.WriteString(regexp.QuoteMeta(string(b)))
 				}
 			}
 		}
-		regex, err := regexp.Compile(regexStr)
+		regex, err := regexp.Compile(regexStr.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile hex pattern: %w", err)
 		}
