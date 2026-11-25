@@ -77,6 +77,31 @@
 	<string>Required for location-based threat analysis and anti-theft features</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required for file system scanning</string>
+	<!-- The UIScene lifecycle. An app built with the iOS 27 SDK that does not
+	     declare it is killed at launch. FlutterSceneDelegate is Flutter's own
+	     delegate: it hands scene events (URLs, universal links, foreground and
+	     background) on to the plugins. One scene only. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
