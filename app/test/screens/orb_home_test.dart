@@ -25,7 +25,6 @@ import 'package:orbguard/services/home/guard_status_controller.dart';
 import 'package:orbguard/services/home/home_brief.dart';
 import 'package:orbguard/services/home/last_scan_verdict_controller.dart';
 import 'package:orbguard/services/security/device_scan_service.dart';
-import 'package:orbguard/utils/device_words.dart';
 import 'package:orbguard/widgets/home/orb_ring.dart';
 import 'package:orbguard/widgets/home/today_card.dart';
 
@@ -130,12 +129,23 @@ Future<void> _mount(
 
 void main() {
   group('before the first check', () {
+    // The words follow the platform Home is given, not the machine the code
+    // happens to run on: a phone-sized test on a desktop host must read as a
+    // phone does.
+    testWidgets('names the device by the platform it is given', (tester) async {
+      await _mount(tester,
+          verdict: await _verdict(),
+          guards: await _watching(),
+          platform: TargetPlatform.android);
+
+      expect(find.text('Let’s check your phone.'), findsOneWidget);
+    });
+
     testWidgets('Home invites a check and shows no score', (tester) async {
       await _mount(tester,
           verdict: await _verdict(), guards: await _watching());
 
-      expect(
-          find.text('Let’s check your ${DeviceWords.noun}.'), findsOneWidget);
+      expect(find.text('Let’s check your phone.'), findsOneWidget);
       expect(find.text('Not checked yet'), findsOneWidget);
       expect(find.text('privacy score'), findsNothing);
       expect(find.text('Nothing yet. Your first check starts the record.'),
@@ -293,9 +303,7 @@ void main() {
         tester.getSemantics(find.bySemanticsLabel('Spyware & Pegasus, on')),
         isSemantics(isButton: true, hasTapAction: true),
       );
-      expect(
-          find.bySemanticsLabel(
-              'Who’s watching you, limited on this ${DeviceWords.noun}'),
+      expect(find.bySemanticsLabel('Who’s watching you, limited on this phone'),
           findsOneWidget);
       expect(find.bySemanticsLabel('Scam shield, off'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(', (on|off|limited|needs you)')),
@@ -589,7 +597,7 @@ void main() {
       run.report(progress(0, done: false));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('Checking your ${DeviceWords.noun}.'), findsOneWidget);
+      expect(find.text('Checking your phone.'), findsOneWidget);
       expect(find.text('Looking for interception'), findsOneWidget);
       expect(find.text('0/5', findRichText: true), findsOneWidget);
       expect(find.text('checks'), findsOneWidget);
@@ -683,7 +691,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('Checking your ${DeviceWords.noun}.'), findsNothing);
+      expect(find.text('Checking your phone.'), findsNothing);
       expect(find.widgetWithText(BrandButton, 'Check now'), findsOneWidget);
       expect(find.byType(TodayCard), findsOneWidget);
     });

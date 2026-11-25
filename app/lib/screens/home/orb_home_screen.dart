@@ -36,7 +36,7 @@ import '../../services/home/home_reading.dart';
 import '../../services/home/home_today.dart';
 import '../../services/home/last_scan_verdict_controller.dart';
 import '../../services/home/privacy_score_engine.dart';
-import '../../utils/device_words.dart';
+import '../../utils/host_platform.dart';
 import '../../widgets/home/care_card.dart';
 import '../../widgets/home/orb_hero.dart';
 import '../../widgets/home/orb_ring.dart';
@@ -127,7 +127,9 @@ class OrbHomeScreen extends StatelessWidget {
       builder: (context, _) {
         Theme.of(context); // Brand tokens flip with the theme
         final DateTime now = (clock ?? DateTime.now)();
-        final String noun = DeviceWords.noun;
+        // The word for this device follows the platform Home is given, so a
+        // phone-sized test on a desktop reads as a phone does.
+        final String noun = deviceNounFor(platform ?? hostPlatform());
         final List<GuardStatus> guards = guardsController.guards;
         final HomeReading reading = HomeReading.of(
           verdict: verdict,

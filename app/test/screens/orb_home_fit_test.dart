@@ -53,12 +53,15 @@ Future<GuardStatusController> _guards() async {
 
 /// Mounts Home the way the shell does: under the status bar ([top]), running
 /// down to the bottom edge, with the system's bottom inset ([bottom]) reported
-/// to it.
+/// to it. [platform] is the phone being measured: its words ("your phone")
+/// set the headline's width, so the machine running the test must not choose
+/// them.
 Future<void> _mount(
   WidgetTester tester, {
   required Size screen,
   required double top,
   required double bottom,
+  required TargetPlatform platform,
   int? score,
 }) async {
   tester.view.physicalSize = screen;
@@ -79,6 +82,7 @@ Future<void> _mount(
                 verdict: verdict,
                 guardsController: guards,
                 onRunCheck: () {},
+                platform: platform,
                 clock: () => _now,
               ),
             ),
@@ -97,20 +101,30 @@ double _barTop(Size screen, double bottom) =>
 void main() {
   setUpAll(loadRealFonts);
 
-  // (name, screen, status bar, bottom inset)
+  // (name, screen, status bar, bottom inset, platform)
   const phones = [
-    ('an iPhone SE of 2016', Size(320, 568), 20.0, 0.0),
-    ('a small Android with navigation buttons', Size(360, 640), 24.0, 48.0),
-    ('an iPhone SE of 2022', Size(375, 667), 20.0, 0.0),
+    ('an iPhone SE of 2016', Size(320, 568), 20.0, 0.0, TargetPlatform.iOS),
+    (
+      'a small Android with navigation buttons',
+      Size(360, 640),
+      24.0,
+      48.0,
+      TargetPlatform.android
+    ),
+    ('an iPhone SE of 2022', Size(375, 667), 20.0, 0.0, TargetPlatform.iOS),
   ];
 
-  for (final (name, screen, top, bottom) in phones) {
+  for (final (name, screen, top, bottom, platform) in phones) {
     for (final int? score in [null, 92]) {
       final String state = score == null ? 'before a check' : 'after a check';
       testWidgets('on $name, $state, the one action shows above the tab bar',
           (tester) async {
         await _mount(tester,
-            screen: screen, top: top, bottom: bottom, score: score);
+            screen: screen,
+            top: top,
+            bottom: bottom,
+            platform: platform,
+            score: score);
 
         expect(tester.takeException(), isNull);
         expect(
@@ -121,7 +135,12 @@ void main() {
     }
 
     testWidgets('on $name every shield stays on the screen', (tester) async {
-      await _mount(tester, screen: screen, top: top, bottom: bottom, score: 92);
+      await _mount(tester,
+          screen: screen,
+          top: top,
+          bottom: bottom,
+          platform: platform,
+          score: 92);
 
       for (final moon in tester.widgetList(find.byType(ShieldMoon))) {
         final Rect rect = tester.getRect(find.byWidget(moon));
@@ -134,10 +153,12 @@ void main() {
   group('on a tall phone', () {
     const Size pixel = Size(411, 914);
     const double top = 32, bottom = 24;
+    const TargetPlatform platform = TargetPlatform.android;
 
     testWidgets('before the first check the spare height is shared out',
         (tester) async {
-      await _mount(tester, screen: pixel, top: top, bottom: bottom);
+      await _mount(tester,
+          screen: pixel, top: top, bottom: bottom, platform: platform);
 
       // Home has little under the action before a check. Left alone, all of
       // a tall screen's spare height would pile up above the tab bar.
@@ -153,7 +174,8 @@ void main() {
 
     testWidgets('before the first check Today sits a little lower too',
         (tester) async {
-      await _mount(tester, screen: pixel, top: top, bottom: bottom);
+      await _mount(tester,
+          screen: pixel, top: top, bottom: bottom, platform: platform);
 
       final double gap = tester.getRect(find.byType(TodayCard)).top -
           tester.getRect(find.byType(BrandButton)).bottom;
@@ -162,7 +184,12 @@ void main() {
 
     testWidgets('once checked, the ring keeps its place under the top row',
         (tester) async {
-      await _mount(tester, screen: pixel, top: top, bottom: bottom, score: 92);
+      await _mount(tester,
+          screen: pixel,
+          top: top,
+          bottom: bottom,
+          platform: platform,
+          score: 92);
 
       // 8 of page padding, the 44 top row, 12 of air.
       expect(tester.getRect(find.byType(OrbHero)).top - top, 64);
@@ -171,7 +198,11 @@ void main() {
 
   testWidgets('before the first check a full-size phone has nothing to share',
       (tester) async {
-    await _mount(tester, screen: const Size(390, 844), top: 54, bottom: 34);
+    await _mount(tester,
+        screen: const Size(390, 844),
+        top: 54,
+        bottom: 34,
+        platform: TargetPlatform.iOS);
 
     expect(tester.getRect(find.byType(OrbHero)).top - 54, 64);
   });
@@ -179,14 +210,22 @@ void main() {
   testWidgets('on a full-size phone the ring keeps its design size',
       (tester) async {
     await _mount(tester,
-        screen: const Size(390, 844), top: 54, bottom: 34, score: 92);
+        screen: const Size(390, 844),
+        top: 54,
+        bottom: 34,
+        platform: TargetPlatform.iOS,
+        score: 92);
 
     expect(tester.getSize(find.byType(OrbRing)), const Size(224, 224));
   });
 
   testWidgets('on a tablet Home stays one readable column', (tester) async {
     await _mount(tester,
-        screen: const Size(760, 1000), top: 24, bottom: 0, score: 92);
+        screen: const Size(760, 1000),
+        top: 24,
+        bottom: 0,
+        platform: TargetPlatform.android,
+        score: 92);
 
     // A button stretched across a tablet stops reading as one action.
     expect(
