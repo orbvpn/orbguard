@@ -49,5 +49,11 @@ jobs:
       # API contract gate. tools/check_api_contract.py cross-checks the app's
       # endpoint calls against the backend chi router. In the monorepo both
       # sides are always present, so this gate always runs.
+      #
+      # The gate's own tests run first: a route form its parser cannot read
+      # looks to the gate like a route the backend does not serve.
+      - name: API contract gate self-test
+        run: python3 -m unittest discover -s tools -p "test_*.py"
+
       - name: API contract gate
         run: python3 tools/check_api_contract.py --lab-root ../backend

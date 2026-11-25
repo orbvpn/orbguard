@@ -234,6 +234,73 @@ ROUTE_RE = re.compile(r'(\w+)\.Route\(\s*"([^"]*)"\s*,\s*func\(\s*(\w+)\s+chi\.R
 GROUP_RE = re.compile(r'(\w+)\.Group\(\s*func\(\s*(\w+)\s+chi\.Router\s*\)')
 METHOD_RE = re.compile(r'(\w+)\.(Get|Post|Put|Delete|Patch)\(\s*"([^"]*)"')
 REGISTER_RE = re.compile(r'\.RegisterRoutes\(\s*(\w+)\s*\)')
+WITH_RE = re.compile(r'\.With\(')
+CHAIN_DOT_RE = re.compile(r'\.\s*')
+
+
+def _end_of_quoted(text: str, start: int) -> int:
+    """Index just past the Go string literal that opens at start."""
+    quote = text[start]
+    i = start + 1
+    while i < len(text):
+        if text[i] == "\\" and quote == '"':
+            i += 2
+            continue
+        if text[i] == quote:
+            return i + 1
+        i += 1
+    return i
+
+
+def _closing_bracket(text: str, open_at: int):
+    """Index of the bracket that closes the one at open_at, or None.
+
+    Brackets inside string literals do not count.
+    """
+    depth = 0
+    i = open_at
+    while i < len(text):
+        char = text[i]
+        if char in '"`':
+            i = _end_of_quoted(text, i)
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+def drop_with_links(text: str) -> str:
+    """Take chi's `.With(middleware...)` links out of call chains.
+
+    `api.With(mw).Get("/x", h)` serves the same path as `api.Get("/x", h)`:
+    the middleware decides who may call a route, not where it is. With the
+    link gone the registration reads the way the patterns above expect. The
+    link can span lines (a list of middleware, or a chain that goes on after
+    a line break), so this works on the whole text, not line by line.
+    """
+    out = []
+    at = 0
+    while True:
+        link = WITH_RE.search(text, at)
+        if link is None:
+            out.append(text[at:])
+            return "".join(out)
+        close = _closing_bracket(text, link.end() - 1)
+        if close is None:  # not a complete call: leave the rest as written
+            out.append(text[at:])
+            return "".join(out)
+        out.append(text[at:link.start()])
+        at = close + 1
+        # `x.With(...).` + line break + `Post(` closes up to `x.Post(`.
+        dot = CHAIN_DOT_RE.match(text, at)
+        if dot is not None:
+            out.append(".")
+            at = dot.end()
 
 
 def parse_chi(lines, initial_vars, lab_root: Path, follow_registers=True):
@@ -252,9 +319,10 @@ def parse_chi(lines, initial_vars, lab_root: Path, follow_registers=True):
                 return prefix
         return initial_vars.get(var)
 
-    for line in lines:
-        stripped = line.split("//")[0]
+    # Comments go first, so a route that is commented out stays out.
+    code = drop_with_links("\n".join(line.split("//")[0] for line in lines))
 
+    for stripped in code.split("\n"):
         mm = METHOD_RE.search(stripped)
         if mm:
             prefix = resolve(mm.group(1))
