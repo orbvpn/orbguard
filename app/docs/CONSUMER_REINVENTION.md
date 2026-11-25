@@ -69,7 +69,8 @@ Platform columns: **iOS · And · mac · Win · Lin**. `Test` = unit/widget + e2
   APK now builds clean (201 MB debug). Android delivery + 0.5 runtime verify + P0.7 Android leg unblocked.
 
 - **BLOCKER-2: iOS app is killed at launch when built with Xcode 27.2 for iOS 27.1 (found 2026-11-25).
-  Launch is fixed on the simulator (2026-11-25, not committed); the rest of the migration is unproven.**
+  Launch is fixed on the simulator (2026-11-25, commit `5c20b8c`, on `main`); the rest of the migration
+  is unproven.**
   The crash was `EXC_BREAKPOINT` in UIKit's check for scene lifecycle adoption: `ios/Runner/Info.plist`
   had no `UIApplicationSceneManifest`, and Flutter's own build log warns that UIScene support will be
   required (https://flutter.dev/to/uiscene-migration). Not caused by Phase 5, and it blocked every new
@@ -216,8 +217,10 @@ in `docs/flagship-prototype/` (`build.py` writes `orbguard-flagship.html`). Its 
 | 5.3 | Every screen size: the adaptive shell for foldables and tablets, then the desktop window | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 5.4 | The sell kit: store screenshots, widgets, the share card and the site hero | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 
-**5.1 state (2026-11-25).** Built on branch `flagship-phase-1` (off `production-hardening`), **not
-committed yet**, which is the only reason its status is 🟡. `flutter analyze`: no issues. `flutter test`:
+**5.1 state (2026-11-25).** Built on branch `flagship-phase-1` (off `production-hardening`) and
+committed with 5.2 (see "Landing" below). Its status stays 🟡 because it has run on one platform of
+five. An earlier version of this note called the missing commit the only reason for the 🟡; that was
+wrong. `flutter analyze`: no issues. `flutter test`:
 498 pass, 8 skipped (the render harnesses, which run only when `RENDER_DIR` is set). API contract gate:
 PASS. Android is 🔵: a debug build ran on a Pixel 6 emulator (Android 15) from first open through the
 automatic first check, the results sheet, Home with the real score (606, gap toward Spyware), the score
@@ -288,9 +291,35 @@ granted over adb; the check and everything after it were the real thing.
 
 **5.2 state (2026-11-25).** The owner's word after the 5.1 page was "fix all and next step please".
 It was read as the go-ahead for the open items of 5.1 and for 5.2, and for nothing further. Built on
-the same branch, `flagship-phase-1`, **not committed yet**. `flutter analyze`: no issues.
+the same branch, `flagship-phase-1`. `flutter analyze`: no issues.
 `flutter test`: 916 pass, 26 skipped (the render harnesses). API contract gate: PASS. Shown, with
 screenshots of the running app, at https://claude.ai/artifact/HejruYDNkgjas25busoG1k.
+
+**Landing (2026-11-25).** The owner's word was "commit, push, merge to main all".
+- **Commits.** `5c20b8c` (the iOS scene lifecycle), `3ec5bbb` (5.1 and 5.2 in the app), `9fa69f0`
+  (this document and the prototype's source).
+- **The hardening line came first.** `main` deploys the backend on every push that touches it, and
+  the backend running in production was 55 commits ahead of `production-hardening`, on branches of
+  its own (pull requests #6 and #7). Merging the flagship work into `main` alone would have put an
+  older backend into production. The owner chose to merge all of it: the hardening line into
+  `production-hardening` (`d114416`), then `production-hardening` into `main` (`d9bc7ac`). Before the
+  push, the backend in that merge was shown to be the same tree as the source of the running image,
+  so the deploy rebuilt the backend that was already live. It went out green, and the service
+  answered healthy from the new revision.
+- **App CI is green, for the first time since 2026-07-31.** It runs on Linux, and three things were
+  red there that pass on a Mac:
+  - Ten tests of sign-in and plans. Both screens asked the machine they ran on whether it was
+    Windows or Linux, so on the build server the phone tests saw the desktop version. They now take
+    the platform they draw for, as Home and the shields do (`e2fccba`).
+  - Two of this phase's own fit tests, by the same fault: Home's word for the device came from the
+    machine, and "computer" wraps wider than "phone" (`534247a`).
+  - The contract gate. It could not read the twenty routes the hardening line registers behind
+    middleware (`x.With(...).Get(...)`), so it called six paths the app uses missing. Its parser now
+    reads them, has tests of its own, and CI runs those first (`ad54c74`).
+
+  The run on `production-hardening` at `e2fccba`: 936 tests pass, 26 skipped, the gate passes.
+- **Still true after landing:** nothing here was run as a desktop app or on a real iPhone, and 5.3
+  and 5.4 wait for the owner's word.
 
 **What 5.2 built:**
 - **The check inside the ring.** No second page. The ring breaks into one segment per check, fills as
@@ -350,8 +379,8 @@ screenshots of the running app, at https://claude.ai/artifact/HejruYDNkgjas25bus
   clean.", with the 6 checks an iPhone cannot run named and not passed. Home showed 766 in dark and
   in light. Taps cannot be scripted on that simulator, so nothing past Home was seen, and on that
   display the tab bar and the sheet do not span the odd width, which is 5.3.
-- **macOS, Windows, Linux (🟡).** As in 5.1: the shared Dart is analyzed and tested on the macOS host,
-  and the app was not run as a desktop window.
+- **macOS, Windows, Linux (🟡).** As in 5.1: the shared Dart is analyzed and tested on the macOS host
+  (and, since landing, on the Linux CI runner), and the app was not run as a desktop window.
 
 **Not verified:**
 - The Kotlin side that tells OrbGuard's own firewall from another app's VPN (`SpywareScanner.kt`):
@@ -381,7 +410,8 @@ screenshots of the running app, at https://claude.ai/artifact/HejruYDNkgjas25bus
 
 **Render harness.** `cd app && flutter test test/visual --dart-define=RENDER_DIR=<absolute dir>` writes
 the ring states, five Homes at 390 by 844, three at 320 by 568 and the real shell's tabs, in both
-themes. The host is a Mac, so the never-checked Home says "Mac" there; on a phone it says "phone".
+themes. Home is given the phone it is drawn for, so the never-checked Home says "phone" there, as
+it does on a phone, whatever machine runs the harness.
 
 ---
 
@@ -411,6 +441,7 @@ themes. The host is a Mac, so the never-checked Home says "Mac" there; on a phon
 | 2026-11-25 | Kit lime ink on light | **Unchanged** (`#5C8A00`), flagged: fails 4.5 to 1 as small text, `#4A7000` passes, the kit is shared with OrbVPN |
 | 2026-11-25 | Flagship phase 2 | **Built**, with the open items of 5.1, after the owner's "fix all and next step please". 5.3 and 5.4 wait for the owner's word |
 | 2026-11-25 | Kit lime ink on light, revised | **`#4A7000` in OrbGuard**, which reverses the row two above. OrbVPN's copy of the kit is not changed |
+| 2026-11-25 | Landing the flagship | **Merged to `production-hardening` and `main`, together with the hardening line that already ran in production** (the owner: "Merge all, hotfixes too"). 5.3 and 5.4 still wait for the owner's word |
 
 **Strategy dossier (rationale, competitive teardown, psychology):** https://claude.ai/code/artifact/cf12693f-fef4-4781-bf64-d4fe67b3450c
 **Live status dashboard:** https://claude.ai/code/artifact/d3462645-f12c-46ca-a3c2-e1f366cf26f0
