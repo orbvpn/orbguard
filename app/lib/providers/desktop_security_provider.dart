@@ -13,6 +13,7 @@ import '../models/api/threat_indicator.dart';
 import '../services/api/orbguard_api_client.dart';
 import '../services/security/desktop_firewall_enforcer.dart';
 import '../services/security/desktop_host_collector.dart';
+import '../services/security/mac_code_signature.dart';
 import '../services/security/macos_persistence_scanner_service.dart';
 import '../services/security/windows_persistence_scanner_service.dart';
 import '../services/security/linux_persistence_scanner_service.dart';
@@ -1093,53 +1094,60 @@ class DesktopSecurityProvider extends ChangeNotifier {
   /// that lost their metadata. Registry `.reg` backups are attached to their
   /// owning entry instead of being listed as items.
   Future<List<QuarantinedItem>> getQuarantinedItems() async {
-    final items = <QuarantinedItem>[];
     try {
-      final quarantineDir = await _getQuarantineDir();
-      final metadata = await _loadQuarantineMetadata();
-      final registryBackups = metadata.values
-          .whereType<Map<String, dynamic>>()
-          .map((m) => m['registry_backup'] as String?)
-          .whereType<String>()
-          .toSet();
-
-      // All metadata entries, file-backed or not.
-      for (final entry in metadata.entries) {
-        final itemMeta = entry.value as Map<String, dynamic>?;
-        items.add(QuarantinedItem(
-          fileName: entry.key,
-          originalPath: itemMeta?['original_path'] as String? ?? '',
-          name: itemMeta?['name'] as String? ?? entry.key,
-          type: itemMeta?['type_display_name'] as String? ?? 'Unknown',
-          quarantinedAt: itemMeta?['quarantined_at'] != null
-              ? DateTime.tryParse(itemMeta!['quarantined_at'] as String)
-              : null,
-          isService: itemMeta?['is_service'] as bool? ?? false,
-          isRegistry: itemMeta?['is_registry'] as bool? ?? false,
-          isTask: itemMeta?['is_task'] as bool? ?? false,
-          registryBackupPath: itemMeta?['registry_backup'] as String?,
-        ));
-      }
-
-      // Orphan quarantine files without metadata.
-      if (await quarantineDir.exists()) {
-        await for (final entity in quarantineDir.list()) {
-          if (entity is! File || entity.path.endsWith('.metadata.json')) {
-            continue;
-          }
-          if (registryBackups.contains(entity.path)) continue;
-          final fileName = entity.path.split(PlatformInfo.pathSeparator).last;
-          if (metadata.containsKey(fileName)) continue;
-          items.add(QuarantinedItem(
-            fileName: fileName,
-            originalPath: '',
-            name: fileName,
-            type: 'Unknown',
-          ));
-        }
-      }
+      return await readQuarantinedItems();
     } catch (e) {
       // Ignore
+      return [];
+    }
+  }
+
+  /// [getQuarantinedItems], for a caller that must tell an empty quarantine
+  /// from one that could not be read: a failure is thrown, not swallowed.
+  Future<List<QuarantinedItem>> readQuarantinedItems() async {
+    final items = <QuarantinedItem>[];
+    final quarantineDir = await _getQuarantineDir();
+    final metadata = await _loadQuarantineMetadata();
+    final registryBackups = metadata.values
+        .whereType<Map<String, dynamic>>()
+        .map((m) => m['registry_backup'] as String?)
+        .whereType<String>()
+        .toSet();
+
+    // All metadata entries, file-backed or not.
+    for (final entry in metadata.entries) {
+      final itemMeta = entry.value as Map<String, dynamic>?;
+      items.add(QuarantinedItem(
+        fileName: entry.key,
+        originalPath: itemMeta?['original_path'] as String? ?? '',
+        name: itemMeta?['name'] as String? ?? entry.key,
+        type: itemMeta?['type_display_name'] as String? ?? 'Unknown',
+        quarantinedAt: itemMeta?['quarantined_at'] != null
+            ? DateTime.tryParse(itemMeta!['quarantined_at'] as String)
+            : null,
+        isService: itemMeta?['is_service'] as bool? ?? false,
+        isRegistry: itemMeta?['is_registry'] as bool? ?? false,
+        isTask: itemMeta?['is_task'] as bool? ?? false,
+        registryBackupPath: itemMeta?['registry_backup'] as String?,
+      ));
+    }
+
+    // Orphan quarantine files without metadata.
+    if (await quarantineDir.exists()) {
+      await for (final entity in quarantineDir.list()) {
+        if (entity is! File || entity.path.endsWith('.metadata.json')) {
+          continue;
+        }
+        if (registryBackups.contains(entity.path)) continue;
+        final fileName = entity.path.split(PlatformInfo.pathSeparator).last;
+        if (metadata.containsKey(fileName)) continue;
+        items.add(QuarantinedItem(
+          fileName: fileName,
+          originalPath: '',
+          name: fileName,
+          type: 'Unknown',
+        ));
+      }
     }
     return items;
   }
@@ -1314,12 +1322,23 @@ class DesktopSecurityProvider extends ChangeNotifier {
         source: '$_macFirewallTool --getglobalstate',
       );
     } on ProcessException catch (e) {
-      return HostFirewallStatus(
-        state: HostFirewallState.unavailable,
-        detail: 'socketfilterfw could not be executed: ${e.message}',
-        source: _macFirewallTool,
-      );
+      return macFirewallOutOfReach(e);
     }
+  }
+
+  /// The Mac's firewall tool would not start. In the App Sandbox, which the
+  /// shipping Mac build runs in, macOS does not let it, and no other way to
+  /// read the setting is open, so the setting is out of reach: never read as
+  /// on or off.
+  @visibleForTesting
+  static HostFirewallStatus macFirewallOutOfReach(ProcessException e) {
+    debugPrint('[Firewall] socketfilterfw would not start: ${e.message}');
+    return const HostFirewallStatus(
+      state: HostFirewallState.unavailable,
+      detail: 'macOS does not let OrbGuard read the firewall setting. You can '
+          'see it in System Settings, under Network, then Firewall.',
+      source: _macFirewallTool,
+    );
   }
 
   Future<HostFirewallStatus> _readWindowsFirewallStatus() async {
@@ -1929,6 +1948,9 @@ class DesktopSecurityProvider extends ChangeNotifier {
       'by_browser': byBrowser,
       'errors': collection.errors,
       'source': collection.source,
+      // The browsers it found a profile of: none means nothing was looked
+      // at, which is not the same as no extensions.
+      'looked': collection.looked,
       'collected_at': DateTime.now().toIso8601String(),
     };
     _isCollectingBrowser = false;
@@ -1982,7 +2004,8 @@ class DesktopSecurityProvider extends ChangeNotifier {
     notifyListeners();
 
     // Candidate set: executables referenced by persistence items, plus
-    // installed app bundles on macOS.
+    // installed app bundles on macOS. On a Mac, what sits in a folder System
+    // Integrity Protection guards is Apple's and is not listed.
     final candidates = <String>{};
     for (final item in _items) {
       final exe = _extractExecutablePath(item.command);
@@ -1990,7 +2013,11 @@ class DesktopSecurityProvider extends ChangeNotifier {
       final looksAbsolute = PlatformInfo.isWindows
           ? RegExp(r'^[A-Za-z]:[\\/]').hasMatch(exe)
           : exe.startsWith('/');
-      if (looksAbsolute) candidates.add(exe);
+      if (!looksAbsolute) continue;
+      if (PlatformInfo.isMacOS && MacCodeSignature.isProtectedBySip(exe)) {
+        continue;
+      }
+      candidates.add(exe);
     }
     if (PlatformInfo.isMacOS) {
       try {
@@ -2004,11 +2031,22 @@ class DesktopSecurityProvider extends ChangeNotifier {
     }
 
     final results = <Map<String, dynamic>>[];
-    for (final path in candidates.take(maxItems)) {
-      if (PlatformInfo.isMacOS) {
-        final r = await _verifyMacCodeSigning(path);
-        if (r != null) results.add(r);
-      } else {
+    if (PlatformInfo.isMacOS) {
+      final paths = <String>[
+        for (final path in candidates.take(maxItems))
+          if (await File(path).exists() || await Directory(path).exists())
+            path,
+      ];
+      final read = await MacCodeSignature.read(paths);
+      results.addAll(MacCodeSignature.appRows(read.values));
+      debugPrint('[CodeSigning] ${paths.length} read, '
+          '${paths.length - results.length} out of reach, '
+          '${results.where((r) => r['is_signed'] != true).length} unsigned');
+      // Nothing could be read: say so, rather than list apps as unsigned.
+      _codeSigningUnavailableReason =
+          MacCodeSignature.unreadable(read.values);
+    } else {
+      for (final path in candidates.take(maxItems)) {
         final r = await _verifyWindowsCodeSigning(path);
         if (r != null) results.add(r);
       }
@@ -2022,51 +2060,6 @@ class DesktopSecurityProvider extends ChangeNotifier {
     _localSignedApps = results;
     _isVerifyingCodeSigning = false;
     notifyListeners();
-  }
-
-  Future<Map<String, dynamic>?> _verifyMacCodeSigning(String path) async {
-    if (!await File(path).exists() && !await Directory(path).exists()) {
-      return null;
-    }
-    try {
-      final info = await Process.run('codesign', ['-dv', '--verbose=2', path]);
-      final detail = info.stderr as String; // codesign prints info to stderr
-      final isSigned = info.exitCode == 0;
-      String developer = '';
-      String? teamId;
-      String bundleId = '';
-      if (isSigned) {
-        final auth = RegExp(r'^Authority=(.+)$', multiLine: true).firstMatch(detail);
-        developer = auth?.group(1) ?? '';
-        teamId = RegExp(r'^TeamIdentifier=(.+)$', multiLine: true)
-            .firstMatch(detail)
-            ?.group(1);
-        if (teamId == 'not set') teamId = null;
-        bundleId = RegExp(r'^Identifier=(.+)$', multiLine: true)
-                .firstMatch(detail)
-                ?.group(1) ??
-            '';
-      }
-      bool isValid = false;
-      if (isSigned) {
-        final verify =
-            await Process.run('codesign', ['--verify', '--strict', path]);
-        isValid = verify.exitCode == 0;
-      }
-      return {
-        'name': path.split('/').last.replaceAll('.app', ''),
-        'bundle_id': bundleId,
-        'path': path,
-        'is_signed': isSigned,
-        'is_valid': isValid,
-        'developer': developer,
-        'team_id': teamId,
-        'source': 'local',
-      };
-    } on ProcessException catch (e) {
-      debugPrint('codesign unavailable for $path: ${e.message}');
-      return null;
-    }
   }
 
   Future<Map<String, dynamic>?> _verifyWindowsCodeSigning(String path) async {

@@ -60,6 +60,17 @@ void main() {
           };
         case 'getInstalledApps':
           return {'apps': <Map<String, dynamic>>[]};
+        case 'networkReroute':
+          return {
+            'tunnels': [
+              if (tunnel)
+                {
+                  'name': 'utun4',
+                  'addresses': ['10.8.0.2'],
+                },
+            ],
+            'proxy': {if (proxyHost != null) 'https': proxyHost},
+          };
       }
       return null;
     });
@@ -122,6 +133,22 @@ void main() {
     expect(await w.saidItIsMine, isFalse);
     expect(find.text('This VPN is mine'), findsOneWidget);
     expect(find.text('You told OrbGuard this one is yours.'), findsNothing);
+  });
+
+  testWidgets('on a Mac the tunnel and the proxy are both really checked',
+      (tester) async {
+    tunnel = true;
+    proxyHost = 'proxy.example.net:8443';
+    await pump(
+        tester, HiddenVpnProxyScreen(watch: watchFor(TargetPlatform.macOS)));
+
+    final String said = visible(tester).join(' ');
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Active at proxy.example.net:8443'), findsOneWidget);
+    expect(said, isNot(contains('wired')));
+    expect(said, isNot(contains('environment variables')));
+    // Named as it is written, in a sentence too.
+    expect(said, isNot(contains('this mac')));
   });
 
   testWidgets('only a proxy active reads "This proxy is mine"', (tester) async {

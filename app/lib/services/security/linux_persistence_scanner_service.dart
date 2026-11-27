@@ -1610,6 +1610,10 @@ class LinuxPersistenceScannerService {
         else
           ...firefoxResults.map((r) => r.source),
       ].join('; '),
+      looked: [
+        ...chromium.looked,
+        for (final r in firefoxResults) ...r.looked,
+      ],
     );
   }
 }

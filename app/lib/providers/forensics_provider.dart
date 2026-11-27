@@ -11,6 +11,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../services/api/api_interceptors.dart';
 import '../services/api/orbguard_api_client.dart';
 
 /// Forensic analysis type
@@ -662,21 +663,39 @@ class ForensicsProvider extends ChangeNotifier {
       notifyListeners();
       return completedResult;
     } catch (e) {
+      // The raw error is for the log; the person reads plain words.
+      debugPrint('[Forensics] ${type.displayName} failed: $e');
       final errorResult = ForensicAnalysisResult(
         id: result.id,
         type: type,
         startedAt: result.startedAt,
         completedAt: DateTime.now(),
         isComplete: true,
-        error: e.toString(),
+        error: plainError(e),
       );
 
       _currentAnalysis = errorResult;
-      _error = 'Analysis failed: $e';
+      _error = plainError(e);
       _isAnalyzing = false;
       notifyListeners();
       return errorResult;
     }
+  }
+
+  /// What went wrong, as a person reads it. Never the raw error.
+  @visibleForTesting
+  static String plainError(Object error) {
+    if (error is ApiError) {
+      if (error.statusCode == 422) {
+        return 'There was nothing for the analysis to look at. Choose a '
+            'backup or a diagnostics file first.';
+      }
+      if (error.code == 'TIMEOUT' || error.code == 'CONNECTION_ERROR') {
+        return 'OrbGuard could not reach its servers. Check your internet '
+            'connection and try again.';
+      }
+    }
+    return 'The analysis could not finish. Try again in a moment.';
   }
 
   /// Stable device identifier matching what device registration sends.

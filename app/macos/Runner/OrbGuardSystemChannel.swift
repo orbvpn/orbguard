@@ -15,11 +15,16 @@
 // A sandboxed app cannot enumerate other applications' files, read another
 // process's memory, inspect system-wide privacy (TCC) records, or read the
 // kernel's socket table. What it CAN do — and what this implements for real —
-// is inspect the applications currently running.
+// is inspect the applications currently running, read the code signature of
+// a file it can read (Security framework), and read the network interfaces
+// and the system proxy settings (getifaddrs, SystemConfiguration).
 
 import AppKit
+import Darwin
 import Foundation
 import FlutterMacOS
+import Security
+import SystemConfiguration
 
 enum OrbGuardSystemChannel {
 
@@ -45,6 +50,19 @@ enum OrbGuardSystemChannel {
 
     case "scanProcesses":
       result(["threats": scanRunningApplications()])
+
+    case "codeSignatures":
+      // Verified off the main thread: a large app takes a moment.
+      let args = call.arguments as? [String: Any]
+      let paths = (args?["paths"] as? [String]) ?? []
+      DispatchQueue.global(qos: .userInitiated).async {
+        var signatures: [String: Any] = [:]
+        for path in paths { signatures[path] = codeSignature(of: path) }
+        DispatchQueue.main.async { result(signatures) }
+      }
+
+    case "networkReroute":
+      result(networkReroute())
 
     // Everything below needs access the App Sandbox does not grant. Say so.
     case "scanNetwork":
@@ -151,6 +169,166 @@ enum OrbGuardSystemChannel {
     }
 
     return threats
+  }
+
+  // MARK: - Code signatures (Security framework, works in the sandbox)
+
+  /// Errors that mean the signature is there but does not check out: the
+  /// code or its sealed parts were changed after signing.
+  private static let brokenSignature: Set<OSStatus> = [
+    errSecCSSignatureFailed,
+    errSecCSSignatureInvalid,
+    errSecCSResourcesNotSealed,
+    errSecCSResourcesNotFound,
+    errSecCSResourcesInvalid,
+    errSecCSBadResource,
+    errSecCSResourceRulesInvalid,
+    errSecCSInfoPlistFailed,
+    errSecCSResourceDirectoryFailed,
+    errSecCSBadNestedCode,
+    errSecCSUnsignedNestedCode,
+    errSecCSBadMainExecutable,
+  ]
+
+  /// One file's signature: "apple" (signed by Apple), "valid" (signed by a
+  /// developer and intact), "unsigned", "broken" (signed but changed since),
+  /// or "unknown" when macOS would not let it be read. "unknown" is never
+  /// reported as unsigned.
+  private static func codeSignature(of path: String) -> [String: Any] {
+    var code: SecStaticCode?
+    let opened = SecStaticCodeCreateWithPath(
+      URL(fileURLWithPath: path) as CFURL, SecCSFlags(), &code)
+    guard opened == errSecSuccess, let code = code else {
+      return ["status": "unknown", "error": Int(opened)]
+    }
+    // The signature and the main executable are checked; the hashes of every
+    // resource in a large bundle are not, so this stays quick.
+    let flags = SecCSFlags(rawValue: kSecCSDoNotValidateResources)
+    let validity = SecStaticCodeCheckValidity(code, flags, nil)
+    if validity == errSecCSUnsigned {
+      return ["status": "unsigned"]
+    }
+    var status: String
+    if validity == errSecSuccess {
+      status = "valid"
+    } else if brokenSignature.contains(validity) {
+      status = "broken"
+    } else {
+      return ["status": "unknown", "error": Int(validity)]
+    }
+
+    var info: CFDictionary?
+    SecCodeCopySigningInformation(
+      code, SecCSFlags(rawValue: kSecCSSigningInformation), &info)
+    let signing = (info as? [String: Any]) ?? [:]
+    var out: [String: Any] = [:]
+    if let team = signing[kSecCodeInfoTeamIdentifier as String] as? String {
+      out["teamId"] = team
+    }
+    if let identifier = signing[kSecCodeInfoIdentifier as String] as? String {
+      out["identifier"] = identifier
+    }
+    if let certificates = signing[kSecCodeInfoCertificates as String] as? [SecCertificate],
+       let leaf = certificates.first,
+       let summary = SecCertificateCopySubjectSummary(leaf) as String? {
+      out["authority"] = summary
+    }
+
+    if status == "valid" {
+      var requirement: SecRequirement?
+      if SecRequirementCreateWithString(
+        "anchor apple" as CFString, SecCSFlags(), &requirement) == errSecSuccess,
+         let requirement = requirement,
+         SecStaticCodeCheckValidity(code, flags, requirement) == errSecSuccess {
+        status = "apple"
+      }
+    }
+    out["status"] = status
+    return out
+  }
+
+  // MARK: - VPN tunnels and the system proxy
+
+  /// Interfaces a VPN brings up: utun (most VPN apps and Network Extension),
+  /// ipsec (the built-in IKEv2 client), ppp (L2TP), tun and tap (OpenVPN).
+  private static let tunnelPrefixes = ["utun", "ipsec", "ppp", "tun", "tap"]
+
+  /// The tunnel interfaces that are up with a routable address, the
+  /// interface the system sends its traffic through, and the proxy settings.
+  /// macOS keeps a few utun interfaces of its own with only a link-local
+  /// address; those carry no traffic off the Mac and are left out.
+  private static func networkReroute() -> [String: Any] {
+    var tunnels: [String: [String]] = [:]
+    var list: UnsafeMutablePointer<ifaddrs>?
+    if getifaddrs(&list) == 0, let first = list {
+      var cursor: UnsafeMutablePointer<ifaddrs>? = first
+      while let entry = cursor {
+        defer { cursor = entry.pointee.ifa_next }
+        let name = String(cString: entry.pointee.ifa_name)
+        guard tunnelPrefixes.contains(where: { name.hasPrefix($0) }) else { continue }
+        let flags = Int32(entry.pointee.ifa_flags)
+        guard flags & IFF_UP != 0, flags & IFF_RUNNING != 0 else { continue }
+        guard let address = entry.pointee.ifa_addr,
+              let text = numericHost(address) else { continue }
+        let family = Int32(address.pointee.sa_family)
+        if family == AF_INET6 && text.lowercased().hasPrefix("fe80") { continue }
+        if family != AF_INET && family != AF_INET6 { continue }
+        tunnels[name, default: []].append(text)
+      }
+      freeifaddrs(first)
+    }
+
+    var out: [String: Any] = [
+      "tunnels": tunnels.keys.sorted().map { ["name": $0, "addresses": tunnels[$0]!] },
+    ]
+    if let store = SCDynamicStoreCreate(nil, "OrbGuard" as CFString, nil, nil),
+       let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
+       let primary = global["PrimaryInterface"] as? String {
+      out["primaryInterface"] = primary
+    }
+    if let proxies = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any] {
+      out["proxy"] = proxySettings(proxies)
+    }
+    return out
+  }
+
+  private static func numericHost(_ address: UnsafeMutablePointer<sockaddr>) -> String? {
+    var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+    let length = socklen_t(address.pointee.sa_len)
+    guard getnameinfo(address, length, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else {
+      return nil
+    }
+    return String(cString: host)
+  }
+
+  /// The proxies the system sends traffic through, by kind, as host:port.
+  private static func proxySettings(_ p: [String: Any]) -> [String: Any] {
+    func on(_ key: CFString) -> Bool { (p[key as String] as? Int ?? 0) != 0 }
+    func endpoint(_ host: CFString, _ port: CFString) -> String? {
+      guard let h = p[host as String] as? String, !h.isEmpty else { return nil }
+      if let n = p[port as String] as? Int { return "\(h):\(n)" }
+      return h
+    }
+    var out: [String: Any] = [:]
+    if on(kCFNetworkProxiesHTTPEnable),
+       let e = endpoint(kCFNetworkProxiesHTTPProxy, kCFNetworkProxiesHTTPPort) {
+      out["http"] = e
+    }
+    if on(kCFNetworkProxiesHTTPSEnable),
+       let e = endpoint(kCFNetworkProxiesHTTPSProxy, kCFNetworkProxiesHTTPSPort) {
+      out["https"] = e
+    }
+    if on(kCFNetworkProxiesSOCKSEnable),
+       let e = endpoint(kCFNetworkProxiesSOCKSProxy, kCFNetworkProxiesSOCKSPort) {
+      out["socks"] = e
+    }
+    if on(kCFNetworkProxiesProxyAutoConfigEnable) {
+      out["pac"] = (p[kCFNetworkProxiesProxyAutoConfigURLString as String] as? String) ?? ""
+    }
+    if on(kCFNetworkProxiesProxyAutoDiscoveryEnable) {
+      out["autoDiscovery"] = true
+    }
+    return out
   }
 
   private static func threat(id: String,

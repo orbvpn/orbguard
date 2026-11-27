@@ -25,6 +25,7 @@ import 'services/home/home_brief.dart';
 import 'services/home/check_plan.dart';
 import 'services/home/check_results.dart';
 import 'services/home/check_run.dart';
+import 'services/home/computer_check.dart';
 import 'services/home/glance.dart';
 import 'services/home/home_reading.dart';
 import 'services/home/home_today.dart';
@@ -543,6 +544,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentNavIndex = dest;
         _sideShield = null;
         _palette = false;
+        _deskTab = 0;
       });
 
   /// The device the shell is drawn for.
@@ -555,9 +557,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _platform == TargetPlatform.linux;
 
   /// The check that runs on Home, in place: one step per check this device
-  /// can run.
-  late final CheckRun _check = CheckRun(
-      plan: CheckPlan.forDevice(android: _platform == TargetPlatform.android));
+  /// can run. A computer's are the six areas of its Desktop Security page.
+  late final CheckRun _check = CheckRun(plan: CheckPlan.forPlatform(_platform));
+
+  /// The Desktop Security tab a computer's Check tab opens on. A thing a
+  /// check found opens the tab of the area that found it.
+  int _deskTab = 0;
 
   /// True while a finished check is being written down.
   bool _recording = false;
@@ -633,7 +638,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // person starts does, with the same coverage figure, so Home hears it.
     AutoScanScheduler.instance
       ..verdict = context.read<LastScanVerdictController>()
-      ..coverage = () => _detectionCapability.round();
+      ..coverage = (() => _detectionCapability.round())
+      // On a computer the daily checkup is Home's own check, its six areas.
+      ..engine = _onComputer ? (widget.checkRunner ?? _computerCheck) : null
+      ..plan = _onComputer ? CheckPlan.computer : null
+      ..coverageOf = _onComputer ? ComputerCheck.coverageOf : null;
     _vpnWatch.addListener(_onVpnChanged);
     _verdictForGlance = context.read<LastScanVerdictController>()
       ..addListener(_glanceChanged);
@@ -668,7 +677,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _darkWeb?.removeListener(_onBreachesChanged);
     AutoScanScheduler.instance
       ..verdict = null
-      ..coverage = null;
+      ..coverage = null
+      ..engine = null
+      ..plan = null
+      ..coverageOf = null;
     _check.dispose();
     _guards.dispose();
     super.dispose();
@@ -804,7 +816,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     final s = context.read<SettingsProvider>();
     if (s.isProMode || !s.permissionsPrimed || s.firstCheckDone) return;
-    // A computer's check lives on the Check tab and is started by hand.
+    // A computer's check reads its startup items, apps, firewall, network
+    // and browsers, so it starts only when the person asks.
     if (_onComputer) return;
     s.markFirstCheckDone();
     // The onboarding "your first check found N things" moment is free — not
@@ -975,12 +988,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final bool isPro = context.read<SettingsProvider>().isProMode;
 
-    // On a computer the check is the Check tab's own. Home leads there
-    // instead of starting a phone check that cannot run.
-    if (!isPro && _onComputer) {
-      if (userInitiated) _goTo(1);
-      return;
-    }
+    // A computer's check runs on Home too, in its six areas. It asks for
+    // none of a phone's permissions.
+    final bool computer = !isPro && _onComputer;
 
     // One check at a time. Asked again while one runs, show the one running.
     if (_check.running) {
@@ -989,7 +999,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     // Check if we have enough permissions
-    if (_detectionCapability < 50) {
+    if (!computer && _detectionCapability < 50) {
       _showPermissionWarning();
       return;
     }
@@ -998,7 +1008,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // (earning more via a rewarded ad). Only checks a person starts are
     // metered, and never their first: that one is free wherever it starts,
     // because Home promises "One tap" and an account wall would break it.
-    // Background auto-scans are exempt too.
+    // Background auto-scans are exempt too. A computer's check is metered
+    // the same way.
     final bool metered =
         userInitiated && context.read<LastScanVerdictController>().hasScanned;
     if (metered && !await ensureScanCredit(_sheetContext)) return;
@@ -1020,11 +1031,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _runCheckOnHome({required bool deep}) async {
     _goTo(0);
     final CheckRunner engine = widget.checkRunner ??
-        (onProgress) => DeviceScanService.instance.performScan(
-              deepScan: deep,
-              hasRoot: _hasRootAccess,
-              onProgress: onProgress,
-            );
+        (_onComputer
+            ? _computerCheck
+            : (onProgress) => DeviceScanService.instance.performScan(
+                  deepScan: deep,
+                  hasRoot: _hasRootAccess,
+                  onProgress: onProgress,
+                ));
 
     final CheckOutcome? outcome = await _check.start((onProgress) async {
       final List<Map<String, dynamic>> found = await engine(onProgress);
@@ -1045,11 +1058,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final DateTime now = DateTime.now();
     _recording = true;
     // The record holds the new check from this call on; storing it takes a
-    // moment longer.
+    // moment longer. A computer's coverage is the share of its six areas
+    // that ran; a phone's, what its permissions let the check see.
     final Future<void> stored =
         context.read<LastScanVerdictController>().recordScan(
               threats: outcome.findings,
-              coveragePercent: _detectionCapability.round(),
+              coveragePercent: _onComputer
+                  ? ComputerCheck.coverageOf(outcome)
+                  : _detectionCapability.round(),
               now: now,
               checksRun: outcome.ran.length,
               stagesRan: outcome.ran,
@@ -1069,6 +1085,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } finally {
       _recording = false;
     }
+  }
+
+  /// A computer's check: the six areas of its Desktop Security page, read
+  /// through the provider that page uses, so its tabs show what was read.
+  Future<List<Map<String, dynamic>>> _computerCheck(
+      DeviceScanProgressCallback onProgress) {
+    return ComputerCheck(
+      platform: _platform ?? defaultTargetPlatform,
+      source: ProviderComputerSource(context.read<DesktopSecurityProvider>()),
+    ).run(onProgress);
   }
 
   /// Pro: the check keeps its own page and its fuller findings screen.
@@ -1148,20 +1174,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final Map<String, dynamic> lead = thing.lead;
     final RemediationKind kind = Remediation.kindFor(lead);
-    final (String step, String action) = switch (kind) {
-      RemediationKind.appInfo => (
-          'Open its settings to remove the app, or to take back the access.',
-          'Open app settings',
-        ),
-      RemediationKind.vpnSettings => (
-          'Open your VPN settings to see what is connected and turn it off.',
-          'Open VPN settings',
-        ),
-      RemediationKind.guidanceOnly => (
-          '${thing.shield.name} looks closer and says what to do next.',
-          'Open ${thing.shield.name}',
-        ),
-    };
+    // A computer keeps each area's details on its own tab of the Check tab.
+    final int? tab = _onComputer && ComputerCheck.isComputerFinding(lead)
+        ? ComputerCheck.tabOf('${lead['stage']}')
+        : null;
+    final (String step, String action) = tab != null
+        ? (
+            'The details, and what you can do about it, are on the Check '
+                'tab.',
+            'See details',
+          )
+        : switch (kind) {
+            RemediationKind.appInfo => (
+                'Open its settings to remove the app, or to take back the '
+                    'access.',
+                'Open app settings',
+              ),
+            RemediationKind.vpnSettings => (
+                'Open your VPN settings to see what is connected and turn it '
+                    'off.',
+                'Open VPN settings',
+              ),
+            RemediationKind.guidanceOnly => (
+                '${thing.shield.name} looks closer and says what to do next.',
+                'Open ${thing.shield.name}',
+              ),
+          };
     final List<String> said = [
       for (final Map<String, dynamic> f in thing.findings)
         if ('${f['description'] ?? ''}'.trim().isNotEmpty)
@@ -1188,6 +1226,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         secondaryLabel: 'Not now',
         primaryLabel: action,
         onPrimary: () async {
+          if (tab != null) {
+            _openDetails(tab);
+            return;
+          }
           if (kind != RemediationKind.guidanceOnly &&
               await _remediation.fix(lead)) {
             return;
@@ -1198,6 +1240,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         },
       ),
     );
+  }
+
+  /// A computer's details, on its Check tab, open at [tab]. The sheets over
+  /// the window close first, so the page is not left under them.
+  void _openDetails(int tab) {
+    Navigator.of(_sheetContext, rootNavigator: true)
+        .popUntil((route) => route.isFirst);
+    _goTo(1);
+    setState(() => _deskTab = tab);
   }
 
   /// The engine could not run at all. Said plainly, with nothing recorded.
@@ -1637,10 +1688,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final Shield? shield = _sideShield;
     final Widget root = switch (current) {
       4 => ShieldsScreen(platform: _platform),
-      // A computer's check is its own page here, headed as one, since no
-      // shell header sits over a pane.
+      // A computer's Check tab is the details of its six areas, headed as a
+      // page, since no shell header sits over a pane.
       1 => _onComputer
-          ? const DesktopSecurityScreen(showBackButton: false)
+          ? DesktopSecurityScreen(
+              key: ValueKey<String>('desk-$_deskTab'),
+              showBackButton: false,
+              initialTab: _deskTab,
+            )
           : _buildScanContent(),
       3 => _buildSettingsContent(),
       _ => HomeSide(
@@ -1879,9 +1934,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Scan tab content
   Widget _buildScanContent() {
-    // On desktop platforms, show the DesktopSecurityScreen directly (embedded mode)
+    // On a computer, the details of the six areas Home's check runs in
+    // (embedded mode), open at the tab a result asked for.
     if (_onComputer) {
-      return const DesktopSecurityScreen(embedded: true);
+      return DesktopSecurityScreen(
+        key: ValueKey<String>('desk-$_deskTab'),
+        embedded: true,
+        initialTab: _deskTab,
+      );
     }
 
     // Guard on a phone: every check in one place, the full check first.

@@ -55,6 +55,7 @@ PrivacySignals _signals({
   int breachedAccounts = 0,
   bool watching = true,
   String noun = 'phone',
+  int checks = 11,
 }) {
   final DateTime? at = checked ? _now.subtract(since) : null;
   final PrivacySignals signals = _signals(
@@ -68,7 +69,7 @@ PrivacySignals _signals({
       hasScanned: checked,
       verdictScore: checked ? verdictScore : -1,
       lastScanAt: at,
-      checksRun: checked ? 11 : null,
+      checksRun: checked ? checks : null,
       openThreats: openThreats,
       breachedAccounts: breachedAccounts,
       score: const PrivacyScoreEngine().compute(signals),
@@ -188,6 +189,14 @@ void main() {
       final Glance g = Glance.from(brief: r.brief, lastScanAt: r.at);
       expect(g.headline, r.brief.headline);
       expect(g.proof, r.brief.proof);
+    });
+
+    test('after a Mac\'s six areas ran clean, it says what Home says', () {
+      final r = _read(noun: 'Mac', checks: 6);
+      final Glance g = Glance.from(brief: r.brief, lastScanAt: r.at);
+      expect(g.title, 'All clear');
+      expect(g.headline, r.brief.headline);
+      expect(g.proof, '6 checks ran 2 hours ago, all clean');
     });
 
     test('it carries what Today records, newest first, three at most', () {

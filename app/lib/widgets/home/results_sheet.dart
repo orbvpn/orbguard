@@ -227,7 +227,10 @@ class ResultsSheet extends StatelessWidget {
               '${failed.length == 1 ? 'It is' : 'They are'} not counted as '
               'passed. Run the check again.',
         ),
-      const CreditLine(),
+      // No plan can be offered on Windows or Linux (no store purchase, and
+      // the Microsoft Store forbids steering to one), so no sale line there.
+      if (on != TargetPlatform.windows && on != TargetPlatform.linux)
+        const CreditLine(),
     ];
 
     // At most one lime action.

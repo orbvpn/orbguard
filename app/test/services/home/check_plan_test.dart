@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orbguard/services/home/check_plan.dart';
 import 'package:orbguard/services/home/home_brief.dart';
@@ -83,5 +84,61 @@ void main() {
     expect(step.name, 'Thermal sensors');
     expect(step.doing, 'Checking thermal sensors');
     expect(step.shield, Shield.spyware);
+  });
+
+  group('a computer', () {
+    test('is checked in six areas, the tabs of its Desktop Security page',
+        () {
+      for (final TargetPlatform platform in const [
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      ]) {
+        expect(
+          CheckPlan.forPlatform(platform).map((s) => s.name),
+          [
+            'Startup items',
+            'Code signing',
+            'Firewall',
+            'Network',
+            'Browser',
+            'Quarantine',
+          ],
+          reason: '$platform',
+        );
+      }
+    });
+
+    test('says what each area does while it runs, with no dash', () {
+      expect(CheckPlan.computer.map((s) => s.doing), [
+        'Looking at what starts at login',
+        'Checking who signed your apps',
+        'Checking the system firewall',
+        'Checking your network connections',
+        'Checking your browsers',
+        'Reviewing quarantined files',
+      ]);
+      for (final CheckStep step in CheckPlan.computer) {
+        expect('${step.name} ${step.doing}', isNot(matches(RegExp('[—–·]'))));
+        // The Spyware shield covers every area on a computer.
+        expect(step.shield, Shield.spyware);
+        expect(step.androidOnly, isFalse);
+      }
+    });
+
+    test('names its areas apart from the phone checks', () {
+      final Set<String> phone = {for (final s in CheckPlan.all) s.stage};
+      for (final CheckStep step in CheckPlan.computer) {
+        expect(phone.contains(step.stage), isFalse, reason: step.stage);
+        expect(CheckPlan.byStage(step.stage).name, step.name);
+      }
+    });
+
+    test('a phone keeps its own checks', () {
+      expect(CheckPlan.forPlatform(TargetPlatform.android),
+          CheckPlan.forDevice(android: true));
+      expect(CheckPlan.forPlatform(TargetPlatform.iOS),
+          CheckPlan.forDevice(android: false));
+    });
   });
 }

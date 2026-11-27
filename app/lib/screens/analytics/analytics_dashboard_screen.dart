@@ -697,7 +697,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _buildThreatTypeCard(context, 'Phishing URLs', urlCount, 'link', AppColors.chartColors[7]),
-          _buildThreatTypeCard(context, 'Malicious Domains', domainCount, 'globe', AppColors.chartColors[5]),
+          _buildThreatTypeCard(context, 'Malicious Domains', domainCount, 'global', AppColors.chartColors[5]),
           _buildThreatTypeCard(context, 'Malicious IPs', ipCount, 'server', AppColors.chartColors[1]),
           _buildThreatTypeCard(context, 'Malware Hashes', hashCount, 'code', AppColors.chartColors[4]),
           _buildThreatTypeCard(context, 'Phone/SMS Threats', phoneCount, 'chat_dots', AppColors.chartColors[2]),

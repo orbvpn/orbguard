@@ -154,6 +154,92 @@ void main() {
     });
   });
 
+  group('detect() on a Mac (native interface and proxy read)', () {
+    const channel = MethodChannel(VpnProxyDetector.channelName);
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    Future<VpnProxyStatus> onMac(Map<String, Object?> wire) {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'networkReroute') return wire;
+        throw MissingPluginException();
+      });
+      return VpnProxyDetector(
+        platform: TargetPlatform.macOS,
+        environment: const {},
+      ).detect();
+    }
+
+    test('a tunnel up with an address is an active VPN', () async {
+      final s = await onMac({
+        'tunnels': [
+          {
+            'name': 'utun4',
+            'addresses': ['10.8.0.2'],
+          },
+        ],
+        'primaryInterface': 'utun4',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.activeTunnel, TriState.yes);
+      expect(s.systemProxy, TriState.no);
+      expect(s.verdict, RerouteVerdict.active);
+      expect(s.platformLabel, 'This Mac');
+    });
+
+    test('no tunnel and no proxy is clear, and says nothing is unwired',
+        () async {
+      final s = await onMac({
+        'tunnels': <Object?>[],
+        'primaryInterface': 'en0',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.activeTunnel, TriState.no);
+      expect(s.systemProxy, TriState.no);
+      expect(s.verdict, RerouteVerdict.clear);
+      expect(s.limitations.join(' '), isNot(contains('wired')));
+      expect(s.limitations.join(' '), isNot(contains('environment')));
+    });
+
+    test('a proxy set in the network settings is found, with its host',
+        () async {
+      final s = await onMac({
+        'tunnels': <Object?>[],
+        'proxy': {'https': 'proxy.example.net:8443', 'http': 'other:80'},
+      });
+      expect(s.systemProxy, TriState.yes);
+      expect(s.proxyHost, 'proxy.example.net:8443');
+      expect(s.verdict, RerouteVerdict.active);
+    });
+
+    test('an automatic proxy setup counts as a proxy', () async {
+      final s = await onMac({
+        'tunnels': <Object?>[],
+        'proxy': {'pac': 'http://wpad.example.net/proxy.pac'},
+      });
+      expect(s.systemProxy, TriState.yes);
+    });
+
+    test('settings it could not read leave the proxy unknown, not clear',
+        () async {
+      final s = await onMac({'tunnels': <Object?>[]});
+      expect(s.systemProxy, TriState.unknown);
+      expect(s.verdict, RerouteVerdict.inconclusive);
+    });
+
+    test('with no native read it falls back and never says unwired',
+        () async {
+      final s = await VpnProxyDetector(
+        platform: TargetPlatform.macOS,
+        environment: const {},
+      ).detect();
+      expect(s.activeTunnel, TriState.unknown);
+      expect(s.limitations.join(' '), isNot(contains('wired')));
+    });
+  });
+
   group('detect() on Android (mocked native scan channel)', () {
     const channel = MethodChannel(VpnProxyDetector.channelName);
     final messenger =

@@ -19,9 +19,16 @@
 //     sandbox, confirm a VPN tunnel or name the app that owns a VPN/proxy, so
 //     the tunnel is reported as unknown.
 //
-//   Desktop (macOS/Windows/Linux) — best-effort: the system proxy is read from
-//     the process environment (HTTP(S)_PROXY / ALL_PROXY). Tunnel detection
-//     needs a system helper that isn't wired yet, so it is reported as unknown.
+//   macOS: the same channel's `networkReroute` reads the network interfaces
+//     (getifaddrs: a utun/ipsec/ppp/tun/tap interface up with a routable
+//     address is an active tunnel) and the system proxy settings
+//     (CFNetworkCopySystemProxySettings). Both work in the App Sandbox. macOS
+//     does not say which app owns a tunnel.
+//
+//   Windows/Linux: best effort, the proxy is read from the process
+//     environment (HTTP(S)_PROXY / ALL_PROXY), and a tunnel is not checked,
+//     so it is reported as unknown. A Mac without the native read falls back
+//     to the same.
 //
 // Honesty contract (do not weaken):
 //   * A "we can't check that here" result is [TriState.unknown]; it never
@@ -309,8 +316,20 @@ class VpnProxyDetector {
   // ── Desktop (macOS / Windows / Linux) ───────────────────────────────────
 
   Future<VpnProxyStatus> _detectDesktop() async {
+    if (_platform == TargetPlatform.macOS) {
+      try {
+        final Object? wire = await _channel.invokeMethod('networkReroute');
+        if (wire is Map) return fromMacReroute(wire);
+      } on MissingPluginException {
+        // An older build: fall back to what the environment says.
+      } on PlatformException {
+        // Same.
+      }
+    }
+
     final proxyResult = proxyFromEnvironment(_environment);
-    const tunnel = TriState.unknown; // Needs a system helper — not wired yet.
+    // Not checked here, so unknown: never a reassuring "no".
+    const tunnel = TriState.unknown;
 
     final label = _platform == TargetPlatform.macOS
         ? 'This Mac'
@@ -327,10 +346,60 @@ class VpnProxyDetector {
       tunnelOwnerIdentifiable: false,
       platformLabel: label,
       limitations: const [
-        'Desktop VPN-tunnel detection needs a system helper that isn’t '
-            'wired up yet.',
-        'The proxy check reads environment variables; a proxy set only in '
-            'system network settings may not show up here.',
+        'OrbGuard can’t check for a VPN tunnel on this computer.',
+        'Only a proxy set for OrbGuard itself can be seen; one set in the '
+            'system’s network settings may not show here.',
+      ],
+    );
+  }
+
+  /// The Mac's own answer (`networkReroute`): the tunnel interfaces up with
+  /// a routable address, the interface traffic leaves by, and the proxy
+  /// settings. Settings that could not be read leave the proxy unknown.
+  @visibleForTesting
+  static VpnProxyStatus fromMacReroute(Map<Object?, Object?> wire) {
+    final Object? tunnels = wire['tunnels'];
+    final Object? primary = wire['primaryInterface'];
+    final bool routedThroughTunnel = primary is String &&
+        const ['utun', 'ipsec', 'ppp', 'tun', 'tap']
+            .any((prefix) => primary.startsWith(prefix));
+    final TriState tunnel =
+        (tunnels is List && tunnels.isNotEmpty) || routedThroughTunnel
+            ? TriState.yes
+            : TriState.no;
+
+    final Object? proxy = wire['proxy'];
+    TriState proxyState = TriState.unknown;
+    String? proxyHost;
+    bool automatic = false;
+    if (proxy is Map) {
+      String? host(String key) {
+        final Object? v = proxy[key];
+        return v is String && v.isNotEmpty ? v : null;
+      }
+
+      proxyHost = host('https') ?? host('http') ?? host('socks');
+      automatic = proxy['pac'] != null || proxy['autoDiscovery'] == true;
+      proxyState =
+          proxyHost != null || automatic ? TriState.yes : TriState.no;
+    }
+
+    debugPrint('[VPN] Mac: tunnel ${tunnel.name}, proxy ${proxyState.name}');
+    return VpnProxyStatus(
+      verdict: verdictFor(tunnel: tunnel, proxy: proxyState),
+      activeTunnel: tunnel,
+      systemProxy: proxyState,
+      proxyHost: proxyHost,
+      installedVpnApps: const [],
+      tunnelOwnerIdentifiable: false,
+      platformLabel: 'This Mac',
+      limitations: [
+        'macOS doesn’t tell an app which app owns a VPN tunnel.',
+        if (proxy is! Map)
+          'macOS didn’t let OrbGuard read the proxy settings this time.',
+        if (automatic)
+          'An automatic proxy setup is on; its own script decides which '
+              'addresses go through a proxy.',
       ],
     );
   }

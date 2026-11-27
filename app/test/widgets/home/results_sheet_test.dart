@@ -220,6 +220,26 @@ void main() {
       expect(find.text('All clear'), findsNothing);
     });
 
+    testWidgets('on Windows and Linux no credit line: no plan is sold there',
+        (tester) async {
+      for (final TargetPlatform computer in const [
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      ]) {
+        await open(tester, _results(), platform: computer);
+        expect(find.text('All clear'), findsOneWidget);
+        expect(find.byType(CreditLine), findsNothing, reason: '$computer');
+        await tester.tap(find.text('Done'));
+        await settle(tester);
+      }
+    });
+
+    testWidgets('on a Mac the credit line shows, as on a phone',
+        (tester) async {
+      await open(tester, _results(), platform: TargetPlatform.macOS);
+      expect(find.byType(CreditLine), findsOneWidget);
+    });
+
     testWidgets('one check reads in the singular', (tester) async {
       await open(tester, _results(ran: const ['Memory']));
       expect(find.text('1 check ran clean.'), findsOneWidget);

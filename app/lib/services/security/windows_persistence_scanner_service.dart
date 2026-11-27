@@ -1510,6 +1510,7 @@ if (cfg.hashVerification) {
         ...firefox.errors,
       ],
       source: '${chromium.source}; ${firefox.source}',
+      looked: [...chromium.looked, ...firefox.looked],
     );
   }
 }
