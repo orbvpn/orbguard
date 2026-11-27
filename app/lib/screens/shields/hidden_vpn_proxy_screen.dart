@@ -366,7 +366,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
               DuotoneIcon(AppIcons.infoCircle,
                   size: 18, color: AppColors.secondaryInk),
               const SizedBox(width: 8),
-              Text('What we can’t check on ${s.platformLabel.toLowerCase()}',
+              Text('What we can’t check on ${_inSentence(s.platformLabel)}',
                   style: BrandText.title(color: cs.onSurface, size: 14)),
             ],
           ),
@@ -467,13 +467,13 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
         final owner = _ownerHint(s);
         return 'Your internet traffic is going through $what.$owner';
       case RerouteVerdict.clear:
-        return 'Nothing is sitting between ${s.platformLabel.toLowerCase()} and '
+        return 'Nothing is sitting between ${_inSentence(s.platformLabel)} and '
             'the internet right now.';
       case RerouteVerdict.inconclusive:
         return 'No active VPN or proxy was found, but some checks aren’t '
-            'available on ${s.platformLabel.toLowerCase()}. See below.';
+            'available on ${_inSentence(s.platformLabel)}. See below.';
       case RerouteVerdict.unavailable:
-        return 'This check isn’t available on ${s.platformLabel.toLowerCase()}.';
+        return 'This check isn’t available on ${_inSentence(s.platformLabel)}.';
     }
   }
 
@@ -600,15 +600,21 @@ class _SignalRow extends StatelessWidget {
         Expanded(
           child: Text(label, style: BrandText.title(color: cs.onSurface, size: 15)),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: ink.withAlpha(28),
-            borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
-          ),
-          child: Text(
-            text,
-            style: BrandText.label(color: ink, size: 11.5),
+        const SizedBox(width: 10),
+        // A long proxy address wraps inside its pill rather than push the
+        // row off the screen.
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: ink.withAlpha(28),
+              borderRadius: BorderRadius.circular(GlassTheme.radiusXSmall),
+            ),
+            child: Text(
+              text,
+              textAlign: TextAlign.end,
+              style: BrandText.label(color: ink, size: 11.5),
+            ),
           ),
         ),
       ],
@@ -669,3 +675,8 @@ class _VpnAppRow extends StatelessWidget {
     );
   }
 }
+
+/// A device's label inside a sentence: "This Mac" reads "this Mac", and a
+/// proper name keeps its capital.
+String _inSentence(String label) =>
+    label.isEmpty ? label : label[0].toLowerCase() + label.substring(1);

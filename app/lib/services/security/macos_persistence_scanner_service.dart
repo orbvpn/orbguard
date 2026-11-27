@@ -16,10 +16,14 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
 import '../../utils/platform_info.dart';
 import 'desktop_scan_config.dart';
 
 import 'desktop_host_collector.dart';
+import 'mac_code_signature.dart';
 
 /// Persistence item type
 enum PersistenceType {
@@ -1042,12 +1046,15 @@ class MacOSPersistenceScannerService {
       final programArgs = (plistData['ProgramArguments'] as List<dynamic>?)?.cast<String>();
       final execPath = program ?? (programArgs?.isNotEmpty == true ? programArgs!.first : null);
 
-      // Check code signing
+      // Check code signing. A plist in a folder System Integrity Protection
+      // guards was put there by Apple: it is Apple's, and its program is
+      // not checked one by one (some are Apple's own unsigned scripts).
+      final bool applePlaced = MacCodeSignature.isProtectedBySip(path);
       SigningStatus signingStatus = SigningStatus.unknown;
       String? signingAuthority;
       String? teamId;
 
-      if (execPath != null) {
+      if (execPath != null && !applePlaced) {
         final signResult = await _checkCodeSignature(execPath);
         signingStatus = signResult['status'] as SigningStatus;
         signingAuthority = signResult['authority'] as String?;
@@ -1065,8 +1072,13 @@ class MacOSPersistenceScannerService {
         }
       }
 
-      if (signingStatus == SigningStatus.unsigned) {
+      if (applePlaced) {
+        status = ItemStatus.legitimate;
+      } else if (signingStatus == SigningStatus.unsigned) {
         suspiciousIndicators.add('Unsigned binary');
+        status = ItemStatus.suspicious;
+      } else if (signingStatus == SigningStatus.invalid) {
+        suspiciousIndicators.add('Signature does not check out');
         status = ItemStatus.suspicious;
       } else if (signingStatus == SigningStatus.appleSigned) {
         status = ItemStatus.legitimate;
@@ -1138,39 +1150,41 @@ class MacOSPersistenceScannerService {
     }
   }
 
-  /// Check code signature
+  /// Check code signature, natively (the `codesign` tool cannot run in the
+  /// App Sandbox). A signature macOS would not let the app read is unknown,
+  /// never unsigned.
   Future<Map<String, dynamic>> _checkCodeSignature(String path) async {
-    try {
-      final result = await Process.run('codesign', ['-dvv', path]);
-      final output = '${result.stdout}\n${result.stderr}';
-
-      if (output.contains('code object is not signed')) {
-        return {'status': SigningStatus.unsigned};
-      }
-
-      if (output.contains('Authority=Apple')) {
-        return {
-          'status': SigningStatus.appleSigned,
-          'authority': 'Apple',
-        };
-      }
-
-      final authorityMatch = RegExp(r'Authority=(.+)').firstMatch(output);
-      final teamIdMatch = RegExp(r'TeamIdentifier=(.+)').firstMatch(output);
-
-      if (authorityMatch != null) {
-        return {
-          'status': SigningStatus.thirdPartySigned,
-          'authority': authorityMatch.group(1),
-          'teamId': teamIdMatch?.group(1),
-        };
-      }
-
-      return {'status': SigningStatus.unknown};
-    } catch (e) {
-      return {'status': SigningStatus.unknown};
-    }
+    final read = await MacCodeSignature.read([path]);
+    return signingResult(read[path]!);
   }
+
+  /// What [signature] means for a persistence item. An unsigned program in
+  /// a folder System Integrity Protection guards is one of Apple's own
+  /// scripts, so it is not called unsigned.
+  @visibleForTesting
+  static Map<String, dynamic> signingResult(MacCodeSignature signature) =>
+      switch (signature.state) {
+        MacSignature.apple => {
+            'status': SigningStatus.appleSigned,
+            'authority': 'Apple',
+            'teamId': signature.teamId,
+          },
+        MacSignature.valid => {
+            'status': SigningStatus.thirdPartySigned,
+            'authority': signature.authority,
+            'teamId': signature.teamId,
+          },
+        MacSignature.broken => {
+            'status': SigningStatus.invalid,
+            'authority': signature.authority,
+            'teamId': signature.teamId,
+          },
+        MacSignature.unsigned
+            when MacCodeSignature.isProtectedBySip(signature.path) =>
+          {'status': SigningStatus.unknown},
+        MacSignature.unsigned => {'status': SigningStatus.unsigned},
+        MacSignature.unknown => {'status': SigningStatus.unknown},
+      };
 
   /// Analyze cron job
   ItemStatus _analyzeCronJob(String line) {
@@ -1292,6 +1306,7 @@ class MacOSPersistenceScannerService {
       items: [...chromium.items, ...firefox.items],
       errors: [...chromium.errors, ...firefox.errors],
       source: '${chromium.source}; ${firefox.source}',
+      looked: [...chromium.looked, ...firefox.looked],
     );
   }
 }

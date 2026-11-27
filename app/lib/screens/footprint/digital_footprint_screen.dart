@@ -68,7 +68,7 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
             ),
             GlassTab(
               label: 'Brokers',
-              iconPath: 'globe',
+              iconPath: 'global',
               content: _buildBrokersTab(provider),
             ),
             GlassTab(

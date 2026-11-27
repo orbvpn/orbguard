@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:orbguard/presentation/widgets/brand_button.dart';
 import 'package:orbguard/screens/check/check_tab_screen.dart';
-import 'package:orbguard/screens/desktop/desktop_security_screen.dart';
 import 'package:orbguard/screens/home/orb_home_screen.dart';
 import 'package:orbguard/services/security/device_scan_service.dart';
 import 'package:orbguard/widgets/home/results_sheet.dart';
@@ -179,20 +178,7 @@ void main() {
     await unmountShell(tester);
   });
 
-  testWidgets("on a computer Home's check opens the Check tab", (tester) async {
-    await mountShell(tester,
-        autoCheckSpent: true, platform: TargetPlatform.macOS);
-
-    await _press(tester, 'Run my first check');
-
-    // The computer's own check lives on the Check tab. Home starts no phone
-    // check here and asks for no phone permissions.
-    expect(_checking, findsNothing);
-    expect(find.text('Enable deeper scanning'), findsNothing);
-    expect(find.byType(DesktopSecurityScreen), findsOneWidget);
-
-    await unmountShell(tester);
-  });
+  // A computer's own check, in six areas, is in shell_computer_check_test.
 
   testWidgets('on a computer no check starts by itself', (tester) async {
     await mountShell(tester, platform: TargetPlatform.macOS);

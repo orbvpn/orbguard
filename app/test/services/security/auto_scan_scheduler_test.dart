@@ -4,7 +4,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:orbguard/services/home/check_plan.dart';
 import 'package:orbguard/services/home/check_run.dart';
+import 'package:orbguard/services/home/computer_check.dart';
 import 'package:orbguard/services/home/last_scan_verdict_controller.dart';
 import 'package:orbguard/services/security/auto_scan_scheduler.dart';
 import 'package:orbguard/services/security/device_scan_service.dart';
@@ -148,6 +150,37 @@ void main() {
     expect((await stored()).hasScanned, isFalse);
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     expect(prefs.getInt('auto_scan_last_at'), isNull);
+  });
+
+  test('on a computer, a scheduled check runs its six areas and keeps their '
+      'coverage', () async {
+    // The app hands over its own check for a computer, the one Home runs.
+    final List<String> areas = [
+      for (final CheckStep s in CheckPlan.computer) s.stage,
+    ];
+    final AutoScanScheduler computer = scheduler((onProgress) async {
+      for (int i = 0; i < areas.length; i++) {
+        onProgress(_start(i, areas[i]));
+        onProgress(_end(i, areas[i],
+            error: areas[i] == 'Code signing'
+                ? DeviceScanService.notSupported
+                : null));
+      }
+      return const [];
+    })
+      ..plan = CheckPlan.computer
+      ..coverageOf = ComputerCheck.coverageOf
+      // The phone figure the app also hands over is not this check's.
+      ..coverage = (() => 35);
+    await computer.runIfDue();
+
+    final LastScanVerdictController v = await stored();
+    expect(v.checksRun, 5);
+    expect(v.stagesNotPossible, ['Code signing']);
+    expect(v.stagesFailed, isEmpty,
+        reason: 'every area of the plan reported, so none went silent');
+    expect(v.coveragePercent, 83,
+        reason: 'five of the six areas ran; a phone figure is not used');
   });
 
   test('a later load sees a verdict another isolate wrote', () async {

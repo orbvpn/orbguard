@@ -6,9 +6,14 @@
 // which of them a device can run at all, so Home can draw one ring segment
 // per check before the first one starts.
 //
+// A computer (macOS, Windows, Linux) is checked in six other areas, the six
+// tabs of Desktop Security, run by `ComputerCheck` ([CheckPlan.computer]).
+//
 // The table promises nothing. What ran, what found something and what could
 // not run is decided by the engine's own events, in `CheckRun`.
 library;
+
+import 'package:flutter/foundation.dart';
 
 import 'home_brief.dart';
 
@@ -116,6 +121,48 @@ abstract final class CheckPlan {
     ),
   ];
 
+  /// A computer is checked in six areas instead: the tabs of its Desktop
+  /// Security page, in the same order (`ComputerCheck` runs them). On a
+  /// computer the Spyware shield covers all six.
+  static const List<CheckStep> computer = [
+    CheckStep(
+      stage: 'Startup items',
+      name: 'Startup items',
+      doing: 'Looking at what starts at login',
+      shield: Shield.spyware,
+    ),
+    CheckStep(
+      stage: 'Code signing',
+      name: 'Code signing',
+      doing: 'Checking who signed your apps',
+      shield: Shield.spyware,
+    ),
+    CheckStep(
+      stage: 'Firewall',
+      name: 'Firewall',
+      doing: 'Checking the system firewall',
+      shield: Shield.spyware,
+    ),
+    CheckStep(
+      stage: 'Network',
+      name: 'Network',
+      doing: 'Checking your network connections',
+      shield: Shield.spyware,
+    ),
+    CheckStep(
+      stage: 'Browser',
+      name: 'Browser',
+      doing: 'Checking your browsers',
+      shield: Shield.spyware,
+    ),
+    CheckStep(
+      stage: 'Quarantine',
+      name: 'Quarantine',
+      doing: 'Reviewing quarantined files',
+      shield: Shield.spyware,
+    ),
+  ];
+
   /// The check that looks at the connection itself. A VPN or proxy it sees
   /// is not one of its findings: that state belongs to the Hidden VPN shield.
   /// So while one waits to be confirmed, this check is not called clean.
@@ -127,11 +174,22 @@ abstract final class CheckPlan {
           if (android || !step.androidOnly) step,
       ];
 
+  /// The checks expected to run on [platform], in order: a computer's six
+  /// areas, or a phone's own checks.
+  static List<CheckStep> forPlatform(TargetPlatform? platform) =>
+      switch (platform) {
+        TargetPlatform.macOS ||
+        TargetPlatform.windows ||
+        TargetPlatform.linux =>
+          computer,
+        _ => forDevice(android: platform == TargetPlatform.android),
+      };
+
   /// The step for an engine stage. A stage this table does not know (one
   /// added to the engine later) still gets a readable name, and reports to
   /// the Spyware shield like every other check of the device itself.
   static CheckStep byStage(String stage) {
-    for (final CheckStep step in all) {
+    for (final CheckStep step in [...all, ...computer]) {
       if (step.stage == stage) return step;
     }
     final String words = stage.trim().isEmpty ? 'device check' : stage.trim();

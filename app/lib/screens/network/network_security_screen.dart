@@ -328,7 +328,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
             'Stay protected on unsecured networks',
           ),
           _buildBenefitItem(
-            'globe',
+            'global',
             'Access Global Content',
             'Access content from anywhere in the world',
           ),

@@ -71,6 +71,19 @@ class AutoScanScheduler {
   /// app recorded is kept, or the base 25 when it never recorded one.
   int Function()? coverage;
 
+  /// The app's own check, where it is not the phone engine: on a computer,
+  /// the six areas Home's check runs, so a scheduled check leaves the same
+  /// record as one the person starts. Null in a background isolate and on a
+  /// phone.
+  CheckRunner? engine;
+
+  /// The steps [engine] runs. Null is the phone plan.
+  List<CheckStep>? plan;
+
+  /// The coverage of one finished check, where it depends on what ran (a
+  /// computer's share of its six areas). Takes the place of [coverage].
+  int Function(CheckOutcome outcome)? coverageOf;
+
   /// What the app's coverage starts from before any permission adds to it,
   /// as `_calculateDetectionCapability` in lib/main.dart counts it.
   static const int baseCoverage = 25;
@@ -124,12 +137,14 @@ class AutoScanScheduler {
     // same way (no outcome). They are told apart here, because only the first
     // is stamped: a broken run is tried again next cycle.
     final CheckRunner engine = _scan ??
+        this.engine ??
         (onProgress) =>
             DeviceScanService.instance.performScan(onProgress: onProgress);
     String? unavailable;
     try {
       final CheckOutcome? outcome = await CheckRun(
-        plan: CheckPlan.forDevice(android: _android ?? PlatformInfo.isAndroid),
+        plan: plan ??
+            CheckPlan.forDevice(android: _android ?? PlatformInfo.isAndroid),
         beat: Duration.zero,
         settle: Duration.zero,
       ).start((onProgress) async {
@@ -184,7 +199,8 @@ class AutoScanScheduler {
     final LastScanVerdictController target =
         verdict ?? LastScanVerdictController();
     if (verdict == null) await target.load();
-    final int percent = coverage?.call() ??
+    final int percent = coverageOf?.call(outcome) ??
+        coverage?.call() ??
         (target.hasScanned ? target.coveragePercent : baseCoverage);
     await target.recordScan(
       threats: outcome.findings,

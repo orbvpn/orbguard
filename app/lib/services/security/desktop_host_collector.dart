@@ -24,10 +24,16 @@ class HostCollection {
   final List<String> errors;
   final String source;
 
+  /// What the pass found to look in (for browsers, each browser with a
+  /// profile on this device). Empty when it found nothing to look in, which
+  /// is not the same as looking and finding nothing.
+  final List<String> looked;
+
   const HostCollection({
     required this.items,
     this.errors = const [],
     required this.source,
+    this.looked = const [],
   });
 }
 
@@ -98,7 +104,9 @@ Map<String, dynamic> _connectionMap({
   };
 }
 
-/// macOS: `lsof -nP -i -FpcnPT` machine-readable output.
+/// macOS: `lsof -nP -i -FpcnPT` machine-readable output. In the App Sandbox
+/// lsof cannot read other processes, and no other way to list them is open
+/// there (`netstat` gets an empty list), so a sandboxed Mac reads none.
 Future<HostCollection> collectMacosNetworkConnections() async {
   const source = 'lsof -nP -i (local device)';
   final ProcessResult result;
@@ -118,8 +126,7 @@ Future<HostCollection> collectMacosNetworkConnections() async {
     return HostCollection(
       items: const [],
       errors: [
-        'lsof returned no socket data (exit ${result.exitCode}): '
-            '${(result.stderr as String? ?? '').trim()}',
+        macLsofFailure(result.exitCode, result.stderr as String? ?? ''),
       ],
       source: source,
     );
@@ -195,6 +202,14 @@ Future<HostCollection> collectMacosNetworkConnections() async {
   }
   return HostCollection(items: items, errors: errors, source: source);
 }
+
+/// Why lsof read no connection, as a person reads it. "Operation not
+/// permitted" is macOS keeping other apps out of reach, as it does in the
+/// App Sandbox.
+String macLsofFailure(int exitCode, String stderr) =>
+    stderr.contains('Operation not permitted')
+        ? 'macOS does not let OrbGuard see which apps are connected to what.'
+        : 'lsof returned no socket data (exit $exitCode): ${stderr.trim()}';
 
 /// Linux: `ss -tunap` with `netstat -tunap` fallback.
 Future<HostCollection> collectLinuxNetworkConnections() async {
@@ -585,6 +600,7 @@ Future<HostCollection> collectChromiumExtensions(
     source: scannedBrowsers.isEmpty
         ? 'no Chromium-family browser profiles found on this device'
         : 'manifest scan of ${scannedBrowsers.join(', ')} profiles (local device)',
+    looked: scannedBrowsers,
   );
 }
 
@@ -659,6 +675,7 @@ Future<HostCollection> collectFirefoxExtensions(String profilesRoot) async {
     source: profilesScanned == 0
         ? 'Firefox installed but no profiles with extensions.json found'
         : 'extensions.json scan of $profilesScanned Firefox profile(s) (local device)',
+    looked: const ['Firefox'],
   );
 }
 

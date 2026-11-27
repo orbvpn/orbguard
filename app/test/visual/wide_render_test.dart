@@ -211,6 +211,71 @@ void main() {
       debugDisableShadows = true;
     });
 
+    testWidgets('a Mac window checking, $theme', skip: !enabled,
+        (tester) async {
+      debugDisableShadows = false;
+      final GlobalKey shot = GlobalKey();
+      await mountShell(tester,
+          platform: TargetPlatform.macOS,
+          autoCheckSpent: true,
+          themed: true,
+          theme: theme,
+          size: const Size(1180, 760),
+          shot: shot);
+      await tester.tap(find.text('Run my first check'));
+      // Part way in, one area running.
+      for (int i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      await _save(tester, shot, 'mac-checking-$theme');
+      await finishCheck(tester);
+      await _settle(tester);
+      await _save(tester, shot, 'mac-results-$theme');
+      await tester.tap(find.text('Done').last);
+      await _settle(tester);
+      await _save(tester, shot, 'mac-checked-$theme');
+      await unmountShell(tester);
+      // The binding checks this before tear-downs run.
+      debugDisableShadows = true;
+    });
+
+    testWidgets('a Windows window with results, $theme', skip: !enabled,
+        (tester) async {
+      debugDisableShadows = false;
+      final GlobalKey shot = GlobalKey();
+      await mountShell(tester,
+          platform: TargetPlatform.windows,
+          autoCheckSpent: true,
+          themed: true,
+          theme: theme,
+          size: const Size(1180, 760),
+          runner: fakeCheck(
+            platform: TargetPlatform.windows,
+            failing: {'Network'},
+            findings: const [
+              {
+                'id': 'desktop-extensions',
+                'name': '2 browser extensions can read and change every '
+                    'site you visit',
+                'description': 'Grammar Helper and Coupon Finder. Remove any '
+                    'you do not use or do not recognise.',
+                'severity': 'LOW',
+                'type': 'desktop_browser',
+                'path': 'extensions',
+                'stage': 'Browser',
+              },
+            ],
+          ),
+          shot: shot);
+      await tester.tap(find.text('Run my first check'));
+      await finishCheck(tester);
+      await _settle(tester);
+      await _save(tester, shot, 'windows-results-$theme');
+      await unmountShell(tester);
+      // The binding checks this before tear-downs run.
+      debugDisableShadows = true;
+    });
+
     testWidgets('a Windows window, $theme', skip: !enabled, (tester) async {
       debugDisableShadows = false;
       final GlobalKey shot = GlobalKey();

@@ -52,20 +52,22 @@ class QuietDarkWeb extends DarkWebProvider {
 }
 
 /// A check that reports every step of [platform]'s plan, in order, and then
-/// returns [findings]. [failing] steps report an error instead of a result;
-/// [error], when set, is thrown before anything runs.
+/// returns [findings]. On a computer the plan is its six areas. [failing]
+/// steps report an error instead of a result, and [notPossible] steps that
+/// this device cannot run them; [error], when set, is thrown before anything
+/// runs.
 CheckRunner fakeCheck({
   TargetPlatform platform = TargetPlatform.android,
   List<Map<String, dynamic>> findings = const [],
   Set<String> failing = const {},
+  Set<String> notPossible = const {},
   Object? error,
 }) =>
     (onProgress) async {
       final Object? e = error;
       if (e != null) throw e;
       final List<String> stages = [
-        for (final CheckStep step
-            in CheckPlan.forDevice(android: platform == TargetPlatform.android))
+        for (final CheckStep step in CheckPlan.forPlatform(platform))
           step.stage,
       ];
       for (int i = 0; i < stages.length; i++) {
@@ -76,7 +78,13 @@ CheckRunner fakeCheck({
             stageName: stages[i],
             stageCompleted: done,
             threatsFound: 0,
-            stageError: done && failing.contains(stages[i]) ? 'broke' : null,
+            stageError: !done
+                ? null
+                : failing.contains(stages[i])
+                    ? 'broke'
+                    : notPossible.contains(stages[i])
+                        ? DeviceScanService.notSupported
+                        : null,
           ));
         }
       }

@@ -13,19 +13,34 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
+import '../../utils/host_platform.dart';
 
 class ForensicsScreen extends StatefulWidget {
-  const ForensicsScreen({super.key, this.title = 'Forensic Analysis'});
+  const ForensicsScreen({
+    super.key,
+    this.title = 'Forensic Analysis',
+    this.platform,
+  });
 
   /// The name in the header. A shield passes its own, so the sheet reads
   /// the same as the moon or the card that opened it.
   final String title;
+
+  /// The device the screen is drawn for; null is this one.
+  final TargetPlatform? platform;
 
   @override
   State<ForensicsScreen> createState() => _ForensicsScreenState();
 }
 
 class _ForensicsScreenState extends State<ForensicsScreen> {
+  TargetPlatform? get _on => widget.platform ?? hostPlatform();
+
+  bool get _onComputer =>
+      _on == TargetPlatform.macOS ||
+      _on == TargetPlatform.windows ||
+      _on == TargetPlatform.linux;
+
   @override
   void initState() {
     super.initState();
@@ -99,20 +114,61 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Full scan button
-          _buildAnalysisButton(
-            icon: 'shield_check',
-            title: 'Full Forensic Scan',
-            description: 'Comprehensive analysis for all known spyware',
-            color: AppColors.accentInk,
-            onTap: provider.isAnalyzing
-                ? null
-                : () => provider.runFullAnalysis(),
-          ),
-          const SizedBox(height: 12),
+          // Full scan button. A computer has nothing of its own to send
+          // it, so there the analysis starts from a file instead.
+          if (!_onComputer) ...[
+            _buildAnalysisButton(
+              icon: 'shield_check',
+              title: 'Full Forensic Scan',
+              description: 'Comprehensive analysis for all known spyware',
+              color: AppColors.accentInk,
+              onTap: provider.isAnalyzing
+                  ? null
+                  : () => provider.runFullAnalysis(),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // Platform-specific options
-          if (PlatformInfo.isIOS) ...[
+          if (_onComputer) ...[
+            _buildAnalysisButton(
+              icon: 'cloud_storage',
+              title: 'iPhone backup',
+              description: 'Choose an iPhone backup (.zip) saved on this '
+                  'computer, and OrbGuard looks through it for spyware.',
+              color: AppColors.secondaryInk,
+              onTap: provider.isAnalyzing
+                  ? null
+                  : () => _pickAndUpload(
+                        context,
+                        provider,
+                        allowedExtensions: const ['zip'],
+                        serverAcceptedSuffixes: const ['.zip'],
+                        upload: provider.uploadIosBackup,
+                      ),
+            ),
+            const SizedBox(height: 12),
+            _buildAnalysisButton(
+              icon: 'bug',
+              title: 'iPhone sysdiagnose',
+              description: 'Choose a sysdiagnose archive (.tar.gz, .tgz or '
+                  '.zip) taken from an iPhone, for a deeper look.',
+              color: AppColors.chartColors[4], // spectrum purple
+              onTap: provider.isAnalyzing
+                  ? null
+                  : () => _pickAndUpload(
+                        context,
+                        provider,
+                        allowedExtensions: const ['gz', 'tgz', 'zip'],
+                        serverAcceptedSuffixes: const [
+                          '.tar.gz',
+                          '.tgz',
+                          '.zip',
+                        ],
+                        upload: provider.uploadSysdiagnose,
+                      ),
+            ),
+          ] else if (_on == TargetPlatform.iOS) ...[
             _buildAnalysisButton(
               icon: 'power',
               title: 'Shutdown Log Analysis',
@@ -155,7 +211,7 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
                         upload: provider.uploadSysdiagnose,
                       ),
             ),
-          ] else if (PlatformInfo.isAndroid) ...[
+          ] else if (_on == TargetPlatform.android) ...[
             _buildAnalysisButton(
               icon: 'clipboard_text',
               title: 'Capture & Analyze Logs',

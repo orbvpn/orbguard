@@ -28,8 +28,16 @@ class DesktopSecurityScreen extends StatefulWidget {
   /// of the window, not one pushed over it, has nowhere to go back to.
   final bool showBackButton;
 
+  /// The tab it opens on: 0 Persistence, 1 Code Signing, 2 Firewall,
+  /// 3 Network, 4 Browser, 5 Quarantine. Home's check runs the same six
+  /// areas, in the same order.
+  final int initialTab;
+
   const DesktopSecurityScreen(
-      {super.key, this.embedded = false, this.showBackButton = true});
+      {super.key,
+      this.embedded = false,
+      this.showBackButton = true,
+      this.initialTab = 0});
 
   @override
   State<DesktopSecurityScreen> createState() => _DesktopSecurityScreenState();
@@ -192,6 +200,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       searchHint: 'Search devices...',
       embedded: widget.embedded,
       showBackButton: widget.showBackButton,
+      initialIndex: widget.initialTab.clamp(0, 5),
       headerContent: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -233,7 +242,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         ),
         GlassTab(
           label: 'Browser',
-          iconPath: 'globe',
+          iconPath: 'global',
           content: _buildBrowserTab(),
         ),
         GlassTab(
@@ -1728,7 +1737,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
           child: Row(
             children: [
               GlassDuotoneIconBox(
-                icon: 'globe',
+                icon: 'global',
                 color: highRisk > 0 ? GlassTheme.warningColor : GlassTheme.successColor,
                 size: 48,
                 iconSize: 24,
@@ -1816,7 +1825,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    DuotoneIcon('globe', size: 48, color: context.colors.outline),
+                    DuotoneIcon('global', size: 48, color: context.colors.outline),
                     const SizedBox(height: 12),
                     Text('No extensions data', style: TextStyle(color: context.colors.onSurfaceVariant)),
                     const SizedBox(height: 4),
