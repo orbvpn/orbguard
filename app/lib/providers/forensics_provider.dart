@@ -686,9 +686,23 @@ class ForensicsProvider extends ChangeNotifier {
   @visibleForTesting
   static String plainError(Object error) {
     if (error is ApiError) {
+      // The server reads only part of a file it ran out of time or room for,
+      // and answers so when nothing high turned up in that part.
+      if (error.code == 'partly_examined') {
+        return 'Only part of it could be read, so this is not an all-clear. '
+            'Nothing serious turned up in the part that was read.';
+      }
+      if (error.code == 'analysis_busy' || error.statusCode == 503) {
+        return 'The analysis service is busy, so this is not an all-clear. '
+            'Try again in a moment.';
+      }
+      if (error.statusCode == 413) {
+        return 'The file did not reach OrbGuard in full, so it was not read. '
+            'Try again on Wi-Fi.';
+      }
       if (error.statusCode == 422) {
-        return 'There was nothing for the analysis to look at. Choose a '
-            'backup or a diagnostics file first.';
+        return 'OrbGuard could not read anything in it, so this is not an '
+            'all-clear. Choose a backup or a diagnostics file and try again.';
       }
       if (error.code == 'TIMEOUT' || error.code == 'CONNECTION_ERROR') {
         return 'OrbGuard could not reach its servers. Check your internet '

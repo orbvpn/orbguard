@@ -862,7 +862,7 @@ func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := h.service.AnalyzeLogcatStream(ctx, buffered, maxBugreportParseBytes, artifact.DeviceID)
+	result, err := h.service.AnalyzeBugreportStream(ctx, buffered, maxBugreportParseBytes, artifact.DeviceID)
 	if respondUnexamined(w, err) {
 		return
 	}

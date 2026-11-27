@@ -1,7 +1,6 @@
 package android
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -82,10 +81,74 @@ func TestStreamKeepsAFindingReadBeforeItBroke(t *testing.T) {
 	}
 }
 
-func TestStreamLineOverTheScannerLimitStaysAnError(t *testing.T) {
+// A line longer than the line limit used to fail the whole analysis, and a
+// real bug report has such lines outside its logs (one from an emulator held
+// three, the longest 388 KiB). It is now read past, counted as unread.
+func TestStreamReadsPastALineOverTheLineLimit(t *testing.T) {
+	long := strings.Repeat("x", 70*1024) + "\n"
+	log := strings.Repeat(streamLine, 9) + long + streamLine
+	result, err := streamParser().ParseStream(context.Background(), strings.NewReader(log), 0)
+	if err != nil {
+		t.Fatalf("a long line must not fail the analysis: %v", err)
+	}
+	if got := result.RawData["total_entries"]; got != 10 {
+		t.Fatalf("entries read: %v", got)
+	}
+}
+
+func TestStreamOfOnlyALongLineExaminedNothing(t *testing.T) {
 	_, err := streamParser().ParseStream(context.Background(), strings.NewReader(strings.Repeat("x", 70*1024)+"\n"), 0)
-	if !errors.Is(err, bufio.ErrTooLong) {
-		t.Fatalf("want the line error, got %v", err)
+	if !errors.Is(err, models.ErrNothingExamined) {
+		t.Fatalf("want nothing examined, got %v", err)
+	}
+}
+
+// A spyware name in the part of a long line that is not kept is still never
+// tolerated as noise, wherever it falls, including across two pieces.
+func TestStreamNameInTheUnkeptPartOfALongLineIsNotNoise(t *testing.T) {
+	for name, at := range map[string]int{
+		"well past the kept piece":  100 * 1024,
+		"across the piece boundary": maxLogcatLineBytes - 4,
+	} {
+		t.Run(name, func(t *testing.T) {
+			line := strings.Repeat("x", at) + "flexispy" + strings.Repeat("x", 30*1024) + "\n"
+			log := strings.Repeat(streamLine, 20) + line
+			_, err := streamParser().ParseStream(context.Background(), strings.NewReader(log), 0)
+			var partly *models.PartlyExaminedError
+			if !errors.As(err, &partly) || !slices.Contains(partly.NotExamined, "logcat lines in an unread format") {
+				t.Fatalf("want a partial answer for the unread name, got %v", err)
+			}
+		})
+	}
+}
+
+func TestStreamLongLineWithoutANameIsTolerated(t *testing.T) {
+	log := strings.Repeat(streamLine, 20) + strings.Repeat("y", 200*1024) + "\n"
+	if _, err := streamParser().ParseStream(context.Background(), strings.NewReader(log), 0); err != nil {
+		t.Fatalf("one unread line in twenty-one is noise: %v", err)
+	}
+}
+
+func TestStreamStopsInsideALongLineWhenTheContextEnds(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	line := strings.Repeat("z", 16<<20) + "\n"
+	r := &cancelAfterBytes{r: strings.NewReader(strings.Repeat(streamLine, 5) + line), cancel: cancel, limit: 1 << 20}
+	_, err := streamParser().ParseStream(ctx, r, 0)
+	assertStreamPartial(t, err)
+	if r.read > 3<<20 {
+		t.Fatalf("read %d bytes of a 16 MiB line after the budget ended at 1 MiB", r.read)
+	}
+}
+
+func TestStreamLastLineWithoutALineEndCounts(t *testing.T) {
+	log := streamLine + streamLine + strings.TrimSuffix(streamSpyLine, "\n")
+	result, err := streamParser().ParseStream(context.Background(), strings.NewReader(log), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Anomalies) != 1 {
+		t.Fatalf("anomalies %d", len(result.Anomalies))
 	}
 }
 

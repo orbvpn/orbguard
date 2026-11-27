@@ -1,7 +1,6 @@
 package android
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -80,6 +79,17 @@ var suspiciousLogPatterns = []struct {
 	// Unusual system access
 	{regexp.MustCompile(`(?i)/proc/.*mem|/dev/mem|/dev/kmem`), "Direct memory access", 0.85, []string{"memory", "kernel"}},
 	{regexp.MustCompile(`(?i)/system/.*write|remount.*rw`), "System partition write", 0.8, []string{"system", "modification"}},
+}
+
+// namedSpywareReasons are the rules that match a spyware or a stalkerware by
+// its name. In a log of the whole device, such as a bug report, only these
+// stand: the other rules match words a phone's own system logs use all the
+// time. A bug report of a clean, just-booted emulator matched them 184 times
+// (113 of them high), from lines such as lock screen state and /proc/meminfo.
+var namedSpywareReasons = map[string]bool{
+	"Known spyware name":     true,
+	"Known spyware codename": true,
+	"Known stalkerware":      true,
 }
 
 // Known legitimate log patterns to exclude (reduce false positives)
@@ -195,26 +205,55 @@ func (p *LogcatParser) Parse(data []byte) (*models.ForensicResult, error) {
 // does not follow the size of the log. It stops when ctx ends and after
 // maxBytes (0 means no limit). What it did not reach counts as not examined.
 func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes int64) (*models.ForensicResult, error) {
+	return p.parseStream(ctx, r, maxBytes, false)
+}
+
+// ParseBugreportStream is ParseStream for a log of the whole device, such as
+// an Android bug report: a line is a finding only when it names a known
+// spyware or stalkerware (see namedSpywareReasons).
+func (p *LogcatParser) ParseBugreportStream(ctx context.Context, r io.Reader, maxBytes int64) (*models.ForensicResult, error) {
+	return p.parseStream(ctx, r, maxBytes, true)
+}
+
+func (p *LogcatParser) parseStream(ctx context.Context, r io.Reader, maxBytes int64, namedOnly bool) (*models.ForensicResult, error) {
 	result := models.NewForensicResult("", "android", models.ForensicScanTypeLogcat)
 
 	limited := &io.LimitedReader{R: r, N: math.MaxInt64}
 	if maxBytes > 0 {
 		limited.N = maxBytes + 1
 	}
-	scanner := bufio.NewScanner(limited)
+	lines := newLogLineReader(limited)
 	entryCount := 0
 	stopped := false
 	timeline := models.NewTimeline()
 	var share logcatShare
 
 	lineNum := 0
-	for scanner.Scan() {
+	for {
 		if ctx.Err() != nil {
 			stopped = true
 			break
 		}
+		read, err := lines.next(ctx)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				stopped = true // the stream broke or time ran out, so the rest was not read
+			}
+			break
+		}
 		lineNum++
-		line := scanner.Text()
+		line := read.text
+
+		if read.cut {
+			// No logcat entry is this long, so this is a line of another
+			// section: it counts as unread, and a spyware name anywhere in
+			// it is never tolerated as noise.
+			share.add(line, false)
+			if read.nameInCutPart {
+				share.unreadIndicator = true
+			}
+			continue
+		}
 
 		entry, ok := p.parseLine(line, lineNum)
 		share.add(line, ok)
@@ -225,7 +264,7 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 		entryCount++
 
 		// Analyze for suspicious patterns
-		isSuspicious, score, reason, tags := p.analyzeEntry(entry)
+		isSuspicious, score, reason, tags := p.analyzeEntry(entry, namedOnly)
 		if isSuspicious {
 			entry.IsSuspicious = true
 			entry.Reason = reason
@@ -279,12 +318,6 @@ func (p *LogcatParser) ParseStream(ctx context.Context, r io.Reader, maxBytes in
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		if errors.Is(err, bufio.ErrTooLong) {
-			return nil, err
-		}
-		stopped = true // the stream broke, so the rest was not read
-	}
 	if maxBytes > 0 && limited.N <= 0 {
 		stopped = true
 	}
@@ -416,18 +449,26 @@ func (p *LogcatParser) parseLine(line string, lineNum int) (models.LogcatEntry, 
 	return entry, false
 }
 
-// analyzeEntry analyzes a single logcat entry for suspicious content
-func (p *LogcatParser) analyzeEntry(entry models.LogcatEntry) (bool, float64, string, []string) {
+// analyzeEntry analyzes a single logcat entry for suspicious content. With
+// namedOnly, only the rules that name a spyware or stalkerware apply, and the
+// legitimate patterns do not hide them: they exist to quiet the other rules,
+// and a stalkerware app logs through Firebase like any other.
+func (p *LogcatParser) analyzeEntry(entry models.LogcatEntry, namedOnly bool) (bool, float64, string, []string) {
 	// Check if it matches legitimate patterns first
-	fullLine := entry.Tag + ": " + entry.Message
-	for _, legit := range legitimatePatterns {
-		if legit.MatchString(fullLine) {
-			return false, 0, "", nil
+	if !namedOnly {
+		fullLine := entry.Tag + ": " + entry.Message
+		for _, legit := range legitimatePatterns {
+			if legit.MatchString(fullLine) {
+				return false, 0, "", nil
+			}
 		}
 	}
 
 	// Check against suspicious patterns
 	for _, pattern := range suspiciousLogPatterns {
+		if namedOnly && !namedSpywareReasons[pattern.Reason] {
+			continue
+		}
 		if pattern.Pattern.MatchString(entry.Tag) || pattern.Pattern.MatchString(entry.Message) {
 			return true, pattern.Score, pattern.Reason, pattern.Tags
 		}

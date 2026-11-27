@@ -162,6 +162,29 @@ func (s *Service) AnalyzeLogcatStream(ctx context.Context, r io.Reader, maxBytes
 	return result, nil
 }
 
+// AnalyzeBugreportStream analyzes the text of an Android bug report as it is
+// read, up to maxBytes (0 means no limit), and stops when ctx ends. A bug
+// report logs the whole device, so only lines that name a known spyware or
+// stalkerware count as findings (see android.LogcatParser.ParseBugreportStream).
+func (s *Service) AnalyzeBugreportStream(ctx context.Context, r io.Reader, maxBytes int64, deviceID string) (*models.ForensicResult, error) {
+	s.logger.Info().Str("device_id", deviceID).Msg("analyzing Android bug report")
+
+	result, err := s.logcatParser.ParseBugreportStream(ctx, r, maxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse bug report: %w", err)
+	}
+
+	result.DeviceID = deviceID
+	s.logger.Info().
+		Str("device_id", deviceID).
+		Int("anomalies", result.TotalAnomalies).
+		Int("threats", len(result.DetectedThreats)).
+		Float64("infection_likelihood", result.InfectionLikelihood).
+		Msg("Android bug report analysis complete")
+
+	return result, nil
+}
+
 // RunFullAnalysis performs a comprehensive forensic analysis based on available data
 func (s *Service) RunFullAnalysis(ctx context.Context, req models.ForensicScanRequest) (*models.ForensicResult, error) {
 	start := time.Now()
