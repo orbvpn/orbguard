@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OrbGuard</string>
+
+    <!-- Home-screen widgets (glance) -->
+    <string name="glance_name">OrbGuard</string>
+    <string name="glance_description">See where you stand at a glance</string>
+    <string name="glance_open">Open OrbGuard</string>
 </resources>

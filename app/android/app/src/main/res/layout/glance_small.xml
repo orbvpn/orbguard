@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small glance (2x2): the ring with the score in its hole, then the title.
+     Drawn by GlanceWidgets; before any update it shows the mark and Open OrbGuard. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/glance_bg"
+    android:clipToOutline="true"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <include layout="@layout/glance_ring_slot" />
+
+    <TextView
+        android:id="@+id/glance_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="@string/glance_open"
+        android:textColor="@color/glance_text"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+</LinearLayout>

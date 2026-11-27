@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The ring, dark. layout/ has the same slot with its own id, so the host's
+     night mode picks which of the two drawings shows. -->
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/glance_ring_dark"
+    android:layout_width="98dp"
+    android:layout_height="98dp"
+    android:adjustViewBounds="true"
+    android:importantForAccessibility="yes"
+    android:scaleType="fitCenter"
+    android:src="@drawable/glance_logo"
+    android:contentDescription="@string/glance_open" />

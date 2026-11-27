@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Environment
 import android.net.Uri
 import androidx.annotation.NonNull
+import com.orb.guard.glance.GlanceChannelHandler
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -83,6 +84,9 @@ class MainActivity: FlutterActivity() {
             it.setActivity(this)
             it.register(flutterEngine.dartExecutor.binaryMessenger)
         }
+
+        // Home-screen widgets (com.orb.guard/glance)
+        GlanceChannelHandler(applicationContext).register(flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The OrbGuard ring mark (app/assets/branding/orbguard_icon.svg, as the glance brief
+     gives it): circle r 34, stroke 22, in a 100 box, radial gradient centred 38,38 radius 62. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="98dp"
+    android:height="98dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:pathData="M50,16 A34,34 0 1,1 49.99,16 Z"
+        android:strokeWidth="22"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="radial"
+                android:centerX="38"
+                android:centerY="38"
+                android:gradientRadius="62">
+                <item android:offset="0" android:color="#FFF2FCD0" />
+                <item android:offset="0.2" android:color="#FFE0F4B0" />
+                <item android:offset="0.4" android:color="#FFC4E896" />
+                <item android:offset="0.6" android:color="#FFA0D87C" />
+                <item android:offset="0.8" android:color="#FF84C86C" />
+                <item android:offset="1" android:color="#FF68B060" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Its luminance sheen: light at the top left, shade at the bottom right. -->
+    <path
+        android:pathData="M50,16 A34,34 0 1,1 49.99,16 Z"
+        android:strokeWidth="22"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="10"
+                android:startY="10"
+                android:endX="90"
+                android:endY="90">
+                <item android:offset="0" android:color="#24FFFFFF" />
+                <item android:offset="0.4" android:color="#00FFFFFF" />
+                <item android:offset="1" android:color="#1F000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

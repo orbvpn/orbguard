@@ -194,6 +194,33 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- Home-screen widgets (the glance): draw what Dart last sent over
+             com.orb.guard/glance, stored in the private orbguard_glance prefs.
+             REDRAW is sent only by the app's own alarms (stale moment, local
+             midnight), so the receivers stay unexported. -->
+        <receiver
+            android:name=".glance.GlanceSmallProvider"
+            android:exported="false"
+            android:label="@string/glance_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/glance_small_info" />
+        </receiver>
+        <receiver
+            android:name=".glance.GlanceMediumProvider"
+            android:exported="false"
+            android:label="@string/glance_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/glance_medium_info" />
+        </receiver>
     </application>
 
     <!-- Queries for Package Visibility (Android 11+) -->
