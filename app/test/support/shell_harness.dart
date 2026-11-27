@@ -25,6 +25,7 @@ import 'package:orbguard/providers/scan_credit_provider.dart';
 import 'package:orbguard/providers/settings_provider.dart';
 import 'package:orbguard/providers/sms_provider.dart';
 import 'package:orbguard/services/habit/protection_streak_controller.dart';
+import 'package:orbguard/services/desktop/desktop_tray.dart';
 import 'package:orbguard/services/home/check_plan.dart';
 import 'package:orbguard/services/home/check_run.dart';
 import 'package:orbguard/services/home/last_scan_verdict_controller.dart';
@@ -107,6 +108,8 @@ Future<void> finishCheck(WidgetTester tester) async {
 /// [insets] are the system's bars, in logical pixels. [theme] ('dark' or
 /// 'light') is the appearance saved in settings; set it with [themed].
 /// [shot] wraps the whole app in a boundary a render can draw from.
+/// [desktopTray] is the tray icon on a Windows or Linux computer, built on
+/// stand-ins (test/support/desktop_fakes.dart); left out, there is none.
 Future<ShellUnderTest> mountShell(
   WidgetTester tester, {
   bool checked = false,
@@ -124,6 +127,7 @@ Future<ShellUnderTest> mountShell(
   EdgeInsets insets = EdgeInsets.zero,
   String? theme,
   GlobalKey? shot,
+  DesktopTray? desktopTray,
 }) async {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -216,6 +220,7 @@ Future<ShellUnderTest> mountShell(
     platform: platform,
     checkRunner: runner ?? fakeCheck(platform: platform),
     vpnWatch: VpnWatch(detector: VpnProxyDetector(platform: platform)),
+    desktopTray: desktopTray,
   );
   if (themed) addTearDown(() => AppColors.uiBrightness = Brightness.dark);
 

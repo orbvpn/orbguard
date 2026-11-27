@@ -26,6 +26,7 @@ import 'services/home/check_plan.dart';
 import 'services/home/check_results.dart';
 import 'services/home/check_run.dart';
 import 'services/home/glance.dart';
+import 'services/desktop/desktop_tray.dart';
 import 'services/home/home_reading.dart';
 import 'services/home/home_today.dart';
 import 'services/security/vpn_watch.dart';
@@ -483,6 +484,7 @@ class HomeScreen extends StatefulWidget {
     this.platform,
     this.checkRunner,
     this.vpnWatch,
+    this.desktopTray,
   });
 
   /// The device the shell is drawn for. Null is the one this runs on; tests
@@ -497,6 +499,12 @@ class HomeScreen extends StatefulWidget {
   /// Null is the one the app shares.
   @visibleForTesting
   final VpnWatch? vpnWatch;
+
+  /// The tray icon on a Windows or Linux computer. Null is the real one when
+  /// the shell runs on the computer itself, and none when a test names the
+  /// platform.
+  @visibleForTesting
+  final DesktopTray? desktopTray;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -625,6 +633,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final GlanceSync _glance = GlanceSync();
   bool _glanceDue = false;
 
+  /// On Windows and Linux, the tray icon: told what the glance is told, and
+  /// heard when it asks for a check. The Mac's menu bar ring is native.
+  late final DesktopTray? _tray = widget.desktopTray ??
+      (widget.platform == null && DesktopTray.runsOn(_platform)
+          ? DesktopTray.forComputer(_platform!)
+          : null);
+
+  /// A check asked for from outside the app: the menu bar or the tray.
+  void _checkFromOutside() {
+    if (mounted) unawaited(_startScan());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -640,9 +660,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _guards.addListener(_glanceChanged);
     _glance
       ..current = _glanceNow
-      ..onCheckNow = () {
-        if (mounted) unawaited(_startScan());
-      };
+      ..onCheckNow = _checkFromOutside;
+    final DesktopTray? tray = _tray;
+    if (tray != null) {
+      tray.onCheckNow = _checkFromOutside;
+      unawaited(tray.start());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _watchBreaches();
@@ -665,6 +688,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _verdictForGlance?.removeListener(_glanceChanged);
     _guards.removeListener(_glanceChanged);
     _glance.dispose();
+    _tray?.dispose();
     _darkWeb?.removeListener(_onBreachesChanged);
     AutoScanScheduler.instance
       ..verdict = null
@@ -758,7 +782,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     scheduleMicrotask(() {
       _glanceDue = false;
       final Glance? glance = _glanceNow();
-      if (glance != null) unawaited(_glance.push(glance));
+      if (glance == null) return;
+      unawaited(_glance.push(glance));
+      _tray?.show(glance);
     });
   }
 

@@ -3,8 +3,12 @@
 // The menu bar side of the glance: an NSStatusItem whose image is the ring
 // (whole when all clear, cut with an amber spark at each gap, dots when never
 // checked, greyed when nothing is on watch, the logo mark before any glance)
-// and a transient popover with the headline, the proof, two Today rows and
-// one lime "Check now".
+// and a transient popover with the headline, the proof, two Today rows, one
+// lime "Check now" and a quiet "Open OrbGuard". A right click (or a control
+// click) opens a menu instead: the status line, Check now, Open OrbGuard and
+// Quit OrbGuard, the same menu the Windows and Linux tray icon has
+// (lib/services/desktop/desktop_tray.dart). Closing the window only hides it,
+// so this is how OrbGuard is brought back or quit.
 //
 // Contract (standard method codec):
 //   Dart -> native  update(map)  store the map, redraw. Replies nil.
@@ -94,19 +98,21 @@ final class OrbGuardGlance: NSObject, NSPopoverDelegate {
     let now = Date()
     if let button = statusItem?.button {
       button.image = GlanceRingPainter.statusImage(mode: glance?.ringMode ?? .logo)
-      let words: String
-      if let g = glance {
-        let title = g.shownTitle(at: now)
-        words = g.checkedAt.map { title + ". " + GlanceTime.checked($0, now: now) } ?? title
-      } else {
-        words = "Open OrbGuard"
-      }
+      let words = statusLine(at: now) ?? "Open OrbGuard"
       button.toolTip = words
       button.setAccessibilityLabel("OrbGuard. " + words)
     }
     model.glance = glance
     model.now = now
     schedule(after: now)
+  }
+
+  /// Home's words for now: the title (its stale title once stale) and when the
+  /// check ran. Nil before the first glance ever.
+  private func statusLine(at now: Date) -> String? {
+    guard let g = glance else { return nil }
+    let title = g.shownTitle(at: now)
+    return g.checkedAt.map { title + ". " + GlanceTime.checked($0, now: now) } ?? title
   }
 
   /// Redraw at staleAt (the score goes) and at the next local midnight (today's times
@@ -127,7 +133,7 @@ final class OrbGuardGlance: NSObject, NSPopoverDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     item.button?.imagePosition = .imageOnly
     item.button?.target = self
-    item.button?.action = #selector(togglePopover(_:))
+    item.button?.action = #selector(clicked(_:))
     item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
     statusItem = item
 
@@ -146,6 +152,49 @@ final class OrbGuardGlance: NSObject, NSPopoverDelegate {
       popover.hasFullSizeContent = true
     }
   }
+
+  /// A left click opens the popover; a right or control click, the menu.
+  @objc private func clicked(_ sender: Any?) {
+    let event = NSApp.currentEvent
+    if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+      showMenu()
+    } else {
+      togglePopover(sender)
+    }
+  }
+
+  /// The status line, Check now, Open OrbGuard and Quit OrbGuard. Before the
+  /// first glance ever there is nothing to say and no check to start here.
+  private func showMenu() {
+    if popover.isShown { popover.performClose(nil) }
+    guard let item = statusItem else { return }
+    let menu = NSMenu()
+    menu.autoenablesItems = false
+    func command(_ title: String, _ action: Selector) -> NSMenuItem {
+      let row = NSMenuItem(title: title, action: action, keyEquivalent: "")
+      row.target = self
+      return row
+    }
+    if let words = statusLine(at: Date()) {
+      let line = NSMenuItem(title: words, action: nil, keyEquivalent: "")
+      line.isEnabled = false
+      menu.addItem(line)
+      menu.addItem(.separator())
+      menu.addItem(command("Check now", #selector(menuCheckNow)))
+    }
+    menu.addItem(command("Open OrbGuard", #selector(menuOpen)))
+    menu.addItem(.separator())
+    menu.addItem(command("Quit OrbGuard", #selector(menuQuit)))
+    // Hung on the item only while it is open, so a left click still opens
+    // the popover.
+    item.menu = menu
+    item.button?.performClick(nil)
+    item.menu = nil
+  }
+
+  @objc private func menuCheckNow() { checkNow() }
+  @objc private func menuOpen() { openApp() }
+  @objc private func menuQuit() { NSApp.terminate(nil) }
 
   @objc private func togglePopover(_ sender: Any?) {
     if popover.isShown {
@@ -181,8 +230,14 @@ final class OrbGuardGlance: NSObject, NSPopoverDelegate {
     channel?.invokeMethod("checkNow", arguments: nil)
   }
 
+  /// Brings the window back, whether it was hidden by closing it or
+  /// minimised.
   private func openApp() {
     popover.performClose(nil)
+    if let main = window as? MainFlutterWindow {
+      main.bringBack()
+      return
+    }
     NSApp.activate(ignoringOtherApps: true)
     guard let window else { return }
     if window.isMiniaturized { window.deminiaturize(nil) }

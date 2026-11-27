@@ -92,6 +92,13 @@ dependencies:
   yandex_mobileads: ^7.18.0
   share_plus: ^12.0.2
 
+  # The tray icon on Windows and Linux (the Mac draws its own menu bar ring
+  # natively), and the window it hides and brings back. Held on the 0.5 line:
+  # 0.6 and later are a rewrite on nativeapi that needs Flutter 3.47 or newer,
+  # and this app builds on 3.44. Never called on the Mac, iOS or Android.
+  tray_manager: ^0.5.3
+  window_manager: ^0.5.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -172,6 +179,13 @@ flutter:
   assets:
     - assets/icons/
     - assets/branding/
+    # The tray icon in each state the ring can show, for each taskbar shade.
+    # Drawn by test/visual/tray_icons_render_test.dart, which says how to draw
+    # them again.
+    - assets/tray/windows/dark/
+    - assets/tray/windows/light/
+    - assets/tray/linux/dark/
+    - assets/tray/linux/light/
 
   # Brand type stack — bundled (no runtime font fetch), shared with OrbVPN.
   # Display = Archivo · body/UI = IBM Plex Sans · labels/data = IBM Plex Mono.
