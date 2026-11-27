@@ -11,7 +11,8 @@
 //  - Home's proof counts the checks that ran, as it does on a phone
 //  - the Check tab is still the details of the six areas
 //  - the first check is free; a later one a person starts passes the credit
-//    gate, as on a phone
+//    gate, as on a phone, and without Premium or a credit the gate says
+//    Premium is needed
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +25,7 @@ import 'package:orbguard/services/home/check_plan.dart';
 import 'package:orbguard/widgets/home/check_list.dart';
 import 'package:orbguard/widgets/home/orb_hero.dart';
 import 'package:orbguard/widgets/home/results_sheet.dart';
+import 'package:orbguard/widgets/scan_credits/premium_sheet.dart';
 
 import '../support/shell_harness.dart';
 
@@ -189,12 +191,13 @@ void main() {
 
     await _press(tester, 'Check now');
 
-    // Signed out, so the gate asks for an account before any check runs.
-    expect(find.byType(LoginScreen), findsOneWidget);
+    // Signed out, so the gate says Premium is needed before any check runs;
+    // a computer has no credits sheet of its own.
+    expect(find.byType(PremiumSheet), findsOneWidget);
     expect(find.text('Checking your Mac.'), findsNothing);
 
     // Turning the gate down runs no check.
-    Navigator.of(tester.element(find.byType(LoginScreen))).pop();
+    Navigator.of(tester.element(find.byType(PremiumSheet))).pop();
     await _settle(tester);
     expect(find.text('Checking your Mac.'), findsNothing);
 

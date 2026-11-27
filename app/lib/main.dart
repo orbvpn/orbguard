@@ -127,6 +127,7 @@ import 'providers/account_provider.dart';
 import 'screens/account/two_factor_resume.dart';
 import 'services/orbnet/magic_link_deep_link.dart';
 import 'providers/scan_credit_provider.dart';
+import 'providers/check_allowance.dart';
 import 'services/ads/rewarded_ad_service.dart';
 import 'services/orbnet/ad_api.dart';
 import 'services/orbnet/scan_credit_api.dart';
@@ -291,6 +292,10 @@ class AntiSpywareApp extends StatelessWidget {
             );
           },
         ),
+        // The free tier's one free check, and the device the paywall is drawn
+        // for. Read by the scan-credit gate (ensureScanCredit).
+        ChangeNotifierProvider(
+            create: (_) => CheckAllowance(platform: hostPlatform())),
         // In-app purchases (subscriptions). The singleton IapService connects to
         // the store, loads the real localized prices, and — on a verified
         // purchase — refreshes the account session so the shared entitlement
@@ -1035,12 +1040,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Scan-credit gate: subscribers scan freely; free users spend one credit
     // (earning more via a rewarded ad). Only checks a person starts are
-    // metered, and never their first: that one is free wherever it starts,
-    // because Home promises "One tap" and an account wall would break it.
-    // Background auto-scans are exempt too. A computer's check is metered
-    // the same way.
-    final bool metered =
-        userInitiated && context.read<LastScanVerdictController>().hasScanned;
+    // metered, and never the device's first: that one is free wherever it
+    // starts, because Home promises "One tap" and an account wall would break
+    // it. The gate keeps that count, so the free one is shared with every
+    // tool and given once. Background auto-scans are exempt too. A
+    // computer's check is metered the same way.
+    final bool metered = userInitiated;
     if (metered && !await ensureScanCredit(_sheetContext)) return;
     if (!mounted) return;
 

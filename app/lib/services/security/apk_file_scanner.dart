@@ -92,21 +92,25 @@ class ApkFileScannerService {
 
   /// Let the user pick APK file(s), then scan them. Returns an empty list when
   /// the user cancels. Never throws.
-  Future<List<ApkScanResult>> pickAndScan() async {
+  Future<List<ApkScanResult>> pickAndScan() async =>
+      scanPaths(await pickApks());
+
+  /// Let the user pick APK file(s). Returns the paths of the .apk files they
+  /// chose, and an empty list when they cancel or chose none. Nothing is
+  /// scanned. Never throws.
+  Future<List<String>> pickApks() async {
     try {
       final picked = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         type: FileType.any,
         withData: false,
       );
-      final paths = picked?.files
+      return picked?.files
               .map((f) => f.path)
               .whereType<String>()
               .where((p) => p.toLowerCase().endsWith('.apk'))
               .toList() ??
           const <String>[];
-      if (paths.isEmpty) return const [];
-      return scanPaths(paths);
     } catch (e) {
       debugPrint('[OrbGuard] APK pick failed: $e');
       return const [];

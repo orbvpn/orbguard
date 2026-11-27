@@ -12,10 +12,13 @@ import 'package:orbguard/presentation/theme/app_theme.dart';
 import 'package:orbguard/presentation/theme/brand.dart';
 import 'package:orbguard/presentation/theme/colors.dart';
 import 'package:orbguard/providers/scam_detection_provider.dart';
+import 'package:orbguard/screens/account/login_screen.dart';
+import 'package:orbguard/services/iap/iap_service.dart';
 import 'package:orbguard/widgets/check/paste_card.dart';
 import 'package:orbguard/widgets/check/paste_verdict.dart';
 
 import '../../support/real_fonts.dart';
+import '../../support/sale_fakes.dart';
 
 ScamAnalysisResult _scam() => ScamAnalysisResult(
       id: '1',
@@ -66,18 +69,21 @@ class _FakeAnalyser {
 void main() {
   setUpAll(loadRealFonts);
 
+  /// [user] is who presses "Check it". Left out, a subscriber, whose checks
+  /// are never counted.
   Future<void> pump(
     WidgetTester tester,
     _FakeAnalyser fake, {
     double width = 390,
     bool dark = true,
+    GateUser? user,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = Size(width, 900);
     addTearDown(tester.view.reset);
     AppColors.uiBrightness = dark ? Brightness.dark : Brightness.light;
     addTearDown(() => AppColors.uiBrightness = Brightness.dark);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget((user ?? GateUser.subscriber()).over(MaterialApp(
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,
@@ -88,7 +94,7 @@ void main() {
           child: PasteCard(analyse: fake.call),
         ),
       ),
-    ));
+    )));
   }
 
   Finder button(String label) => find
@@ -370,6 +376,120 @@ void main() {
 
       expect(find.text('Could not check this'), findsOneWidget);
       expect(find.text('No signs of a scam found'), findsNothing);
+    });
+  });
+
+  group('what a check costs', () {
+    setUp(() => IapService.instance.debugSeed(available: false, products: []));
+
+    Future<void> check(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pump();
+      await tester.tap(find.text('Check it'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    testWidgets('the first check on the device is free', (tester) async {
+      final _FakeAnalyser fake = _FakeAnalyser();
+      final GateUser user = GateUser(freeCheckUsed: false);
+      await pump(tester, fake, user: user);
+
+      await check(tester, 'See you at six');
+
+      expect(fake.asked, ['See you at six']);
+      expect(find.byType(LoginScreen), findsNothing);
+      expect(user.spent, 0);
+      fake.answer(_clean());
+      await tester.pump();
+      await tester.pump();
+    });
+
+    testWidgets(
+        'after it, signed out: sign-in is asked for and nothing is checked',
+        (tester) async {
+      final _FakeAnalyser fake = _FakeAnalyser();
+      await pump(tester, fake, user: GateUser());
+
+      await check(tester, 'See you at six');
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(fake.asked, isEmpty);
+      expect(find.text('Checking this message'), findsNothing);
+
+      // Closed without signing in: the card is as it was, ready to try.
+      Navigator.of(tester.element(find.byType(LoginScreen))).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(fake.asked, isEmpty);
+      expect(find.text('Check it'), findsOneWidget);
+    });
+
+    testWidgets('signed in: each check spends one credit', (tester) async {
+      final _FakeAnalyser fake = _FakeAnalyser();
+      final GateUser user = GateUser(signedIn: true, credits: 2);
+      await pump(tester, fake, user: user);
+
+      await check(tester, 'See you at six');
+      expect(fake.asked, hasLength(1));
+      expect(user.sale.api.balance, 1);
+      fake.answer(_clean());
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Check something else'));
+      await tester.pump();
+      await check(tester, 'example.com/login');
+      expect(fake.asked, hasLength(2));
+      expect(user.sale.api.balance, 0);
+      fake.answer(_clean());
+      await tester.pump();
+      await tester.pump();
+    });
+
+    testWidgets('a check that got no answer is not paid for twice',
+        (tester) async {
+      final _FakeAnalyser fake = _FakeAnalyser();
+      final GateUser user = GateUser(signedIn: true, credits: 2);
+      await pump(tester, fake, user: user);
+
+      await check(tester, 'See you at six');
+      fake.answer(null);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Could not check this'), findsOneWidget);
+
+      await tester.tap(find.text('Try again'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(fake.asked, hasLength(2));
+      expect(user.sale.api.balance, 1); // one credit, two tries
+
+      // Once it answers, the next check is a new one.
+      fake.answer(_clean());
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(find.text('Check something else'));
+      await tester.pump();
+      await check(tester, 'example.com/login');
+      expect(user.sale.api.balance, 0);
+      fake.answer(_clean());
+      await tester.pump();
+      await tester.pump();
+    });
+
+    testWidgets('the server cannot be reached: it says so, nothing is checked',
+        (tester) async {
+      final _FakeAnalyser fake = _FakeAnalyser();
+      final GateUser user = GateUser(signedIn: true, credits: 2)
+        ..sale.api.consumeError = Exception('down');
+      await pump(tester, fake, user: user);
+
+      await check(tester, 'See you at six');
+
+      expect(fake.asked, isEmpty);
+      expect(
+          find.text('Something went wrong. Please try again.'), findsOneWidget);
     });
   });
 

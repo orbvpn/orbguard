@@ -11,6 +11,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/sms_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../widgets/sms/sms_widgets.dart';
 
 /// SMS detail screen
@@ -60,6 +61,9 @@ class _SmsDetailScreenState extends State<SmsDetailScreen> {
   }
 
   Future<void> _analyzeMessage() async {
+    // A check a person starts: the scan-credit gate decides.
+    if (!await ensureScanCredit(context)) return;
+    if (!mounted) return;
     setState(() {
       _isAnalyzing = true;
     });

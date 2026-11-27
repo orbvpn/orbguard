@@ -13,6 +13,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/darkweb_provider.dart';
 import '../../widgets/darkweb/darkweb_widgets.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class DarkWebScreen extends StatefulWidget {
   const DarkWebScreen({super.key, this.title = 'Dark Web Monitor'});
@@ -38,7 +39,7 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           // Issue 2: screen-level action icon lives in the header pill.
           actions: [
             GestureDetector(
-              onTap: () => context.read<DarkWebProvider>().refreshAssets(),
+              onTap: () => _checkWatchedAgain(context),
               child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
             ),
           ],
@@ -99,7 +100,9 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           ),
           const SizedBox(height: 16),
           EmailCheckInput(
-            onCheck: (email) => provider.checkEmail(email),
+            // A lookup a person starts: the scan-credit gate decides first.
+            onCheck: (email) =>
+                runGatedCheck(context, () => provider.checkEmail(email)),
             isChecking: provider.isCheckingEmail,
           ),
           // Result
@@ -174,7 +177,8 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
           ),
           const SizedBox(height: 16),
           PasswordCheckInput(
-            onCheck: (password) => provider.checkPassword(password),
+            onCheck: (password) =>
+                runGatedCheck(context, () => provider.checkPassword(password)),
             isChecking: provider.isCheckingPassword,
           ),
           // Result
@@ -441,6 +445,16 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
     );
   }
 
+  /// Looks up every watched address again. With none watched there is
+  /// nothing to look up, and nothing to pay for.
+  void _checkWatchedAgain(BuildContext context) {
+    final DarkWebProvider watch = context.read<DarkWebProvider>();
+    final bool any =
+        watch.assets.any((a) => a.isMonitoring && a.type == AssetType.email);
+    if (!any) return;
+    runGatedCheck(context, watch.refreshAssets);
+  }
+
   void _showAddAssetSheet(BuildContext context, {AssetType? preselectedType}) {
     final cs = Theme.of(context).colorScheme;
     final provider = context.read<DarkWebProvider>();
@@ -544,12 +558,18 @@ class _DarkWebScreenState extends State<DarkWebScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    if (controller.text.isNotEmpty) {
-                      final success =
-                          await provider.addAsset(selectedType, controller.text);
-                      if (success && context.mounted) {
-                        Navigator.pop(context);
-                      }
+                    final String value = controller.text;
+                    if (value.isEmpty) return;
+                    // An address is checked for breaches the moment it is
+                    // added, so adding one is a check. One already watched
+                    // is not checked again, and is not paid for.
+                    final bool checksNow = selectedType == AssetType.email &&
+                        !provider.assets.any(
+                            (a) => a.type == selectedType && a.value == value);
+                    if (checksNow && !await ensureScanCredit(context)) return;
+                    final success = await provider.addAsset(selectedType, value);
+                    if (success && context.mounted) {
+                      Navigator.pop(context);
                     }
                   },
                   style: ElevatedButton.styleFrom(

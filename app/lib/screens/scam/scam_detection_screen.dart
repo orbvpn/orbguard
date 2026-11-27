@@ -15,6 +15,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/scam_detection_provider.dart';
 import '../../utils/platform_info.dart';
 import '../../widgets/scam/iphone_scam_guards_card.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class ScamDetectionScreen extends StatefulWidget {
   const ScamDetectionScreen({super.key, this.title = 'Scam Detection'});
@@ -443,22 +444,29 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
     return '$bytes B';
   }
 
-  void _analyze(ScamDetectionProvider provider) {
+  Future<void> _analyze(ScamDetectionProvider provider) async {
+    // With nothing to judge there is no check, and nothing to pay for.
+    final bool hasInput = switch (_selectedType) {
+      ScamContentType.text => _textController.text.isNotEmpty,
+      ScamContentType.url => _urlController.text.isNotEmpty,
+      ScamContentType.phone => _phoneController.text.isNotEmpty,
+      ScamContentType.image ||
+      ScamContentType.voice =>
+        _pickedMediaFile?.bytes?.isNotEmpty ?? false,
+    };
+    if (!hasInput) return;
+    // A check a person starts: the scan-credit gate decides first.
+    if (!await ensureScanCredit(context) || !mounted) return;
+
     switch (_selectedType) {
       case ScamContentType.text:
-        if (_textController.text.isNotEmpty) {
-          provider.analyzeText(_textController.text);
-        }
+        provider.analyzeText(_textController.text);
         break;
       case ScamContentType.url:
-        if (_urlController.text.isNotEmpty) {
-          provider.analyzeUrl(_urlController.text);
-        }
+        provider.analyzeUrl(_urlController.text);
         break;
       case ScamContentType.phone:
-        if (_phoneController.text.isNotEmpty) {
-          provider.checkPhone(_phoneController.text);
-        }
+        provider.checkPhone(_phoneController.text);
         break;
       case ScamContentType.image:
       case ScamContentType.voice:

@@ -18,6 +18,7 @@ import 'package:orbguard/permissions/special_permissions_manager.dart';
 import 'package:orbguard/presentation/theme/app_theme.dart';
 import 'package:orbguard/presentation/theme/colors.dart';
 import 'package:orbguard/providers/account_provider.dart';
+import 'package:orbguard/providers/check_allowance.dart';
 import 'package:orbguard/providers/darkweb_provider.dart';
 import 'package:orbguard/providers/desktop_security_provider.dart';
 import 'package:orbguard/providers/network_firewall_provider.dart';
@@ -240,6 +241,9 @@ Future<ShellUnderTest> mountShell(
       ChangeNotifierProvider<AccountProvider>.value(value: account),
       ChangeNotifierProvider<ScanCreditProvider>.value(value: sale.provider),
       ChangeNotifierProvider<IapService>.value(value: IapService.instance),
+      // The real allowance, over the same stored values: the free check is
+      // there until a check is on record or one was let through.
+      ChangeNotifierProvider(create: (_) => CheckAllowance(platform: platform)),
       ChangeNotifierProvider<DarkWebProvider>.value(value: darkWeb),
       ChangeNotifierProvider(create: (_) => NetworkFirewallProvider()),
       ChangeNotifierProvider(create: (_) => SmsProvider()),

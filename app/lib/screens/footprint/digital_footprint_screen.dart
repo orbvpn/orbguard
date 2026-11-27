@@ -13,6 +13,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/sheet_panel.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/digital_footprint_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class DigitalFootprintScreen extends StatefulWidget {
   const DigitalFootprintScreen({super.key});
@@ -559,13 +560,15 @@ class _DigitalFootprintScreenState extends State<DigitalFootprintScreen> {
     );
   }
 
-  void _startScan(DigitalFootprintProvider provider) {
+  Future<void> _startScan(DigitalFootprintProvider provider) async {
     if (_emailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter an email address')),
       );
       return;
     }
+    // A check a person starts: the scan-credit gate decides.
+    if (!await ensureScanCredit(context)) return;
 
     final nameParts = _nameController.text.split(' ');
     provider.scan(

@@ -13,6 +13,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:orbguard/presentation/theme/app_theme.dart';
 import 'package:orbguard/presentation/theme/colors.dart';
 import 'package:orbguard/providers/account_provider.dart';
+import 'package:orbguard/providers/check_allowance.dart';
 import 'package:orbguard/providers/scan_credit_provider.dart';
 import 'package:orbguard/services/ads/rewarded_ad_service.dart';
 import 'package:orbguard/services/iap/iap_service.dart';
@@ -39,11 +40,25 @@ class FakeSaleAccount extends AccountProvider {
   String? name;
   String? mail;
 
-  void signIn({String? name, String? email}) {
+  void signIn({String? name, String? email, bool? premium}) {
     _loggedIn = true;
     if (name != null) this.name = name;
     if (email != null) mail = email;
+    if (premium != null) this.premium = premium;
     notifyListeners();
+  }
+
+  /// What asking the server for the plan again does. Left out, it answers
+  /// that it could not ask.
+  Future<bool> Function()? onRefreshEntitlement;
+  int entitlementRefreshes = 0;
+
+  @override
+  Future<bool> refreshEntitlement() async {
+    entitlementRefreshes++;
+    final bool ok = await (onRefreshEntitlement?.call() ?? Future.value(false));
+    notifyListeners();
+    return ok;
   }
 
   @override
@@ -70,10 +85,40 @@ class FakeSaleAccount extends AccountProvider {
   Future<List<PasskeyInfo>> listPasskeys() async => const [];
 }
 
+/// The free check, kept in memory. [used] says whether it is gone; it is by
+/// default, since most tests are about what a check costs after it.
+class FakeAllowance extends CheckAllowance {
+  FakeAllowance({
+    super.platform = TargetPlatform.android,
+    this.used = true,
+  });
+
+  bool used;
+
+  @override
+  Future<bool> freeCheckUsed() async => used;
+
+  @override
+  Future<void> useFreeCheck() async {
+    if (used) return;
+    used = true;
+    notifyListeners();
+  }
+}
+
 class FakeScanCreditApi implements ScanCreditApi {
   FakeScanCreditApi(this.balance);
   double balance;
   Object? error;
+
+  /// Thrown by [consume] when set: the server could not be reached.
+  Object? consumeError;
+
+  /// How many times a credit was asked for, spent or not.
+  int consumeCalls = 0;
+
+  /// When set, [consume] waits for it: the server is taking its time.
+  Completer<void>? consumeHold;
 
   @override
   Future<double> getBalance() async {
@@ -84,6 +129,10 @@ class FakeScanCreditApi implements ScanCreditApi {
 
   @override
   Future<double> consume({int amount = 1}) async {
+    consumeCalls++;
+    await consumeHold?.future;
+    final Object? e = consumeError;
+    if (e != null) throw e;
     if (balance < amount) throw InsufficientScanCreditsException();
     balance -= amount;
     return balance;
@@ -161,8 +210,47 @@ class SaleCredits {
   late final ScanCreditProvider provider;
 }
 
+/// One person as the scan gate sees them: their account, their credits, and
+/// whether this device's free check is gone. Tests about a tool put
+/// [providers] above it.
+class GateUser {
+  GateUser({
+    bool signedIn = false,
+    bool premium = false,
+    double credits = 0,
+    bool freeCheckUsed = true,
+    TargetPlatform? platform = TargetPlatform.android,
+  })  : account = FakeSaleAccount(loggedIn: signedIn, premium: premium),
+        allowance = FakeAllowance(platform: platform, used: freeCheckUsed) {
+    sale = SaleCredits(account: account, balance: credits);
+  }
+
+  /// A subscriber: every check runs and nothing is counted.
+  GateUser.subscriber() : this(signedIn: true, premium: true);
+
+  final FakeSaleAccount account;
+  final FakeAllowance allowance;
+  late final SaleCredits sale;
+
+  /// How many credits were spent.
+  int get spent => sale.api.consumeCalls;
+
+  List<SingleChildWidget> get providers => [
+        ChangeNotifierProvider<AccountProvider>.value(value: account),
+        ChangeNotifierProvider<ScanCreditProvider>.value(value: sale.provider),
+        ChangeNotifierProvider<IapService>.value(value: IapService.instance),
+        ChangeNotifierProvider<CheckAllowance>.value(value: allowance),
+      ];
+
+  /// [child] with this person above it.
+  Widget over(Widget child) =>
+      MultiProvider(providers: providers, child: child);
+}
+
 /// Wraps [child] the way the app does: the account, the credits, the store,
-/// a theme, and a screen [width] wide.
+/// a theme, and a screen [width] wide. [allowance] is the free check and the
+/// device the paywall is drawn for; left out, an Android phone whose free
+/// check is gone.
 Future<void> pumpSale(
   WidgetTester tester, {
   required AccountProvider account,
@@ -171,6 +259,7 @@ Future<void> pumpSale(
   double width = 390,
   double height = 844,
   bool dark = true,
+  CheckAllowance? allowance,
   List<SingleChildWidget> extra = const [],
 }) async {
   AppColors.uiBrightness = dark ? Brightness.dark : Brightness.light;
@@ -184,6 +273,8 @@ Future<void> pumpSale(
         ChangeNotifierProvider<AccountProvider>.value(value: account),
         ChangeNotifierProvider<ScanCreditProvider>.value(value: credits),
         ChangeNotifierProvider<IapService>.value(value: IapService.instance),
+        ChangeNotifierProvider<CheckAllowance>.value(
+            value: allowance ?? FakeAllowance()),
         ...extra,
       ],
       child: MaterialApp(

@@ -13,6 +13,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/network_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../widgets/network/network_widgets.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 /// Well-known public resolvers with built-in malware/phishing blocking that
 /// users can configure as OS-level Private DNS. These are third-party
@@ -92,8 +93,10 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           actions: [
             GestureDetector(
               onTap: () {
+                // Reading which network this is costs nothing. Scanning is a
+                // check a person starts, so the scan-credit gate decides.
                 provider.refreshNetworkInfo();
-                provider.scanNetworks();
+                runGatedCheck(context, provider.scanNetworks);
               },
               child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
             ),
@@ -142,7 +145,7 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           // Current network
           CurrentNetworkCard(
             network: provider.currentNetwork,
-            onScan: () => provider.scanNetworks(),
+            onScan: () => runGatedCheck(context, provider.scanNetworks),
           ),
           // Threats
           if (provider.activeThreats.isNotEmpty) ...[
@@ -171,7 +174,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: provider.isScanning ? null : () => provider.scanNetworks(),
+              onPressed: provider.isScanning
+                  ? null
+                  : () => runGatedCheck(context, provider.scanNetworks),
               icon: provider.isScanning
                   ? const SizedBox(
                       width: 18,
@@ -605,8 +610,9 @@ class _NetworkSecurityScreenState extends State<NetworkSecurityScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed:
-                  provider.isCheckingDns ? null : () => provider.runDnsCheck(),
+              onPressed: provider.isCheckingDns
+                  ? null
+                  : () => runGatedCheck(context, provider.runDnsCheck),
               icon: provider.isCheckingDns
                   ? const SizedBox(
                       width: 18,

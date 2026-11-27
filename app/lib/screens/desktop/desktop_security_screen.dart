@@ -19,6 +19,7 @@ import '../../providers/desktop_security_provider.dart';
 import '../../services/security/desktop_firewall_enforcer.dart';
 import '../../services/security/desktop_scan_config.dart';
 import '../../services/api/orbguard_api_client.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class DesktopSecurityScreen extends StatefulWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -78,8 +79,14 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         if (!mounted) return;
         context.read<DesktopSecurityProvider>().init();
         // Auto-scan on startup when enabled (Desktop Scanner settings).
+        // Only a subscriber's checks are unlimited, so only theirs start on
+        // their own; anyone else starts one with the button, through the
+        // scan-credit gate.
         final cfg = await DesktopScanConfig.load();
-        if (cfg.autoScanOnStartup && mounted && !_isScanning) {
+        if (cfg.autoScanOnStartup &&
+            mounted &&
+            !_isScanning &&
+            checksAreUnlimited(context)) {
           _runScan();
         }
       });
@@ -213,7 +220,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
             ),
             IconButton(
               icon: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
-              onPressed: _isScanning ? null : _runScan,
+              onPressed: _isScanning ? null : _startScan,
               tooltip: 'Refresh',
             ),
           ],
@@ -278,7 +285,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
 
                   return GlassCard(
                     margin: EdgeInsets.zero,
-                    onTap: (_isScanning || provider.isScanning) ? null : _runScan,
+                    onTap: (_isScanning || provider.isScanning) ? null : _startScan,
                     tintColor: (_isScanning || provider.isScanning) ? GlassTheme.primaryAccent : null,
                     child: Column(
                       children: [
@@ -338,7 +345,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
               )
             : GlassCard(
                 margin: EdgeInsets.zero,
-                onTap: _isScanning ? null : _runScan,
+                onTap: _isScanning ? null : _startScan,
                 tintColor: _isScanning ? GlassTheme.primaryAccent : null,
                 child: Row(
                   children: [
@@ -600,7 +607,8 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
                 margin: EdgeInsets.zero,
                 onTap: provider.isVerifyingCodeSigning
                     ? null
-                    : () => provider.verifyLocalCodeSigning(),
+                    : () => runGatedCheck(
+                        context, provider.verifyLocalCodeSigning),
                 child: Row(
                   children: [
                     GlassSvgIconBox(
@@ -2337,6 +2345,13 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
         );
       }
     }
+  }
+
+  /// A scan a person starts: it passes the scan-credit gate first.
+  Future<void> _startScan() async {
+    if (_isScanning) return;
+    if (!await ensureScanCredit(context) || !mounted) return;
+    await _runScan();
   }
 
   Future<void> _runScan() async {

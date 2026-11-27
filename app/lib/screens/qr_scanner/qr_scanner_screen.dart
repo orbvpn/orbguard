@@ -1,5 +1,9 @@
 // QR Scanner Screen
 // Main screen for QR code scanning and security analysis
+//
+// Analyzing a code, read by the camera or typed in, is a check a person
+// starts, so it goes through the scan-credit gate. Opening the screen, the
+// history and the stats cost nothing.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,11 +18,16 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/qr_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../widgets/qr/qr_widgets.dart';
 import '../../models/api/sms_analysis.dart';
 
 class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key});
+  const QrScannerScreen({super.key, this.cameraOnOpen = true});
+
+  /// Whether the camera starts with the screen. Off in tests, which have no
+  /// camera.
+  final bool cameraOnOpen;
 
   @override
   State<QrScannerScreen> createState() => _QrScannerScreenState();
@@ -31,12 +40,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   bool _isFlashOn = false;
   bool _isFrontCamera = false;
 
+  /// A code is being decided on or analyzed. The camera reports the same code
+  /// many times a second: only the first one counts.
+  bool _handling = false;
+
   @override
   void initState() {
     super.initState();
+    if (!widget.cameraOnOpen) return;
     // Start camera after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startCamera();
+      if (mounted) _startCamera();
     });
   }
 
@@ -53,6 +67,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
     setState(() {
       _isCameraActive = true;
+    });
+  }
+
+  /// Turns the camera off and leaves "Start Camera" in its place.
+  void _stopCamera() {
+    _scannerController?.dispose();
+    _scannerController = null;
+    setState(() {
+      _isCameraActive = false;
+      _isFlashOn = false;
     });
   }
 
@@ -77,25 +101,40 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     final barcode = barcodes.first;
     final content = barcode.rawValue;
     if (content == null || content.isEmpty) return;
+    if (_handling) return;
+    _handling = true;
 
-    // Pause scanning while processing
-    _scannerController?.stop();
+    try {
+      // Pause scanning while processing
+      _scannerController?.stop();
 
-    // Haptic feedback
-    HapticFeedback.mediumImpact();
+      // Haptic feedback
+      HapticFeedback.mediumImpact();
 
-    // Process QR code
-    final provider = context.read<QrProvider>();
-    final result = await provider.scanQrCode(
-      content,
-      contentType: _detectContentType(content),
-    );
+      // A code was read: analyzing it is the check, and the gate decides.
+      if (!await ensureScanCredit(context)) {
+        // Not let through. The camera stays off: left on, it would read the
+        // same code again and ask again at once.
+        if (mounted) _stopCamera();
+        return;
+      }
+      if (!mounted) return;
 
-    if (result != null && mounted) {
-      _showResultBottomSheet(result);
-    } else {
-      // Resume scanning if no result
-      _scannerController?.start();
+      // Process QR code
+      final provider = context.read<QrProvider>();
+      final result = await provider.scanQrCode(
+        content,
+        contentType: _detectContentType(content),
+      );
+
+      if (result != null && mounted) {
+        _showResultBottomSheet(result);
+      } else {
+        // Resume scanning if no result
+        _scannerController?.start();
+      }
+    } finally {
+      _handling = false;
     }
   }
 
@@ -264,15 +303,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   void _onManualInput(String content) async {
     if (content.isEmpty) return;
+    if (_handling) return;
+    _handling = true;
 
-    final provider = context.read<QrProvider>();
-    final result = await provider.scanQrCode(
-      content,
-      contentType: _detectContentType(content),
-    );
+    try {
+      if (!await ensureScanCredit(context)) return;
+      if (!mounted) return;
 
-    if (result != null && mounted) {
-      _showResultBottomSheet(result);
+      final provider = context.read<QrProvider>();
+      final result = await provider.scanQrCode(
+        content,
+        contentType: _detectContentType(content),
+      );
+
+      if (result != null && mounted) {
+        _showResultBottomSheet(result);
+      }
+    } finally {
+      _handling = false;
     }
   }
 

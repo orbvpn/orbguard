@@ -11,6 +11,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../models/api/url_reputation.dart';
 import '../../providers/url_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../widgets/url/url_widgets.dart';
 
 /// Main URL protection screen
@@ -55,6 +56,8 @@ class _UrlProtectionScreenState extends State<UrlProtectionScreen> {
   }
 
   Future<void> _checkUrl(String url) async {
+    // A check a person starts: the scan-credit gate decides.
+    if (!await ensureScanCredit(context)) return;
     final result = await _provider.checkUrl(url);
     if (mounted && result != null) {
       setState(() {

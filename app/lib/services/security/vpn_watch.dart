@@ -147,6 +147,18 @@ class VpnWatch extends ChangeNotifier {
     return answer;
   }
 
+  /// The answer the last look gives, without looking again: the same three
+  /// values as [unknownVpnActive], read from [lastStatus]. Null when nothing
+  /// has been looked at yet. It applies no memory rule, since no new scan
+  /// was made to apply one to.
+  Future<bool?> lastAnswer({required bool ownFirewallOn}) async {
+    _lastOwnFirewallOn = ownFirewallOn;
+    await _loadMine();
+    final s = _lastStatus;
+    if (s == null || s.verdict == RerouteVerdict.unavailable) return null;
+    return _uncovered(s, ownFirewallOn: ownFirewallOn);
+  }
+
   // What listeners last heard about, so a listener that asks again does not
   // loop: only a change in the answer or in what was seen notifies.
   String? _heard;

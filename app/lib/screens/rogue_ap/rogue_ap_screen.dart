@@ -10,6 +10,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/rogue_ap_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class RogueAPScreen extends StatefulWidget {
   const RogueAPScreen({super.key});
@@ -25,7 +26,11 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RogueAPProvider>().initialize();
+      // Opening the screen is free. The scan that used to start with it is a
+      // check, so it starts by itself only where checks cost nothing.
+      context
+          .read<RogueAPProvider>()
+          .initialize(scan: checksAreUnlimited(context));
     });
   }
 
@@ -65,7 +70,8 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
               )
             else
               GestureDetector(
-                onTap: () => provider.scanForAPs(),
+                // A check a person starts: the scan-credit gate decides.
+                onTap: () => runGatedCheck(context, provider.scanForAPs),
                 child: DuotoneIcon('refresh', size: 22, color: cs.onSurface),
               ),
             GestureDetector(
@@ -351,6 +357,15 @@ class _RogueAPScreenState extends State<RogueAPScreen> {
             ap.threatLevel == APThreatLevel.dangerous ||
             ap.threatLevel == APThreatLevel.suspicious)
         .toList());
+
+    // Nothing was scanned: no threats listed is not the same as none found.
+    if (provider.stats.lastScan == null && _searchQuery.isEmpty) {
+      return _buildEmptyState(
+        icon: 'radar',
+        title: 'Not scanned yet',
+        subtitle: 'Tap scan to check nearby WiFi networks',
+      );
+    }
 
     if (threats.isEmpty) {
       return _buildEmptyState(
