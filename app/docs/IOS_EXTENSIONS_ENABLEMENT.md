@@ -1,80 +1,122 @@
-# Enabling the three iOS app extensions (post-1.0)
+# iOS app extensions: what ships and why
 
-The 1.0 App Store build ships WITHOUT the three app extensions (excluded in
-commit `1e51ee8`). This is the exact path to shipping each one. Current
-App-ID registry state (verified via the App Store Connect API, 2026-07-23):
+Updated 2026-11-28. The iPhone app embeds three extensions: the widget
+(`OrbGuardWidget`), the Call Directory (`OrbGuardCallDirectory`) and the
+Message Filter (`OrbGuardSmsFilter`). The Content Filter (`OrbGuardFilter`)
+stays out (section 3).
 
-| App ID | Capabilities today | Missing for its extension |
+## App IDs (team 33T4RDL646, read back through the App Store Connect API)
+
+| App ID | Resource id | Capabilities |
 |---|---|---|
-| `com.orb.guard` (main) | IAP, Push, Sign in with Apple | App Groups (to share state with the extensions), Associated Domains (also needed for iOS passkeys) |
-| `com.orb.guard.OrbGuardSmsFilter` | IAP | **Message Filter** (`com.apple.developer.identitylookup.message-filter`) — the capability that blocked the 1.0 archive |
-| `com.orb.guard.OrbGuardCallDirectory` | IAP, App Groups | none — capability-complete |
-| `com.orb.guard.OrbGuardFilter` | IAP, App Groups, Network Extensions | none — capability-complete |
+| `com.orb.guard` | RA23J8DSFL | IAP, Push, Sign in with Apple, App Groups, Access Wi-Fi Information, Associated Domains |
+| `com.orb.guard.OrbGuardWidget` | P93S4963Y9 | IAP, App Groups (App ID created 2026-11-28) |
+| `com.orb.guard.OrbGuardCallDirectory` | FHDD53AKLM | IAP, App Groups |
+| `com.orb.guard.OrbGuardSmsFilter` | QZM36D6BNZ | IAP, App Groups (App Groups added 2026-11-28) |
+| `com.orb.guard.OrbGuardFilter` | B6N8S64CCS | IAP, App Groups, Network Extensions (not shipped) |
 
-## 1. SMS Filter (`OrbGuardSmsFilter`, ILMessageFilterExtension)
+All four shipped bundles carry `group.com.orb.guard.shared` in their
+entitlements. The App Groups **capability** is on all four App IDs, but the
+**group itself** is assigned only to `com.orb.guard` and
+`com.orb.guard.OrbGuardCallDirectory` (their Xcode-managed profiles list it).
+For `OrbGuardWidget` and `OrbGuardSmsFilter` it still has to be assigned,
+once, by a person:
 
-Blocker: the Message Filter capability is NOT exposed in the ASC API's
-capability enum (verified — the API lists 28 types, none is message-filter),
-so it must be enabled manually, once:
+- The public API can enable the capability but has no App Group resource
+  (`settings` reads back `null`).
+- Xcode's automatic provisioning with the API key creates App IDs and
+  profiles, but its group-assignment call answers "Authentication failed"
+  (seen 2026-11-28 on both App IDs, three times; the same build signs once
+  the group is not requested).
+- So: either sign in again in Xcode, Settings, Accounts (the saved session
+  for the team's Apple ID was rejected), after which any
+  `xcodebuild -allowProvisioningUpdates` build assigns it; or in the
+  developer portal open Identifiers, the App ID, App Groups, Configure, tick
+  `group.com.orb.guard.shared`, Continue, Save. Until then a signed archive
+  fails on those two targets with "doesn't support the
+  group.com.orb.guard.shared App Group".
 
-1. **Apple Developer portal** → Certificates, Identifiers & Profiles →
-   Identifiers → `com.orb.guard.OrbGuardSmsFilter` → Edit → enable the
-   **Message Filter** capability → Save.
-   - If the portal list doesn't show it: open `ios/Runner.xcworkspace` in
-     Xcode, select the `OrbGuardSmsFilter` target → Signing & Capabilities →
-     `+ Capability` → **Message Filtering** (with automatic signing signed
-     into team 33T4RDL646, Xcode registers it on the App ID for you).
-2. That's the whole grant — no Apple review/request form is needed for the
-   filter extension itself. (Only the *network* variant, deferring queries to
-   your server via `ILMessageFilterQueryHandling`, requires the associated
-   domain `messagefilter:` entry on top.)
-3. Re-enable the target: `git revert 1e51ee8` (restores the pbxproj
-   dependencies + Embed App Extensions entries; Podfile/pubspec parts of that
-   commit stay — revert only the pbxproj hunk if the others conflict).
-4. Rebuild (`flutter build ipa --release`) — the archive that failed with
-   "Entitlement …identitylookup.message-filter not found" now signs.
-5. QA on a real device: Settings → Messages → Unknown & Junk → enable
-   OrbGuard, then verify filtering of non-contact SMS.
+## 1. Message Filter (`OrbGuardSmsFilter`, ILMessageFilterExtension)
+
+- **No capability or entitlement is needed.** Xcode's own Message Filter
+  Extension template has none, and Apple's capability list (Xcode's cached
+  portal capabilities) has no message-filter entry. The entitlements file
+  used to claim `com.apple.developer.identitylookup.message-filter`, which
+  does not exist; that invented entitlement is what stopped automatic
+  provisioning ("Entitlement ... not found"), not a missing portal switch.
+- **On the device only.** The classifier (links, shorteners, punycode and
+  raw-IP hosts, scam wording, one-time-code shape) decides; when unsure it
+  delivers the text normally. The old network deferral to
+  `/api/v1/sms/analyze` could never work: iOS sends its own JSON with no
+  Authorization header (the API answers 401), guard.orbai.world serves no
+  apple-app-site-association (404), and the extension had no
+  `messagefilter:` associated domain. Message text never leaves the iPhone.
+- **Turning it on (iOS 26):** in Messages, the Filter button at the top
+  right, Manage Filtering, Text Message Filter, then turn on Text Message
+  Filter and OrbGuard. iOS 26 has no Settings path for this. iOS gives the
+  app no way to read whether it is on.
 
 ## 2. Call Directory (`OrbGuardCallDirectory`, CXCallDirectoryProvider)
 
-Capability-complete (CallKit needs no special App-ID capability). The blocker
-is the open install bug (FB 90349: extension fails to install/activate —
-repros on the local simulator; strip-appex was the workaround).
+- **ITMS-90349 root cause:** the Info.plist named the extension point
+  `com.apple.callkitcalldirectory.extension`, which does not exist. The real
+  identifier, as in Xcode's Call Directory Extension template, is
+  `com.apple.callkit.call-directory`. The same wrong value is why the
+  simulator refused to install the app with the appex inside.
+- **Data:** the extension reads `call_directory.json` from the App Group
+  container. The app writes it through the `com.orb.guard/call_directory`
+  channel (`list`, `block`, `unblock`, `status`, `openSettings`). The only
+  numbers in it are ones the person adds in the Scam shield on iPhone; nothing
+  writes caller-ID labels yet.
+- **Turning it on (iOS 26):** Settings, Apps, Phone, Call Blocking &
+  Identification, then OrbGuard. The Scam shield reads the real on/off state
+  (`CXCallDirectoryManager`) and opens that page.
 
-1. Fix the 90349 repro first (attach the appex, run on device, Settings →
-   Phone → Call Blocking & Identification → toggle OrbGuard, watch Console
-   for `callservicesd` errors).
-2. Then include the target in the build (same revert as above) and QA that
-   `CXCallDirectoryManager.reloadExtension` succeeds.
+## Versions
+
+Every extension takes the app's version and build from
+`Flutter/Generated.xcconfig` through its own base xcconfig
+(`OrbGuardWidget.xcconfig`, `OrbGuardCallDirectory.xcconfig`,
+`OrbGuardSmsFilter.xcconfig`): `CFBundleShortVersionString` is
+`$(FLUTTER_BUILD_NAME)` and `CFBundleVersion` is `$(FLUTTER_BUILD_NUMBER)`.
+Hard-coded values (the Call Directory and Message Filter said 1.0.0 / 1.0.0
+while the app was 1.0.0 (11)) fail validation.
+
+## Verified 2026-11-28
+
+- **Simulator (iOS 27.1, arm64 Debug build):** the app installs with all
+  three appexes in `PlugIns` (the Call Directory used to make the install
+  fail), PlugInKit lists `com.orb.guard.OrbGuardCallDirectory` under
+  `com.apple.callkit.call-directory`, `com.orb.guard.OrbGuardSmsFilter` under
+  `com.apple.identitylookup.message-filter` and the widget under
+  `com.apple.widgetkit-extension`, and the app launches to onboarding.
+- **App Store validation:** a signed Release archive as 1.1.0 (12), exported
+  for App Store Connect with the API key, passed
+  `xcrun altool --validate-app` with "VERIFY SUCCEEDED with no errors"; no
+  ITMS-90349. Not uploaded. Because the group is not yet assigned to the
+  Widget and Message Filter App IDs, that archive was made with the group
+  removed from those two entitlements files for the run only; Runner and the
+  Call Directory kept theirs. Every bundle was signed by the existing Apple
+  Distribution certificate, with Xcode-managed App Store profiles.
+- **Not verified:** anything on a real iPhone (iOS actually loading the
+  extensions, a blocked call, a filtered text).
 
 ## 3. Content Filter (`OrbGuardFilter`, NEFilterDataProvider)
 
-Capability-complete (Network Extensions + App Groups already on its App ID).
-The blocker is engineering, not signing: on iOS, `NEFilterDataProvider` only
-runs on **supervised (MDM-managed) devices** — Apple does not allow consumer
-content-filter data providers. The extension is also currently unwired from
-the Flutter layer.
+Not shipped. On iOS, `NEFilterDataProvider` only runs on supervised
+(MDM-managed) devices; Apple does not allow consumer content-filter data
+providers. The target stays in the project, outside Runner's dependencies and
+Embed App Extensions phase.
 
-- For consumer devices the equivalent capability is the DNS-filter approach
-  the Android side already ships. On iOS that would be an
-  `NEDNSProxyProvider`/`NEDNSSettingsManager` design (DNS settings manager IS
-  consumer-usable since iOS 14) — a different extension type, still under the
+- For consumer devices the equivalent is the DNS-filter approach the Android
+  side already ships. On iOS that would be an `NEDNSSettingsManager` design
+  (consumer-usable since iOS 14), a different extension type under the
   Network Extensions capability the App ID already has.
 - Decision needed: target MDM/enterprise (keep NEFilterDataProvider) or
-  consumer DNS filtering (new NEDNSSettings extension). Until then this stays
-  out of the build.
+  consumer DNS filtering. Until then this stays out of the build.
 
-## Shared plumbing when re-enabling (any of the three)
+## Notes
 
-- Add **App Groups** to the main `com.orb.guard` App ID (API-enablable; the
-  extensions already have it) and put the same `group.com.orb.guard` group in
-  the app + extension entitlements, so the app can hand the filter/directory
-  data over.
-- While in the portal, also add **Associated Domains** to `com.orb.guard`
-  (`webcredentials:orbai.world`) — required for iOS passkeys to work with the
-  orbai.world relying party, independent of the extensions.
 - Capability changes invalidate existing provisioning profiles; the next
-  automatic-signing build regenerates them — do NOT toggle capabilities while
-  a build is mid-review.
-- Ship as 1.1: bump `pubspec.yaml` build number, archive, upload, submit.
+  automatic-signing build regenerates them. Do not toggle capabilities while
+  a build is in review.
