@@ -214,8 +214,8 @@ in `docs/flagship-prototype/` (`build.py` writes `orbguard-flagship.html`). Its 
 |----|------|-----|-----|-----|-----|-----|------|--------|
 | 5.1 | The ring and Home: `OrbRing`, the new Home (`OrbHomeScreen`), four tabs, the wide Archivo type, one vocabulary for the six shields | 🟡 | 🔵 | 🟡 | 🟡 | 🟡 | ✅ | 🟡 |
 | 5.2 | Honest checks and the sale: the check inside the ring, true results, the score sheet's fixes, the four points of sale | 🟡 | 🔵 | 🟡 | 🟡 | 🟡 | ✅ | 🟡 |
-| 5.3 | Every screen size: the adaptive shell for foldables and tablets, then the desktop window | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 5.4 | The sell kit: store screenshots, widgets, the share card and the site hero | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 5.3 | Every screen size: the adaptive shell for foldables and tablets, then the desktop window | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 | ✅ | 🟡 |
+| 5.4 | The sell kit: store screenshots, widgets, the share card and the site hero | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 | ✅ | 🟡 |
 
 **5.1 state (2026-11-25).** Built on branch `flagship-phase-1` (off `production-hardening`) and
 committed with 5.2 (see "Landing" below). Its status stays 🟡 because it has run on one platform of
@@ -413,6 +413,68 @@ the ring states, five Homes at 390 by 844, three at 320 by 568 and the real shel
 themes. Home is given the phone it is drawn for, so the never-checked Home says "phone" there, as
 it does on a phone, whatever machine runs the harness.
 
+### 5.3 and 5.4 state (2026-11-28)
+
+Approved by the owner ("start phases 3 and 4") on 2026-11-25 and built on branch
+`flagship-phase-3` (off `b730aef`). **Not committed.** Screenshots of everything below, rendered from
+the running code: https://claude.ai/artifact/PGmiL4YJMo9sXBq4noih3t. `flutter analyze`: no
+issues. `flutter test`: 1016 pass, 40 skipped (render harnesses). Contract gate: PASS, and its own
+tests pass.
+
+**What 5.3 built (every screen size):**
+- `ShellForm` (`lib/presentation/layout/shell_form.dart`) picks one of four forms from the window
+  size, the display features and the platform: phone, split (a foldable open flat, or a tablet),
+  tabletop (a fold half open on a table) and desk (a computer at least 984 wide). Pro mode keeps
+  the phone layout.
+- **Split.** The ring keeps the left pane (`HomeLayout.pane`) and the tab bar stays under it.
+  Today and the shields (`HomeSide`) take the right pane. A shield, a tab and every sheet open in
+  the right pane (`Pane`, `PanePage`, `SheetHost`), so nothing lies across the fold, and the ring
+  marks the open shield. Android back closes the right pane first.
+- **Tabletop.** The ring and its verdict stand in the top half (`HomeLayout.stand`); Today, the
+  shields and the tab bar lie in the bottom half.
+- **Desk.** A sidebar (`DeskSidebar`) in place of the tab bar, a command palette on Cmd K or
+  Ctrl K, Cmd or Ctrl 1 to 4 for the tabs, and sheets as one centred column 480 wide, at most 0.9
+  of the window tall. A Mac window draws its own 40 pt title bar (`DeskTitleBar`) under a clear
+  native one, and its minimum size is 984 by 640, so a Mac window is always this layout
+  (`macos/Runner/MainFlutterWindow.swift`). Windows keeps its own title bar. Only the Mac build
+  shows plans.
+
+**What 5.4 built (the sell kit):**
+- **The share card** (`lib/widgets/home/share_card.dart`). Offered after a check that ran clean
+  today with nothing open, as a Share button beside Done. It sends a picture of the card through
+  the system share sheet (`share_plus`, a new dependency).
+- **iPhone widgets** (`ios/OrbGuardWidget/`): small, medium and two lock screen sizes, fed by the
+  shell through the `com.orb.guard/glance` channel (`lib/services/home/glance.dart`,
+  `ios/Runner/GlanceChannelHandler.swift`) and the App Group `group.com.orb.guard.shared`.
+- **The Mac menu bar ring and popover** (`macos/Runner/GlanceRing.swift`,
+  `GlancePopoverView.swift`, `OrbGuardGlanceChannel.swift`), with Check now.
+- **The site hero** at `/` (`backend/internal/api/site/`). Store buttons appear when
+  `ORBGUARD_STORE_IOS`, `_ANDROID`, `_MAC` or `_WINDOWS` holds an https link.
+- **Store screenshots.** `test/visual/store_render_test.dart` writes five frames for the App Store
+  (1290 by 2796) and Google Play (1080 by 2160) in both themes, each a caption over a real screen
+  of the shell with nobody signed in.
+
+**Fixed while checking the renders (test first where a test applies):** the Mac command key drew
+as an empty box in the keycap and is now the Solar command icon; the privacy sheet named the
+machine the app ran on, not the device it draws for, and now takes the platform like Home does;
+the dot beside a wrapped proof line now stays on its first line.
+
+**Not built or not verified:**
+- Android home screen widgets: started, paused at the weekly agent limit, resumes after 2 December.
+- The six checks on Home for computers. Check on a computer still opens Desktop Security.
+- A tray icon on Windows and Linux.
+- The App ID `com.orb.guard.OrbGuardWidget` with the App Group is not registered on the Apple
+  team yet; the next TestFlight build needs it. The three older iPhone extensions are not embedded.
+- No foldable or tablet run on Android, and no Windows or Linux run. The desk and split forms are
+  covered by widget tests and renders.
+- `flutter build ios --simulator` makes an Intel-only app on this Mac: an ads SDK pod excludes
+  `arm64e`, and Flutter's check matches it as `arm64`. Build with `xcodebuild` and
+  `ARCHS=arm64 EXCLUDED_ARCHS=i386` instead.
+
+**Render harnesses.** `test/visual/wide_render_test.dart` renders the foldable, tabletop, tablet,
+Mac and Windows shells and the share sheet; `test/visual/store_render_test.dart` renders the store
+frames. Both run only when `RENDER_DIR` is set.
+
 ---
 
 ## The honesty guardrails (never ship a claim on this list)
@@ -442,6 +504,7 @@ it does on a phone, whatever machine runs the harness.
 | 2026-11-25 | Flagship phase 2 | **Built**, with the open items of 5.1, after the owner's "fix all and next step please". 5.3 and 5.4 wait for the owner's word |
 | 2026-11-25 | Kit lime ink on light, revised | **`#4A7000` in OrbGuard**, which reverses the row two above. OrbVPN's copy of the kit is not changed |
 | 2026-11-25 | Landing the flagship | **Merged to `production-hardening` and `main`, together with the hardening line that already ran in production** (the owner: "Merge all, hotfixes too"). 5.3 and 5.4 still wait for the owner's word |
+| 2026-11-25 | Flagship phases 3 and 4 | **Approved** (the owner: "start phases 3 and 4"). Built on `flagship-phase-3`, not committed, waiting for the owner's review. Screenshots: https://claude.ai/artifact/PGmiL4YJMo9sXBq4noih3t |
 
 **Strategy dossier (rationale, competitive teardown, psychology):** https://claude.ai/code/artifact/cf12693f-fef4-4781-bf64-d4fe67b3450c
 **Live status dashboard:** https://claude.ai/code/artifact/d3462645-f12c-46ca-a3c2-e1f366cf26f0
