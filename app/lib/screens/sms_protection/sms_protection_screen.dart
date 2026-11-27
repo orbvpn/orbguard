@@ -12,6 +12,7 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../models/api/sms_analysis.dart';
 import '../../providers/sms_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../widgets/sms/sms_widgets.dart';
 import 'sms_detail_screen.dart';
 
@@ -82,6 +83,9 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
   }
 
   Future<void> _analyzeManual(String content, String? sender) async {
+    // A check a person starts: the scan-credit gate decides.
+    if (!await ensureScanCredit(context)) return;
+    if (!mounted) return;
     setState(() {
       _isManualAnalyzing = true;
       _manualAnalysisResult = null;
@@ -236,7 +240,8 @@ class _SmsProtectionScreenState extends State<SmsProtectionScreen> {
                           message: message,
                           onTap: () => _navigateToDetail(message),
                           onAnalyze: message.analysisResult == null
-                              ? () => _provider.analyzeMessage(message.id)
+                              ? () => runGatedCheck(context,
+                                  () => _provider.analyzeMessage(message.id))
                               : null,
                           onBlock: () => _provider.blockSender(message.sender),
                         ),

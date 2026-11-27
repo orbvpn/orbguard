@@ -13,6 +13,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../providers/identity_protection_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../services/security/identity_theft_protection_service.dart';
 
 class IdentityProtectionScreen extends StatefulWidget {
@@ -55,7 +56,8 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
               )
             else
               GestureDetector(
-                onTap: () => provider.scanAllAssets(),
+                // A check a person starts: the scan-credit gate decides.
+                onTap: () => runGatedCheck(context, provider.scanAllAssets),
                 child: DuotoneIcon('refresh', size: 22, color: context.colors.onSurface),
               ),
           ],
@@ -1114,6 +1116,12 @@ class _IdentityProtectionScreenState extends State<IdentityProtectionScreen> {
                     onPressed: selectedType != null &&
                             valueController.text.isNotEmpty
                         ? () async {
+                            // An email is checked as it is added, and that
+                            // check is one the gate decides on.
+                            if (selectedType == AssetType.email &&
+                                !await ensureScanCredit(context)) {
+                              return;
+                            }
                             await provider.addMonitoredAsset(
                               type: selectedType!,
                               value: valueController.text,

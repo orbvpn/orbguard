@@ -14,6 +14,7 @@ import 'package:orbguard/services/security/vpn_proxy_detector.dart';
 import 'package:orbguard/services/security/vpn_watch.dart';
 
 import '../support/real_fonts.dart';
+import '../support/sale_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +76,10 @@ void main() {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 2000);
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: AppTheme.dark, home: screen));
+    // A subscriber: the screen looks as it opens, and looking again costs
+    // nothing. What a look costs everyone else is in tool_gates_test.dart.
+    await tester.pumpWidget(GateUser.subscriber()
+        .over(MaterialApp(theme: AppTheme.dark, home: screen)));
     // Past the checking spinner (it loops, so no pumpAndSettle).
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 50));

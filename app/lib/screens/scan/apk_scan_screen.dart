@@ -11,9 +11,16 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/security/apk_file_scanner.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class ApkScanScreen extends StatefulWidget {
-  const ApkScanScreen({super.key});
+  const ApkScanScreen({super.key, this.pick, this.scan});
+
+  /// Stands in for the file picker, for tests: the .apk paths chosen.
+  final Future<List<String>> Function()? pick;
+
+  /// Stands in for the scanner, for tests.
+  final Future<List<ApkScanResult>> Function(List<String> paths)? scan;
 
   @override
   State<ApkScanScreen> createState() => _ApkScanScreenState();
@@ -26,7 +33,21 @@ class _ApkScanScreenState extends State<ApkScanScreen> {
 
   Future<void> _pickAndScan() async {
     setState(() => _scanning = true);
-    final results = await ApkFileScannerService.instance.pickAndScan();
+    final ApkFileScannerService scanner = ApkFileScannerService.instance;
+    final List<String> paths = await (widget.pick ?? scanner.pickApks)();
+    if (!mounted) return;
+
+    // A file was chosen: now it is a check a person started, and the
+    // scan-credit gate decides. Choosing nothing is not a check.
+    List<ApkScanResult> results = const [];
+    if (paths.isNotEmpty) {
+      if (!await ensureScanCredit(context)) {
+        // Not let through. The screen stays as it was.
+        if (mounted) setState(() => _scanning = false);
+        return;
+      }
+      results = await (widget.scan ?? scanner.scanPaths)(paths);
+    }
     if (!mounted) return;
     setState(() {
       _results = results;

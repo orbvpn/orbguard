@@ -12,6 +12,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../providers/social_media_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../services/security/social_media_monitor_service.dart';
 
 class SocialMediaScreen extends StatefulWidget {
@@ -57,7 +58,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               onTap: () {
                 HapticFeedback.mediumImpact();
                 if (!provider.isScanning) {
-                  provider.scanAllAccounts();
+                  // A check a person starts: the scan-credit gate decides.
+                  runGatedCheck(context, provider.scanAllAccounts);
                 }
               },
               child: DuotoneIcon(
@@ -468,7 +470,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => provider.scanAccount(account.id),
+                onPressed: () => runGatedCheck(
+                    context, () => provider.scanAccount(account.id)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: platformColor, // vendor identity
                   foregroundColor: Colors.white, // vendor identity (on platform fill)
@@ -1197,6 +1200,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     if (username.isEmpty) return;
     FocusScope.of(context).unfocus();
     HapticFeedback.mediumImpact();
+    if (!await ensureScanCredit(context)) return;
     await provider.scanUsername(username);
   }
 

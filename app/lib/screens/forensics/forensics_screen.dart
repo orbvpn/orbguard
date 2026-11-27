@@ -13,6 +13,7 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class ForensicsScreen extends StatefulWidget {
   const ForensicsScreen({super.key, this.title = 'Forensic Analysis'});
@@ -105,9 +106,11 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             title: 'Full Forensic Scan',
             description: 'Comprehensive analysis for all known spyware',
             color: AppColors.accentInk,
+            // Each analysis here is a check a person starts, so each goes
+            // through the scan-credit gate first.
             onTap: provider.isAnalyzing
                 ? null
-                : () => provider.runFullAnalysis(),
+                : () => runGatedCheck(context, provider.runFullAnalysis),
           ),
           const SizedBox(height: 12),
 
@@ -165,7 +168,8 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
               color: AppColors.chartColors[6], // spectrum mint
               onTap: provider.isAnalyzing
                   ? null
-                  : () => provider.captureAndAnalyzeLogcat(),
+                  : () =>
+                      runGatedCheck(context, provider.captureAndAnalyzeLogcat),
             ),
             const SizedBox(height: 12),
             _buildAnalysisButton(
@@ -1024,11 +1028,15 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  if (controller.text.isNotEmpty) {
-                    Navigator.pop(context);
-                    provider.analyzeShutdownLog(controller.text);
-                  }
+                onPressed: () async {
+                  final String log = controller.text;
+                  if (log.isEmpty) return;
+                  // Asked over this sheet, so what was pasted is kept when
+                  // the answer is no.
+                  if (!await ensureScanCredit(context)) return;
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  provider.analyzeShutdownLog(log);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,
@@ -1089,6 +1097,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
       return;
     }
 
+    // A file was chosen and can be read: now it is a check to pay for.
+    if (!context.mounted) return;
+    if (!await ensureScanCredit(context)) return;
     await upload(path);
   }
 
@@ -1142,11 +1153,15 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  if (controller.text.isNotEmpty) {
-                    Navigator.pop(context);
-                    provider.analyzeLogcat(controller.text);
-                  }
+                onPressed: () async {
+                  final String log = controller.text;
+                  if (log.isEmpty) return;
+                  // Asked over this sheet, so what was pasted is kept when
+                  // the answer is no.
+                  if (!await ensureScanCredit(context)) return;
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  provider.analyzeLogcat(log);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GlassTheme.primaryAccent,

@@ -20,6 +20,7 @@ import '../../providers/network_firewall_provider.dart';
 import '../../services/security/vpn_proxy_detector.dart';
 import '../../services/security/vpn_watch.dart';
 import '../../utils/platform_info.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class HiddenVpnProxyScreen extends StatefulWidget {
   const HiddenVpnProxyScreen({
@@ -70,7 +71,30 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
   @override
   void initState() {
     super.initState();
-    _check();
+    // A subscriber's look starts with the screen. For anyone else a new look
+    // is theirs to start, since it is a check to pay for: the screen opens
+    // on what the watch last saw (Home asks the watch by itself, and that is
+    // never counted), or on nothing when it has not looked yet.
+    if (checksAreUnlimited(context)) {
+      _check();
+    } else if (_watch.lastStatus != null) {
+      _showLast();
+    } else {
+      _loading = false;
+    }
+  }
+
+  /// Shows what the watch last saw, without a new look.
+  Future<void> _showLast() async {
+    await _reanswer();
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  /// The button and the pull: a new look, which a person starts.
+  Future<void> _startCheck() async {
+    if (!await ensureScanCredit(context) || !mounted) return;
+    await _check();
   }
 
   bool _firewallOn() {
@@ -91,10 +115,10 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
     setState(() => _loading = false);
   }
 
-  /// Re-reads the answer from the cached scan (no new scan).
+  /// Re-reads the answer from the last look (no new look).
   Future<void> _reanswer() async {
     final firewall = _firewallOn();
-    final unknown = await _watch.unknownVpnActive(ownFirewallOn: firewall);
+    final unknown = await _watch.lastAnswer(ownFirewallOn: firewall);
     await _readAnswer(unknown);
   }
 
@@ -136,9 +160,58 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
   Widget build(BuildContext context) {
     return GlassPage(
       title: 'Hidden VPN & proxy',
-      body: _loading || _status == null
+      body: _loading
           ? _buildLoading(context)
-          : _buildResult(context, _status!),
+          : _status == null
+              ? _buildNotLooked(context)
+              : _buildResult(context, _status!),
+    );
+  }
+
+  /// Nothing has been looked at yet: what the check is, and the one action
+  /// that starts it.
+  Widget _buildNotLooked(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final Color ink = cs.onSurfaceVariant;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        const SizedBox(height: 8),
+        Center(
+          child: Container(
+            width: 104,
+            height: 104,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ink.withAlpha(28),
+              border: Border.all(color: ink.withAlpha(90), width: 2),
+            ),
+            child: Center(
+                child: DuotoneIcon(AppIcons.route, size: 44, color: ink)),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Not checked yet',
+          textAlign: TextAlign.center,
+          style: BrandText.h2(color: cs.onSurface, size: 25),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'This looks for an active VPN tunnel or a system proxy on this '
+          'device.',
+          textAlign: TextAlign.center,
+          style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
+        ),
+        const SizedBox(height: 24),
+        // The one primary action.
+        BrandButton(
+          label: 'Check now',
+          expand: true,
+          onPressed: _startCheck,
+        ),
+      ],
     );
   }
 
@@ -165,7 +238,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
 
     return RefreshIndicator(
       color: AppColors.accentInk,
-      onRefresh: _check,
+      onRefresh: _startCheck,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -250,7 +323,7 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
           BrandButton(
             label: 'Check again',
             expand: true,
-            onPressed: _check,
+            onPressed: _startCheck,
           ),
         ],
       ),

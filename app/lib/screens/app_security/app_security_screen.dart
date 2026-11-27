@@ -12,6 +12,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/victim_safety_notice.dart';
 import '../../providers/app_security_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../widgets/app_security/app_security_widgets.dart';
 
 /// Whether a flagged app reads like covert monitoring / stalkerware, using the
@@ -112,7 +113,8 @@ class _AppsTab extends StatelessWidget {
           child: ScanProgressIndicator(
             progress: provider.scanProgress,
             isScanning: provider.isScanning,
-            onStart: () => provider.scanAllApps(),
+            // A check a person starts: the scan-credit gate decides.
+            onStart: () => runGatedCheck(context, provider.scanAllApps),
           ),
         ),
         // Filter chips
@@ -165,8 +167,8 @@ class _AppsTab extends StatelessWidget {
                               provider.selectApp(app.app.packageName);
                               _showAppDetails(context, provider);
                             },
-                            onAnalyze: () =>
-                                provider.analyzeApp(app.app.packageName),
+                            onAnalyze: () => runGatedCheck(context,
+                                () => provider.analyzeApp(app.app.packageName)),
                           ),
                         );
                       },
@@ -494,9 +496,10 @@ class _AppsTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
+                          if (!await ensureScanCredit(context)) return;
                           provider.analyzeApp(app.app.packageName);
-                          Navigator.pop(context);
+                          if (context.mounted) Navigator.pop(context);
                         },
                         icon: const DuotoneIcon('magnifer',
                             size: 20, color: Brand.onLime),
@@ -969,9 +972,10 @@ class _RisksTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
+                          if (!await ensureScanCredit(context)) return;
                           provider.analyzeApp(app.app.packageName);
-                          Navigator.pop(context);
+                          if (context.mounted) Navigator.pop(context);
                         },
                         icon: const DuotoneIcon('magnifer',
                             size: 20, color: Brand.onLime),

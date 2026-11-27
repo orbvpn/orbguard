@@ -697,6 +697,15 @@ class _QrManualInputState extends State<QrManualInput> {
   final _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // The button is live only with something typed, so it follows the field.
+    _controller.addListener(_onTyped);
+  }
+
+  void _onTyped() => setState(() {});
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();

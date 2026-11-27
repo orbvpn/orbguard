@@ -4,6 +4,10 @@
 /// It calls the same [ScamDetectionProvider.analyzeContent] the Scam shield
 /// screen does, and draws its answer through [PasteVerdict], which adds no
 /// judgement of its own. "Check it" is the Check tab's one lime action.
+///
+/// A check here is one a person starts, so it goes through the scan-credit
+/// gate first. A check that got no answer is not paid for twice: trying
+/// again, or checking something else, rides on what was already paid.
 library;
 
 import 'dart:async';
@@ -18,6 +22,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_rows.dart';
 import '../../providers/scam_detection_provider.dart';
 import '../../utils/device_words.dart';
+import '../scan_credits/scan_gate.dart';
 import 'paste_verdict.dart';
 
 /// Judges what was pasted. Null, or a throw, is no answer.
@@ -72,6 +77,12 @@ class _PasteCardState extends State<PasteCard> {
   bool _slow = false;
   Timer? _slowTimer;
 
+  /// The gate let a check through that has not had an answer yet.
+  bool _paid = false;
+
+  /// The gate is deciding: a second press starts nothing.
+  bool _asking = false;
+
   @override
   void initState() {
     super.initState();
@@ -97,8 +108,19 @@ class _PasteCardState extends State<PasteCard> {
   }
 
   Future<void> _check() async {
-    if (!_hasText || _phase == _Phase.checking) return;
+    if (!_hasText || _phase == _Phase.checking || _asking) return;
     FocusScope.of(context).unfocus();
+    if (!_paid) {
+      _asking = true;
+      final bool go;
+      try {
+        go = await ensureScanCredit(context);
+      } finally {
+        _asking = false;
+      }
+      if (!go || !mounted) return;
+      _paid = true;
+    }
     final String input = _text.text;
     final PasteKind kind = PasteKind.of(input);
     final int run = ++_run;
@@ -128,12 +150,15 @@ class _PasteCardState extends State<PasteCard> {
     }
     if (!mounted || run != _run) return;
     _slowTimer?.cancel();
+    final PasteVerdict verdict = late
+        ? PasteVerdict.late
+        : PasteVerdict.from(result, kind, noun: DeviceWords.noun);
+    // Paid for until it is answered.
+    if (verdict.tone != PasteTone.failed) _paid = false;
     setState(() {
       _phase = _Phase.answered;
       _slow = false;
-      _verdict = late
-          ? PasteVerdict.late
-          : PasteVerdict.from(result, kind, noun: DeviceWords.noun);
+      _verdict = verdict;
     });
   }
 

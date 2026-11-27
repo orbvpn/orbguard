@@ -15,6 +15,7 @@ import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/victim_safety_notice.dart';
 import '../../providers/device_security_provider.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 import '../../services/device_agent/device_admin.dart';
 import '../../services/device_agent/device_agent.dart' show AgentDisplayMessage;
 
@@ -385,7 +386,9 @@ class _DeviceSecurityScreenState extends State<DeviceSecurityScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => context.read<DeviceSecurityProvider>().auditVulnerabilities(),
+            // A check a person starts: the scan-credit gate decides.
+            onPressed: () => runGatedCheck(context,
+                context.read<DeviceSecurityProvider>().auditVulnerabilities),
             child: const Text('Scan'),
           ),
         ],

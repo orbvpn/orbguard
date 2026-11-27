@@ -7,6 +7,11 @@
 //
 // Wiring: the parent Protect hub routes the "Secure call" shield to
 // [SecureCallScreen]. This screen is self-contained (runs [SecureCallCheck]).
+//
+// The check is one a person starts, so it goes through the scan-credit gate.
+// A subscriber's check still starts as the screen opens. Anyone else reads
+// what the check is first and starts it themselves, since it is theirs to
+// spend: opening the screen costs nothing.
 
 import 'package:flutter/material.dart';
 
@@ -14,9 +19,13 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../services/security/secure_call_check.dart';
+import '../../widgets/scan_credits/scan_gate.dart';
 
 class SecureCallScreen extends StatefulWidget {
-  const SecureCallScreen({super.key});
+  const SecureCallScreen({super.key, this.check});
+
+  /// Stands in for [SecureCallCheck.run], for tests.
+  final Future<SecureCallPosture> Function()? check;
 
   @override
   State<SecureCallScreen> createState() => _SecureCallScreenState();
@@ -24,17 +33,24 @@ class SecureCallScreen extends StatefulWidget {
 
 class _SecureCallScreenState extends State<SecureCallScreen> {
   SecureCallPosture? _posture;
-  bool _loading = true;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _run();
+    if (checksAreUnlimited(context)) _run();
+  }
+
+  /// The button: a check a person starts.
+  Future<void> _start() async {
+    if (_loading) return;
+    if (!await ensureScanCredit(context) || !mounted) return;
+    await _run();
   }
 
   Future<void> _run() async {
     setState(() => _loading = true);
-    final posture = await SecureCallCheck().run();
+    final posture = await (widget.check ?? SecureCallCheck().run)();
     if (!mounted) return;
     setState(() {
       _posture = posture;
@@ -44,13 +60,48 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final SecureCallPosture? posture = _posture;
     return GlassPage(
       title: 'Secure call',
-      body: _posture == null
-          ? Center(child: CircularProgressIndicator(color: AppColors.accentInk))
-          : _buildReport(context, _posture!),
+      body: posture != null
+          ? _buildReport(context, posture)
+          : _loading
+              ? Center(
+                  child: CircularProgressIndicator(color: AppColors.accentInk))
+              : _buildIntro(context),
     );
   }
+
+  /// Before any check: what it is, the one action that starts it, and the
+  /// honest part.
+  Widget _buildIntro(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+      children: [
+        const SizedBox(height: 6),
+        _what(cs),
+        const SizedBox(height: 24),
+        // The single lime action on the screen.
+        BrandButton(
+          label: 'Check my device',
+          expand: true,
+          onPressed: _start,
+        ),
+        const SizedBox(height: 28),
+        _honestPart(cs),
+      ],
+    );
+  }
+
+  /// Honest one-liner: we check the DEVICE, not the call.
+  Widget _what(ColorScheme cs) => Text(
+        'This checks your device, not the call itself, for the conditions '
+        'someone would need to listen in.',
+        textAlign: TextAlign.center,
+        style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
+      );
 
   Widget _buildReport(BuildContext context, SecureCallPosture posture) {
     final cs = Theme.of(context).colorScheme;
@@ -63,13 +114,7 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         const SizedBox(height: 6),
-        // Honest one-liner: we check the DEVICE, not the call.
-        Text(
-          'This checks your device, not the call itself, for the conditions '
-          'someone would need to listen in.',
-          textAlign: TextAlign.center,
-          style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
-        ),
+        _what(cs),
         const SizedBox(height: 24),
 
         // ── Verdict hero ────────────────────────────────────────────────
@@ -82,7 +127,7 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
           label: 'Check my device again',
           isLoading: _loading,
           expand: true,
-          onPressed: _loading ? null : _run,
+          onPressed: _loading ? null : _start,
         ),
 
         const SizedBox(height: 28),
@@ -113,42 +158,47 @@ class _SecureCallScreenState extends State<SecureCallScreen> {
 
         const SizedBox(height: 16),
 
-        // ── The honest part ─────────────────────────────────────────────
-        GlassCard(
-          margin: EdgeInsets.zero,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  DuotoneIcon(AppIcons.infoCircle,
-                      size: 18, color: AppColors.secondaryInk),
-                  const SizedBox(width: 8),
-                  Text('THE HONEST PART',
-                      style: BrandText.label(color: AppColors.secondaryInk)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "No app, including OrbGuard, can listen inside WhatsApp, "
-                "Signal, Telegram or a normal phone call, or tell you a "
-                "specific call is being tapped. End-to-end encryption and the "
-                "phone's app sandbox make that impossible.",
-                style: BrandText.body(color: cs.onSurfaceVariant, size: 14),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'What OrbGuard can do is check THIS device for the conditions '
-                'an eavesdropper would need first. That is everything listed '
-                'above.',
-                style: BrandText.body(color: cs.onSurfaceVariant, size: 14),
-              ),
-            ],
-          ),
-        ),
+        _honestPart(cs, listed: true),
       ],
     );
   }
+
+  /// The honest part. [listed] is whether the checks are on screen above it.
+  Widget _honestPart(ColorScheme cs, {bool listed = false}) => GlassCard(
+        margin: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                DuotoneIcon(AppIcons.infoCircle,
+                    size: 18, color: AppColors.secondaryInk),
+                const SizedBox(width: 8),
+                Text('THE HONEST PART',
+                    style: BrandText.label(color: AppColors.secondaryInk)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "No app, including OrbGuard, can listen inside WhatsApp, "
+              "Signal, Telegram or a normal phone call, or tell you a "
+              "specific call is being tapped. End-to-end encryption and the "
+              "phone's app sandbox make that impossible.",
+              style: BrandText.body(color: cs.onSurfaceVariant, size: 14),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              listed
+                  ? 'What OrbGuard can do is check THIS device for the '
+                      'conditions an eavesdropper would need first. That is '
+                      'everything listed above.'
+                  : 'What OrbGuard can do is check THIS device for the '
+                      'conditions an eavesdropper would need first.',
+              style: BrandText.body(color: cs.onSurfaceVariant, size: 14),
+            ),
+          ],
+        ),
+      );
 
   /// Sort actionable findings to the top, unavailable checks to the bottom.
   static int _priority(SecureCallCheckItem i) {

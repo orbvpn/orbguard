@@ -185,14 +185,17 @@ class RogueAPProvider extends ChangeNotifier {
       _detectedAPs.where((a) => a.threatLevel == APThreatLevel.suspicious).toList();
 
   /// Initialize the provider
-  Future<void> initialize() async {
+  /// [scan] false loads the settings and the trusted list and leaves the
+  /// scan to be asked for: a scan is a check, and the scan-credit gate
+  /// decides on those.
+  Future<void> initialize({bool scan = true}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _loadSettings();
       await _loadTrustedAPs();
-      await scanForAPs();
+      if (scan) await scanForAPs();
     } catch (e) {
       _error = 'Failed to initialize rogue AP detection';
       debugPrint('Error initializing: $e');
