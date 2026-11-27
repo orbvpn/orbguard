@@ -11,13 +11,17 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  APP_VERSION: "1.0.0"
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The version comes from app/pubspec.yaml (without the build number),
+      # so the downloads, the .deb and the snap never drift from the app.
+      - name: Read the app version
+        run: echo "APP_VERSION=$(sed -n 's/^version: *\([^+]*\).*/\1/p' app/pubspec.yaml)" >> "$GITHUB_ENV"
 
       - name: Install Linux desktop build deps
         run: |
@@ -62,7 +66,7 @@ jobs:
           cat > $PKG/usr/share/applications/orbguard.desktop <<DESKTOP
           [Desktop Entry]
           Name=OrbGuard
-          Comment=Know if you're being watched — anti-spyware & scam protection
+          Comment=Know if you're being watched. Anti-spyware and scam protection.
           Exec=/opt/orbguard/orbguard %u
           Icon=orbguard
           Terminal=false
@@ -88,7 +92,7 @@ jobs:
           Architecture: amd64
           Depends: libgtk-3-0, libsecret-1-0, libjsoncpp-dev | libjsoncpp25 | libjsoncpp26, libayatana-appindicator3-1 | libappindicator3-1
           Maintainer: OrbVPN <support@orbvpn.com>
-          Description: OrbGuard — anti-spyware, scam shield and anti-theft
+          Description: OrbGuard: anti-spyware, scam shield and anti-theft
            Know if you're being watched. Spyware checks, scam link/QR analysis,
            and device anti-theft, sharing one subscription with OrbVPN.
           CONTROL

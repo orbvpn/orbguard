@@ -1,6 +1,6 @@
 name: orbguard
 description: Anti-spyware defense system
-version: 1.0.0+11
+version: 1.1.0+12
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -122,7 +122,7 @@ msix_config:
   publisher_display_name: ORB GLOBAL LTD
   identity_name: ORBGROUP.OrbGuard
   publisher: CN=2C449207-2B23-4797-AE9D-14ECBABB5966
-  msix_version: 1.0.7.0
+  msix_version: 1.1.0.0
   logo_path: assets/branding/icon_master.png
   # ONLY capabilities the Windows build actually exercises. geolocator_windows
   # is registered (location); nothing on Windows opens a camera or a mic —

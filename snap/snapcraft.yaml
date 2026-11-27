@@ -1,11 +1,13 @@
 name: orbguard
 base: core22
-version: '1.0.0'
-summary: Know if you're being watched — anti-spyware & scam protection
+# Keep in step with app/pubspec.yaml (without the build number);
+# app/tools/test_release_versions.py fails CI when they differ.
+version: '1.1.0'
+summary: Know if you're being watched. Anti-spyware and scam protection.
 description: |
-  OrbGuard checks your device for spyware and stalkerware, analyses scam
-  links and QR codes, and adds anti-theft protection. One subscription is
-  shared with OrbVPN and OrbBrowser (sign in with your Orb account).
+  OrbGuard checks your computer for spyware and stalkerware, analyses scam
+  links, and watches for a hidden VPN or proxy. One subscription is shared
+  with OrbVPN and OrbBrowser (sign in with your Orb account).
 license: Proprietary
 grade: stable
 confinement: strict
@@ -14,17 +16,24 @@ apps:
   orbguard:
     command: orbguard
     extensions: [gnome]
+    # snap/gui/orbguard.desktop (picked up by name) registers orbguard://
+    # so the emailed sign-in link opens the app.
     plugs:
       - network
       - home
-      - camera
       - audio-playback
+      # The sign-in token is kept in the desktop keyring (libsecret).
       - password-manager-service
+      # The computer check reads running processes and network state.
+      # Without these connected those areas say they are not possible here;
+      # nothing is faked.
+      - system-observe
+      - network-observe
 
 parts:
   orbguard:
     # Package the release bundle the workflow already built (flutter build
-    # linux runs before snapcraft in linux-build.yml) — the snapcraft flutter
+    # linux runs before snapcraft in linux-build.yml); the snapcraft flutter
     # plugin's own in-container Flutter rebuild is redundant and crashes.
     plugin: dump
     source: app/build/linux/x64/release/bundle
