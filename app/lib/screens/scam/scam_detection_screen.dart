@@ -13,6 +13,8 @@ import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/scam_detection_provider.dart';
+import '../../utils/platform_info.dart';
+import '../../widgets/scam/iphone_scam_guards_card.dart';
 
 class ScamDetectionScreen extends StatefulWidget {
   const ScamDetectionScreen({super.key, this.title = 'Scam Detection'});
@@ -192,6 +194,13 @@ class _ScamDetectionScreenState extends State<ScamDetectionScreen> {
           if (provider.lastResult != null) ...[
             const SizedBox(height: 24),
             _buildResultCard(provider.lastResult!),
+          ],
+
+          // iPhone: the Messages text filter and the call blocker, which
+          // live in iOS itself and need the person to turn them on.
+          if (PlatformInfo.isIOS) ...[
+            const SizedBox(height: 24),
+            const IphoneScamGuardsCard(),
           ],
         ],
       ),
