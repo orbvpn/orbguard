@@ -28,3 +28,7 @@ parts:
     # plugin's own in-container Flutter rebuild is redundant and crashes.
     plugin: dump
     source: app/build/linux/x64/release/bundle
+    # The tray icon's plugin links AppIndicator; without the library in the
+    # snap the app would not start.
+    stage-packages:
+      - libayatana-appindicator3-1

@@ -22,7 +22,8 @@ jobs:
       - name: Install Linux desktop build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev libjsoncpp-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+          # libayatana-appindicator3-dev: the tray icon (tray_manager).
+          sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev libjsoncpp-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libayatana-appindicator3-dev
 
       - uses: subosito/flutter-action@v2
         with:
@@ -85,7 +86,7 @@ jobs:
           Section: utils
           Priority: optional
           Architecture: amd64
-          Depends: libgtk-3-0, libsecret-1-0, libjsoncpp-dev | libjsoncpp25 | libjsoncpp26
+          Depends: libgtk-3-0, libsecret-1-0, libjsoncpp-dev | libjsoncpp25 | libjsoncpp26, libayatana-appindicator3-1 | libappindicator3-1
           Maintainer: OrbVPN <support@orbvpn.com>
           Description: OrbGuard — anti-spyware, scam shield and anti-theft
            Know if you're being watched. Spyware checks, scam link/QR analysis,
