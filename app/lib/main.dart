@@ -559,6 +559,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final TargetPlatform? _platform = widget.platform ?? hostPlatform();
 
   bool get _onPhone => isPhonePlatform(_platform);
+
+  /// Whether this device can see a VPN tunnel or proxy at all.
+  bool get _seesVpn => _onPhone || _platform == TargetPlatform.macOS;
   bool get _onComputer =>
       _platform == TargetPlatform.macOS ||
       _platform == TargetPlatform.windows ||
@@ -621,9 +624,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         breachedAccounts: () async =>
             context.read<DarkWebProvider>().openBreachedAccounts),
     GuardProbes.hiddenVpn(
-        // A phone can see a tunnel (Android) or a proxy (iPhone). A computer
-        // build cannot see either yet.
-        supported: _onPhone,
+        // A phone can see a tunnel (Android) or a proxy (iPhone); a Mac reads
+        // its own tunnels and system proxy. Windows and Linux cannot yet.
+        supported: _seesVpn,
         unknownVpnActive: _askVpn),
     GuardProbes.secureCall(
         supported: PlatformInfo.isAndroid || PlatformInfo.isIOS),
@@ -742,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// theirs. Null when that cannot be known here. [force] looks again now
   /// instead of answering from the last look.
   Future<bool?> _askVpn({bool force = false}) async {
-    if (!mounted || !_onPhone) return null;
+    if (!mounted || !_seesVpn) return null;
     // Only used where the scan cannot say for itself whether a tunnel is
     // OrbGuard's own firewall.
     final bool firewallOn = _platform == TargetPlatform.android &&
