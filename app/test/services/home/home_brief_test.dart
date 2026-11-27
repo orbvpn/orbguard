@@ -66,6 +66,7 @@ HomeBrief _brief({
       lastScanAt: hasScanned ? _now.subtract(since) : null,
       checksRun: checksRun,
       openThreats: signals.openThreats,
+      minorThreatsOnly: signals.minorThreatsOnly,
       appsToReview: signals.riskyPermissionApps ?? 0,
       breachedAccounts: signals.breachedAccounts ?? 0,
       score: _score(signals),
@@ -79,6 +80,7 @@ HomeBrief _brief({
 PrivacySignals _signals({
   int lastScanScore = 92,
   int openThreats = 0,
+  bool minorThreatsOnly = false,
   int? breachedAccounts = 0,
   int? riskyPermissionApps = 0,
   bool? unknownVpnActive = false,
@@ -87,6 +89,7 @@ PrivacySignals _signals({
       lastScanScore: lastScanScore,
       daysSinceScan: 0,
       openThreats: openThreats,
+      minorThreatsOnly: minorThreatsOnly,
       guardsActive: 8,
       guardsAvailable: 8,
       breachedAccounts: breachedAccounts,
@@ -285,6 +288,18 @@ void main() {
       expect(two.title, 'Your last check found 2 things');
       expect(two.detail, 'See what they are and how to remove them.');
       expect(two.gain, 'Closing it adds 150 to your score');
+    });
+
+    test('a minor finding is something to fix, not to remove', () {
+      final gap = _brief(
+        verdictScore: 87,
+        signals: _signals(
+            lastScanScore: 87, openThreats: 1, minorThreatsOnly: true),
+      ).gaps.single;
+
+      expect(gap.title, 'Your last check found 1 thing');
+      expect(gap.detail, 'See what it is and what to do.');
+      expect(gap.gain, 'Closing it adds 50 to your score');
     });
 
     test('a VPN or proxy nobody confirmed is stated, not accused', () {

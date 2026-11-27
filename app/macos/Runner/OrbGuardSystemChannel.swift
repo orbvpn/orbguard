@@ -278,10 +278,19 @@ enum OrbGuardSystemChannel {
       freeifaddrs(first)
     }
 
+    let store = SCDynamicStoreCreate(nil, "OrbGuard" as CFString, nil, nil)
+    let owners = store.map(vpnOwners) ?? [:]
     var out: [String: Any] = [
-      "tunnels": tunnels.keys.sorted().map { ["name": $0, "addresses": tunnels[$0]!] },
+      "tunnels": tunnels.keys.sorted().map { name -> [String: Any] in
+        var entry: [String: Any] = ["name": name, "addresses": tunnels[name]!]
+        if let owner = owners[name] {
+          entry["owner"] = owner.app
+          if let label = owner.name { entry["ownerName"] = label }
+        }
+        return entry
+      },
     ]
-    if let store = SCDynamicStoreCreate(nil, "OrbGuard" as CFString, nil, nil),
+    if let store = store,
        let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
        let primary = global["PrimaryInterface"] as? String {
       out["primaryInterface"] = primary
@@ -290,6 +299,36 @@ enum OrbGuardSystemChannel {
       out["proxy"] = proxySettings(proxies)
     }
     return out
+  }
+
+  /// The VPN behind each tunnel interface that a VPN configuration on this
+  /// Mac has up: the app the configuration belongs to (its bundle
+  /// identifier, which macOS records for a Network Extension VPN) and the
+  /// name it shows in System Settings. A tunnel no configuration claims is
+  /// left out, so its owner stays unknown.
+  private static func vpnOwners(_ store: SCDynamicStore) -> [String: (app: String, name: String?)] {
+    var owners: [String: (app: String, name: String?)] = [:]
+    for family in ["IPv4", "IPv6"] {
+      let pattern = "State:/Network/Service/[^/]+/\(family)" as CFString
+      guard let keys = SCDynamicStoreCopyKeyList(store, pattern) as? [String] else { continue }
+      for key in keys {
+        let parts = key.split(separator: "/")
+        guard parts.count >= 4 else { continue }
+        let service = String(parts[3])
+        guard let state = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any],
+              let interface = state["InterfaceName"] as? String,
+              owners[interface] == nil,
+              let setup = SCDynamicStoreCopyValue(
+                store, "Setup:/Network/Service/\(service)/Interface" as CFString) as? [String: Any],
+              setup["Type"] as? String == "VPN",
+              let app = setup["SubType"] as? String, !app.isEmpty
+        else { continue }
+        let named = SCDynamicStoreCopyValue(
+          store, "Setup:/Network/Service/\(service)" as CFString) as? [String: Any]
+        owners[interface] = (app: app, name: named?["UserDefinedName"] as? String)
+      }
+    }
+    return owners
   }
 
   private static func numericHost(_ address: UnsafeMutablePointer<sockaddr>) -> String? {

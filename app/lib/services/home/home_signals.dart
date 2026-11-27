@@ -2,7 +2,8 @@
 //
 // A pure function, so the one rule that matters here is covered by a test:
 // a thing found by a check is counted once. A finding about the device itself
-// is spyware to resolve (the Spyware shield, 150 points). A finding about
+// is spyware to resolve (the Spyware shield, 150 points, or 50 when every
+// such finding is minor). A finding about
 // another app is an app to review (Who's watching you, 50 points). Counting
 // one finding under both would open two gaps for one thing and make "closing
 // it adds N" untrue.
@@ -54,10 +55,25 @@ abstract final class HomeSignals {
             ? apps.length
             : null;
 
+    // Findings about the device itself. When the list is kept and each is
+    // low severity (a setting to change, an app with no signature), none is
+    // a sign of spyware, and they cost less.
+    final List<Map<String, dynamic>> aboutDevice = !listKept
+        ? const []
+        : [
+            for (final Map<String, dynamic> f in findings)
+              if (CheckPlan.shieldOf(f) != Shield.watching) f,
+          ];
+    final bool minorOnly = listKept &&
+        aboutDevice.isNotEmpty &&
+        aboutDevice.every((f) => _minorSeverities
+            .contains('${f['severity'] ?? ''}'.toUpperCase()));
+
     return PrivacySignals(
       lastScanScore: verdictScore,
       daysSinceScan: checked ? now.difference(lastScanAt).inDays : null,
       openThreats: threatCount - aboutApps.length,
+      minorThreatsOnly: minorOnly,
       guardsActive: guardsActive,
       guardsAvailable: guardsAvailable,
       breachedAccounts: breachedAccounts,
@@ -68,6 +84,9 @@ abstract final class HomeSignals {
       alertsPossible: alertsPossible,
     );
   }
+
+  /// The severities that mark a finding as minor.
+  static const Set<String> _minorSeverities = {'LOW', 'INFO'};
 
   /// What tells one app from another in a finding: the package it names, or
   /// failing that the finding itself.

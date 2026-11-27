@@ -30,6 +30,11 @@ class PrivacySignals {
   /// in both.
   final int openThreats;
 
+  /// True when every one of [openThreats] is minor: a setting to change or
+  /// something to look at (a low severity finding), not a sign of spyware.
+  /// They then cost [PrivacyScoreEngine] a third of the rule, not all of it.
+  final bool minorThreatsOnly;
+
   /// Guards currently active vs available on THIS platform
   /// (unavailable guards are excluded from both numbers — iOS is never
   /// penalized for what iOS forbids).
@@ -55,6 +60,7 @@ class PrivacySignals {
     this.lastScanScore = -1,
     this.daysSinceScan,
     this.openThreats = 0,
+    this.minorThreatsOnly = false,
     this.guardsActive = 0,
     this.guardsAvailable = 0,
     this.breachedAccounts,
@@ -149,13 +155,16 @@ class PrivacyScore {
 /// A VPN or proxy the person has not confirmed takes 50 off on top.
 ///
 /// One thing found costs one rule, so "closing it adds N" is always true:
-/// spyware costs the 150, apps to review cost the 50, never both.
+/// spyware costs the 150, apps to review cost the 50, never both. When all
+/// a check found on the device is minor (a firewall that is off, apps with no
+/// signature), it costs 50 of the 150, not all of it.
 class PrivacyScoreEngine {
   const PrivacyScoreEngine();
 
   static const int _base = 200;
   static const int _recency = 200;
   static const int _clean = 150;
+  static const int _minor = 50;
   static const int _guards = 250;
   static const int _breach = 100;
   static const int _alerts = 50;
@@ -207,6 +216,13 @@ class PrivacyScoreEngine {
       clean = 0;
     } else if (s.openThreats == 0) {
       clean = _clean;
+    } else if (s.minorThreatsOnly) {
+      clean = _clean - _minor;
+      factors.add(ScoreFactor(
+          id: 'resolve_threats',
+          label:
+              'Fix ${s.openThreats} thing${s.openThreats == 1 ? '' : 's'} your check found',
+          points: _minor));
     } else {
       clean = 0;
       factors.add(ScoreFactor(

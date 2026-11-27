@@ -222,6 +222,26 @@ void main() {
       expect(r.factors.single.points, 150);
     });
 
+    // A firewall that is off, or apps with no signature: something to fix,
+    // not a sign of spyware.
+    test('minor findings cost fifty of the spyware points', () {
+      final PrivacyScore r = engine.compute(const PrivacySignals(
+          daysSinceScan: 1,
+          openThreats: 1,
+          minorThreatsOnly: true,
+          guardsActive: 5,
+          guardsAvailable: 5,
+          breachedAccounts: 0,
+          riskyPermissionApps: 0,
+          notificationsGranted: true));
+
+      expect(r.value, 950);
+      expect(r.rules.firstWhere((x) => x.id == 'clean').earned, 100);
+      expect(r.factors.single.id, 'resolve_threats');
+      expect(r.factors.single.points, 50);
+      expect(r.factors.single.label, 'Fix 1 thing your check found');
+    });
+
     test('an iPhone is given the audit points, and the rule says so', () {
       final PrivacyScore r = engine.compute(const PrivacySignals(
           daysSinceScan: 1,

@@ -19,6 +19,7 @@ import 'package:orbguard/services/security/device_scan_service.dart';
 DesktopPersistenceItem _item(String name,
         {DesktopItemRisk risk = DesktopItemRisk.safe,
         List<String> indicators = const [],
+        String signing = 'Unknown',
         String? path}) =>
     DesktopPersistenceItem(
       id: name,
@@ -27,6 +28,7 @@ DesktopPersistenceItem _item(String name,
       type: 'launchAgent',
       typeDisplayName: 'Launch Agent',
       risk: risk,
+      signingStatus: signing,
       indicators: indicators,
     );
 
@@ -250,6 +252,48 @@ void main() {
       expect(found.single['path'],
           '/Library/LaunchAgents/com.updater.agent.plist');
       expect(run.ends['Startup items'], isNull);
+    });
+
+    // A Mac rates a startup item high for no signature alone, and tools a
+    // person installs (Homebrew services, for one) often have none.
+    test('on a Mac, an item with no signature is medium, not high', () async {
+      final _Run run = await _check(FakeSource(
+        startup: _scan([
+          _item('homebrew.mxcl.postgresql',
+              risk: DesktopItemRisk.high,
+              signing: 'Unsigned',
+              indicators: ['Unsigned binary']),
+          _item('com.changed.agent',
+              risk: DesktopItemRisk.high,
+              signing: 'Invalid',
+              indicators: ['Signature does not check out']),
+          _item('com.known.bad',
+              risk: DesktopItemRisk.critical,
+              signing: 'Unsigned',
+              indicators: ['Unsigned binary', 'Matches known malware: bad']),
+        ]),
+      ));
+
+      expect({
+        for (final f in run.foundBy('Startup items')) f['name']: f['severity']
+      }, {
+        'homebrew.mxcl.postgresql': 'MEDIUM',
+        'com.changed.agent': 'HIGH',
+        'com.known.bad': 'CRITICAL',
+      });
+    });
+
+    test('elsewhere, an item rated high stays high', () async {
+      final _Run run = await _check(
+          FakeSource(
+            startup: _scan([
+              _item('updater.bat',
+                  risk: DesktopItemRisk.high, signing: 'Unsigned'),
+            ]),
+          ),
+          platform: TargetPlatform.windows);
+
+      expect(run.foundBy('Startup items').single['severity'], 'HIGH');
     });
 
     test('a scan that read nothing could not run, it is not clean', () async {

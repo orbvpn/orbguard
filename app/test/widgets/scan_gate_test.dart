@@ -193,7 +193,8 @@ void main() {
       credits.dispose();
     });
 
-    testWidgets('a check Home has on record was the free one', (tester) async {
+    testWidgets('an automatic check on record does not use up the free one',
+        (tester) async {
       SharedPreferences.setMockInitialValues({});
       final verdict = LastScanVerdictController();
       await tester.runAsync(() async {
@@ -211,7 +212,7 @@ void main() {
           verdict: verdict);
 
       expect(result, isTrue);
-      expect(credits.spendCalls, 1); // paid for, not free
+      expect(credits.spendCalls, 0); // the first one a person starts is free
       expect(allowance.used, isTrue); // and remembered as gone
       account.dispose();
       credits.dispose();

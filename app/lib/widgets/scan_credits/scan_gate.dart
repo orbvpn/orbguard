@@ -6,9 +6,9 @@
 // check, an app file, the spyware forensics).
 //
 //   • Premium (subscribed) users check without limit and never see an ad.
-//   • Everyone else gets the device's FIRST check free, whatever kind it is,
-//     and only that one ([CheckAllowance]; a check Home already has on record
-//     counts as it).
+//   • Everyone else gets the FIRST check they start on the device free,
+//     whatever kind it is, and only that one ([CheckAllowance]). Automatic
+//     checks do not use it up.
 //   • After that a check costs one scan credit. Credits belong to the
 //     account, so a signed-out person is asked to sign in first.
 //   • Out of credits, the way on depends on the device:
@@ -34,7 +34,6 @@ import 'package:provider/provider.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/check_allowance.dart';
 import '../../providers/scan_credit_provider.dart';
-import '../../services/home/last_scan_verdict_controller.dart';
 import '../../utils/host_platform.dart';
 import '../sale/login_sheet.dart';
 import 'credits_sheet.dart';
@@ -86,19 +85,14 @@ Future<bool> _decide(
   ScanCreditProvider credits,
 ) async {
   final allowance = context.read<CheckAllowance>();
-  final bool onRecord =
-      Provider.of<LastScanVerdictController?>(context, listen: false)
-              ?.hasScanned ??
-          false;
 
-  // The first check is free, wherever it starts. A check Home already has
-  // on record was it.
-  if (!onRecord && !await allowance.freeCheckUsed()) {
+  // The first check a person starts is free, wherever it starts. Only this
+  // gate counts it: the automatic check after setup and background checks
+  // never pass here, so they do not use it up.
+  if (!await allowance.freeCheckUsed()) {
     await allowance.useFreeCheck();
     return true;
   }
-  // Written down, so clearing Home's record cannot bring it back.
-  if (onRecord) await allowance.useFreeCheck();
   if (!context.mounted) return false;
 
   return isPhonePlatform(allowance.platform)

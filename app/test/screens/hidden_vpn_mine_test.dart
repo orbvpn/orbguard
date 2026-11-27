@@ -28,6 +28,7 @@ void main() {
   late String? proxyHost;
   late bool? metaOwnFirewall;
   late bool? metaOrbVpn;
+  late String? macOwner;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -35,6 +36,7 @@ void main() {
     proxyHost = null;
     metaOwnFirewall = null;
     metaOrbVpn = null;
+    macOwner = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
         case 'scanNetwork':
@@ -68,6 +70,7 @@ void main() {
                 {
                   'name': 'utun4',
                   'addresses': ['10.8.0.2'],
+                  if (macOwner != null) 'owner': macOwner,
                 },
             ],
             'proxy': {if (proxyHost != null) 'https': proxyHost},
@@ -153,6 +156,32 @@ void main() {
     expect(said, isNot(contains('environment variables')));
     // Named as it is written, in a sentence too.
     expect(said, isNot(contains('this mac')));
+  });
+
+  testWidgets('on a Mac, a tunnel OrbVPN brought up is OrbVPN, unasked',
+      (tester) async {
+    tunnel = true;
+    macOwner = 'com.orb.vpn';
+    final w = watchFor(TargetPlatform.macOS);
+    await pump(tester, HiddenVpnProxyScreen(watch: w));
+
+    expect(
+        find.text('The VPN that is active is OrbVPN, so OrbGuard treats it '
+            'as yours.'),
+        findsOneWidget);
+    expect(find.text('This VPN is mine'), findsNothing);
+    expect(await w.unknownVpnActive(ownFirewallOn: false), isFalse);
+  });
+
+  testWidgets("on a Mac, another app's tunnel is still asked about",
+      (tester) async {
+    tunnel = true;
+    macOwner = 'com.wireguard.macos';
+    final w = watchFor(TargetPlatform.macOS);
+    await pump(tester, HiddenVpnProxyScreen(watch: w));
+
+    expect(find.text('This VPN is mine'), findsOneWidget);
+    expect(await w.unknownVpnActive(ownFirewallOn: false), isTrue);
   });
 
   testWidgets('only a proxy active reads "This proxy is mine"', (tester) async {

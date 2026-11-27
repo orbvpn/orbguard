@@ -189,6 +189,70 @@ void main() {
       expect(s.platformLabel, 'This Mac');
     });
 
+    test('a tunnel OrbVPN brought up is known to be OrbVPN', () async {
+      final s = await onMac({
+        'tunnels': [
+          {
+            'name': 'utun4',
+            'addresses': ['10.11.0.1'],
+            'owner': 'com.orb.vpn',
+            'ownerName': 'OrbVPN',
+          },
+        ],
+        'primaryInterface': 'en0',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.activeTunnel, TriState.yes);
+      expect(s.genuineOrbVpnInstalled, isTrue);
+      expect(s.tunnelOwnerIdentifiable, isTrue);
+    });
+
+    test('another app\'s tunnel is a VPN to ask about', () async {
+      final s = await onMac({
+        'tunnels': [
+          {
+            'name': 'utun5',
+            'addresses': ['10.6.0.2'],
+            'owner': 'com.wireguard.macos',
+          },
+        ],
+        'primaryInterface': 'utun5',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.genuineOrbVpnInstalled, isFalse);
+      expect(s.tunnelOwnerIdentifiable, isTrue);
+    });
+
+    test('OrbVPN next to a tunnel nobody claims is not all OrbVPN', () async {
+      final s = await onMac({
+        'tunnels': [
+          {
+            'name': 'utun4',
+            'addresses': ['10.11.0.1'],
+            'owner': 'com.orb.vpn',
+          },
+          {
+            'name': 'utun6',
+            'addresses': ['10.9.0.2'],
+          },
+        ],
+        'primaryInterface': 'utun6',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.genuineOrbVpnInstalled, isFalse);
+      expect(s.tunnelOwnerIdentifiable, isFalse);
+      expect(s.limitations.join(' '), contains('which app'));
+    });
+
+    test('no tunnel says nothing about OrbVPN', () async {
+      final s = await onMac({
+        'tunnels': <Object?>[],
+        'primaryInterface': 'en0',
+        'proxy': <String, Object?>{},
+      });
+      expect(s.genuineOrbVpnInstalled, isNull);
+    });
+
     test('no tunnel and no proxy is clear, and says nothing is unwired',
         () async {
       final s = await onMac({

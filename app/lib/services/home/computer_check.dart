@@ -242,9 +242,16 @@ class ComputerCheck {
             'name': _plain(item.name),
             'description': _plain('${item.typeDisplayName}. '
                 '${item.indicators.isEmpty ? item.risk.description : item.indicators.map(_bare).join(', ')}.'),
+            // On a Mac a startup item rates high for its signature alone.
+            // No signature is common for tools a person installs (Homebrew
+            // services, for one), so it is medium there; a known bad item
+            // is critical, and a broken signature stays high.
             'severity': switch (item.risk) {
               DesktopItemRisk.critical => 'CRITICAL',
-              DesktopItemRisk.high => 'HIGH',
+              DesktopItemRisk.high
+                  when !(platform == TargetPlatform.macOS &&
+                      item.signingStatus == 'Unsigned') =>
+                'HIGH',
               _ => 'MEDIUM',
             },
             'type': 'desktop_startup',

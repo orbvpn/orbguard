@@ -48,8 +48,14 @@ void main() {
     'App malware scan',
   ];
 
-  Map<String, dynamic> finding(String stage, {String? app, String id = 'x'}) =>
-      {'id': id, 'stage': stage, if (app != null) 'path': app};
+  Map<String, dynamic> finding(String stage,
+          {String? app, String id = 'x', String? severity}) =>
+      {
+        'id': id,
+        'stage': stage,
+        if (app != null) 'path': app,
+        if (severity != null) 'severity': severity,
+      };
 
   test('before any check nothing is known about the device or its apps', () {
     final PrivacySignals s = gather();
@@ -91,6 +97,44 @@ void main() {
 
     expect(s.openThreats, 1);
     expect(s.riskyPermissionApps, 0);
+  });
+
+  test('a device finding that is low severity is minor', () {
+    final PrivacySignals s = gather(
+      lastScanAt: now,
+      threatCount: 1,
+      findings: [finding('File system', severity: 'LOW')],
+      stagesRan: allEleven,
+    );
+
+    expect(s.openThreats, 1);
+    expect(s.minorThreatsOnly, isTrue);
+  });
+
+  test('one finding above low makes none of them minor', () {
+    final PrivacySignals s = gather(
+      lastScanAt: now,
+      threatCount: 2,
+      findings: [
+        finding('File system', id: 'a', severity: 'LOW'),
+        finding('File system', id: 'b', severity: 'MEDIUM'),
+      ],
+      stagesRan: allEleven,
+    );
+
+    expect(s.openThreats, 2);
+    expect(s.minorThreatsOnly, isFalse);
+  });
+
+  test('a finding with no severity is not minor', () {
+    final PrivacySignals s = gather(
+      lastScanAt: now,
+      threatCount: 1,
+      findings: [finding('File system')],
+      stagesRan: allEleven,
+    );
+
+    expect(s.minorThreatsOnly, isFalse);
   });
 
   test('a finding about another app is an app to review, and not spyware', () {

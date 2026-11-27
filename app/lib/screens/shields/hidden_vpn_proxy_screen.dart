@@ -364,9 +364,13 @@ class _HiddenVpnProxyScreenState extends State<HiddenVpnProxyScreen> {
       return [
         const SizedBox(height: 14),
         Text(
-            'A VPN is active. OrbVPN is installed on this phone, so OrbGuard '
-            'treats it as yours. Android does not tell any app which app runs '
-            'a VPN.',
+            // A Mac names the app behind each tunnel; Android does not.
+            s.tunnelOwnerIdentifiable
+                ? 'The VPN that is active is OrbVPN, so OrbGuard treats it '
+                    'as yours.'
+                : 'A VPN is active. OrbVPN is installed on this phone, so '
+                    'OrbGuard treats it as yours. Android does not tell any '
+                    'app which app runs a VPN.',
             textAlign: TextAlign.center,
             style: line),
       ];

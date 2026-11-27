@@ -68,6 +68,7 @@ class HomeReading {
         lastScanAt: verdict.lastScanAt,
         checksRun: verdict.checksRun,
         openThreats: signals.openThreats,
+        minorThreatsOnly: signals.minorThreatsOnly,
         appsToReview: signals.riskyPermissionApps ?? 0,
         breachedAccounts: signals.breachedAccounts ?? 0,
         score: score,

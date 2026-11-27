@@ -105,7 +105,9 @@ Future<void> finishCheck(WidgetTester tester) async {
 ///
 /// [checked] seeds a clean check from two hours ago. [found] seeds a check
 /// from two hours ago that found these things. [autoCheckSpent] says the one
-/// automatic first check already had its turn. [keepFound] is whether the
+/// automatic first check already had its turn. [freeCheckUsed] says the free
+/// check a person starts is gone; left out, it is gone when a check was
+/// seeded, as if that person started it. [keepFound] is whether the
 /// list itself was kept; an install from before it was kept has only the
 /// count.
 ///
@@ -123,6 +125,7 @@ Future<ShellUnderTest> mountShell(
   WidgetTester tester, {
   bool checked = false,
   bool autoCheckSpent = false,
+  bool? freeCheckUsed,
   List<Map<String, dynamic>> found = const [],
   bool keepFound = true,
   TargetPlatform platform = TargetPlatform.android,
@@ -176,6 +179,8 @@ Future<ShellUnderTest> mountShell(
     'onboarding_complete': true,
     'permissions_primed': true,
     if (autoCheckSpent) 'first_check_done': true,
+    if (freeCheckUsed ?? (checked || found.isNotEmpty))
+      CheckAllowance.prefsKey: true,
     // Keeps the scheduled background check out of these tests.
     'auto_scan_last_at': now.millisecondsSinceEpoch,
     if (theme != null) 'app_theme_mode': theme,

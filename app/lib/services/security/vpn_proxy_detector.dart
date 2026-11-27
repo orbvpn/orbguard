@@ -22,8 +22,9 @@
 //   macOS: the same channel's `networkReroute` reads the network interfaces
 //     (getifaddrs: a utun/ipsec/ppp/tun/tap interface up with a routable
 //     address is an active tunnel) and the system proxy settings
-//     (CFNetworkCopySystemProxySettings). Both work in the App Sandbox. macOS
-//     does not say which app owns a tunnel.
+//     (CFNetworkCopySystemProxySettings). Both work in the App Sandbox. The
+//     system configuration store names the app each VPN configuration
+//     belongs to, so a tunnel OrbVPN brought up is recognised as OrbVPN.
 //
 //   Windows/Linux: best effort, the proxy is read from the process
 //     environment (HTTP(S)_PROXY / ALL_PROXY), and a tunnel is not checked,
@@ -128,8 +129,9 @@ class VpnProxyStatus {
   final bool? tunnelIsOwnFirewall;
 
   /// Whether the GENUINE OrbVPN (signing certificate checked natively) is
-  /// installed, from the Android tunnel entry. Null when not known. Unlike
-  /// [orbVpnInstalled], which trusts the package name.
+  /// installed, from the Android tunnel entry. On a Mac, whether every
+  /// tunnel up belongs to OrbVPN's VPN configuration. Null when not known.
+  /// Unlike [orbVpnInstalled], which trusts the package name.
   final bool? genuineOrbVpnInstalled;
 
   const VpnProxyStatus({
@@ -167,6 +169,15 @@ class VpnProxyDetector {
   /// OrbVPN packages are the user's own, trusted VPN — recognised, never
   /// flagged.
   static const String orbVpnPackagePrefix = 'com.orbvpn.';
+
+  /// The Mac app OrbVPN's VPN configuration belongs to.
+  static const String orbVpnMacApp = 'com.orb.vpn';
+
+  /// Whether [app], the owner macOS records for a VPN configuration, is
+  /// OrbVPN. macOS ties a Network Extension VPN to the signed app that
+  /// installed it, so another app cannot claim this identifier.
+  static bool isOrbVpnMacApp(String app) =>
+      app == orbVpnMacApp || app.startsWith(orbVpnPackagePrefix);
 
   /// Well-known consumer VPN packages, so we recognise them even if their
   /// package/app name doesn't literally contain "vpn". This is a recognition
@@ -384,17 +395,35 @@ class VpnProxyDetector {
           proxyHost != null || automatic ? TriState.yes : TriState.no;
     }
 
-    debugPrint('[VPN] Mac: tunnel ${tunnel.name}, proxy ${proxyState.name}');
+    // Whose each tunnel is: macOS records the app a VPN configuration
+    // belongs to. Every tunnel up must be OrbVPN's for the tunnel to count
+    // as OrbVPN; one nobody claims leaves the question open.
+    final List<Object?> owners = [
+      if (tunnels is List)
+        for (final Object? t in tunnels) t is Map ? t['owner'] : null,
+    ];
+    final bool ownersKnown =
+        owners.isNotEmpty && owners.every((o) => o is String && o.isNotEmpty);
+    final bool orbVpnTunnel = tunnel == TriState.yes &&
+        ownersKnown &&
+        owners.every((o) => isOrbVpnMacApp(o! as String)) &&
+        (!routedThroughTunnel ||
+            (tunnels as List).any((t) => t is Map && t['name'] == primary));
+
+    debugPrint('[VPN] Mac: tunnel ${tunnel.name}'
+        '${orbVpnTunnel ? ' (OrbVPN)' : ''}, proxy ${proxyState.name}');
     return VpnProxyStatus(
       verdict: verdictFor(tunnel: tunnel, proxy: proxyState),
       activeTunnel: tunnel,
       systemProxy: proxyState,
       proxyHost: proxyHost,
       installedVpnApps: const [],
-      tunnelOwnerIdentifiable: false,
+      tunnelOwnerIdentifiable: ownersKnown,
+      genuineOrbVpnInstalled: tunnel == TriState.yes ? orbVpnTunnel : null,
       platformLabel: 'This Mac',
       limitations: [
-        'macOS doesn’t tell an app which app owns a VPN tunnel.',
+        if (tunnel == TriState.yes && !ownersKnown)
+          'macOS didn’t say which app this VPN tunnel belongs to.',
         if (proxy is! Map)
           'macOS didn’t let OrbGuard read the proxy settings this time.',
         if (automatic)

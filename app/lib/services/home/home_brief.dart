@@ -208,6 +208,7 @@ class HomeBrief {
     required DateTime? lastScanAt,
     required int? checksRun,
     required int openThreats,
+    bool minorThreatsOnly = false,
     int appsToReview = 0,
     int breachedAccounts = 0,
     required PrivacyScore score,
@@ -218,7 +219,8 @@ class HomeBrief {
   }) {
     final List<HomeGap> gaps = [
       for (final HomeGap gap
-          in _gaps(score, openThreats, appsToReview, breachedAccounts))
+          in _gaps(score, openThreats, appsToReview, breachedAccounts,
+              minorThreatsOnly: minorThreatsOnly))
         // Whose VPN it is is a question, not a finding, and most often the
         // answer is "mine". Until the first check has run Home has one job,
         // to get it run, so the question waits for that check's results.
@@ -325,7 +327,8 @@ class HomeBrief {
   /// than is known: a VPN is "active", not "spying", until they say whose it
   /// is.
   static List<HomeGap> _gaps(PrivacyScore score, int openThreats,
-      int appsToReview, int breachedAccounts) {
+      int appsToReview, int breachedAccounts,
+      {bool minorThreatsOnly = false}) {
     final List<HomeGap> gaps = [];
     for (final ScoreFactor factor in score.factors) {
       for (final Shield shield in Shield.values) {
@@ -334,9 +337,14 @@ class HomeBrief {
           'resolve_threats' => (
               'Your last check found $openThreats '
                   'thing${openThreats == 1 ? '' : 's'}',
-              openThreats == 1
-                  ? 'See what it is and how to remove it.'
-                  : 'See what they are and how to remove them.',
+              // A setting to change is not something to remove.
+              minorThreatsOnly
+                  ? (openThreats == 1
+                      ? 'See what it is and what to do.'
+                      : 'See what they are and what to do.')
+                  : openThreats == 1
+                      ? 'See what it is and how to remove it.'
+                      : 'See what they are and how to remove them.',
             ),
           'review_apps' => (
               'Your last check found $appsToReview '
