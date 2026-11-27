@@ -54,6 +54,17 @@
 				<string>orbguard</string>
 			</array>
 		</dict>
+		<!-- Google sign-in returns to the app through the reversed iOS OAuth
+		     client id (the Mac shares com.orb.guard with the iPhone app). Without
+		     it google_sign_in throws before the sheet opens. -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

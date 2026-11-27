@@ -12,6 +12,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:passkeys/exceptions.dart';
 
 import '../services/device_agent/device_claim_service.dart';
 import '../services/orbnet/auth_repository.dart';
@@ -421,8 +422,15 @@ class AccountProvider extends ChangeNotifier {
       _busy = false;
       notifyListeners();
       return ok;
+    } on PasskeyAuthCancelledException {
+      // Backing out of the passkey sheet is a choice, not a failure.
+      _busy = false;
+      notifyListeners();
+      return false;
     } catch (e) {
-      _error = _friendlyError(e);
+      _error = e is AuthenticatorException
+          ? _passkeyError(e, adding: true)
+          : _friendlyError(e);
       _busy = false;
       notifyListeners();
       return false;
@@ -491,6 +499,11 @@ class AccountProvider extends ChangeNotifier {
       return true;
     } on SocialAuthCancelledException {
       // The user backed out of the native sheet — not an error.
+      _busy = false;
+      notifyListeners();
+      return false;
+    } on PasskeyAuthCancelledException {
+      // Backing out of the passkey sheet is a choice, not a failure.
       _busy = false;
       notifyListeners();
       return false;
@@ -668,6 +681,7 @@ class AccountProvider extends ChangeNotifier {
       }
       return 'Your session has expired. Please sign in again.';
     }
+    if (e is AuthenticatorException) return _passkeyError(e);
     final msg = e.toString().toLowerCase();
     if (msg.contains('exclude') ||
         msg.contains('already registered') ||
@@ -680,6 +694,24 @@ class AccountProvider extends ChangeNotifier {
     }
     return 'Something went wrong. Please try again.';
   }
+
+  /// What a failed passkey ceremony means for the person, in their words.
+  /// The platform reports these before any request reaches the server.
+  static String _passkeyError(AuthenticatorException e,
+          {bool adding = false}) =>
+      switch (e) {
+        NoCredentialsAvailableException() =>
+          'There is no passkey for this account on this device. '
+              'Use email instead.',
+        DeviceNotSupportedException() || PasskeyUnsupportedException() =>
+          adding
+              ? 'This device cannot use passkeys.'
+              : 'This device cannot use passkeys. Use email instead.',
+        ExcludeCredentialsCanNotBeRegisteredException() =>
+          'A passkey for this account already exists on this device.',
+        _ when adding => "Couldn't add a passkey. Try again later.",
+        _ => "Couldn't sign in with a passkey. Use email instead.",
+      };
 
   void _log(String message) {
     if (kDebugMode) debugPrint('[AccountProvider] $message');

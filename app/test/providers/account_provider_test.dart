@@ -17,12 +17,14 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:passkeys/exceptions.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:orbguard/providers/account_provider.dart';
 import 'package:orbguard/services/orbnet/auth_api.dart';
 import 'package:orbguard/services/orbnet/auth_repository.dart';
+import 'package:orbguard/services/orbnet/models/auth_response.dart';
 import 'package:orbguard/services/orbnet/orbnet_api_client.dart';
 import 'package:orbguard/services/orbnet/social_auth_service.dart';
 
@@ -132,6 +134,17 @@ Map<String, dynamic> _oauthEnvelope(String token) => {
         },
       },
     };
+
+/// A repository whose passkey ceremony fails the way the platform reports it.
+class _PasskeyFailingRepository extends AuthRepository {
+  _PasskeyFailingRepository(this.failure)
+      : super(secureStorage: const FlutterSecureStorage());
+
+  final Object failure;
+
+  @override
+  Future<AuthResponse> signInWithPasskey(String email) async => throw failure;
+}
 
 /// Wire a provider whose repository uses [social] instead of the real SDKs.
 AccountProvider _providerWithSocial(SocialAuthService social) {
@@ -309,6 +322,58 @@ void main() {
         provider.lastError, "Couldn't sign in with Google. Try email instead.");
 
     provider.dispose();
+  });
+
+  group('passkey sign-in failures', () {
+    Future<AccountProvider> failWith(Object failure) async {
+      final provider = AccountProvider(
+          authRepository: _PasskeyFailingRepository(failure),
+          enableProactiveRefresh: false);
+      await provider.init();
+      final ok = await provider.loginWithPasskey('user@orbvpn.test');
+      expect(ok, isFalse);
+      expect(provider.isLoggedIn, isFalse);
+      return provider;
+    }
+
+    test('backing out of the passkey sheet is silent', () async {
+      final provider = await failWith(PasskeyAuthCancelledException());
+      expect(provider.lastError, isNull);
+      provider.dispose();
+    });
+
+    test('no passkey on this device says so and offers email', () async {
+      final provider = await failWith(NoCredentialsAvailableException());
+      expect(provider.lastError,
+          'There is no passkey for this account on this device. Use email instead.');
+      provider.dispose();
+    });
+
+    test('a device that cannot use passkeys says so', () async {
+      for (final Object failure in [
+        DeviceNotSupportedException(),
+        PasskeyUnsupportedException(),
+      ]) {
+        final provider = await failWith(failure);
+        expect(provider.lastError,
+            'This device cannot use passkeys. Use email instead.');
+        provider.dispose();
+      }
+    });
+
+    test('any other passkey failure names passkeys, never "Something went wrong"',
+        () async {
+      for (final Object failure in [
+        DomainNotAssociatedException('not associated'),
+        UnhandledAuthenticatorException('x', 'y', null),
+        MissingGoogleSignInException(),
+      ]) {
+        final provider = await failWith(failure);
+        expect(provider.lastError,
+            "Couldn't sign in with a passkey. Use email instead.");
+        provider.dispose();
+      }
+    });
   });
 
   group('two-factor sign-in', () {

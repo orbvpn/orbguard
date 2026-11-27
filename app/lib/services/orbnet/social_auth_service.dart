@@ -14,9 +14,8 @@
 // the user cancels, or the backend rejects the token's audience, the caller
 // gets a truthful failure / cancellation — never a fabricated session.
 
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugPrint, defaultTargetPlatform, visibleForTesting;
 
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -96,9 +95,20 @@ class SocialAuthService {
   // package + SHA-1 within the project. Overridable via --dart-define.
   static const String _defaultServerClientId =
       '568666805173-9ufp2it7gl2dntqehqohi6s4qnmh4hb1.apps.googleusercontent.com';
-  static String get _defaultClientId => Platform.isIOS
-      ? '568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p.apps.googleusercontent.com'
-      : '';
+  static String get _defaultClientId =>
+      defaultClientIdFor(defaultTargetPlatform);
+
+  /// The app's own OAuth client on [platform]. The Mac app shares the iPhone
+  /// app's bundle id (com.orb.guard), so it shares that iOS client; without
+  /// one, google_sign_in on macOS throws before any sheet opens. Android
+  /// resolves its client by package and SHA-1, so it needs none here.
+  @visibleForTesting
+  static String defaultClientIdFor(TargetPlatform platform) =>
+      switch (platform) {
+        TargetPlatform.iOS || TargetPlatform.macOS =>
+          '568666805173-gj5jahjs2tpj3bvvi0i9304343q4082p.apps.googleusercontent.com',
+        _ => '',
+      };
 
   final AuthApi _authApi;
 

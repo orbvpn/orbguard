@@ -6,6 +6,14 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- Passkeys: the shared account's relying party is orbvpn.com, whose
+	     apple-app-site-association lists 33T4RDL646.com.orb.guard under
+	     webcredentials. Without this the Mac's passkey sheet fails before any
+	     request reaches the server. Mirrors ios/Runner/Runner.entitlements. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:orbvpn.com</string>
+	</array>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
