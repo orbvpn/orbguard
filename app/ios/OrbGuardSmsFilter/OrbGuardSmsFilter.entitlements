@@ -2,11 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- IdentityLookup Message Filter capability. REQUIRED for iOS to load and
-	     run this extension. The matching capability must be enabled on the App
-	     ID in the Apple Developer portal and present in the signing profile;
-	     until then the extension builds and ships but iOS will not invoke it. -->
-	<key>com.apple.developer.identitylookup.message-filter</key>
-	<true/>
+	<!-- A Message Filter extension needs no special entitlement: Xcode's own
+	     template has none, and Apple's capability list has no message-filter
+	     capability. This file used to claim
+	     com.apple.developer.identitylookup.message-filter, an entitlement that
+	     does not exist, which is what stopped automatic provisioning.
+
+	     App Groups: the same group as the app and the other extensions, so the
+	     App ID com.orb.guard.OrbGuardSmsFilter carries it. The classifier
+	     reads nothing from the group today. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.orb.guard.shared</string>
+	</array>
 </dict>
 </plist>

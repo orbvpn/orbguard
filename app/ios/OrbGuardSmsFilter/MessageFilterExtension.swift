@@ -1,40 +1,28 @@
 // MessageFilterExtension.swift
-// OrbGuard SMS Filter — real anti-smishing via Apple's IdentityLookup framework.
+// OrbGuard SMS Filter: on-device scam-text sorting via Apple's IdentityLookup.
 // Location: ios/OrbGuardSmsFilter/MessageFilterExtension.swift
 //
 // WHAT THIS IS
-// A real ILMessageFilterExtension. When enabled by the user it lets iOS hand
-// OrbGuard every message from an UNKNOWN sender (not in the user's contacts)
-// and asks us to classify it as .none / .promotion / .transaction / .junk.
+// An ILMessageFilterExtension. Once the person turns it on, iOS hands OrbGuard
+// each SMS, MMS or RCS message from an UNKNOWN sender (not in their contacts,
+// and not someone they have replied to three times or more) and asks for an
+// action: .none (deliver normally), .transaction, .promotion or .junk.
 //
-// TWO-STAGE CLASSIFICATION
-//   1. OFFLINE — a self-contained heuristic (URLs, shorteners, punycode/raw-IP
-//      hosts, urgency/credential/payment/prize/delivery keywords, OTP shape)
-//      returns a decisive action for clear cases with NO network round-trip.
-//   2. NETWORK DEFERRAL — for uncertain cases we call
-//      context.deferQueryRequestToNetwork(). iOS itself performs an HTTPS
-//      request to the URL declared in Info.plist
-//      (ILMessageFilterExtensionNetworkURL = the OrbGuard backend
-//      /api/v1/sms/analyze endpoint) and hands us back the server's response,
-//      which we map to an action in handle(_:context:completion:).
+// ON THE DEVICE ONLY
+// A self-contained heuristic (URLs, shorteners, punycode or raw-IP hosts,
+// urgency, credential, payment, prize and delivery wording, one-time-code
+// shape) decides. Clear scams are .junk, codes .transaction, marketing with an
+// opt-out .promotion; anything it is unsure about is delivered normally. There
+// is no network deferral: the OrbGuard API cannot answer the request iOS sends
+// (it requires an Authorization header iOS never adds, and the host serves no
+// messagefilter apple-app-site-association), so a deferral could only fail.
+// Message text never leaves the iPhone.
 //
 // HONESTY / ACTIVATION CONTRACT
-// This extension only RUNS after the user turns it on in
-//   Settings > Messages > Unknown & Spam > (enable "OrbGuard").
-// and only in a build signed with an Apple provisioning profile that carries
-// the `com.apple.developer.identitylookup.message-filter` capability. Until
-// both are true iOS does not invoke it; it filters nothing. It never reads
-// messages from known contacts, and it cannot exfiltrate message content — iOS
-// controls exactly what is sent on the network deferral (only to the declared
-// URL, only when the user has enabled filtering).
-//
-// PRIVACY OF THE NETWORK PATH
-// The extension never builds the outgoing request body itself. When we call
-// deferQueryRequestToNetwork(), the SYSTEM issues the HTTPS request to the
-// declared URL on our behalf and returns the server response. We own only the
-// response mapping. The backend endpoint must therefore accept the system's
-// message-filter deferral format and answer with OrbGuard's SMSAnalysisResult
-// JSON ({ "is_threat", "threat_level", "threat_type", ... }).
+// iOS runs this extension only after the person turns it on. On iOS 26 that is
+// in Messages: the Filter button at the top right, Manage Filtering, Text
+// Message Filter, then OrbGuard. No entitlement or portal capability is
+// involved. Until it is on, iOS never calls it and it filters nothing.
 
 import Foundation
 import IdentityLookup
@@ -55,34 +43,12 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         let body = queryRequest.messageBody ?? ""
         let sender = queryRequest.sender ?? ""
 
-        // Stage 1 — offline classification. A non-nil result is decisive.
-        if let action = SmishingClassifier.decisiveAction(body: body, sender: sender) {
-            Self.logger.debug("Offline decisive action: \(action.rawValue, privacy: .public)")
-            completion(Self.response(for: action))
-            return
-        }
-
-        // Stage 2 — uncertain: defer to the backend. iOS performs the HTTPS
-        // request to ILMessageFilterExtensionNetworkURL and returns the result.
-        context.deferQueryRequestToNetwork { [weak self] networkResponse, error in
-            if let error = error {
-                Self.logger.error("Network deferral failed: \(error.localizedDescription, privacy: .public)")
-            }
-            // Route through the network-response handler (also usable directly).
-            (self ?? MessageFilterExtension())
-                .handle(networkResponse, context: context, completion: completion)
-        }
-    }
-
-    /// Maps the backend's response (delivered by the system after a network
-    /// deferral) to a message-filter action. On any parse failure or missing
-    /// response it returns `.none` — we NEVER junk a message we could not
-    /// positively classify.
-    func handle(_ networkResponse: ILNetworkResponse?,
-                context: ILMessageFilterExtensionContext,
-                completion: @escaping (ILMessageFilterQueryResponse) -> Void) {
-        let action = SmishingClassifier.action(fromBackendResponse: networkResponse?.data)
-        Self.logger.debug("Network-mapped action: \(action.rawValue, privacy: .public)")
+        // A nil verdict means the classifier is unsure: deliver normally. We
+        // never file a message we could not positively classify.
+        // Spelled out: inside an optional context a bare `.none` is nil.
+        let action: ILMessageFilterAction =
+            SmishingClassifier.decisiveAction(body: body, sender: sender) ?? ILMessageFilterAction.none
+        Self.logger.debug("Message filter action: \(action.rawValue, privacy: .public)")
         completion(Self.response(for: action))
     }
 
@@ -93,7 +59,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
     }
 }
 
-// MARK: - Smishing classifier (offline + backend-response mapping)
+// MARK: - Smishing classifier (on-device)
 
 /// Self-contained smishing heuristics. Kept dependency-free so the extension
 /// target compiles against IdentityLookup alone.
@@ -102,11 +68,13 @@ enum SmishingClassifier {
     // MARK: Offline decision
 
     /// Returns a decisive `ILMessageFilterAction` for clear cases, or `nil`
-    /// when the message is ambiguous and should be deferred to the backend.
+    /// when the message is ambiguous (the caller then delivers it normally).
     static func decisiveAction(body rawBody: String, sender: String) -> ILMessageFilterAction? {
         let body = rawBody.lowercased()
         if body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .none // nothing to classify — deliver normally
+            // ILMessageFilterAction.none, spelled out: in this function's
+            // optional return type a bare `.none` would be nil ("unsure").
+            return ILMessageFilterAction.none // nothing to classify: deliver normally
         }
 
         let hosts = extractHosts(from: rawBody)
@@ -155,47 +123,11 @@ enum SmishingClassifier {
 
         // --- Clearly benign: no link and no pretext signals ----------------
         if !hasURL && pretextSignals == 0 && !otp {
-            return .none
+            return ILMessageFilterAction.none
         }
 
-        // --- Uncertain: defer to backend -----------------------------------
+        // --- Uncertain: the caller delivers it normally ---------------------
         return nil
-    }
-
-    // MARK: Backend-response mapping
-
-    /// Maps OrbGuard's `SMSAnalysisResult` JSON to an action. Returns `.none`
-    /// on any failure so we never misfile a message we could not classify.
-    static func action(fromBackendResponse data: Data?) -> ILMessageFilterAction {
-        guard let data = data,
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let json = object as? [String: Any] else {
-            return .none
-        }
-
-        let isThreat = (json["is_threat"] as? Bool) ?? false
-        let level = (json["threat_level"] as? String)?.lowercased() ?? ""
-        let type = (json["threat_type"] as? String)?.lowercased() ?? ""
-
-        if isThreat {
-            switch level {
-            case "critical", "high", "medium":
-                return .junk
-            case "low":
-                // Low-confidence threat: junk only outright spam, otherwise
-                // route to the Promotions tab rather than penalising the sender.
-                return type == "spam" ? promotionAction() : .none
-            default:
-                // is_threat == true but an unrecognised level — treat as junk.
-                return .junk
-            }
-        }
-
-        // Not a threat. Bucket obvious marketing spam into Promotions.
-        if type == "spam" {
-            return promotionAction()
-        }
-        return .none
     }
 
     // MARK: Action helpers (iOS 16 sub-tabs, else deliver normally)

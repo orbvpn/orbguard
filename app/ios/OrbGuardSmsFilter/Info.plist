@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>OrbGuard SMS Filter</string>
+	<string>OrbGuard</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -16,17 +16,20 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<!-- Same version and build as the app (Flutter/Generated.xcconfig, included by
+	     OrbGuardSmsFilter.xcconfig), so App Store validation sees them match. -->
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
-	<string>1.0.0</string>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Offline only: no ILMessageFilterExtensionNetworkURL. Network deferral
+	     would need a server that accepts the request iOS itself sends (no
+	     Authorization header), an apple-app-site-association file with a
+	     messagefilter entry on that host, and the messagefilter: associated
+	     domain on this extension. The OrbGuard API has none of the three, so
+	     every deferral would fail. The extension decides on the device. -->
 	<key>NSExtension</key>
 	<dict>
-		<key>NSExtensionAttributes</key>
-		<dict>
-			<key>ILMessageFilterExtensionNetworkURL</key>
-			<string>https://guard.orbai.world/api/v1/sms/analyze</string>
-		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.identitylookup.message-filter</string>
 		<key>NSExtensionPrincipalClass</key>

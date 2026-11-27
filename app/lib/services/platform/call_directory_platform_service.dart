@@ -8,14 +8,14 @@
 /// `OrbGuardCallDirectory` `CXCallDirectoryProvider` extension reads, then asks
 /// iOS to reload that extension.
 ///
-/// Honesty contract: this is a DATA-SYNC bridge only. Syncing numbers does not
-/// mean calls are being blocked — the call directory only takes effect once the
-/// user enables it in Settings > Phone > Call Blocking & Identification on a
-/// device signed with the CallKit call-directory capability. [status] reports
-/// the real enablement state. The channel is registered only by the iOS host
-/// app; every method is a no-op / unavailable on other platforms, and this
-/// service NEVER fabricates phone numbers — callers pass real user blocks and
-/// real threat-intel phone reputation, or nothing at all.
+/// Honesty contract: this is a DATA-SYNC bridge only. Saving numbers does not
+/// mean calls are being blocked: the call directory only takes effect once the
+/// person turns OrbGuard on in Settings, Apps, Phone, Call Blocking &
+/// Identification (iOS 26 wording; [openSettings] opens that page). [status]
+/// reports the real enablement state. The channel is registered only by the
+/// iOS host app; every method is a no-op or unavailable on other platforms,
+/// and this service NEVER fabricates phone numbers: the only numbers it saves
+/// are ones the person chose to block.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -123,6 +123,74 @@ class CallDirectoryPlatformService {
           'Call directory channel is not registered in this build.');
     }
   }
+
+  /// Parses a number typed with its country code ("+1 408 555 0123",
+  /// "0044 20 7946 0000") into the CallKit form (14085550123). Returns null
+  /// without a leading "+" or "00": CallKit matches the full international
+  /// number, so a local number would be saved and never match a call.
+  static int? parseInternationalNumber(String raw) {
+    var s = raw.trim().replaceAll(RegExp(r'[\s\-().]'), '');
+    if (s.startsWith('+')) {
+      s = s.substring(1);
+    } else if (s.startsWith('00')) {
+      s = s.substring(2);
+    } else {
+      return null;
+    }
+    // E.164: at most 15 digits; no country code plus subscriber is under 7.
+    if (!RegExp(r'^[1-9]\d{6,14}$').hasMatch(s)) return null;
+    return int.parse(s);
+  }
+
+  /// Numbers in the block list the extension reads, ascending.
+  Future<List<int>> blockedNumbers() async {
+    if (!isSupported) return const [];
+    try {
+      final result = await _channel.invokeMethod<Map>('list');
+      return _numbers(result?['blocked']);
+    } on MissingPluginException {
+      throw const CallDirectoryUnavailableException(
+          'Call directory channel is not registered in this build.');
+    }
+  }
+
+  /// Adds one number (CallKit form, see [parseInternationalNumber]) to the
+  /// block list and asks iOS to reload the extension. Returns the new list.
+  /// Rethrows [PlatformException] (e.g. APP_GROUP_UNAVAILABLE).
+  Future<List<int>> block(int number) => _edit('block', number);
+
+  /// Removes one number from the block list. Returns the new list.
+  Future<List<int>> unblock(int number) => _edit('unblock', number);
+
+  Future<List<int>> _edit(String method, int number) async {
+    if (!isSupported) return const [];
+    try {
+      final result =
+          await _channel.invokeMethod<Map>(method, {'number': number});
+      return _numbers(result?['blocked']);
+    } on MissingPluginException {
+      throw const CallDirectoryUnavailableException(
+          'Call directory channel is not registered in this build.');
+    }
+  }
+
+  /// Opens Settings at Call Blocking & Identification, where the person turns
+  /// OrbGuard on. Returns false if iOS refused.
+  Future<bool> openSettings() async {
+    if (!isSupported) return false;
+    try {
+      return await _channel.invokeMethod<bool>('openSettings') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      throw const CallDirectoryUnavailableException(
+          'Call directory channel is not registered in this build.');
+    }
+  }
+
+  static List<int> _numbers(Object? raw) => raw is List
+      ? raw.whereType<num>().map((n) => n.toInt()).toList()
+      : const [];
 
   /// Report the stored counts and the REAL enablement state of the extension.
   ///

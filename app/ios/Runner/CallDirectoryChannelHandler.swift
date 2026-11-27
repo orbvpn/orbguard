@@ -1,19 +1,18 @@
 // CallDirectoryChannelHandler.swift - OrbGuard iOS
 // Hosts the com.orb.guard/call_directory method channel.
 //
-// Purpose: bridge the Dart-side call block/identify lists (the user's blocked
-// numbers plus OrbGuard phone-reputation threat intel) into the shared App
-// Group container (group.com.orb.guard.shared, via CallDirectoryStore) that the
-// OrbGuardCallDirectory CXCallDirectoryProvider extension reads, and ask iOS to
-// reload that extension so the new data takes effect.
+// Purpose: bridge the Dart-side call block list (numbers the person chose to
+// block) into the shared App Group container (group.com.orb.guard.shared, via
+// CallDirectoryStore) that the OrbGuardCallDirectory CXCallDirectoryProvider
+// extension reads, and ask iOS to reload that extension so the new data takes
+// effect.
 //
 // Honesty contract: this channel performs DATA SYNC + a reload request only. It
 // never claims that calls are being blocked. Whether the call directory is live
-// is governed entirely by the user toggling it on in
-//   Settings > Phone > Call Blocking & Identification
-// on a device signed with the CallKit call-directory capability. The `status`
-// method reports the real enablement state via CXCallDirectoryManager and states
-// plainly that user activation is required.
+// is governed entirely by the person turning OrbGuard on in Settings, Apps,
+// Phone, Call Blocking & Identification (iOS 26 wording; `openSettings` opens
+// that page). The `status` method reports the real enablement state via
+// CXCallDirectoryManager and states plainly that the person must turn it on.
 
 import CallKit
 import Flutter
@@ -44,6 +43,14 @@ final class CallDirectoryChannelHandler {
             reload(result: result)
         case "status":
             reportStatus(result: result)
+        case "list":
+            result(["blocked": store.loadBlockedNumbers()])
+        case "block":
+            editBlocked(call: call, result: result, adding: true)
+        case "unblock":
+            editBlocked(call: call, result: result, adding: false)
+        case "openSettings":
+            openSettings(result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -97,6 +104,66 @@ final class CallDirectoryChannelHandler {
         }
     }
 
+    // MARK: - Block list edits
+
+    /// Adds or removes one number in the stored block list, keeps any
+    /// identification entries as they are, and asks iOS to reload the
+    /// extension. Returns the new list plus the reload outcome.
+    private func editBlocked(call: FlutterMethodCall, result: @escaping FlutterResult, adding: Bool) {
+        guard store.isContainerAvailable else {
+            result(FlutterError(
+                code: "APP_GROUP_UNAVAILABLE",
+                message: "The App Group container (group.com.orb.guard.shared) is not provisioned for this build; the block list cannot be written.",
+                details: ["platform": "ios"]))
+            return
+        }
+        guard let number = Self.parseNumber((call.arguments as? [String: Any])?["number"]) else {
+            result(FlutterError(code: "BAD_NUMBER", message: "Expected a phone number with its country code.", details: nil))
+            return
+        }
+
+        var blocked = store.loadBlockedNumbers()
+        if adding {
+            blocked.append(number)
+        } else {
+            blocked.removeAll { $0 == number }
+        }
+        guard store.save(blocked: blocked, identified: store.loadIdentificationEntries()) else {
+            result(FlutterError(
+                code: "WRITE_FAILED",
+                message: "Failed to write the block list to the shared App Group container.",
+                details: ["platform": "ios"]))
+            return
+        }
+
+        let saved = store.loadBlockedNumbers()
+        CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: Self.extensionIdentifier) { error in
+            DispatchQueue.main.async {
+                result([
+                    "blocked": saved,
+                    "reloadRequested": error == nil,
+                    "reloadError": error?.localizedDescription as Any,
+                ])
+            }
+        }
+    }
+
+    // MARK: - Settings
+
+    /// Opens Settings at Call Blocking & Identification, where the person
+    /// turns OrbGuard on (CXCallDirectoryManager.openSettings, iOS 13.4+).
+    private func openSettings(result: @escaping FlutterResult) {
+        CXCallDirectoryManager.sharedInstance.openSettings { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    result(FlutterError(code: "OPEN_SETTINGS_FAILED", message: error.localizedDescription, details: nil))
+                } else {
+                    result(true)
+                }
+            }
+        }
+    }
+
     // MARK: - Reload
 
     private func reload(result: @escaping FlutterResult) {
@@ -136,7 +203,7 @@ final class CallDirectoryChannelHandler {
                     "extensionStatus": statusString,
                     "extensionEnabled": status == .enabled,
                     "requiresUserEnable": true,
-                    "note": "OrbGuard's call directory only blocks or labels calls after the user enables it in Settings > Phone > Call Blocking & Identification, on a device signed with the CallKit call-directory capability. This status reports data sync + enablement only.",
+                    "note": "OrbGuard's call directory only blocks or labels calls after the person turns OrbGuard on in Settings, Apps, Phone, Call Blocking & Identification. This status reports data sync and enablement only.",
                     "error": error?.localizedDescription as Any,
                 ])
             }

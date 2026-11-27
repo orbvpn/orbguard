@@ -11,6 +11,7 @@
 		138DC68035D573D48459AB70 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 482A1D189383BFB32D53AB8D /* Pods_Runner.framework */; };
 		1419CA26C499FB911E09D6FB /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46209C653DA657543BD72541 /* SharedDataManager.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		14E24F68A301F86BC54D43B6 /* OrbGuardCallDirectory.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 1A46735C9A89D65999896277 /* OrbGuardCallDirectory.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1830D11653A1E324FFB1FCF7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
 		2AE5216CF867799D4D18A8CA /* GlanceChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9213E9D27F8DA44CABE886FC /* GlanceChannelHandler.swift */; };
 		2F5C003788C8690D4C6FA63A /* GlanceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFF6AAC2A1A685374FCFF24 /* GlanceViews.swift */; };
@@ -42,6 +43,7 @@
 		B6C0FF3E2E10000200BA51CE /* BackgroundScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */; };
 		B6C0FF412E10000500BA51CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */; };
 		B8C18A1E677B2E5E6568F4B3 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
+		BB0C6D35A2A76D8C697AACCA /* OrbGuardSmsFilter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 3E30EDFC50C537E54664DC85 /* OrbGuardSmsFilter.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BDB1A0617DDF0BEB6C4F4702 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
 		C9D1916001F7DF0141EE4105 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
 		CB51EB6BBC620F2E579AE3FE /* OrbRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460337CAADAB161976D811F2 /* OrbRingView.swift */; };
@@ -53,6 +55,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		30CE4DFECC1B0660E3B19EB0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7688776B18CA0E7B858C2080;
+			remoteInfo = OrbGuardCallDirectory;
+		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -67,6 +76,13 @@
 			remoteGlobalIDString = 5835371E6317485B3F7171D2;
 			remoteInfo = OrbGuardWidget;
 		};
+		9A78B188ADB5ACE7572DDF47 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2604BDE65F657B803C06AC4E;
+			remoteInfo = OrbGuardSmsFilter;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -77,6 +93,8 @@
 			dstSubfolderSpec = 13;
 			files = (
 				6D2767168B2E985B77D7AC4F /* OrbGuardWidget.appex in Embed App Extensions */,
+				14E24F68A301F86BC54D43B6 /* OrbGuardCallDirectory.appex in Embed App Extensions */,
+				BB0C6D35A2A76D8C697AACCA /* OrbGuardSmsFilter.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -151,6 +169,8 @@
 		CE4651689AD02593A405765F /* OrbGuardWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D695DCFADB9715C6E72D94EB /* FilterDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilterDataProvider.swift; sourceTree = "<group>"; };
 		EB9189E627722B1D5BC25685 /* GlanceLogic.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlanceLogic.swift; sourceTree = "<group>"; };
+		EB99591300CC2E3EBCE7855B /* OrbGuardSmsFilter.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = OrbGuardSmsFilter.xcconfig; sourceTree = "<group>"; };
+		ECE4C8BDDE0E39FB25E72E69 /* OrbGuardCallDirectory.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = OrbGuardCallDirectory.xcconfig; sourceTree = "<group>"; };
 		EEFF6AAC2A1A685374FCFF24 /* GlanceViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlanceViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -285,6 +305,7 @@
 				A9BEF0CC47748DE71029465A /* CallDirectoryHandler.swift */,
 				164CE3AD9660D10AB0ECA419 /* Info.plist */,
 				02A487010DC00D409003FB3B /* OrbGuardCallDirectory.entitlements */,
+				ECE4C8BDDE0E39FB25E72E69 /* OrbGuardCallDirectory.xcconfig */,
 			);
 			name = OrbGuardCallDirectory;
 			path = OrbGuardCallDirectory;
@@ -307,6 +328,7 @@
 				7F44F6C931229B7E1EF29FBC /* MessageFilterExtension.swift */,
 				3A699464ACEB220BFD5839CB /* Info.plist */,
 				12DC0F605847CA08C1385F0D /* OrbGuardSmsFilter.entitlements */,
+				EB99591300CC2E3EBCE7855B /* OrbGuardSmsFilter.xcconfig */,
 			);
 			name = OrbGuardSmsFilter;
 			path = OrbGuardSmsFilter;
@@ -503,6 +525,8 @@
 			);
 			dependencies = (
 				02060305122895AA6FDCFB94 /* PBXTargetDependency */,
+				778904FE42F3CB20A2AB6053 /* PBXTargetDependency */,
+				E0D6E5C3A7898C249956333E /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -758,6 +782,18 @@
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
 		};
+		778904FE42F3CB20A2AB6053 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = OrbGuardCallDirectory;
+			target = 7688776B18CA0E7B858C2080 /* OrbGuardCallDirectory */;
+			targetProxy = 30CE4DFECC1B0660E3B19EB0 /* PBXContainerItemProxy */;
+		};
+		E0D6E5C3A7898C249956333E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = OrbGuardSmsFilter;
+			target = 2604BDE65F657B803C06AC4E /* OrbGuardSmsFilter */;
+			targetProxy = 9A78B188ADB5ACE7572DDF47 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -820,6 +856,7 @@
 		};
 		21688FDB0CEC8278D11C6EDF /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB99591300CC2E3EBCE7855B /* OrbGuardSmsFilter.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -827,7 +864,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardSmsFilter/OrbGuardSmsFilter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -838,12 +875,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardSmsFilter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -1014,6 +1050,7 @@
 		};
 		3D4894732639D9138E57303F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = ECE4C8BDDE0E39FB25E72E69 /* OrbGuardCallDirectory.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -1021,7 +1058,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardCallDirectory/OrbGuardCallDirectory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -1032,12 +1069,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardCallDirectory;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -1048,6 +1084,7 @@
 		};
 		5BE49BE02FFA9DC1FB9FDF70 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB99591300CC2E3EBCE7855B /* OrbGuardSmsFilter.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -1055,7 +1092,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardSmsFilter/OrbGuardSmsFilter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -1070,13 +1107,12 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardSmsFilter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -1086,6 +1122,7 @@
 		};
 		6687DE2D5822FD782BFD3873 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = ECE4C8BDDE0E39FB25E72E69 /* OrbGuardCallDirectory.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -1093,7 +1130,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardCallDirectory/OrbGuardCallDirectory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -1108,13 +1145,12 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardCallDirectory;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -1352,6 +1388,7 @@
 		};
 		9F500A97001872BD0BFCC4E7 /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = ECE4C8BDDE0E39FB25E72E69 /* OrbGuardCallDirectory.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -1359,7 +1396,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardCallDirectory/OrbGuardCallDirectory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -1370,12 +1407,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardCallDirectory;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -1454,6 +1490,7 @@
 		};
 		C90908B6398531FFC16046F4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB99591300CC2E3EBCE7855B /* OrbGuardSmsFilter.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_MODULES = YES;
@@ -1461,7 +1498,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = OrbGuardSmsFilter/OrbGuardSmsFilter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 33T4RDL646;
 				ENABLE_BITCODE = NO;
@@ -1472,12 +1509,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardSmsFilter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

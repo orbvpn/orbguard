@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>OrbGuard Call Directory</string>
+	<string>OrbGuard</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -16,14 +16,21 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<!-- Same version and build as the app (Flutter/Generated.xcconfig, included by
+	     OrbGuardCallDirectory.xcconfig), so App Store validation sees them match. -->
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
-	<string>1.0.0</string>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- The extension point is com.apple.callkit.call-directory, as in Xcode's
+	     own Call Directory Extension template. This plist used to say
+	     com.apple.callkitcalldirectory.extension, which is no extension point at
+	     all: App Store Connect rejected the upload with ITMS-90349 and the
+	     simulator refused to install the app. -->
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.callkitcalldirectory.extension</string>
+		<string>com.apple.callkit.call-directory</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).CallDirectoryHandler</string>
 	</dict>
