@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OrbGuard: know if you’re being watched</title>
+<meta name="description" content="OrbGuard checks your phone for spyware, stalkerware and trackers, then tells you plainly what it found.">
+<meta property="og:title" content="OrbGuard">
+<meta property="og:description" content="OrbGuard checks your phone for spyware, stalkerware and trackers, then tells you plainly what it found.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#08080A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F5F1" media="(prefers-color-scheme: light)">
+<link rel="icon" href="{{asset "mark.svg"}}" type="image/svg+xml">
+<link rel="preload" href="{{asset "archivo.woff2"}}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{asset "plex-sans.woff2"}}" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Archivo";src:url("{{asset "archivo.woff2"}}") format("woff2");font-weight:500 700;font-stretch:100% 125%;font-display:swap}
+@font-face{font-family:"IBM Plex Sans";src:url("{{asset "plex-sans.woff2"}}") format("woff2");font-weight:400 600;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("{{asset "plex-mono-medium.woff2"}}") format("woff2");font-weight:500;font-display:swap}
+
+/* OrbVPN 2026 kit. Dark is obsidian, light is cloud. Lime is a fill, never dark-mode text. */
+:root{
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --bg:#08080A; --surface:#131316;
+  --text:#F5F6F8; --text2:#9A9CA6;
+  --hairline:rgba(255,255,255,.10);
+  --lime:#C6FF3D; --on-lime:#08080A; --focus:#C6FF3D;
+  --glass:rgba(255,255,255,.08); --glass-br:rgba(255,255,255,.18); --glass-hi:rgba(255,255,255,.22);
+  --bed-lime:rgba(198,255,61,.13); --bed-pink:rgba(255,61,166,.10);
+  --lime-lift:0 12px 26px -12px rgba(0,0,0,.7);
+  --phone-shadow:0 40px 70px -28px rgba(0,0,0,.85);
+  --ring-shadow:rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root{
+  --bg:#F4F5F1; --surface:#FFFFFF;
+  --text:#0B0B0E; --text2:#5A5C66;
+  --hairline:rgba(18,18,28,.10);
+  --focus:#4D7A00;
+  --glass:rgba(255,255,255,.55); --glass-br:rgba(18,18,28,.08); --glass-hi:rgba(255,255,255,.9);
+  --bed-lime:rgba(198,255,61,.30); --bed-pink:rgba(255,61,166,.14);
+  --lime-lift:0 12px 26px -14px rgba(40,56,10,.45);
+  --phone-shadow:0 40px 70px -30px rgba(30,40,20,.55);
+  --ring-shadow:rgba(60,96,40,.30);
+  color-scheme:light;
+}}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scrollbar-color:color-mix(in srgb,var(--text) 26%,transparent) transparent}
+@media (prefers-reduced-motion: no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.55 var(--f-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-synthesis:none;overflow-x:clip}
+::selection{background:#C6FF3D;color:#08080A}
+a{color:inherit;text-underline-offset:.22em;text-decoration-thickness:1px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:6px}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:clamp(20px,4vw,56px)}
+
+/* ---- the top: header and hero share the kit's colour bed ---- */
+.top{position:relative;isolation:isolate;overflow:clip}
+.top::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle 1100px at 8% -6%,var(--bed-lime),transparent 72%),radial-gradient(circle 760px at 98% 104%,var(--bed-pink),transparent 70%)}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-block:26px}
+.lockup{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font:620 20px/1 var(--f-display);font-stretch:112%;letter-spacing:-.018em}
+.lockup svg{width:28px;height:28px;flex:none}
+.bar nav{display:flex;gap:clamp(16px,2.4vw,32px)}
+.bar nav a{font:500 15px/1 var(--f-sans);color:var(--text2);text-decoration:none;padding-block:8px}
+.bar nav a:hover{color:var(--text);text-decoration:underline}
+
+.hero{--ring:clamp(440px,min(44vw,calc(100svh - 150px)),760px);
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:clamp(32px,4vw,72px);
+  min-height:calc(100svh - 82px);padding-block:12px 64px}
+.copy{max-width:600px}
+h1{margin:0;font-family:var(--f-display);font-weight:540;font-stretch:124%;letter-spacing:-.03em;
+  font-size:clamp(40px,4.7vw,70px);line-height:1;text-wrap:balance}
+.lede{margin:26px 0 0;max-width:30em;font-size:clamp(17px,1.35vw,19.5px);line-height:1.52;color:var(--text2);text-wrap:pretty}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:36px}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:54px;padding:0 26px;border-radius:16px;
+  font:600 16.5px/1 var(--f-sans);letter-spacing:-.01em;text-decoration:none;white-space:nowrap;
+  transition:transform .18s cubic-bezier(.16,1,.3,1),filter .18s ease,background-color .18s ease,box-shadow .18s ease}
+.btn:active{transform:scale(.975)}
+.btn.lime{background:var(--lime);color:var(--on-lime);box-shadow:var(--lime-lift)}
+.btn.lime:hover{filter:brightness(1.05) saturate(1.05);transform:translateY(-1px)}
+.btn.plain{background:var(--glass);border:1px solid var(--glass-br);color:var(--text);
+  box-shadow:inset 0 1px 0 var(--glass-hi);-webkit-backdrop-filter:blur(24px) saturate(1.55);backdrop-filter:blur(24px) saturate(1.55)}
+.btn.plain:hover{background:color-mix(in srgb,var(--glass) 100%,var(--text) 6%)}
+.btn:focus-visible{border-radius:16px}
+.on{margin:22px 0 0;font:400 14.5px/1.45 var(--f-sans);color:var(--text2)}
+
+/* ---- the ring: the one bold thing on the page. It closes once, on arrival ---- */
+.stage{position:relative;width:var(--ring);aspect-ratio:1;margin:0}
+.stage .ring{position:absolute;left:0;top:0;width:var(--ring);height:var(--ring);overflow:visible;display:block}
+.ring{filter:drop-shadow(0 calc(var(--ring)*.02) calc(var(--ring)*.03) var(--ring-shadow))}
+.draw{stroke-dasharray:100 100;stroke-dashoffset:0}
+@media (prefers-reduced-motion: no-preference){
+  .draw{animation:close 1.9s cubic-bezier(.16,1,.3,1) .25s both}
+  @keyframes close{from{stroke-dashoffset:15}to{stroke-dashoffset:0}}
+}
+.phone{position:absolute;z-index:1;left:30%;top:calc(var(--ring)*.044);width:40%;margin:0;
+  padding:calc(var(--ring)*.0095);border-radius:calc(var(--ring)*.056);background:#0C0C0F;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 0 0 1px rgba(0,0,0,.5),var(--phone-shadow)}
+.phone img{display:block;width:100%;height:auto;border-radius:calc(var(--ring)*.047);background:var(--surface)}
+
+/* ---- get ---- */
+.get{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);column-gap:clamp(32px,6vw,120px);align-items:start;padding-block:clamp(56px,6vw,96px) clamp(72px,8vw,120px)}
+h2{margin:0;font-family:var(--f-display);font-weight:600;font-stretch:116%;letter-spacing:-.022em;font-size:clamp(30px,3vw,44px);line-height:1.08}
+.get-head p{margin:16px 0 0;max-width:26em;color:var(--text2)}
+.platforms{list-style:none;margin:0;padding:0;border-top:1px solid var(--hairline)}
+.platforms li{border-bottom:1px solid var(--hairline)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:76px;padding:12px 4px}
+.row b{font:620 clamp(21px,1.9vw,26px)/1.15 var(--f-display);font-stretch:112%;letter-spacing:-.018em}
+.row span{font:500 13px/1.3 var(--f-mono);color:var(--text2);text-align:right}
+a.row{text-decoration:none;border-radius:12px;transition:background-color .18s ease}
+a.row span{color:var(--text);text-decoration:underline;text-decoration-color:var(--glass-br)}
+a.row:hover{background:var(--glass)}
+a.row:hover span{text-decoration-color:currentColor}
+
+/* ---- footer ---- */
+.foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px 40px;border-top:1px solid var(--hairline);padding:32px 0 48px;font-size:13.5px;line-height:1.7;color:var(--text2)}
+.foot p{margin:0}
+.foot nav{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:flex-start}
+.foot a{color:var(--text2)}
+.foot a:hover{color:var(--text)}
+
+@media (max-width:860px){
+  .hero{--ring:min(128vw,640px);grid-template-columns:minmax(0,1fr);min-height:0;padding-block:28px 0}
+  .stage{margin:44px 0 0 calc(50% - var(--ring)/2);}
+  .get{grid-template-columns:minmax(0,1fr);row-gap:32px}
+}
+@media (max-width:520px){
+  .bar{padding-block:20px}
+  .lockup{font-size:18px;gap:9px}
+  .lockup svg{width:24px;height:24px}
+  .btn{flex:1 1 auto;padding:0 20px}
+}
+@media (max-width:380px){
+  .bar nav{gap:14px}
+  .bar nav a{font-size:14px}
+}
+</style></head>
+<body>
+<div class="top">
+<header class="wrap bar">
+  <a class="lockup" href="/" aria-label="OrbGuard home"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="34" fill="none" stroke="url(#rg)" stroke-width="22"/></svg>OrbGuard</a>
+  <nav aria-label="Site"><a href="/pricing">Pricing</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>
+</header>
+<main>
+<section class="wrap hero">
+  <div class="copy">
+    <h1>Is your circle closed?</h1>
+    <p class="lede">OrbGuard checks your phone for spyware, stalkerware and trackers, then tells you plainly what it found.</p>
+    <div class="actions"><a class="btn lime" href="#get">Get OrbGuard</a><a class="btn plain" href="/pricing">See plans</a></div>
+    {{- if .Listed}}
+    <p class="on">Available on {{.Listed}}.</p>
+    {{- end}}
+  </div>
+  <div class="stage">
+    <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <radialGradient id="rg" gradientUnits="userSpaceOnUse" cx="38" cy="38" r="62">
+          <stop offset="0" stop-color="#f2fcd0"/><stop offset=".2" stop-color="#e0f4b0"/><stop offset=".4" stop-color="#c4e896"/>
+          <stop offset=".6" stop-color="#a0d87c"/><stop offset=".8" stop-color="#84c86c"/><stop offset="1" stop-color="#68b060"/>
+        </radialGradient>
+        <radialGradient id="tube" gradientUnits="userSpaceOnUse" cx="50" cy="50" r="45">
+          <stop offset=".5" stop-color="#1d3a12" stop-opacity=".34"/><stop offset=".56" stop-color="#1d3a12" stop-opacity=".1"/>
+          <stop offset=".66" stop-color="#fff" stop-opacity="0"/><stop offset=".75" stop-color="#fff" stop-opacity=".16"/>
+          <stop offset=".86" stop-color="#fff" stop-opacity="0"/><stop offset=".95" stop-color="#1d3a12" stop-opacity=".12"/>
+          <stop offset="1" stop-color="#1d3a12" stop-opacity=".3"/>
+        </radialGradient>
+        <linearGradient id="lum" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="90" y2="90">
+          <stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".16"/>
+        </linearGradient>
+        <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation=".7"/></filter>
+        <mask id="drawn" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+          <path class="draw" d="M84 50A34 34 0 1 1 16 50A34 34 0 1 1 84 50A34 34 0 0 1 83.257 57.069" pathLength="100" fill="none" stroke="#fff" stroke-width="23"/>
+        </mask>
+        <g id="band">
+          <circle cx="50" cy="50" r="34" fill="none" stroke="url(#rg)" stroke-width="22"/>
+          <circle cx="50" cy="50" r="34" fill="none" stroke="url(#tube)" stroke-width="22"/>
+          <circle cx="50" cy="50" r="34" fill="none" stroke="url(#lum)" stroke-width="22"/>
+          <path d="M22.6 33.2a33 33 0 0 1 17.6-14.6" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.6" stroke-linecap="round" filter="url(#soft)"/>
+        </g>
+      </defs>
+      <use href="#band" mask="url(#drawn)"/>
+    </svg>
+    <figure class="phone">
+      <picture>
+        <source srcset="{{asset "home-light.webp"}}" media="(prefers-color-scheme: light)">
+        <img src="{{asset "home-dark.webp"}}" width="720" height="1600" fetchpriority="high" alt="The OrbGuard Home screen after a clean check, saying no signs you’re being watched.">
+      </picture>
+    </figure>
+  </div>
+</section>
+
+<section class="wrap get" id="get" aria-labelledby="get-h">
+  <div class="get-head">
+    <h2 id="get-h">Get OrbGuard</h2>
+    {{- if not .AllListed}}
+    <p>Store links appear here as each listing goes live.</p>
+    {{- end}}
+  </div>
+  <ul class="platforms">
+    {{- range .Platforms}}
+    <li>{{if .URL}}<a class="row" href="{{.URL}}" rel="noopener"><b>{{.Name}}</b><span>{{.Store}}</span></a>{{else}}<div class="row"><b>{{.Name}}</b>{{if $.Listed}}<span>Not listed yet</span>{{end}}</div>{{end}}</li>
+    {{- end}}
+  </ul>
+</section>
+</main>
+<footer class="wrap"><div class="foot">
+  <div>
+    <p>ORB GLOBAL LTD, 7 Bell Yard, London, WC2A 2JR, United Kingdom</p>
+    <p>Registered in England and Wales, company number 08274220.</p>
+    <p><a href="mailto:support@orbvpn.com">support@orbvpn.com</a></p>
+  </div>
+  <nav aria-label="Legal"><a href="/pricing">Pricing</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>
+</div></footer>
+</div>
+</body></html>
