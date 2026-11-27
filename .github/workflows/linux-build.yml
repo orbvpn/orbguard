@@ -21,7 +21,8 @@ jobs:
       # The version comes from app/pubspec.yaml (without the build number),
       # so the downloads, the .deb and the snap never drift from the app.
       - name: Read the app version
-        run: echo "APP_VERSION=$(sed -n 's/^version: *\([^+]*\).*/\1/p' app/pubspec.yaml)" >> "$GITHUB_ENV"
+        run: |
+          echo "APP_VERSION=$(sed -n 's/^version: *\([^+]*\).*/\1/p' app/pubspec.yaml)" >> "$GITHUB_ENV"
 
       - name: Install Linux desktop build deps
         run: |
