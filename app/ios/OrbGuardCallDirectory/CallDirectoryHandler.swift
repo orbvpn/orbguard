@@ -9,9 +9,10 @@
 //   * BLOCKING entries      — numbers iOS should silently reject.
 //   * IDENTIFICATION entries — (number, label) pairs iOS shows on the incoming
 //     call screen (e.g. "OrbGuard: Reported Scam").
-// Numbers come from the user's own block list plus OrbGuard threat-intel phone
-// reputation. If the app has written nothing yet, both lists are empty and the
-// extension correctly adds nothing — it never fabricates numbers.
+// Numbers come from the block list the person keeps in the app (the Scam
+// shield on iPhone). Nothing writes identification labels yet. If the app has
+// written nothing, both lists are empty and the extension adds nothing; it
+// never fabricates numbers.
 //
 // CALLKIT ORDERING CONTRACT
 // CallKit requires every entry to be added in ASCENDING, STRICTLY-INCREASING
@@ -21,11 +22,13 @@
 // the store's normalization rather than re-sorting here.
 //
 // HONESTY / ACTIVATION CONTRACT
-// This extension only takes effect after the user enables it in
-//   Settings > Phone > Call Blocking & Identification > (enable "OrbGuard").
-// and only in a build signed with a profile carrying the CallKit call-directory
-// capability and the group.com.orb.guard.shared App Group. Until both are true
-// iOS does not load it; it blocks/identifies nothing.
+// This extension only takes effect after the person turns it on: on iOS 26,
+// Settings, Apps, Phone, Call Blocking & Identification, then OrbGuard (the
+// app can open that page with CXCallDirectoryManager.openSettings). It reads
+// its lists from the group.com.orb.guard.shared App Group, so the signing
+// profile must carry that group; no other capability is involved. Until it is
+// on, iOS does not load it and it blocks or labels nothing. Today the lists
+// hold only numbers the person chose to block in the app.
 
 import CallKit
 import Foundation
