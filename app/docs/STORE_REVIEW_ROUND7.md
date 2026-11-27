@@ -146,6 +146,38 @@ local DNS firewall; that feature does not exist in the macOS or iOS builds.)
 
 ---
 
+## C2. Apple, macOS reply for version 1.1.0 (build 12), 2026-11-28
+
+The 1.0 reply above still holds. For 1.1.0 the VPN check also reads which app a VPN
+configuration belongs to, so OrbGuard can recognise the person's own OrbVPN. It is still
+read only. Paste this in the macOS version's App Review thread and in App Review
+Information, Notes:
+
+> OrbGuard for macOS does not provide VPN functionality. It contains no tunnel, no Network
+> Extension and no VPN entitlement. Its entitlements are: App Sandbox, outgoing network
+> connections, camera, location, user-selected files (read only), keychain, Sign in with
+> Apple, and associated domains (webcredentials, for passkey sign-in).
+>
+> What the automated analysis most likely saw is the "Hidden VPN & proxy" check. It is a
+> detection feature: it reads this Mac's own network interfaces, the system proxy
+> settings, and which app each VPN configuration belongs to (from the System Configuration
+> framework), so it can tell the user when an unexpected VPN or proxy is routing their
+> traffic, a common spyware technique. It never creates, configures, starts or stops a VPN,
+> and the result stays on the Mac.
+>
+> Answers to your questions:
+> - What user information is the app collecting using VPN? None. There is no VPN in
+>   OrbGuard, so no traffic passes through it.
+> - For what purposes? Not applicable. The only network traffic OrbGuard sends goes to our
+>   own threat-intelligence API for checks the user starts, and to the Orb account service
+>   for sign-in and subscriptions, as the Privacy Policy describes.
+> - Will the data be shared with any third parties? No.
+>
+> A separate app, OrbVPN, provides our VPN. OrbGuard only opens OrbVPN or its App Store
+> page when the user asks for a VPN.
+
+---
+
 ## D. Resubmission log
 
 - 2026-08-22: Play listing updated via API (edit committed, not sent for review — UI step).

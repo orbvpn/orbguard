@@ -77,6 +77,14 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# The tray icon's plugin calls app_indicator_new, which libayatana-appindicator
+# marks deprecated. The standard settings turn every warning into an error, so
+# that one warning is let through for this plugin only.
+if(TARGET tray_manager_plugin)
+  target_compile_options(tray_manager_plugin PRIVATE
+    -Wno-error=deprecated-declarations)
+endif()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build
