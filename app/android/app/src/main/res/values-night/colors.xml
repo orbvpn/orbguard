@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home-screen widgets (glance), dark. OrbVPN 2026 kit. -->
+    <color name="glance_surface">#131316</color>
+    <!-- glass border: white at 18% -->
+    <color name="glance_border">#2EFFFFFF</color>
+    <color name="glance_text">#F5F6F8</color>
+    <color name="glance_text2">#9A9CA6</color>
+    <color name="glance_amber_ink">#FFB800</color>
+    <!-- amber pill: #FFB800 at 12% -->
+    <color name="glance_amber_pill">#1FFFB800</color>
+</resources>
