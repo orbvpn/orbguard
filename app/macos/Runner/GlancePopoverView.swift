@@ -288,6 +288,23 @@ struct GlancePopoverView: View {
       }
       .buttonStyle(.plain)
       .keyboardShortcut(.defaultAction)
+
+      // The quiet way back to the window, which closing only hid.
+      Button(action: onOpen) {
+        Text("Open OrbGuard")
+          .font(Font(GlanceFonts.plexSans(14.5, weight: 500)))
+          .tracking(-0.1)
+          .foregroundColor(c(brand.text))
+          .frame(maxWidth: .infinity)
+          .frame(height: 38)
+          .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(c(brand.glassFill)))
+          .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+              .strokeBorder(c(brand.glassBorder), lineWidth: 1))
+          .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      }
+      .buttonStyle(.plain)
+      .padding(.top, -4)
     }
   }
 

@@ -2,6 +2,7 @@
 // Hosts the com.orb.guard/wifi, com.orbguard/supply_chain, com.orb.guard/logs
 // and com.orb.guard/glance method channels for the macOS build, and the window
 // chrome the desktop layout needs (transparent title bar, Flutter draws the band).
+// Closing the window hides it: OrbGuard keeps running in the menu bar.
 //
 // Honesty contract: capabilities macOS does not expose return explicit
 // FlutterError codes (UNSUPPORTED / PERMISSION_DENIED / UNAVAILABLE) instead of
@@ -29,7 +30,41 @@ class MainFlutterWindow: NSWindow {
 
     configureDesktopChrome()
 
+    // A window closed in full screen leaves full screen first, then hides.
+    NotificationCenter.default.addObserver(
+      forName: NSWindow.didExitFullScreenNotification, object: self, queue: .main
+    ) { [weak self] _ in
+      guard let self, self.hidesAfterFullScreen else { return }
+      self.hidesAfterFullScreen = false
+      self.orderOut(nil)
+    }
+
     super.awakeFromNib()
+  }
+
+  // MARK: - Closing keeps OrbGuard running
+
+  /// Set while the window leaves full screen on its way to hiding.
+  private var hidesAfterFullScreen = false
+
+  /// The close button and Cmd-W hide the window instead of closing it, so
+  /// OrbGuard keeps running in the menu bar. The ring's Open OrbGuard, its menu
+  /// and the Dock icon bring it back; Quit OrbGuard quits.
+  override func performClose(_ sender: Any?) {
+    if styleMask.contains(.fullScreen) {
+      // Hidden in full screen, the window would leave its space behind, empty.
+      hidesAfterFullScreen = true
+      toggleFullScreen(sender)
+      return
+    }
+    orderOut(sender)
+  }
+
+  /// Shows the window again, in front.
+  func bringBack() {
+    NSApp.activate(ignoringOtherApps: true)
+    if isMiniaturized { deminiaturize(nil) }
+    makeKeyAndOrderFront(nil)
   }
 
   // MARK: - Window chrome for the desktop layout
