@@ -32,6 +32,7 @@ import MachO
     private var wifiHandler: WifiChannelHandler?
     private var contentFilterHandler: ContentFilterChannelHandler?
     private var callDirectoryHandler: CallDirectoryChannelHandler?
+    private var glanceHandler: GlanceChannelHandler?
     private let batterySampler = BatteryDrainSampler()
 
     // MARK: - App Lifecycle
@@ -146,6 +147,14 @@ import MachO
         let callDirectoryHandler = CallDirectoryChannelHandler()
         self.callDirectoryHandler = callDirectoryHandler
         callDirectoryHandler.register(with: messenger)
+
+        // Glance bridge (com.orb.guard/glance): stores the glance Dart works
+        // out from Home into the shared App Group, where the OrbGuardWidget
+        // extension (home screen and lock screen widgets) reads it, and asks
+        // WidgetKit to redraw. See GlanceChannelHandler.
+        let glanceHandler = GlanceChannelHandler()
+        self.glanceHandler = glanceHandler
+        glanceHandler.register(with: messenger)
 
         GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     }

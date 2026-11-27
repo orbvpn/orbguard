@@ -1,6 +1,7 @@
 // MainFlutterWindow.swift - OrbGuard macOS
-// Hosts the com.orb.guard/wifi, com.orbguard/supply_chain and
-// com.orb.guard/logs method channels for the macOS build.
+// Hosts the com.orb.guard/wifi, com.orbguard/supply_chain, com.orb.guard/logs
+// and com.orb.guard/glance method channels for the macOS build, and the window
+// chrome the desktop layout needs (transparent title bar, Flutter draws the band).
 //
 // Honesty contract: capabilities macOS does not expose return explicit
 // FlutterError codes (UNSUPPORTED / PERMISSION_DENIED / UNAVAILABLE) instead of
@@ -26,7 +27,69 @@ class MainFlutterWindow: NSWindow {
 
     registerOrbGuardChannels(messenger: flutterViewController.engine.binaryMessenger)
 
+    configureDesktopChrome()
+
     super.awakeFromNib()
+  }
+
+  // MARK: - Window chrome for the desktop layout
+
+  /// The desktop layout draws its own top band (DeskTitleBar: a 40 pt bar with
+  /// the title centred, the sidebar under it), so the native title bar steps
+  /// aside: the content runs under a transparent title bar, the native title
+  /// is hidden, and an empty unified-compact toolbar makes the band tall
+  /// enough for the traffic lights to sit centred in it.
+  ///
+  /// Measured on macOS 27 (Xcode 27.2): the band is 40 pt, the traffic lights
+  /// span x 12 to 72 pt and y 13 to 27 pt (centre 20 pt). A transparent title
+  /// bar passes clicks through to the FlutterView, so a native drag band sits
+  /// over the Flutter content for exactly the band's height (pinned to
+  /// contentLayoutGuide, so it is 0 pt in full screen) to keep the window
+  /// movable and double-click to zoom. Flutter gets no clicks in those 40 pt.
+  static let frameAutosaveName = "OrbGuardMainWindow"
+  static let defaultContentSize = NSSize(width: 1180, height: 760)
+  /// The narrowest window that still fits the desktop layout's three columns:
+  /// sidebar 224 + ring column 440 + side column 320 (ShellForm.deskMinWidth in
+  /// lib/presentation/layout/shell_form.dart). Narrower would fall back to a
+  /// phone's layout, whose top row would sit under the traffic lights.
+  static let minimumContentSize = NSSize(width: 984, height: 640)
+
+  private func configureDesktopChrome() {
+    styleMask.insert([.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView])
+    title = "OrbGuard"            // still the name in the Window menu and Mission Control
+    titleVisibility = .hidden     // Flutter draws the title
+    titlebarAppearsTransparent = true
+    titlebarSeparatorStyle = .none
+    isMovableByWindowBackground = false
+
+    let toolbar = NSToolbar(identifier: "OrbGuardWindowBand")
+    toolbar.showsBaselineSeparator = false
+    toolbar.allowsUserCustomization = false
+    toolbar.displayMode = .iconOnly
+    self.toolbar = toolbar
+    toolbarStyle = .unifiedCompact
+
+    contentMinSize = Self.minimumContentSize
+
+    // First launch: 1180 x 760 centred. After that the remembered frame wins.
+    let firstLaunch = UserDefaults.standard.string(forKey: "NSWindow Frame \(Self.frameAutosaveName)") == nil
+    if firstLaunch {
+      setContentSize(Self.defaultContentSize)
+      center()
+    }
+    setFrameAutosaveName(Self.frameAutosaveName)
+
+    if let content = contentView, let guide = contentLayoutGuide as? NSLayoutGuide {
+      let band = WindowDragBand()
+      band.translatesAutoresizingMaskIntoConstraints = false
+      content.addSubview(band)
+      NSLayoutConstraint.activate([
+        band.topAnchor.constraint(equalTo: content.topAnchor),
+        band.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+        band.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+        band.bottomAnchor.constraint(equalTo: guide.topAnchor),
+      ])
+    }
   }
 
   private func registerOrbGuardChannels(messenger: FlutterBinaryMessenger) {
@@ -59,6 +122,9 @@ class MainFlutterWindow: NSWindow {
     // rather than as empty "clean" results.
     OrbGuardSystemChannel.register(messenger: messenger)
 
+    // Glance channel: the menu bar ring and its popover draw what Dart sends.
+    OrbGuardGlanceChannel.register(messenger: messenger, window: self)
+
     // Logs channel (W5.15 macOS mirror): own-process logs via OSLogStore (macOS 12+).
     let logsChannel = FlutterMethodChannel(
       name: "com.orb.guard/logs",
@@ -66,6 +132,32 @@ class MainFlutterWindow: NSWindow {
     logsChannel.setMethodCallHandler { call, result in
       MacLogStoreReader.handle(call: call, result: result)
     }
+  }
+}
+
+// ============================================================================
+// MARK: - Window drag band
+// ============================================================================
+
+/// Transparent strip over the top band of the Flutter content. It moves the
+/// window on drag and honours the system's double-click action (zoom, minimise
+/// or nothing). The traffic lights sit above it in the title bar and keep their
+/// own clicks.
+final class WindowDragBand: NSView {
+  override var mouseDownCanMoveWindow: Bool { true }
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+  override func mouseDown(with event: NSEvent) {
+    guard let window else { return }
+    if event.clickCount == 2 {
+      switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+      case "Minimize": window.performMiniaturize(nil)
+      case "None": break
+      default: window.performZoom(nil)
+      }
+      return
+    }
+    window.performDrag(with: event)
   }
 }
 

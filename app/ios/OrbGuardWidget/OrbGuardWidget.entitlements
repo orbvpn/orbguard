@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Groups: the widget reads the glance the host app writes
+	     (UserDefaults suite group.com.orb.guard.shared, key glance.v1).
+	     The App ID com.orb.guard.OrbGuardWidget must carry this group too. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.orb.guard.shared</string>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,5 @@
+// OrbGuardWidget base settings: the app's version and build number
+// (FLUTTER_BUILD_NAME / FLUTTER_BUILD_NUMBER) from Flutter's generated config,
+// without Runner's CocoaPods settings. `flutter pub get` and `flutter build`
+// write Generated.xcconfig.
+#include "../Flutter/Generated.xcconfig"

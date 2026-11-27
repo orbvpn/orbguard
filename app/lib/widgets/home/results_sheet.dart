@@ -27,6 +27,7 @@ import '../../utils/host_platform.dart';
 import '../sale/credit_line.dart';
 import '../shields/shield_look.dart';
 import 'orb_ring.dart';
+import 'share_card.dart';
 
 class ResultsSheet extends StatelessWidget {
   const ResultsSheet({
@@ -35,6 +36,7 @@ class ResultsSheet extends StatelessWidget {
     required this.onOpenThing,
     required this.onOpenGap,
     this.platform,
+    this.checkedToday = false,
   });
 
   final CheckResults results;
@@ -44,12 +46,16 @@ class ResultsSheet extends StatelessWidget {
   /// The device the words are for. Defaults to the one this runs on.
   final TargetPlatform? platform;
 
+  /// The check ran today, so its result may be shared as today's.
+  final bool checkedToday;
+
   static Future<void> show(
     BuildContext context, {
     required CheckResults results,
     required void Function(FoundThing) onOpenThing,
     required void Function(HomeGap) onOpenGap,
     TargetPlatform? platform,
+    bool checkedToday = false,
   }) =>
       showAppSheet<void>(
         context,
@@ -59,6 +65,7 @@ class ResultsSheet extends StatelessWidget {
           onOpenThing: onOpenThing,
           onOpenGap: onOpenGap,
           platform: platform,
+          checkedToday: checkedToday,
         ),
       );
 
@@ -244,6 +251,23 @@ class ResultsSheet extends StatelessWidget {
                   ? () => onOpenThing(results.things.first)
                   : () => onOpenGap(results.otherGaps.first),
             ),
+          ),
+        ],
+      );
+    } else if (checkedToday && !_partial && results.stagesKnown) {
+      // An all clear from today can be shared. Done stays the lime one.
+      buttons = Row(
+        children: [
+          Expanded(
+            child: BrandButton.secondary(
+              label: 'Share',
+              padding: pad,
+              onPressed: () => ShareSheet.show(context),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: BrandButton(label: 'Done', onPressed: done, padding: pad),
           ),
         ],
       );

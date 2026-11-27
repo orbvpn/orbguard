@@ -5,6 +5,7 @@
 // where those go wrong.
 
 import 'dart:convert';
+import 'dart:ui' show DisplayFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -101,7 +102,11 @@ Future<void> finishCheck(WidgetTester tester) async {
 /// [platform] is the device the shell is drawn for. [runner] stands in for
 /// the scan engine; left out, a check that reports every step clean.
 /// [tunnel] says a VPN tunnel is up when the shell looks. [signedIn] mounts
-/// a signed-in person with [credits] scan credits.
+/// a signed-in person with [credits] scan credits. [size] is the window in
+/// logical pixels and [features] the folds and hinges the system reports.
+/// [insets] are the system's bars, in logical pixels. [theme] ('dark' or
+/// 'light') is the appearance saved in settings; set it with [themed].
+/// [shot] wraps the whole app in a boundary a render can draw from.
 Future<ShellUnderTest> mountShell(
   WidgetTester tester, {
   bool checked = false,
@@ -114,6 +119,11 @@ Future<ShellUnderTest> mountShell(
   bool signedIn = false,
   double credits = 3,
   bool themed = false,
+  Size size = const Size(390, 844),
+  List<DisplayFeature> features = const [],
+  EdgeInsets insets = EdgeInsets.zero,
+  String? theme,
+  GlobalKey? shot,
 }) async {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -155,6 +165,7 @@ Future<ShellUnderTest> mountShell(
     if (autoCheckSpent) 'first_check_done': true,
     // Keeps the scheduled background check out of these tests.
     'auto_scan_last_at': now.millisecondsSinceEpoch,
+    if (theme != null) 'app_theme_mode': theme,
     if (found.isNotEmpty) ...<String, Object>{
       'verdict_score': LastScanVerdictController.computeScore(
           threats: found, coveragePercent: 60),
@@ -180,8 +191,19 @@ Future<ShellUnderTest> mountShell(
     await verdict.load();
   });
 
-  tester.view.physicalSize = const Size(390, 844) * 3;
+  tester.view.physicalSize = size * 3;
   tester.view.devicePixelRatio = 3;
+  tester.view.displayFeatures = features;
+  if (insets != EdgeInsets.zero) {
+    final FakeViewPadding bars = FakeViewPadding(
+      left: insets.left * 3,
+      top: insets.top * 3,
+      right: insets.right * 3,
+      bottom: insets.bottom * 3,
+    );
+    tester.view.padding = bars;
+    tester.view.viewPadding = bars;
+  }
   addTearDown(tester.view.reset);
 
   final AccountProvider account =
@@ -197,38 +219,39 @@ Future<ShellUnderTest> mountShell(
   );
   if (themed) addTearDown(() => AppColors.uiBrightness = Brightness.dark);
 
-  await tester.pumpWidget(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-        ChangeNotifierProvider<LastScanVerdictController>.value(value: verdict),
-        ChangeNotifierProvider(create: (_) => ProtectionStreakController()),
-        ChangeNotifierProvider<AccountProvider>.value(value: account),
-        ChangeNotifierProvider<ScanCreditProvider>.value(value: sale.provider),
-        ChangeNotifierProvider<IapService>.value(value: IapService.instance),
-        ChangeNotifierProvider<DarkWebProvider>.value(value: darkWeb),
-        ChangeNotifierProvider(create: (_) => NetworkFirewallProvider()),
-        ChangeNotifierProvider(create: (_) => SmsProvider()),
-        ChangeNotifierProvider(create: (_) => DesktopSecurityProvider()),
-      ],
-      child: themed
-          // The app's own theming: both themes, the mode from settings, and
-          // the brand tokens told which one is showing.
-          ? Consumer<SettingsProvider>(
-              builder: (context, settings, _) => MaterialApp(
-                theme: AppTheme.light,
-                darkTheme: AppTheme.dark,
-                themeMode: settings.themeMode,
-                builder: (context, child) {
-                  AppColors.syncWith(context);
-                  return child ?? const SizedBox.shrink();
-                },
-                home: home,
-              ),
-            )
-          : MaterialApp(home: home),
-    ),
+  final Widget app = MultiProvider(
+    providers: [
+      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider<LastScanVerdictController>.value(value: verdict),
+      ChangeNotifierProvider(create: (_) => ProtectionStreakController()),
+      ChangeNotifierProvider<AccountProvider>.value(value: account),
+      ChangeNotifierProvider<ScanCreditProvider>.value(value: sale.provider),
+      ChangeNotifierProvider<IapService>.value(value: IapService.instance),
+      ChangeNotifierProvider<DarkWebProvider>.value(value: darkWeb),
+      ChangeNotifierProvider(create: (_) => NetworkFirewallProvider()),
+      ChangeNotifierProvider(create: (_) => SmsProvider()),
+      ChangeNotifierProvider(create: (_) => DesktopSecurityProvider()),
+    ],
+    child: themed
+        // The app's own theming: both themes, the mode from settings, and
+        // the brand tokens told which one is showing.
+        ? Consumer<SettingsProvider>(
+            builder: (context, settings, _) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: settings.themeMode,
+              builder: (context, child) {
+                AppColors.syncWith(context);
+                return child ?? const SizedBox.shrink();
+              },
+              home: home,
+            ),
+          )
+        : MaterialApp(debugShowCheckedModeBanner: false, home: home),
   );
+  await tester
+      .pumpWidget(shot == null ? app : RepaintBoundary(key: shot, child: app));
   // First frame: the device has not answered yet.
   await tester.pump();
   // The answer lands, and whatever it starts gets time to open.

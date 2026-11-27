@@ -137,6 +137,7 @@ class HomeBrief {
     required this.shieldsKnown,
     required this.live,
     required this.still,
+    required this.allClear,
   });
 
   final HomeMoment moment;
@@ -174,6 +175,10 @@ class HomeBrief {
 
   /// Checked, and nothing is watching on its own.
   final bool still;
+
+  /// A recent check that could look deep found nothing, and nothing found
+  /// is waiting: the one case Home says no signs of being watched.
+  final bool allClear;
 
   /// Guards that keep watching without being asked. The others are tools that
   /// wait to be used, and a tool that waits is not a watch.
@@ -242,6 +247,7 @@ class HomeBrief {
     final String headline;
     String? proof;
     String? action;
+    bool allClear = false;
     switch (moment) {
       case HomeMoment.fresh:
         headline = 'Let’s check your $deviceNoun.';
@@ -260,6 +266,7 @@ class HomeBrief {
       case HomeMoment.clear:
         final bool old = now.difference(lastScanAt ?? now).inDays > _freshDays;
         final bool shallow = verdictScore < _deepEnough;
+        allClear = !old && !shallow;
         headline = old
             ? 'Nothing found last time.'
             : shallow
@@ -293,6 +300,7 @@ class HomeBrief {
       shieldsKnown: guardsResolved,
       live: live,
       still: still,
+      allClear: allClear,
     );
   }
 

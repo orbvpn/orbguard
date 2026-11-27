@@ -203,6 +203,9 @@ class AppIcons {
   static const String medal = 'medal_star';
   static const String medalRibbon = 'medal_ribbon';
   static const String crown = 'crown';
+  static const String pulse = 'pulse';
+  static const String moon = 'moon';
+  static const String sun = 'sun_2';
   static const String cup = 'cup_star';
 
   // Business & Stats

@@ -41,7 +41,8 @@
 				<string>CA92.1</string>
 				<!-- 1C8F.1 — UserDefaults(suiteName:) on the shared app group,
 				     read/written by the app and its extensions:
-				     ios/Shared/SharedDataManager.swift:116-117 -->
+				     ios/Shared/SharedDataManager.swift:116-117, and the glance
+				     the widgets read: Runner/GlanceChannelHandler.swift -->
 				<string>1C8F.1</string>
 			</array>
 		</dict>

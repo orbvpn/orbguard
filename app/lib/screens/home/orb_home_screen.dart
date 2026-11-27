@@ -38,10 +38,32 @@ import '../../services/home/last_scan_verdict_controller.dart';
 import '../../services/home/privacy_score_engine.dart';
 import '../../utils/host_platform.dart';
 import '../../widgets/home/care_card.dart';
+import '../../widgets/home/check_list.dart';
 import '../../widgets/home/orb_hero.dart';
 import '../../widgets/home/orb_ring.dart';
 import '../../widgets/home/score_sheet.dart';
+import '../../widgets/home/shield_moon.dart';
 import '../../widgets/home/today_card.dart';
+
+/// Where Home is drawn.
+enum HomeLayout {
+  /// A phone: one column, with Today under the action.
+  column,
+
+  /// One pane of two. The other pane holds Today, the shields and, while a
+  /// check runs, its list of checks, so Home is the ring, the verdict and
+  /// the one action.
+  pane,
+
+  /// The middle column of a desktop window. The sidebar holds the brand and
+  /// the account, so Home has no top row of its own.
+  desk,
+
+  /// The top half of a foldable half open on a table. The ring stands
+  /// beside the verdict where there is width for both, and the other half,
+  /// lying flat, holds Today, the list of checks and the tab bar.
+  stand,
+}
 
 class OrbHomeScreen extends StatelessWidget {
   const OrbHomeScreen({
@@ -64,7 +86,15 @@ class OrbHomeScreen extends StatelessWidget {
     this.unknownVpnActive,
     this.platform,
     this.clock,
+    this.layout = HomeLayout.column,
+    this.selectedShield,
   });
+
+  /// Where Home is drawn.
+  final HomeLayout layout;
+
+  /// The shield whose screen is open in the other pane, marked on the ring.
+  final Shield? selectedShield;
 
   /// The record of the last check on the Today card was pressed: show that
   /// check's results again.
@@ -156,7 +186,7 @@ class OrbHomeScreen extends StatelessWidget {
             .map((g) => g.state)
             .firstOrNull;
         final String? action = brief.action;
-        final HomeGap? gap = brief.gaps.firstOrNull;
+        final HomeGap? firstGap = brief.gaps.firstOrNull;
         final int waiting = brief.gaps.length - 1;
 
         // The check, while one runs: what the engine has reported so far.
@@ -173,8 +203,138 @@ class OrbHomeScreen extends StatelessWidget {
                 ? steps[focus].doing
                 : 'Opening your results';
 
+        Widget topRow() => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _TopRow(
+                alerts: alerts,
+                accountInitial: accountInitial,
+                // While a check runs the row keeps only the promise:
+                // nothing here should pull the eye off the check.
+                quiet: checking,
+                onTrustTap: onTrustTap,
+                onAlertsTap: onAlertsTap,
+                onAccountTap: onAccountTap,
+              ),
+            );
+
+        Widget hero(double orbit) => OrbHero(
+              brief: brief,
+              orbit: orbit,
+              deviceNoun: noun,
+              selected: selectedShield,
+              checking: checking
+                  ? [for (final CheckStepState s in states) _segment(s)]
+                  : null,
+              ringLabel: checking
+                  ? 'Checking. ${run.finished} of ${steps.length} '
+                      'checks done.'
+                  : brief.checked
+                      ? 'Privacy score ${score.value} of 1000, '
+                          '${score.band}. Show how it adds up'
+                      : 'Not checked yet. Run my first check',
+              onRingTap: checking
+                  ? null
+                  : brief.checked
+                      ? () => ScoreSheet.show(context,
+                          score: score,
+                          onFactorTap: onFactorTap,
+                          platform: platform)
+                      : onRunCheck,
+              onShieldTap: onShieldTap,
+            );
+
+        Widget verdictLine(double size, double gap, {bool start = false}) =>
+            Padding(
+              padding: EdgeInsets.fromLTRB(start ? 0 : 22, gap, 22, 0),
+              child: Align(
+                alignment:
+                    start ? AlignmentDirectional.centerStart : Alignment.center,
+                child: Semantics(
+                  header: true,
+                  child: BalancedText(headline,
+                      textAlign: start ? TextAlign.start : TextAlign.center,
+                      style: BrandText.display(size: size)),
+                ),
+              ),
+            );
+
+        Widget proofLine(String proof, double gap, {bool start = false}) =>
+            Padding(
+              padding: EdgeInsets.fromLTRB(start ? 0 : 22, gap, 22, 0),
+              child: _Proof(
+                text: proof,
+                start: start,
+                dot: checking
+                    ? Brand.limeInk
+                    : brief.moment == HomeMoment.gap
+                        ? Brand.amberInk
+                        : brief.moment == HomeMoment.clear && brief.live
+                            ? Brand.limeInk
+                            : null,
+              ),
+            );
+
+        Widget homeAction(double gap, double pad,
+                {double? buttonWidth, bool start = false}) =>
+            Padding(
+              padding: EdgeInsets.fromLTRB(start ? 0 : 20, gap, 20, 0),
+              child: firstGap != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CareCard(
+                          gap: firstGap,
+                          onClose: onFactorTap == null
+                              ? null
+                              : () => onFactorTap!(firstGap.factor.id),
+                        ),
+                        if (waiting > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              '$waiting more to close after this one.',
+                              textAlign: TextAlign.center,
+                              style: BrandText.body(size: 13.5)
+                                  .copyWith(height: Brand.bodyHeight(1.45)),
+                            ),
+                          ),
+                      ],
+                    )
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                            maxWidth: buttonWidth ?? double.infinity),
+                        child: BrandButton(
+                          label: action ?? 'Check now',
+                          onPressed: onRunCheck,
+                          borderRadius: 16,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: pad),
+                        ),
+                      ),
+                    ),
+            );
+
         return LayoutBuilder(
           builder: (context, constraints) {
+            if (layout != HomeLayout.column) {
+              return _wide(
+                context,
+                constraints,
+                topRow: layout == HomeLayout.desk ? null : topRow(),
+                hero: hero,
+                verdictLine: verdictLine,
+                proof: proof == null
+                    ? null
+                    : (gap, {bool start = false}) =>
+                        proofLine(proof, gap, start: start),
+                // While a check runs the other pane lists the checks, so the
+                // action has nothing to stand in for it here.
+                action: checking ? null : homeAction,
+                tall: firstGap != null,
+              );
+            }
+
             final double reserve = GlassTheme.bottomNavClearance +
                 MediaQuery.paddingOf(context).bottom;
             // One readable column, centred on a wide screen.
@@ -188,19 +348,7 @@ class OrbHomeScreen extends StatelessWidget {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(side, 8, side, 16 + reserve),
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: _TopRow(
-                    alerts: alerts,
-                    accountInitial: accountInitial,
-                    // While a check runs the row keeps only the promise:
-                    // nothing here should pull the eye off the check.
-                    quiet: checking,
-                    onTrustTap: onTrustTap,
-                    onAlertsTap: onAlertsTap,
-                    onAccountTap: onAccountTap,
-                  ),
-                ),
+                topRow(),
                 // The ring glides to its place when the page under it
                 // changes, so it never jumps.
                 AnimatedContainer(
@@ -210,58 +358,13 @@ class OrbHomeScreen extends StatelessWidget {
                   curve: Curves.easeOutCubic,
                   height: fit.topGap,
                 ),
-                OrbHero(
-                  brief: brief,
-                  orbit: fit.orbit,
-                  deviceNoun: noun,
-                  checking: checking
-                      ? [for (final CheckStepState s in states) _segment(s)]
-                      : null,
-                  ringLabel: checking
-                      ? 'Checking. ${run.finished} of ${steps.length} '
-                          'checks done.'
-                      : brief.checked
-                          ? 'Privacy score ${score.value} of 1000, '
-                              '${score.band}. Show how it adds up'
-                          : 'Not checked yet. Run my first check',
-                  onRingTap: checking
-                      ? null
-                      : brief.checked
-                          ? () => ScoreSheet.show(context,
-                              score: score,
-                              onFactorTap: onFactorTap,
-                              platform: platform)
-                          : onRunCheck,
-                  onShieldTap: onShieldTap,
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(22, fit.headlineGap, 22, 0),
-                  child: Center(
-                    child: Semantics(
-                      header: true,
-                      child: BalancedText(headline,
-                          style: BrandText.display(size: fit.headlineSize)),
-                    ),
-                  ),
-                ),
-                if (proof != null)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(22, fit.proofGap, 22, 0),
-                    child: _Proof(
-                      text: proof,
-                      dot: checking
-                          ? Brand.limeInk
-                          : brief.moment == HomeMoment.gap
-                              ? Brand.amberInk
-                              : brief.moment == HomeMoment.clear && brief.live
-                                  ? Brand.limeInk
-                                  : null,
-                    ),
-                  ),
+                hero(fit.orbit),
+                verdictLine(fit.headlineSize, fit.headlineGap),
+                if (proof != null) proofLine(proof, fit.proofGap),
                 if (checking)
                   Padding(
                     padding: EdgeInsets.fromLTRB(28, fit.actionGap, 28, 0),
-                    child: _CheckList(
+                    child: CheckList(
                       steps: steps,
                       states: states,
                       focus: focus,
@@ -269,38 +372,7 @@ class OrbHomeScreen extends StatelessWidget {
                     ),
                   )
                 else ...[
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(20, fit.actionGap, 20, 0),
-                    child: gap != null
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              CareCard(
-                                gap: gap,
-                                onClose: onFactorTap == null
-                                    ? null
-                                    : () => onFactorTap!(gap.factor.id),
-                              ),
-                              if (waiting > 0)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Text(
-                                    '$waiting more to close after this one.',
-                                    textAlign: TextAlign.center,
-                                    style: BrandText.body(size: 13.5).copyWith(
-                                        height: Brand.bodyHeight(1.45)),
-                                  ),
-                                ),
-                            ],
-                          )
-                        : BrandButton(
-                            label: action ?? 'Check now',
-                            onPressed: onRunCheck,
-                            borderRadius: 16,
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 20, vertical: fit.actionPad),
-                          ),
-                  ),
+                  homeAction(fit.actionGap, fit.actionPad),
                   Padding(
                     padding: EdgeInsets.fromLTRB(20, fit.todayGap, 20, 0),
                     child: TodayCard(today: today, onCheckTap: onResultsTap),
@@ -311,6 +383,124 @@ class OrbHomeScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  /// Home in a pane or a desktop column: the top row at the top, and the
+  /// ring, the verdict and the action centred in the height under it. The
+  /// ring takes its wide size when the height allows, and gives some up when
+  /// it does not, so the action never falls below the fold.
+  Widget _wide(
+    BuildContext context,
+    BoxConstraints constraints, {
+    required Widget? topRow,
+    required Widget Function(double orbit) hero,
+    required Widget Function(double size, double gap, {bool start}) verdictLine,
+    required Widget Function(double gap, {bool start})? proof,
+    required Widget Function(double gap, double pad,
+            {double? buttonWidth, bool start})?
+        action,
+    required bool tall,
+  }) {
+    final bool desk = layout == HomeLayout.desk;
+    final bool stand = layout == HomeLayout.stand;
+    // The tab bar is in this column only in a pane.
+    final double reserve = desk || stand
+        ? 0
+        : GlassTheme.bottomNavClearance + MediaQuery.paddingOf(context).bottom;
+    final double column = math.min(constraints.maxWidth, _maxColumn);
+    final double side = (constraints.maxWidth - column) / 2;
+    const double above = 8, below = 16;
+    final double rowHeight = topRow == null ? 0 : 44;
+    final double room = math.max(
+        0, constraints.maxHeight - reserve - above - below - rowHeight);
+
+    final double headlineSize = desk ? 32 : 28;
+    // Everything in the block apart from the ring itself.
+    final double around = 8 +
+        14 +
+        2 * headlineSize * 1.12 +
+        (proof == null ? 0 : 10 + 20) +
+        (action == null ? 0 : 22 + (tall ? 190 : 56)) +
+        24;
+    final double widest = (column - ShieldMoon.target - 8) / 2;
+    final double orbit = math.min(desk ? _deskOrbit : _paneOrbit, widest);
+    final double fitted =
+        ((room - around) / 2).clamp(OrbHero.minOrbit, math.max(orbit, 96));
+
+    if (stand && constraints.maxWidth >= _standRowWidth) {
+      // Ring and words side by side, the pair centred in the half.
+      final double ringOrbit =
+          ((room - 8 - 24) / 2).clamp(OrbHero.minOrbit, _standOrbit).toDouble();
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(0, above, 0, below),
+        child: Column(
+          children: [
+            if (topRow != null) topRow,
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: room),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 2 * ringOrbit + ShieldMoon.target,
+                          child: hero(ringOrbit),
+                        ),
+                        const SizedBox(width: 40),
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 340),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                verdictLine(31, 0, start: true),
+                                if (proof != null) proof(14, start: true),
+                                if (action != null) action(22, 15, start: true),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(side, above, side, below + reserve),
+      child: Column(
+        children: [
+          if (topRow != null) topRow,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: room),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 12),
+                hero(math.min(orbit, fitted)),
+                verdictLine(headlineSize, 14),
+                if (proof != null) proof(10),
+                if (action != null)
+                  action(22, 17, buttonWidth: desk ? 320 : null),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -333,6 +523,16 @@ class OrbHomeScreen extends StatelessWidget {
   /// Home reads as one column. On a tablet or a desktop window it keeps this
   /// width and sits in the middle, instead of stretching one button across.
   static const double _maxColumn = 480;
+
+  /// The orbit in a pane of a foldable or a tablet, where the ring is 216
+  /// across, and in a desktop window's column, where it is 264.
+  static const double _paneOrbit = 144;
+  static const double _deskOrbit = 176;
+
+  /// Half open on a table, the ring is 232 across beside the verdict, once
+  /// the half is wide enough for both.
+  static const double _standOrbit = 155;
+  static const double _standRowWidth = 600;
 }
 
 /// How Home spends a screen's height.
@@ -426,7 +626,7 @@ class _Fit {
         proofGap +
         20 +
         actionGap;
-    final int fits = ((room - above - 12) / _CheckList.rowHeight).floor();
+    final int fits = ((room - above - 12) / CheckList.rowHeight).floor();
     return math.min(count, math.max(2, fits));
   }
 
@@ -622,28 +822,39 @@ class _RoundButton extends StatelessWidget {
 /// The line of evidence under the headline, with a small dot when it speaks
 /// for something live (lime) or for something found (amber).
 class _Proof extends StatelessWidget {
-  const _Proof({required this.text, this.dot});
+  const _Proof({required this.text, this.dot, this.start = false});
 
   final String text;
   final Color? dot;
 
+  /// Set at the start of its line, beside the ring, instead of centred.
+  final bool start;
+
   @override
   Widget build(BuildContext context) {
     final Color? dot = this.dot;
+    final double line = 14 * Brand.bodyHeight(1.42);
+    // The dot sits on the first line, so a line that wraps keeps it there.
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment:
+          start ? MainAxisAlignment.start : MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (dot != null) ...[
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: dot),
+          Padding(
+            padding: EdgeInsets.only(top: (line - 6) / 2),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: dot),
+            ),
           ),
           const SizedBox(width: 9),
         ],
         Flexible(
           child: BalancedText(
             text,
+            textAlign: start ? TextAlign.start : TextAlign.center,
             style: BrandText.body(size: 14, weight: FontWeight.w500)
                 .copyWith(height: Brand.bodyHeight(1.42)),
           ),
@@ -651,289 +862,4 @@ class _Proof extends StatelessWidget {
       ],
     );
   }
-}
-
-/// The checks of the check that is running, one row each.
-///
-/// The list is as tall as the screen allows and no taller. When it cannot
-/// show every check at once it follows the one running now, so nobody has to
-/// scroll to see where the check is.
-class _CheckList extends StatefulWidget {
-  const _CheckList({
-    required this.steps,
-    required this.states,
-    required this.focus,
-    required this.rows,
-  });
-
-  static const double rowHeight = 38;
-
-  final List<CheckStep> steps;
-  final List<CheckStepState> states;
-
-  /// Index of the step to keep in view.
-  final int focus;
-
-  /// How many rows show at once.
-  final int rows;
-
-  @override
-  State<_CheckList> createState() => _CheckListState();
-}
-
-class _CheckListState extends State<_CheckList> {
-  final ScrollController _scroll = ScrollController();
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  /// Keeps the running step one row above the foot of the list.
-  void _follow() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
-      final double height = widget.rows * _CheckList.rowHeight;
-      final double want = ((widget.focus + 2) * _CheckList.rowHeight - height)
-          .clamp(0.0, _scroll.position.maxScrollExtent);
-      if ((want - _scroll.offset).abs() < 0.5) return;
-      if (MediaQuery.disableAnimationsOf(context)) {
-        _scroll.jumpTo(want);
-      } else {
-        _scroll.animateTo(want,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    _follow();
-    final bool all = widget.rows >= widget.steps.length;
-    final Widget list = SingleChildScrollView(
-      controller: _scroll,
-      // The list moves itself. A drag here would only fight it.
-      physics: const NeverScrollableScrollPhysics(),
-      child: Column(
-        children: [
-          for (int i = 0; i < widget.steps.length; i++)
-            _CheckRow(step: widget.steps[i], state: widget.states[i]),
-        ],
-      ),
-    );
-
-    return SizedBox(
-      key: const ValueKey('check-list'),
-      height: widget.rows * _CheckList.rowHeight,
-      child: all
-          ? list
-          : ListenableBuilder(
-              listenable: _scroll,
-              builder: (context, child) {
-                // Rows fade out at an edge that has more behind it.
-                final bool has =
-                    _scroll.hasClients && _scroll.position.hasContentDimensions;
-                final bool above = has && _scroll.offset > 0.5;
-                final bool below = !has ||
-                    _scroll.offset < _scroll.position.maxScrollExtent - 0.5;
-                return ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  shaderCallback: (bounds) => LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0, 0.16, 0.84, 1],
-                    colors: [
-                      above ? Colors.transparent : Brand.bg,
-                      Brand.bg,
-                      Brand.bg,
-                      below ? Colors.transparent : Brand.bg,
-                    ],
-                  ).createShader(bounds),
-                  child: child,
-                );
-              },
-              child: list,
-            ),
-    );
-  }
-}
-
-class _CheckRow extends StatelessWidget {
-  const _CheckRow({required this.step, required this.state});
-
-  final CheckStep step;
-  final CheckStepState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool waiting = state == CheckStepState.pending;
-    final bool failed = state == CheckStepState.unavailable;
-    return Semantics(
-      label: '${step.name}, ${switch (state) {
-        CheckStepState.pending => 'waiting',
-        CheckStepState.running => 'checking now',
-        CheckStepState.done => 'done',
-        CheckStepState.unavailable => 'could not run',
-      }}',
-      excludeSemantics: true,
-      child: SizedBox(
-        height: _CheckList.rowHeight,
-        child: Row(
-          children: [
-            _CheckMark(state: state),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                step.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: BrandText.body(
-                  size: 14.5,
-                  color: waiting ? Brand.text2 : Brand.text,
-                ).copyWith(height: 1.2),
-              ),
-            ),
-            if (failed)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(start: 10),
-                child: Text(
-                  'Could not run',
-                  maxLines: 1,
-                  style: BrandText.body(size: 12.5, color: Brand.amberInk)
-                      .copyWith(height: 1.2),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The 18 mark at the head of a row: an empty circle while the step waits, a
-/// turning lime arc while it runs, a lime disc with a tick once it is done,
-/// and an amber circle when it could not run.
-class _CheckMark extends StatefulWidget {
-  const _CheckMark({required this.state});
-
-  final CheckStepState state;
-
-  @override
-  State<_CheckMark> createState() => _CheckMarkState();
-}
-
-class _CheckMarkState extends State<_CheckMark>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _turn = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 800),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(_CheckMark old) {
-    super.didUpdateWidget(old);
-    _sync();
-  }
-
-  /// The arc turns only while this step runs, and not at all for someone who
-  /// asked for less motion.
-  void _sync() {
-    final bool turn = widget.state == CheckStepState.running &&
-        !MediaQuery.disableAnimationsOf(context);
-    if (turn && !_turn.isAnimating) {
-      _turn.repeat();
-    } else if (!turn && _turn.isAnimating) {
-      _turn.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _turn.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget mark = switch (widget.state) {
-      CheckStepState.pending => _circle(Brand.border),
-      CheckStepState.unavailable => _circle(Brand.amberInk),
-      CheckStepState.running => RotationTransition(
-          turns: _turn,
-          child: CustomPaint(painter: _ArcPainter(Brand.limeInk)),
-        ),
-      CheckStepState.done => DecoratedBox(
-          decoration:
-              const BoxDecoration(shape: BoxShape.circle, color: Brand.lime),
-          child: CustomPaint(painter: _TickPainter(Brand.onLime)),
-        ),
-    };
-    return SizedBox.square(dimension: 18, child: mark);
-  }
-
-  static Widget _circle(Color color) => DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 1.5),
-        ),
-      );
-}
-
-/// Three quarters of a circle, so its turning shows.
-class _ArcPainter extends CustomPainter {
-  const _ArcPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawArc(
-      (Offset.zero & size).deflate(0.75),
-      0,
-      math.pi * 1.5,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..strokeCap = StrokeCap.round
-        ..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ArcPainter old) => old.color != color;
-}
-
-class _TickPainter extends CustomPainter {
-  const _TickPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width, h = size.height;
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.29, h * 0.52)
-        ..lineTo(w * 0.44, h * 0.67)
-        ..lineTo(w * 0.72, h * 0.36),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_TickPainter old) => old.color != color;
 }

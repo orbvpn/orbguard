@@ -2,6 +2,8 @@
 // clean, what this device cannot run and what broke, never counting either
 // of those as passed, and never a number the record does not hold.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +15,7 @@ import 'package:orbguard/services/home/privacy_score_engine.dart';
 import 'package:orbguard/services/iap/iap_service.dart';
 import 'package:orbguard/widgets/home/orb_ring.dart';
 import 'package:orbguard/widgets/home/results_sheet.dart';
+import 'package:orbguard/widgets/home/share_card.dart';
 import 'package:orbguard/widgets/sale/credit_line.dart';
 
 import '../../support/real_fonts.dart';
@@ -90,6 +93,7 @@ void main() {
     double width = 390,
     bool dark = true,
     bool premium = false,
+    bool checkedToday = false,
   }) async {
     opened.clear();
     final FakeSaleAccount account =
@@ -109,6 +113,7 @@ void main() {
               onOpenThing: opened.add,
               onOpenGap: opened.add,
               platform: platform,
+              checkedToday: checkedToday,
             ),
             child: const Text('open'),
           ),
@@ -130,6 +135,68 @@ void main() {
 
   OrbStatus ring(WidgetTester tester) =>
       tester.widget<OrbRing>(find.byType(OrbRing)).status;
+
+  group('sharing', () {
+    testWidgets('an all clear from today can be shared, beside a lime Done',
+        (tester) async {
+      await open(tester, _results(), checkedToday: true);
+      final List<BrandButton> all = buttons(tester).toList();
+      expect(all.map((b) => b.label), ['Share', 'Done']);
+      expect(
+          all
+              .where((b) => b.variant == BrandButtonVariant.primary)
+              .map((b) => b.label),
+          ['Done']);
+
+      await tester.tap(find.text('Share'));
+      await settle(tester);
+      expect(find.text('Share your result'), findsOneWidget);
+      expect(find.byType(ShareCard), findsOneWidget);
+      expect(find.text('No signs I am being watched.'), findsOneWidget);
+      expect(find.text('Checked today with OrbGuard'), findsOneWidget);
+      expect(find.text('Is your circle closed?'), findsOneWidget);
+    });
+
+    testWidgets('a check from another day is not offered as today\'s',
+        (tester) async {
+      await open(tester, _results());
+      expect(find.text('Share'), findsNothing);
+    });
+
+    testWidgets('a check with a gap still open is not shared as all clear',
+        (tester) async {
+      await open(tester, _results(gaps: [_breach]), checkedToday: true);
+      expect(find.text('Share'), findsNothing);
+    });
+
+    testWidgets('a check that broke in part is not shared', (tester) async {
+      await open(tester, _results(failed: const ['Memory']),
+          checkedToday: true);
+      expect(find.text('Share'), findsNothing);
+    });
+
+    testWidgets('Share sends the card as a picture', (tester) async {
+      final Completer<int> sent = Completer<int>();
+      final ShareImage before = shareResultImage;
+      shareResultImage = (png, {origin}) async => sent.complete(png.length);
+      addTearDown(() => shareResultImage = before);
+
+      await open(tester, _results(), checkedToday: true);
+      await tester.tap(find.text('Share'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(BrandButton, 'Share').last);
+      await tester.pump();
+      // The picture is drawn off the test's clock: let real time pass for
+      // the engine, then the test's clock for what follows it, in turn.
+      for (int i = 0; i < 40 && !sent.isCompleted; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)));
+        await tester.pump();
+      }
+      expect(sent.isCompleted, isTrue);
+      expect(await sent.future, greaterThan(1000));
+    });
+  });
 
   group('all clear', () {
     testWidgets('a whole ring, the count, every clean check, one lime Done',

@@ -1,4 +1,5 @@
 // lib/main.dart - OrbGuard with iOS 26 Liquid Glass Design
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -24,15 +25,22 @@ import 'services/home/home_brief.dart';
 import 'services/home/check_plan.dart';
 import 'services/home/check_results.dart';
 import 'services/home/check_run.dart';
+import 'services/home/glance.dart';
 import 'services/home/home_reading.dart';
+import 'services/home/home_today.dart';
 import 'services/security/vpn_watch.dart';
-import 'utils/device_words.dart';
 import 'utils/host_platform.dart';
 import 'widgets/home/results_sheet.dart';
 import 'widgets/shields/breach_fix_sheet.dart';
 import 'services/security/firewall_realtime.dart';
 import 'services/security/remediation.dart';
 import 'presentation/widgets/app_sheet.dart';
+import 'presentation/layout/desk_shell.dart';
+import 'presentation/layout/pane.dart';
+import 'presentation/layout/shell_form.dart';
+import 'widgets/home/home_side.dart';
+import 'widgets/home/score_sheet.dart';
+import 'widgets/sale/plans_sheet.dart';
 import 'presentation/widgets/sheet_panel.dart';
 import 'screens/shields/shields_screen.dart';
 import 'screens/sms_protection/sms_protection_screen.dart';
@@ -500,6 +508,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Bottom navigation state
   int _currentNavIndex = 0;
 
+  /// On a wide screen, the shield whose screen is open in the side pane.
+  Shield? _sideShield;
+
+  /// The side pane's own navigator. A shield opens in it, and so does every
+  /// sheet, so nothing lies across the hinge.
+  final GlobalKey<NavigatorState> _sideNav = GlobalKey<NavigatorState>();
+
+  /// A place under the wide shell's sheet host. Sheets the shell opens from
+  /// here go where the host says; on a phone there is no host.
+  final GlobalKey _sheetAnchor = GlobalKey();
+  BuildContext get _sheetContext => _sheetAnchor.currentContext ?? context;
+
+  /// The desktop command palette is open.
+  bool _palette = false;
+
+  /// The shape the shell takes for this window.
+  ShellForm _form() => ShellForm.of(
+        size: MediaQuery.sizeOf(context),
+        features: MediaQuery.displayFeaturesOf(context),
+        platform: _platform ?? defaultTargetPlatform,
+      );
+
+  /// Guard on a screen with room for two columns: a shield opens beside
+  /// Home instead of over it.
+  bool get _sideBySide {
+    if (context.read<SettingsProvider>().isProMode) return false;
+    final ShellKind kind = _form().kind;
+    return kind == ShellKind.split || kind == ShellKind.desk;
+  }
+
+  /// Shows a tab. On a wide screen the side pane goes back to the tab's top.
+  void _goTo(int dest) => setState(() {
+        _currentNavIndex = dest;
+        _sideShield = null;
+        _palette = false;
+      });
+
   /// The device the shell is drawn for.
   late final TargetPlatform? _platform = widget.platform ?? hostPlatform();
 
@@ -575,6 +620,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// judged, and no coverage figure quoted, before that.
   late final Future<void> _ready;
 
+  /// The home-screen widgets, the lock screen and the menu bar: told what
+  /// Home says each time it changes, and heard when they ask for a check.
+  final GlanceSync _glance = GlanceSync();
+  bool _glanceDue = false;
+
   @override
   void initState() {
     super.initState();
@@ -585,11 +635,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ..verdict = context.read<LastScanVerdictController>()
       ..coverage = () => _detectionCapability.round();
     _vpnWatch.addListener(_onVpnChanged);
+    _verdictForGlance = context.read<LastScanVerdictController>()
+      ..addListener(_glanceChanged);
+    _guards.addListener(_glanceChanged);
+    _glance
+      ..current = _glanceNow
+      ..onCheckNow = () {
+        if (mounted) unawaited(_startScan());
+      };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _watchBreaches();
       _guards.refresh();
       _refreshActivity();
+      _glanceChanged();
     });
     _ready = _initializeApp().catchError((Object e) {
       debugPrint('[OrbGuard] Start-up probes failed: $e');
@@ -603,6 +662,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _vpnWatch.removeListener(_onVpnChanged);
+    _verdictForGlance?.removeListener(_glanceChanged);
+    _guards.removeListener(_glanceChanged);
+    _glance.dispose();
     _darkWeb?.removeListener(_onBreachesChanged);
     AutoScanScheduler.instance
       ..verdict = null
@@ -663,6 +725,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return answer;
   }
 
+  /// The verdict the glance follows, kept so it can be let go of in
+  /// dispose, where the tree may no longer be read.
+  LastScanVerdictController? _verdictForGlance;
+
+  /// What a widget or the menu bar shows of Home right now.
+  Glance? _glanceNow() {
+    if (!mounted) return null;
+    final LastScanVerdictController verdict =
+        context.read<LastScanVerdictController>();
+    final DateTime now = DateTime.now();
+    return Glance.from(
+      brief: _reading().brief,
+      lastScanAt: verdict.lastScanAt,
+      today: HomeToday.from(
+        lastScanAt: verdict.lastScanAt,
+        threatCount: verdict.threatCount,
+        blockedToday: _blockedToday,
+        breachCheckedAt: context.read<DarkWebProvider>().lastBreachCheckAt,
+        streakDays: context.read<ProtectionStreakController>().currentStreak,
+        now: now,
+      ),
+    );
+  }
+
+  /// Something Home reads has changed. The glance is worked out once the
+  /// changes of this moment have all landed; one that says the same as the
+  /// last is not sent again.
+  void _glanceChanged() {
+    if (_glanceDue) return;
+    _glanceDue = true;
+    scheduleMicrotask(() {
+      _glanceDue = false;
+      final Glance? glance = _glanceNow();
+      if (glance != null) unawaited(_glance.push(glance));
+    });
+  }
+
   /// Everything Home knows right now, read the way Home reads it.
   HomeReading _reading() => HomeReading.of(
         verdict: context.read<LastScanVerdictController>(),
@@ -671,7 +770,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         unknownVpnActive: _unknownVpn,
         platform: _platform,
         now: DateTime.now(),
-        deviceNoun: DeviceWords.noun,
+        deviceNoun: deviceNounFor(_platform),
       );
 
   @override
@@ -717,13 +816,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _refreshActivity() async {
     if (!PlatformInfo.isAndroid) return;
     final n = await _firewallRt.blockedToday();
-    if (mounted) setState(() => _blockedToday = n);
+    if (mounted) {
+      setState(() => _blockedToday = n);
+      _glanceChanged();
+    }
   }
 
   /// Open a shield's own screen as a sheet over Home. The Protect tab opens
   /// the same screen for the same shield.
   void _openShield(Shield shield) {
-    showAppSheet(context, heightFactor: 0.94, child: shieldScreen(shield));
+    if (_sideBySide) {
+      setState(() => _sideShield = shield);
+      return;
+    }
+    showAppSheet(_sheetContext,
+        heightFactor: 0.94, child: shieldScreen(shield));
   }
 
   /// Route a fix, chosen on Home's gap card or in the score sheet, to the
@@ -745,13 +852,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 'enable_alerts':
         _requestAlerts();
       case 'fix_breaches':
-        showBreachFixSheet(context);
+        showBreachFixSheet(_sheetContext);
       case 'check_breaches':
         _openShield(Shield.identity);
       case 'review_vpn':
         _openShield(Shield.hiddenVpn);
       default:
-        setState(() => _currentNavIndex = 4); // Protect hub
+        _goTo(4); // Protect hub
     }
   }
 
@@ -761,7 +868,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final bool on = _guards.guards
         .any((g) => g.id == 'alerts' && g.state == GuardState.active);
     if (on) {
-      showAppSheet(context,
+      showAppSheet(_sheetContext,
           heightFactor: 0.94, child: const NotificationDisciplineScreen());
     } else {
       _requestAlerts();
@@ -871,13 +978,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // On a computer the check is the Check tab's own. Home leads there
     // instead of starting a phone check that cannot run.
     if (!isPro && _onComputer) {
-      if (userInitiated) setState(() => _currentNavIndex = 1);
+      if (userInitiated) _goTo(1);
       return;
     }
 
     // One check at a time. Asked again while one runs, show the one running.
     if (_check.running) {
-      setState(() => _currentNavIndex = 0);
+      _goTo(0);
       return;
     }
 
@@ -894,7 +1001,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Background auto-scans are exempt too.
     final bool metered =
         userInitiated && context.read<LastScanVerdictController>().hasScanned;
-    if (metered && !await ensureScanCredit(context)) return;
+    if (metered && !await ensureScanCredit(_sheetContext)) return;
     if (!mounted) return;
 
     // Honor the Deep Scan setting unless a caller explicitly overrides it.
@@ -911,7 +1018,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Guard: the check runs on Home, where the ring is, and ends on a sheet
   /// that says only what happened.
   Future<void> _runCheckOnHome({required bool deep}) async {
-    setState(() => _currentNavIndex = 0);
+    _goTo(0);
     final CheckRunner engine = widget.checkRunner ??
         (onProgress) => DeviceScanService.instance.performScan(
               deepScan: deep,
@@ -1019,12 +1126,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// The latest check's results, as a sheet over Home: what it found, what
   /// ran clean, what could not run, and the gaps still open.
   void _showResults() {
+    final LastScanVerdictController verdict =
+        context.read<LastScanVerdictController>();
+    final DateTime? at = verdict.lastScanAt;
+    final DateTime now = DateTime.now();
     ResultsSheet.show(
-      context,
-      results: _reading().results(context.read<LastScanVerdictController>()),
+      _sheetContext,
+      results: _reading().results(verdict),
       onOpenThing: _openThing,
       onOpenGap: (gap) => _onFactorTap(gap.factor.id),
       platform: _platform,
+      checkedToday: at != null &&
+          at.year == now.year &&
+          at.month == now.month &&
+          at.day == now.day,
     );
   }
 
@@ -1056,7 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         TextStyle(fontSize: 14.5, height: 1.45, color: cs.onSurfaceVariant);
 
     showAppSheet(
-      context,
+      _sheetContext,
       child: SheetPanel(
         title: thing.title,
         body: Column(
@@ -1088,7 +1203,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// The engine could not run at all. Said plainly, with nothing recorded.
   void _showCheckFailed() {
     showAppSheet(
-      context,
+      _sheetContext,
       child: SheetPanel(
         title: 'The check could not run',
         body: Text(
@@ -1116,7 +1231,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     int? checksUnavailable,
   }) {
     showAppSheet(
-      context,
+      _sheetContext,
       heightFactor: 0.94,
       child: FindingsScreen(
         threats: threats,
@@ -1164,7 +1279,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _showPermissionWarning() {
     showAppSheet(
-      context,
+      _sheetContext,
       child: SheetPanel(
         title: 'Enable deeper scanning',
         body: Text(
@@ -1217,6 +1332,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Intel tab and drops the consumer Protect hub.
     final navDests = isPro ? const [0, 1, 2, 3] : const [0, 4, 1, 3];
     final effIndex = navDests.contains(_currentNavIndex) ? _currentNavIndex : 0;
+
+    // A foldable, a tablet or a desktop window: the ring keeps a column of
+    // its own and what it opens takes the rest. Pro keeps its own pages.
+    if (!isPro) {
+      final ShellForm form = _form();
+      if (form.kind != ShellKind.phone) {
+        return _buildWide(form,
+            navDests: navDests, current: effIndex, background: backgroundColor);
+      }
+    }
     // Guard's tabs carry their own tops: Home its row (trust, alerts,
     // account), Protect, Check and Me a heading each. The shell's header
     // steps aside there. A computer's Check tab is the one Guard page that
@@ -1292,11 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const BoxConstraints(maxWidth: GlassTheme.contentMaxWidth),
                 child: GlassBottomNavBar(
                   currentIndex: navDests.indexOf(effIndex),
-                  onTap: (pos) {
-                    setState(() {
-                      _currentNavIndex = navDests[pos];
-                    });
-                  },
+                  onTap: (pos) => _goTo(navDests[pos]),
                   items: [
                     for (final dest in navDests)
                       _navItemFor(dest, isPro: isPro),
@@ -1414,6 +1535,254 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// The shell on a foldable, a tablet or a desktop window. Nothing in it is
+  /// a stretched phone: the ring keeps a column of its own, what it opens
+  /// takes the other, and every sheet opens where the host puts it.
+  Widget _buildWide(
+    ShellForm form, {
+    required List<int> navDests,
+    required int current,
+    required Color background,
+  }) {
+    final bool desk = form.kind == ShellKind.desk;
+    final bool tabletop = form.kind == ShellKind.tabletop;
+    final OrbHomeScreen home = _guardHome(
+      layout: desk
+          ? HomeLayout.desk
+          : tabletop
+              ? HomeLayout.stand
+              : HomeLayout.pane,
+    );
+    final Widget side =
+        _sidePane(current, home, columns: desk ? 3 : 2, navBelow: tabletop);
+    final Widget nav = GlassBottomNavBar(
+      currentIndex: navDests.indexOf(current),
+      onTap: (pos) => _goTo(navDests[pos]),
+      items: [for (final dest in navDests) _navItemFor(dest, isPro: false)],
+    );
+
+    final Widget body;
+    if (desk) {
+      body = _deskBody(home, side, navDests: navDests, current: current);
+    } else if (tabletop) {
+      // Half open on a table: the ring stands in the top half; the half
+      // lying flat, where the hand is, holds the rest and the tab bar.
+      body = Stack(
+        children: [
+          const BrandBed(),
+          Pane(
+            rect: form.primary,
+            child: SafeArea(bottom: false, child: home),
+          ),
+          Pane(
+            rect: form.secondary,
+            child: Stack(
+              children: [
+                side,
+                Positioned(left: 0, right: 0, bottom: 0, child: nav),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      body = Stack(
+        children: [
+          const BrandBed(),
+          Pane(
+            rect: form.primary,
+            child: Stack(
+              children: [
+                SafeArea(bottom: false, child: home),
+                Positioned(left: 0, right: 0, bottom: 0, child: nav),
+              ],
+            ),
+          ),
+          // Panes that meet get a hairline between them. A hinge keeps its
+          // own width clear instead.
+          if (form.primary.right == form.secondary.left)
+            Positioned(
+              left: form.secondary.left,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              child: ColoredBox(color: Brand.hairline),
+            ),
+          Pane(rect: form.secondary, child: side),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: background,
+      drawer: desk ? null : _buildNavigationDrawer(false),
+      body: SheetHost(
+        navigator: desk ? null : _sideNav,
+        maxWidth: desk ? 480 : null,
+        maxHeightFactor: desk ? 0.9 : null,
+        child: KeyedSubtree(key: _sheetAnchor, child: body),
+      ),
+    );
+  }
+
+  /// The side pane: Today and the shields beside Home, another tab's page,
+  /// or a shield's screen over either. It has a navigator of its own, so a
+  /// page opened in it stays in it.
+  Widget _sidePane(
+    int current,
+    OrbHomeScreen home, {
+    required int columns,
+    bool navBelow = false,
+  }) {
+    final Shield? shield = _sideShield;
+    final Widget root = switch (current) {
+      4 => ShieldsScreen(platform: _platform),
+      // A computer's check is its own page here, headed as one, since no
+      // shell header sits over a pane.
+      1 => _onComputer
+          ? const DesktopSecurityScreen(showBackButton: false)
+          : _buildScanContent(),
+      3 => _buildSettingsContent(),
+      _ => HomeSide(
+          home: home,
+          columns: columns,
+          padding: EdgeInsets.fromLTRB(
+              20, 18, 20, 26 + (navBelow ? GlassTheme.bottomNavClearance : 0)),
+        ),
+    };
+    // The system's back goes to the pane first: it closes the sheet or the
+    // shield open there before it would leave the app.
+    return NavigatorPopHandler<Object?>(
+      onPopWithResult: (_) => _sideNav.currentState?.maybePop(),
+      child: Navigator(
+        key: _sideNav,
+        pages: [
+          PanePage(
+            key: ValueKey<int>(current),
+            child: SafeArea(bottom: false, child: root),
+          ),
+          if (shield != null)
+            PanePage(
+                key: ValueKey<Shield>(shield), child: shieldScreen(shield)),
+        ],
+        onDidRemovePage: (page) {
+          final LocalKey? key = page.key;
+          if (key is ValueKey<Shield> && key.value == _sideShield) {
+            setState(() => _sideShield = null);
+          }
+        },
+      ),
+    );
+  }
+
+  /// A Mac window draws its content under a clear title bar, so the app
+  /// draws the bar itself. Windows and Linux keep the system's own above.
+  bool get _drawsTitleBar => _platform == TargetPlatform.macOS;
+
+  /// A desktop window: the sidebar, Home's column and the side column, with
+  /// the palette over them when it is open.
+  Widget _deskBody(
+    OrbHomeScreen home,
+    Widget side, {
+    required List<int> navDests,
+    required int current,
+  }) {
+    final TargetPlatform platform = _platform ?? defaultTargetPlatform;
+    return DeskKeys(
+      platform: platform,
+      tabs: navDests.length,
+      onPalette: () => setState(() => _palette = !_palette),
+      onTab: (pos) => _goTo(navDests[pos]),
+      child: Stack(
+        children: [
+          const BrandBed(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_drawsTitleBar) const DeskTitleBar(),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DeskSidebar(
+                      platform: platform,
+                      items: [
+                        for (final dest in navDests)
+                          _navItemFor(dest, isPro: false),
+                      ],
+                      selected: navDests.indexOf(current),
+                      onTab: (pos) => _goTo(navDests[pos]),
+                      onSearch: () => setState(() => _palette = true),
+                      onAccount: () => _goTo(3),
+                    ),
+                    SizedBox(width: ShellForm.ringColumn, child: home),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border:
+                              Border(left: BorderSide(color: Brand.hairline)),
+                        ),
+                        child: side,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_palette)
+            Positioned.fill(
+              child: CommandPalette(
+                commands: _commands(),
+                onClose: () => setState(() => _palette = false),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// What the desktop palette can do. A command is listed only where it
+  /// does what it says.
+  List<PaletteCommand> _commands() {
+    final bool checked = context.read<LastScanVerdictController>().hasScanned;
+    final bool premium = context.read<AccountProvider>().hasPremium;
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    return [
+      PaletteCommand(AppIcons.shieldCheck, 'Check now', () => _startScan()),
+      // A phone's Check tab is where a link or a message is pasted. On a
+      // computer the Scam shield takes them.
+      PaletteCommand(
+        AppIcons.chatRoundCheck,
+        'Check a link or message',
+        () => _onPhone ? _goTo(1) : _openShield(Shield.scam),
+      ),
+      PaletteCommand(AppIcons.shield, 'Open Protect', () => _goTo(4)),
+      if (checked)
+        PaletteCommand(AppIcons.pulse, 'How my score adds up', _showScore),
+      // Only the Mac build may lead to the plans.
+      if (_platform == TargetPlatform.macOS && !premium)
+        PaletteCommand(AppIcons.crown, 'Go unlimited',
+            () => showPlansSheet(_sheetContext)),
+      PaletteCommand(dark ? AppIcons.sun : AppIcons.moon, 'Switch appearance',
+          _switchAppearance),
+    ];
+  }
+
+  void _showScore() => ScoreSheet.show(
+        _sheetContext,
+        score: _reading().score,
+        onFactorTap: _onFactorTap,
+        platform: _platform,
+      );
+
+  void _switchAppearance() {
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    unawaited(context
+        .read<SettingsProvider>()
+        .setThemeMode(dark ? ThemeMode.light : ThemeMode.dark));
+  }
+
   /// Build current screen based on navigation index
   Widget _buildCurrentScreen(int index) {
     switch (index) {
@@ -1465,11 +1834,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     // Home is drawn again when the breach watch's answers change, not on
     // every step of its loading.
+    return _guardHome();
+  }
+
+  /// Guard's Home, drawn for [layout]. On a wide screen the shield open in
+  /// the side pane is marked on its ring.
+  OrbHomeScreen _guardHome({HomeLayout layout = HomeLayout.column}) {
     final int? breached = context
         .select<DarkWebProvider, int?>((watch) => watch.openBreachedAccounts);
     final DateTime? breachCheckedAt = context
         .select<DarkWebProvider, DateTime?>((watch) => watch.lastBreachCheckAt);
     return OrbHomeScreen(
+      layout: layout,
+      selectedShield: layout == HomeLayout.column ? null : _sideShield,
       onRunCheck: () => _startScan(),
       verdict: context.watch<LastScanVerdictController>(),
       guardsController: _guards,
@@ -1483,9 +1860,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       onShieldTap: _openShield,
       onFactorTap: _onFactorTap,
       onAlertsTap: _onAlertsTap,
-      onAccountTap: () => setState(() => _currentNavIndex = 3), // Me
-      onTrustTap: () => showAppSheet(context,
-          heightFactor: 0.94, child: const PrivacyExplainerScreen()),
+      onAccountTap: () => _goTo(3), // Me
+      onTrustTap: () => showAppSheet(_sheetContext,
+          heightFactor: 0.94,
+          child: PrivacyExplainerScreen(platform: _platform)),
       accountInitial: _initialOf(context.watch<AccountProvider>()),
       blockedTodayCount: () => _blockedToday,
     );
@@ -2264,7 +2642,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _showAboutDialog() {
     showAppSheet(
-      context,
+      _sheetContext,
       heightFactor: 0.7,
       child: SheetPanel(
         title: 'About OrbGuard',

@@ -30,6 +30,9 @@
 		B7A1C0022E2000020000AA02 /* OrbGuardSystemChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C0012E2000010000AA01 /* OrbGuardSystemChannel.swift */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		5BC71FF2697E63AEF6902D87 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B393E47E51830D5FBE327839 /* Pods_RunnerTests.framework */; };
+		B7A1C0042E2000040000AA04 /* GlanceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C0032E2000030000AA03 /* GlanceRing.swift */; };
+		B7A1C0062E2000060000AA06 /* GlancePopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C0052E2000050000AA05 /* GlancePopoverView.swift */; };
+		B7A1C0082E2000080000AA08 /* OrbGuardGlanceChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C0072E2000070000AA07 /* OrbGuardGlanceChannel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +93,9 @@
 		B4BAD90F62D2B21BB255A076 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		B594A9074AED15E3ED7E347D /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA4DC849B6442C074E435635 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		B7A1C0032E2000030000AA03 /* GlanceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceRing.swift; sourceTree = "<group>"; };
+		B7A1C0052E2000050000AA05 /* GlancePopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlancePopoverView.swift; sourceTree = "<group>"; };
+		B7A1C0072E2000070000AA07 /* OrbGuardGlanceChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbGuardGlanceChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -180,6 +186,9 @@
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				B7A1C0012E2000010000AA01 /* OrbGuardSystemChannel.swift */,
+				B7A1C0072E2000070000AA07 /* OrbGuardGlanceChannel.swift */,
+				B7A1C0052E2000050000AA05 /* GlancePopoverView.swift */,
+				B7A1C0032E2000030000AA03 /* GlanceRing.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -460,6 +469,9 @@
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				B7A1C0022E2000020000AA02 /* OrbGuardSystemChannel.swift in Sources */,
+				B7A1C0082E2000080000AA08 /* OrbGuardGlanceChannel.swift in Sources */,
+				B7A1C0062E2000060000AA06 /* GlancePopoverView.swift in Sources */,
+				B7A1C0042E2000040000AA04 /* GlanceRing.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);

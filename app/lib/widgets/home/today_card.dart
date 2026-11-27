@@ -11,9 +11,18 @@ import '../../presentation/widgets/pressable.dart';
 import '../../services/home/home_today.dart';
 
 class TodayCard extends StatelessWidget {
-  const TodayCard({super.key, required this.today, this.onCheckTap});
+  const TodayCard({
+    super.key,
+    required this.today,
+    this.onCheckTap,
+    this.bare = false,
+  });
 
   final HomeToday today;
+
+  /// For a pane whose own head already says "Today": the card's label and
+  /// its note are left out, so neither is printed twice.
+  final bool bare;
 
   /// Opens the results of the check a row records. With none, that row is
   /// plain text.
@@ -35,29 +44,30 @@ class TodayCard extends StatelessWidget {
     return BrandGlass(
       radius: 24,
       elevated: false,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+      padding: EdgeInsets.fromLTRB(18, bare ? 12 : 18, 18, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(today.label.toUpperCase(),
-                    style: BrandText.label(size: 11.5)),
-              ),
-              if (aside != null)
-                Text(aside,
-                    style: BrandText.body(size: 13.5).copyWith(height: 1.2)),
-            ],
-          ),
+          if (!bare)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(today.label.toUpperCase(),
+                      style: BrandText.label(size: 11.5)),
+                ),
+                if (aside != null)
+                  Text(aside,
+                      style: BrandText.body(size: 13.5).copyWith(height: 1.2)),
+              ],
+            ),
           if (empty != null)
             Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 6),
+              padding: EdgeInsets.only(top: bare ? 4 : 10, bottom: 6),
               child: Text(empty, style: BrandText.body(size: 15)),
             ),
           if (strip)
             Padding(
-              padding: const EdgeInsets.fromLTRB(2, 14, 2, 0),
+              padding: EdgeInsets.fromLTRB(2, bare ? 6 : 14, 2, 0),
               child: _DayStrip(marks: today.marks, now: today.nowHour),
             ),
           if (today.events.isNotEmpty) SizedBox(height: strip ? 6 : 4),

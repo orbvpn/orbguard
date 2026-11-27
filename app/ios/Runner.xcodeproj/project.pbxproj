@@ -12,12 +12,17 @@
 		1419CA26C499FB911E09D6FB /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46209C653DA657543BD72541 /* SharedDataManager.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		1830D11653A1E324FFB1FCF7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
+		2AE5216CF867799D4D18A8CA /* GlanceChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9213E9D27F8DA44CABE886FC /* GlanceChannelHandler.swift */; };
+		2F5C003788C8690D4C6FA63A /* GlanceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFF6AAC2A1A685374FCFF24 /* GlanceViews.swift */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		343B075FB07A957CAF22CB20 /* IdentityLookup.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8FEF3EB918B4DC1CD1D0A8DF /* IdentityLookup.framework */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		3D4DA67DFE182C34BADAA9C0 /* OrbGuardWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178ACC2524ACBA2FA2A9383E /* OrbGuardWidget.swift */; };
+		4B50B0FCB987CF6FAFDC691F /* Archivo-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0751C6E75628BC81465983A9 /* Archivo-Variable.ttf */; };
 		4B52CDD189DFE8AA0F6CC077 /* CallKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E002F581CC9E5B7E0BEE0D3 /* CallKit.framework */; };
 		5B610C48A53013509960D357 /* CallDirectoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0321A4AC9C7FDFE0A7E64D77 /* CallDirectoryStore.swift */; };
 		684BEB91AFFD89A4FF989022 /* CallKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E002F581CC9E5B7E0BEE0D3 /* CallKit.framework */; };
+		6D2767168B2E985B77D7AC4F /* OrbGuardWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CE4651689AD02593A405765F /* OrbGuardWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		71A1B45A5A1FE8D84E63ED87 /* ContentFilterChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFBA167E78864F40B4ECD31 /* ContentFilterChannelHandler.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		74976FEB5809439B3FF09F8B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
@@ -25,6 +30,7 @@
 		84192A1450F0772184B19D34 /* MessageFilterExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F44F6C931229B7E1EF29FBC /* MessageFilterExtension.swift */; };
 		8577329723E0B286E6C57E0E /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 32128A2629702286BE209930 /* GoogleService-Info.plist */; };
 		8943115A2E93BE1BE33F45F5 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B3DC6E2CAE5D39977797474 /* NetworkExtension.framework */; };
+		8C1CAE26A023346CD6CEADD6 /* GlanceLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB9189E627722B1D5BC25685 /* GlanceLogic.swift */; };
 		8E144D6522DACA43090E32A0 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46209C653DA657543BD72541 /* SharedDataManager.swift */; };
 		908ECB93D503F8532C138D90 /* CallDirectoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BEF0CC47748DE71029465A /* CallDirectoryHandler.swift */; };
 		937BC4BB24850073D57100C8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
@@ -33,21 +39,20 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A258CADB34D7F27027FF28BF /* ThreatIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */; };
 		AC775FD8B0D78307F2ECC23C /* CallDirectoryChannelHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C680E5875D6CA75E6CCD05 /* CallDirectoryChannelHandler.swift */; };
-		B6C0FF412E10000500BA51CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */; };
 		B6C0FF3E2E10000200BA51CE /* BackgroundScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */; };
+		B6C0FF412E10000500BA51CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */; };
 		B8C18A1E677B2E5E6568F4B3 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
+		BDB1A0617DDF0BEB6C4F4702 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F46E46E376DA0DB00410917 /* Foundation.framework */; };
 		C9D1916001F7DF0141EE4105 /* BlocklistCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */; };
+		CB51EB6BBC620F2E579AE3FE /* OrbRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460337CAADAB161976D811F2 /* OrbRingView.swift */; };
+		D1B587ED5700F2D66B32F5CE /* IBMPlexSans-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1C5202280026466BD0DB98EB /* IBMPlexSans-Variable.ttf */; };
 		D6097BC63DD5D784B8C629E7 /* ThreatIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */; };
+		DBBEC3E575768260791C15D8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC300C6C365126CBC3387E9D /* SwiftUI.framework */; };
+		EDDC1C02F3D5BC3960065F33 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3777347354DB871BE677F236 /* WidgetKit.framework */; };
+		FA080CFC08C2733BB51DF0A2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3F2477ED7A4A1F77F0882BC5 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		0D7233A9E3C4073C87E7CDA3 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 7688776B18CA0E7B858C2080;
-			remoteInfo = OrbGuardCallDirectory;
-		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -55,19 +60,12 @@
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
 		};
-		C6DB932A58AA4DC0303022C3 /* PBXContainerItemProxy */ = {
+		80060D8AB6068AC1B6A73C37 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 1B18BD2D8DFF9FEE47C7D5D1;
-			remoteInfo = OrbGuardFilter;
-		};
-		CE3F9AB70A436D2E416A9B43 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 2604BDE65F657B803C06AC4E;
-			remoteInfo = OrbGuardSmsFilter;
+			remoteGlobalIDString = 5835371E6317485B3F7171D2;
+			remoteInfo = OrbGuardWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -78,6 +76,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				6D2767168B2E985B77D7AC4F /* OrbGuardWidget.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -95,29 +94,38 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		010C65EB876BB8015050A74A /* OrbGuardWidget.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = OrbGuardWidget.xcconfig; sourceTree = "<group>"; };
 		02A487010DC00D409003FB3B /* OrbGuardCallDirectory.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = OrbGuardCallDirectory.entitlements; sourceTree = "<group>"; };
 		0321A4AC9C7FDFE0A7E64D77 /* CallDirectoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CallDirectoryStore.swift; sourceTree = "<group>"; };
+		0751C6E75628BC81465983A9 /* Archivo-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Archivo-Variable.ttf"; sourceTree = "<group>"; };
 		12DC0F605847CA08C1385F0D /* OrbGuardSmsFilter.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = OrbGuardSmsFilter.entitlements; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		164CE3AD9660D10AB0ECA419 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		178ACC2524ACBA2FA2A9383E /* OrbGuardWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OrbGuardWidget.swift; sourceTree = "<group>"; };
 		1A46735C9A89D65999896277 /* OrbGuardCallDirectory.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardCallDirectory.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C5202280026466BD0DB98EB /* IBMPlexSans-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "IBMPlexSans-Variable.ttf"; sourceTree = "<group>"; };
 		1E002F581CC9E5B7E0BEE0D3 /* CallKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CallKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/CallKit.framework; sourceTree = DEVELOPER_DIR; };
 		32128A2629702286BE209930 /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		35F4E7BBC5045524270D4EF8 /* BlocklistCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BlocklistCache.swift; sourceTree = "<group>"; };
+		3777347354DB871BE677F236 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
 		3A699464ACEB220BFD5839CB /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		3E30EDFC50C537E54664DC85 /* OrbGuardSmsFilter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardSmsFilter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3F2477ED7A4A1F77F0882BC5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3F70C46C0A7B5F0DF9C32B1C /* OrbGuardFilter.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = OrbGuardFilter.entitlements; sourceTree = "<group>"; };
 		40AB6AF7ADBE0B7372BF6D9F /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		460337CAADAB161976D811F2 /* OrbRingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OrbRingView.swift; sourceTree = "<group>"; };
 		46209C653DA657543BD72541 /* SharedDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedDataManager.swift; sourceTree = "<group>"; };
 		482A1D189383BFB32D53AB8D /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F46E46E376DA0DB00410917 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		5469725313A3B24A9EBD4E9E /* ThreatIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ThreatIndicator.swift; sourceTree = "<group>"; };
+		57B15D6AAA130F05B9B11094 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		58C680E5875D6CA75E6CCD05 /* CallDirectoryChannelHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CallDirectoryChannelHandler.swift; sourceTree = "<group>"; };
 		5B3DC6E2CAE5D39977797474 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/NetworkExtension.framework; sourceTree = DEVELOPER_DIR; };
+		60241B823371E56CAF5FF441 /* OrbGuardWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = OrbGuardWidget.entitlements; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		76323BD1F7CF21FC9BF2D9A2 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
@@ -125,6 +133,7 @@
 		7F44F6C931229B7E1EF29FBC /* MessageFilterExtension.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MessageFilterExtension.swift; sourceTree = "<group>"; };
 		8FEF3EB918B4DC1CD1D0A8DF /* IdentityLookup.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IdentityLookup.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/IdentityLookup.framework; sourceTree = DEVELOPER_DIR; };
 		8FF80D470DE468A46DC4BD10 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		9213E9D27F8DA44CABE886FC /* GlanceChannelHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlanceChannelHandler.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -138,7 +147,11 @@
 		B5F326C45DDC8796893D44DD /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		B6C0FF3D2E10000100BA51CE /* BackgroundScanService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackgroundScanService.swift; sourceTree = "<group>"; };
 		B6C0FF402E10000400BA51CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BC300C6C365126CBC3387E9D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
+		CE4651689AD02593A405765F /* OrbGuardWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbGuardWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D695DCFADB9715C6E72D94EB /* FilterDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilterDataProvider.swift; sourceTree = "<group>"; };
+		EB9189E627722B1D5BC25685 /* GlanceLogic.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlanceLogic.swift; sourceTree = "<group>"; };
+		EEFF6AAC2A1A685374FCFF24 /* GlanceViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlanceViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +182,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		96AF5304FE5C960B5330F6FC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BDB1A0617DDF0BEB6C4F4702 /* Foundation.framework in Frameworks */,
+				EDDC1C02F3D5BC3960065F33 /* WidgetKit.framework in Frameworks */,
+				DBBEC3E575768260791C15D8 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EB1CF9000F007C117D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -181,6 +204,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0180C4BCCB161784418832F9 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				0751C6E75628BC81465983A9 /* Archivo-Variable.ttf */,
+				1C5202280026466BD0DB98EB /* IBMPlexSans-Variable.ttf */,
+			);
+			name = Fonts;
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 		07BB8910486B875A5F21A315 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -229,6 +262,23 @@
 			path = OrbGuardFilter;
 			sourceTree = "<group>";
 		};
+		5B6C1A53150A8E787D13BE39 /* OrbGuardWidget */ = {
+			isa = PBXGroup;
+			children = (
+				EB9189E627722B1D5BC25685 /* GlanceLogic.swift */,
+				460337CAADAB161976D811F2 /* OrbRingView.swift */,
+				EEFF6AAC2A1A685374FCFF24 /* GlanceViews.swift */,
+				178ACC2524ACBA2FA2A9383E /* OrbGuardWidget.swift */,
+				57B15D6AAA130F05B9B11094 /* Info.plist */,
+				60241B823371E56CAF5FF441 /* OrbGuardWidget.entitlements */,
+				010C65EB876BB8015050A74A /* OrbGuardWidget.xcconfig */,
+				0180C4BCCB161784418832F9 /* Fonts */,
+				3F2477ED7A4A1F77F0882BC5 /* PrivacyInfo.xcprivacy */,
+			);
+			name = OrbGuardWidget;
+			path = OrbGuardWidget;
+			sourceTree = "<group>";
+		};
 		7F172FEC194748E53076A8BB /* OrbGuardCallDirectory */ = {
 			isa = PBXGroup;
 			children = (
@@ -275,6 +325,7 @@
 				A20C6E66E79252364C246675 /* Shared */,
 				97A800541961332799B584D4 /* OrbGuardSmsFilter */,
 				7F172FEC194748E53076A8BB /* OrbGuardCallDirectory */,
+				5B6C1A53150A8E787D13BE39 /* OrbGuardWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -286,6 +337,7 @@
 				B267E273F5A090151DE75F36 /* OrbGuardFilter.appex */,
 				3E30EDFC50C537E54664DC85 /* OrbGuardSmsFilter.appex */,
 				1A46735C9A89D65999896277 /* OrbGuardCallDirectory.appex */,
+				CE4651689AD02593A405765F /* OrbGuardWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -307,6 +359,7 @@
 				4AB90520913966499A4E1214 /* API */,
 				9CFBA167E78864F40B4ECD31 /* ContentFilterChannelHandler.swift */,
 				58C680E5875D6CA75E6CCD05 /* CallDirectoryChannelHandler.swift */,
+				9213E9D27F8DA44CABE886FC /* GlanceChannelHandler.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -329,6 +382,8 @@
 				5B3DC6E2CAE5D39977797474 /* NetworkExtension.framework */,
 				8FEF3EB918B4DC1CD1D0A8DF /* IdentityLookup.framework */,
 				1E002F581CC9E5B7E0BEE0D3 /* CallKit.framework */,
+				3777347354DB871BE677F236 /* WidgetKit.framework */,
+				BC300C6C365126CBC3387E9D /* SwiftUI.framework */,
 			);
 			name = iOS;
 			sourceTree = "<group>";
@@ -396,6 +451,23 @@
 			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5835371E6317485B3F7171D2 /* OrbGuardWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 40DB421A4E9E0639C7EA6068 /* Build configuration list for PBXNativeTarget "OrbGuardWidget" */;
+			buildPhases = (
+				7C5879DB1AAA74C6C07E3946 /* Sources */,
+				96AF5304FE5C960B5330F6FC /* Frameworks */,
+				E7C383D6E26CF89D4267D46E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OrbGuardWidget;
+			productName = OrbGuardWidget;
+			productReference = CE4651689AD02593A405765F /* OrbGuardWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		7688776B18CA0E7B858C2080 /* OrbGuardCallDirectory */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F38A0CEBCB4C40B4444F01DD /* Build configuration list for PBXNativeTarget "OrbGuardCallDirectory" */;
@@ -430,6 +502,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				02060305122895AA6FDCFB94 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -474,6 +547,7 @@
 				1B18BD2D8DFF9FEE47C7D5D1 /* OrbGuardFilter */,
 				2604BDE65F657B803C06AC4E /* OrbGuardSmsFilter */,
 				7688776B18CA0E7B858C2080 /* OrbGuardCallDirectory */,
+				5835371E6317485B3F7171D2 /* OrbGuardWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -517,6 +591,16 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E7C383D6E26CF89D4267D46E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B50B0FCB987CF6FAFDC691F /* Archivo-Variable.ttf in Resources */,
+				D1B587ED5700F2D66B32F5CE /* IBMPlexSans-Variable.ttf in Resources */,
+				FA080CFC08C2733BB51DF0A2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -612,6 +696,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7C5879DB1AAA74C6C07E3946 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C1CAE26A023346CD6CEADD6 /* GlanceLogic.swift in Sources */,
+				CB51EB6BBC620F2E579AE3FE /* OrbRingView.swift in Sources */,
+				2F5C003788C8690D4C6FA63A /* GlanceViews.swift in Sources */,
+				3D4DA67DFE182C34BADAA9C0 /* OrbGuardWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7D5D8D8BE7911448D8F63385 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -636,6 +731,7 @@
 				71A1B45A5A1FE8D84E63ED87 /* ContentFilterChannelHandler.swift in Sources */,
 				AC775FD8B0D78307F2ECC23C /* CallDirectoryChannelHandler.swift in Sources */,
 				5B610C48A53013509960D357 /* CallDirectoryStore.swift in Sources */,
+				2AE5216CF867799D4D18A8CA /* GlanceChannelHandler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -651,28 +747,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		02060305122895AA6FDCFB94 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = OrbGuardWidget;
+			target = 5835371E6317485B3F7171D2 /* OrbGuardWidget */;
+			targetProxy = 80060D8AB6068AC1B6A73C37 /* PBXContainerItemProxy */;
+		};
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
-		};
-		6C8CE3D31BB7CF4BE732662C /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = OrbGuardSmsFilter;
-			target = 2604BDE65F657B803C06AC4E /* OrbGuardSmsFilter */;
-			targetProxy = CE3F9AB70A436D2E416A9B43 /* PBXContainerItemProxy */;
-		};
-		8B1A0D0EB63B8E4F24BDC7A4 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = OrbGuardCallDirectory;
-			target = 7688776B18CA0E7B858C2080 /* OrbGuardCallDirectory */;
-			targetProxy = 0D7233A9E3C4073C87E7CDA3 /* PBXContainerItemProxy */;
-		};
-		BCEB0E7BEF5FA5002F23091E /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = OrbGuardFilter;
-			target = 1B18BD2D8DFF9FEE47C7D5D1 /* OrbGuardFilter */;
-			targetProxy = C6DB932A58AA4DC0303022C3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1038,6 +1122,74 @@
 			};
 			name = Debug;
 		};
+		7A0DAB1219768D1E2C38B091 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 010C65EB876BB8015050A74A /* OrbGuardWidget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = OrbGuardWidget/OrbGuardWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 33T4RDL646;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = OrbGuardWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		849B17BC0D35CA36746BDAB8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 010C65EB876BB8015050A74A /* OrbGuardWidget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = OrbGuardWidget/OrbGuardWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 33T4RDL646;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = OrbGuardWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		97C147031CF9000F007C117D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1232,6 +1384,40 @@
 			};
 			name = Profile;
 		};
+		B8FD1B5315CF25BD97545062 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 010C65EB876BB8015050A74A /* OrbGuardWidget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = OrbGuardWidget/OrbGuardWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 33T4RDL646;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = OrbGuardWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.orb.guard.OrbGuardWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Profile;
+		};
 		C2D37AFC86A468E738AC6B66 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1309,6 +1495,16 @@
 				331C8088294A63A400263BE5 /* Debug */,
 				331C8089294A63A400263BE5 /* Release */,
 				331C808A294A63A400263BE5 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		40DB421A4E9E0639C7EA6068 /* Build configuration list for PBXNativeTarget "OrbGuardWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A0DAB1219768D1E2C38B091 /* Release */,
+				849B17BC0D35CA36746BDAB8 /* Debug */,
+				B8FD1B5315CF25BD97545062 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

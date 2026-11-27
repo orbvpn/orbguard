@@ -12,6 +12,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   local_auth_windows
   passkeys_windows
   permission_handler_windows
+  share_plus
   sim_card_info
   url_launcher_windows
 )

@@ -185,6 +185,12 @@ class Brand {
       _dark ? Colors.transparent : Colors.white.withValues(alpha: 0.55);
   static double get glassBlur => _dark ? 24.0 : 22.0;
 
+  /// The dim laid over a window behind the command palette: dark
+  /// rgba(4,4,6,.6) · light rgba(20,20,28,.32).
+  static Color get scrim => _dark
+      ? const Color(0xFF040406).withValues(alpha: 0.6)
+      : const Color(0xFF14141C).withValues(alpha: 0.32);
+
   // ── Elevation ─────────────────────────────────────────────────────────────
   /// dark 0 24px 50px rgba(0,0,0,.45) · light 0 18px 40px rgba(20,20,45,.12)
   static List<BoxShadow> get shadow => _dark

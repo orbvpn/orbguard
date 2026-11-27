@@ -24,7 +24,12 @@ class DesktopSecurityScreen extends StatefulWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
   final bool embedded;
 
-  const DesktopSecurityScreen({super.key, this.embedded = false});
+  /// Whether the page's own header has a back button. A page that is a pane
+  /// of the window, not one pushed over it, has nowhere to go back to.
+  final bool showBackButton;
+
+  const DesktopSecurityScreen(
+      {super.key, this.embedded = false, this.showBackButton = true});
 
   @override
   State<DesktopSecurityScreen> createState() => _DesktopSecurityScreenState();
@@ -186,6 +191,7 @@ class _DesktopSecurityScreenState extends State<DesktopSecurityScreen> {
       hasSearch: true,
       searchHint: 'Search devices...',
       embedded: widget.embedded,
+      showBackButton: widget.showBackButton,
       headerContent: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(

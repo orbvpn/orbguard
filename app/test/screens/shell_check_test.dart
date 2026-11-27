@@ -51,6 +51,8 @@ void main() {
     expect(shell.verdict.hasScanned, isTrue);
     expect(shell.verdict.stagesRan, hasLength(11));
     expect(shell.verdict.stagesFailed, isEmpty);
+    // A clean check from just now can be shared.
+    expect(find.text('Share'), findsOneWidget);
 
     await unmountShell(tester);
   });

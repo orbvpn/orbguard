@@ -18,7 +18,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/on_device_trust_badge.dart';
-import '../../utils/device_words.dart';
+import '../../utils/host_platform.dart';
 
 /// The four trust promises, each shown as its own glass card:
 ///  1. Everything runs on your phone.
@@ -26,11 +26,16 @@ import '../../utils/device_words.dart';
 ///  3. What we keep.
 ///  4. Your data is yours.
 class PrivacyExplainerScreen extends StatelessWidget {
-  const PrivacyExplainerScreen({super.key});
+  const PrivacyExplainerScreen({super.key, this.platform});
+
+  /// The device the screen speaks of. Defaults to the one the app runs on.
+  final TargetPlatform? platform;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final TargetPlatform? on = platform ?? hostPlatform();
+    final String noun = deviceNounFor(on);
 
     return GlassPage(
       title: 'Your privacy',
@@ -75,11 +80,15 @@ class PrivacyExplainerScreen extends StatelessWidget {
 
           // ── The four trust promises ────────────────────────────────────
           _TrustCard(
-            icon: 'smartphone',
+            icon: switch (on) {
+              TargetPlatform.macOS => 'laptop',
+              TargetPlatform.windows || TargetPlatform.linux => 'monitor',
+              _ => 'smartphone',
+            },
             tint: AppColors.accentInk,
-            title: 'Everything runs on your ${DeviceWords.noun}',
+            title: 'Everything runs on your $noun',
             body: 'Every scan happens locally, right here on your device, '
-                'never sent to a server first. Results stay on your ${DeviceWords.noun} '
+                'never sent to a server first. Results stay on your $noun '
                 'unless you choose to share them, for example when '
                 'contacting support.',
           ),
@@ -88,7 +97,7 @@ class PrivacyExplainerScreen extends StatelessWidget {
             tint: AppColors.secondaryInk,
             title: "We can't read your messages or listen to your calls",
             body: 'OrbGuard cannot open WhatsApp, Signal, or Telegram, and it '
-                'cannot listen in on a call. Your ${DeviceWords.noun} simply does not '
+                'cannot listen in on a call. Your $noun simply does not '
                 'allow any app that kind of access. That is not a gap. It is '
                 'by design, and it is a good thing.',
           ),

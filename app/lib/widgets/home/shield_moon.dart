@@ -6,6 +6,9 @@
 ///   limited  muted ink: this device cannot run it
 ///   off      dim ink, dashed rim: an empty slot, waiting to be turned on
 ///
+/// On a wide screen the shield whose screen is open beside Home is
+/// [ShieldMoon.selected]: its rim turns lime.
+///
 /// Until the guards have answered once it is drawn quiet (dim ink, plain rim),
 /// because "not known yet" must not look like "turned off".
 library;
@@ -36,6 +39,7 @@ class ShieldMoon extends StatelessWidget {
     required this.known,
     required this.deviceNoun,
     this.disc = designDisc,
+    this.selected = false,
     this.onTap,
   });
 
@@ -55,6 +59,9 @@ class ShieldMoon extends StatelessWidget {
   /// False until the guards have answered once.
   final bool known;
   final String deviceNoun;
+
+  /// Its screen is open beside Home.
+  final bool selected;
   final VoidCallback? onTap;
 
   @override
@@ -73,36 +80,44 @@ class ShieldMoon extends StatelessWidget {
             ShieldState.off => Brand.text3,
           };
 
-    return Pressable(
-      onTap: onTap,
-      semanticLabel: known
-          ? '${shield.name}, ${shieldStateWord(state, deviceNoun)}'
-          : shield.name,
-      child: SizedBox.square(
-        dimension: target,
-        child: Center(
-          child: CustomPaint(
-            painter: _DiscPainter(
-              // An empty slot is hollow: the page colour, not a lit disc.
-              fill: dashed
-                  ? Brand.bg
-                  : Color.alphaBlend(
-                      care ? Brand.amberPill : Brand.glassFill, Brand.bg),
-              line: care ? Brand.amberLine : Brand.glassBorder,
-              dashed: dashed,
-            ),
-            foregroundPainter: dashed
-                ? null
-                : GlassTopEdgePainter(
-                    radius: disc / 2,
-                    color: Brand.topEdge,
-                    bottomColor: Brand.bottomEdge,
-                  ),
-            child: SizedBox.square(
-              dimension: disc,
-              child: Center(
-                child: DuotoneIcon(shield.icon,
-                    size: disc * 19 / designDisc, color: ink),
+    return Semantics(
+      selected: selected,
+      child: Pressable(
+        onTap: onTap,
+        semanticLabel: known
+            ? '${shield.name}, ${shieldStateWord(state, deviceNoun)}'
+            : shield.name,
+        child: SizedBox.square(
+          dimension: target,
+          child: Center(
+            child: CustomPaint(
+              painter: _DiscPainter(
+                // An empty slot is hollow: the page colour, not a lit disc.
+                fill: dashed
+                    ? Brand.bg
+                    : Color.alphaBlend(
+                        care ? Brand.amberPill : Brand.glassFill, Brand.bg),
+                line: selected
+                    ? Brand.limeInk
+                    : care
+                        ? Brand.amberLine
+                        : Brand.glassBorder,
+                width: selected ? 1.5 : 1,
+                dashed: dashed && !selected,
+              ),
+              foregroundPainter: dashed
+                  ? null
+                  : GlassTopEdgePainter(
+                      radius: disc / 2,
+                      color: Brand.topEdge,
+                      bottomColor: Brand.bottomEdge,
+                    ),
+              child: SizedBox.square(
+                dimension: disc,
+                child: Center(
+                  child: DuotoneIcon(shield.icon,
+                      size: disc * 19 / designDisc, color: ink),
+                ),
               ),
             ),
           ),
@@ -119,10 +134,12 @@ class _DiscPainter extends CustomPainter {
     required this.fill,
     required this.line,
     required this.dashed,
+    this.width = 1,
   });
 
   final Color fill;
   final Color line;
+  final double width;
   final bool dashed;
 
   @override
@@ -133,10 +150,10 @@ class _DiscPainter extends CustomPainter {
 
     final Paint rim = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
+      ..strokeWidth = width
       ..color = line;
     if (!dashed) {
-      canvas.drawCircle(c, r - 0.5, rim);
+      canvas.drawCircle(c, r - width / 2, rim);
       return;
     }
     // 3 on, 3 off, evened out so the last dash meets the first cleanly.
@@ -150,5 +167,8 @@ class _DiscPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DiscPainter old) =>
-      old.fill != fill || old.line != line || old.dashed != dashed;
+      old.fill != fill ||
+      old.line != line ||
+      old.width != width ||
+      old.dashed != dashed;
 }

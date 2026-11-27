@@ -24,6 +24,7 @@ class OrbHero extends StatelessWidget {
     this.checking,
     this.onRingTap,
     this.onShieldTap,
+    this.selected,
   });
 
   final HomeBrief brief;
@@ -42,6 +43,9 @@ class OrbHero extends StatelessWidget {
   final List<OrbSegment>? checking;
   final VoidCallback? onRingTap;
   final void Function(Shield shield)? onShieldTap;
+
+  /// The shield whose screen is open beside Home, on a wide screen.
+  final Shield? selected;
 
   /// The orbit's radius at its design size, where the ring is 224 across.
   static const double designOrbit = 150;
@@ -151,6 +155,7 @@ class OrbHero extends StatelessWidget {
                 known: brief.shieldsKnown,
                 deviceNoun: deviceNoun,
                 disc: disc,
+                selected: shield == selected,
                 onTap: onShieldTap == null ? null : () => onShieldTap!(shield),
               ),
             ),
