@@ -475,6 +475,33 @@ the dot beside a wrapped proof line now stays on its first line.
 Mac and Windows shells and the share sheet; `test/visual/store_render_test.dart` renders the store
 frames. Both run only when `RENDER_DIR` is set.
 
+### 5.5 Release 1.1.0 (2026-11-28)
+
+Since 5.4, the Android home screen widgets (`glance.GlanceSmallProvider`, `GlanceMediumProvider`),
+the six checks on Home for computers and the Windows and Linux tray (`lib/services/desktop/
+desktop_tray.dart`: Check now, Open OrbGuard, Quit OrbGuard; closing the window keeps the app in
+the tray) were built. iOS ships the Call blocking and SMS filter extensions; the Content Filter
+stays out. The store frames now include the status bar and an Amazon size (1080 by 1920).
+
+Submitted everywhere on 2026-11-28, each set to release at 100% once approved:
+
+| Store | Build | State |
+| --- | --- | --- |
+| App Store (iPhone) | 1.1.0 | Waiting for review |
+| Mac App Store | 1.1.0 (13) | Waiting for review; review notes answer the location rejection |
+| Google Play | 1.1.0 (12) | In review, with the target audience changed to 18 and over |
+| Microsoft Store | 1.1.0.0 | In certification |
+| Amazon Appstore | 1.1.0 (12), no-purchase build | In review, first listing, 12 Fire tablets |
+| Snap Store | 1.1.0 | Live on latest/stable |
+
+The site (`/`) lists iPhone, Android, Windows and Linux with live links, and Linux adds .deb and
+.tar.gz downloads. The Mac row says "Not listed yet" until `ORBGUARD_STORE_MAC` is set after
+approval.
+
+Amazon only showed Fire tablets once the manifest marked GPS, location, camera and microphone as
+optional (`required="false"`); `amazon/verify_amazon_apk.py` now fails a build that requires any
+of them again.
+
 ---
 
 ## The honesty guardrails (never ship a claim on this list)
