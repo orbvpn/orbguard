@@ -34,6 +34,7 @@ import '../../presentation/widgets/glass_app_bar.dart';
 import '../../presentation/widgets/glass_container.dart';
 import '../../providers/account_provider.dart';
 import '../../services/orbnet/magic_link_deep_link.dart';
+import '../../utils/amazon_build.dart';
 import '../../utils/host_platform.dart';
 
 enum _LoginMode { password, magic }
@@ -156,19 +157,28 @@ class _LoginScreenState extends State<LoginScreen> {
   /// styled, and a button depends on what this build can do.
   TargetPlatform? get _platform => widget.platform ?? hostPlatform();
 
+  /// The Amazon build creates no accounts. Google and Apple sign-in create
+  /// one for a new address, and the server cannot be told not to, so that
+  /// build offers neither. The email link there signs in existing accounts
+  /// only (AccountProvider.allowRegistration), and password and passkey
+  /// sign-in never create one.
+  bool get _amazon => isAmazonBuild(context);
+
   /// Apple's guidelines: only offer "Sign in with Apple" on Apple platforms.
   /// The service also enforces [SignInWithApple.isAvailable] at attempt time.
   bool get _showApple =>
-      _platform == TargetPlatform.iOS || _platform == TargetPlatform.macOS;
+      !_amazon &&
+      (_platform == TargetPlatform.iOS || _platform == TargetPlatform.macOS);
 
   /// google_sign_in ships Android/iOS/macOS/web implementations only — it is
   /// absent from windows/flutter/generated_plugins.cmake and the Linux build.
   /// Rendering the button there gives a second sign-in method that can never
   /// succeed, on the very screen Microsoft cited for 10.1.2.10.
   bool get _showGoogle =>
-      _platform == TargetPlatform.android ||
-      _platform == TargetPlatform.iOS ||
-      _platform == TargetPlatform.macOS;
+      !_amazon &&
+      (_platform == TargetPlatform.android ||
+          _platform == TargetPlatform.iOS ||
+          _platform == TargetPlatform.macOS);
 
   /// Closes this screen with [signedIn] as its result.
   ///
@@ -457,8 +467,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Use your OrbVPN / OrbNet account. Signing in unlocks your '
-          'subscription, credits and remote control.',
+          _amazon
+              ? 'Use the OrbVPN account you already have. Signing in brings '
+                  'your plan and remote control to this device.'
+              : 'Use your OrbVPN / OrbNet account. Signing in unlocks your '
+                  'subscription, credits and remote control.',
           textAlign: TextAlign.center,
           style: BrandText.body(color: context.colors.onSurfaceVariant, size: 14),
         ),
@@ -615,10 +628,17 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_magicSent) ...[
           const SizedBox(height: 16),
           Text(
-            'Check your email. We sent a sign-in link to '
-            '${_emailController.text.trim()}.\n'
-            'Tap the link on this device, or copy that link and paste it '
-            'below.',
+            // The Amazon build asks for a link that only an existing
+            // account receives, so it does not promise one arrived.
+            _amazon
+                ? 'Check your email. If ${_emailController.text.trim()} has '
+                    'an account, we sent it a sign-in link.\n'
+                    'Tap the link on this device, or copy that link and '
+                    'paste it below.'
+                : 'Check your email. We sent a sign-in link to '
+                    '${_emailController.text.trim()}.\n'
+                    'Tap the link on this device, or copy that link and '
+                    'paste it below.',
             style: BrandText.body(
                 color: context.colors.onSurfaceVariant, size: 13),
           ),

@@ -9,6 +9,12 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Pure-Dart stand-ins that only the Amazon build resolves, through the
+    # pubspec_overrides.yaml that amazon/build_amazon_apk.sh writes.
+    - amazon/stubs/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

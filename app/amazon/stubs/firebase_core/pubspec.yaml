@@ -1,0 +1,12 @@
+# Amazon Appstore build only: a pure-Dart stand-in for firebase_core. Fire OS
+# has no Google Play services, and Amazon's review flags the Firebase
+# libraries. No `flutter: plugin:` section and no native code.
+# app/amazon/build_amazon_apk.sh points the app here through
+# pubspec_overrides.yaml for one build, then removes it.
+name: firebase_core
+description: Amazon build stand-in, pure Dart, no native code.
+version: 4.12.1
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"

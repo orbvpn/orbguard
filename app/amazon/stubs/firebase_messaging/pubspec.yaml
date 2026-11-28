@@ -1,0 +1,11 @@
+# Amazon Appstore build only: a pure-Dart stand-in for firebase_messaging.
+# No `flutter: plugin:` section and no native code: the anti-theft agent
+# falls back to polling. app/amazon/build_amazon_apk.sh points the app here
+# through pubspec_overrides.yaml for one build, then removes it.
+name: firebase_messaging
+description: Amazon build stand-in, pure Dart, no native code.
+version: 16.4.3
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"

@@ -1,0 +1,12 @@
+# Amazon Appstore build only: a pure-Dart stand-in for in_app_purchase. The
+# Amazon build sells nothing, so it carries no store billing library and asks
+# for no billing permission. No `flutter: plugin:` section and no native
+# code. app/amazon/build_amazon_apk.sh points the app here through
+# pubspec_overrides.yaml for one build, then removes it.
+name: in_app_purchase
+description: Amazon build stand-in, pure Dart, no native code.
+version: 3.3.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"

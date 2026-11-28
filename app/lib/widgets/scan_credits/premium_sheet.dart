@@ -9,6 +9,8 @@
 ///     OrbGuard Premium, offers sign-in to someone who already has it, and
 ///     gives the site as a plain address. No plan, price or store is shown
 ///     or named there.
+///   * The Amazon build, on any device, is Windows and Linux without the
+///     site: it says the check needs OrbGuard Premium and offers sign-in.
 ///
 /// HONEST STATES: it only closes with "go on" once the account really has
 /// Premium, or really has a credit to spend. Asking the account again shows
@@ -27,6 +29,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/pressable.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../sale/login_sheet.dart';
 import '../sale/plans_sheet.dart';
 
@@ -69,7 +72,8 @@ class _PremiumSheetState extends State<PremiumSheet> {
   bool _noteIsError = false;
 
   /// Only the Mac build has a store to sell the plans through.
-  bool get _sellsPlans => widget.platform == TargetPlatform.macOS;
+  bool get _sellsPlans =>
+      widget.platform == TargetPlatform.macOS && !isAmazonBuild(context);
 
   @override
   void didChangeDependencies() {
@@ -238,8 +242,11 @@ class _PremiumSheetState extends State<PremiumSheet> {
             signIn,
           ] else ...[
             signIn,
-            const SizedBox(height: 6),
-            Center(child: _SiteLink(onTap: _openSite)),
+            // The Amazon build names no site to pay at.
+            if (!isAmazonBuild(context)) ...[
+              const SizedBox(height: 6),
+              Center(child: _SiteLink(onTap: _openSite)),
+            ],
           ],
         ],
       ),

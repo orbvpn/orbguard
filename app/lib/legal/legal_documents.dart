@@ -257,4 +257,29 @@ email.
 
 Contact: $legalEntity, $registeredOffice — $supportEmail
 ''';
+
+  /// [doc] ([terms] or [privacy]) as the Amazon build shows it. That build
+  /// names no site and no store, so it cuts the sentences that point to the
+  /// hosted copies and the pricing page, and the names of the app stores and
+  /// the website. Everything else reads word for word as above.
+  static String forAmazon(String doc) {
+    String text = doc;
+    amazonCuts.forEach((String cut, String replacement) {
+      text = text.replaceAll(cut, replacement);
+    });
+    return text;
+  }
+
+  /// What the Amazon build cuts from the documents, and what takes its
+  /// place. A test checks that every cut still matches the text above.
+  static const Map<String, String> amazonCuts = {
+    ' The current version of these Terms is always available at\n$termsUrl.':
+        '',
+    ', and the\ncurrent plans are listed at https://guard.orbai.world/pricing.':
+        '.',
+    ' (Google Play or the Apple App Store)': '',
+    ' (for example on our website)': '',
+    ' The current version of this Policy is always\navailable at $privacyUrl.':
+        '',
+  };
 }

@@ -14,6 +14,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/pressable.dart';
 import '../../providers/account_provider.dart';
 import '../../screens/account/security_screen.dart';
+import '../../utils/amazon_build.dart';
 import 'login_sheet.dart';
 
 class AccountCard extends StatelessWidget {
@@ -30,7 +31,10 @@ class AccountCard extends StatelessWidget {
         ? ((named != null && named.trim().isNotEmpty)
             ? named.trim()
             : (email ?? 'Signed in'))
-        : 'Sign in or create an account';
+        // The Amazon build creates no accounts.
+        : (isAmazonBuild(context)
+            ? 'Sign in'
+            : 'Sign in or create an account');
     // The email goes under the name, unless the name already is the email.
     final String? under =
         signedIn && email != null && email != name ? email : null;
