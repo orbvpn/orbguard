@@ -21,6 +21,7 @@
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../permissions/special_permissions_manager.dart';
@@ -29,6 +30,7 @@ import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
+import '../../utils/platform_info.dart';
 import 'priming_copy.dart';
 
 /// Prefs flag set (true) before [PermissionPrimingScreen.onDone] fires — the
@@ -48,10 +50,17 @@ class PrimingRequests {
   final Future<bool> Function() requestLocation;
   final Future<void> Function() openUsageAccess;
 
+  /// Whether Location Services is off for the whole computer, asked after a
+  /// location request that did not grant. On a Mac no question appears
+  /// then, so the step says why instead of a plain "Skipped". Null where
+  /// there is no such switch.
+  final Future<bool> Function()? locationServicesOff;
+
   const PrimingRequests({
     required this.requestNotifications,
     required this.requestLocation,
     required this.openUsageAccess,
+    this.locationServicesOff,
   });
 
   /// Default wiring onto the app's existing permission plumbing:
@@ -69,9 +78,18 @@ class PrimingRequests {
       requestNotifications: UniversalPermissions.requestNotifications,
       requestLocation: UniversalPermissions.requestLocation,
       openUsageAccess: specialPermissions.requestUsageStatsPermission,
+      locationServicesOff: PlatformInfo.isMacOS
+          ? () async => !await Geolocator.isLocationServiceEnabled()
+          : null,
     );
   }
 }
+
+/// What the location step says when Location Services is off for the whole
+/// Mac: no question could appear, so it says where the switch is.
+const String kLocationServicesOffCopy =
+    'Location Services is off on this Mac. To use this, turn it on in '
+    'System Settings, Privacy & Security, Location Services.';
 
 /// Lifecycle of one step card.
 enum _StepState {
@@ -89,6 +107,10 @@ enum _StepState {
 
   /// Advanced step: Settings was opened; outcome unknowable from here.
   openedSettings,
+
+  /// Location on a computer whose Location Services is off: no question
+  /// could appear, and the step says so.
+  servicesOff,
 }
 
 /// Staged first-run permission priming. See the library doc above for the
@@ -132,7 +154,9 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
 
   bool _isDecided(PrimingStep step) {
     final state = _stateOf(step);
-    return state == _StepState.granted || state == _StepState.skipped;
+    return state == _StepState.granted ||
+        state == _StepState.skipped ||
+        state == _StepState.servicesOff;
   }
 
   List<PrimingStep> get _coreSteps =>
@@ -156,11 +180,22 @@ class _PermissionPrimingScreenState extends State<PermissionPrimingScreen> {
       granted = false; // Never claim "On" if the request itself failed.
     }
 
+    var servicesOff = false;
+    if (!granted && step.id == PrimingStepIds.location) {
+      try {
+        servicesOff = await _requests.locationServicesOff?.call() ?? false;
+      } catch (_) {}
+    }
+
     if (!mounted) return;
     setState(() {
       _states[step.id] = step.opensSystemSettings
           ? _StepState.openedSettings
-          : (granted ? _StepState.granted : _StepState.skipped);
+          : granted
+              ? _StepState.granted
+              : servicesOff
+                  ? _StepState.servicesOff
+                  : _StepState.skipped;
     });
   }
 
@@ -417,6 +452,9 @@ class _StepCard extends StatelessWidget {
       case _StepState.openedSettings:
         // Honest: we cannot confirm these from here, so never claim "On".
         return Text('Opened system Settings. Finish turning it on there.',
+            style: BrandText.label(color: cs.onSurfaceVariant));
+      case _StepState.servicesOff:
+        return Text(kLocationServicesOffCopy,
             style: BrandText.label(color: cs.onSurfaceVariant));
     }
   }

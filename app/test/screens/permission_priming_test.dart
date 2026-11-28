@@ -134,6 +134,27 @@ void main() {
       expect(inStep('location', find.text(kSkippedCopy)), findsOneWidget);
     });
 
+    testWidgets('a Mac with Location Services off says so, not "Skipped"',
+        (tester) async {
+      final base = fakeRequests(location: false);
+      await pumpPriming(tester,
+          platform: TargetPlatform.macOS,
+          requests: PrimingRequests(
+            requestNotifications: base.requestNotifications,
+            requestLocation: base.requestLocation,
+            openUsageAccess: base.openUsageAccess,
+            locationServicesOff: () async => true,
+          ));
+
+      await tester.tap(inStep('location', find.text('Continue')));
+      await tester.pumpAndSettle();
+
+      expect(inStep('location', find.text(kLocationServicesOffCopy)),
+          findsOneWidget);
+      expect(inStep('location', find.text(kSkippedCopy)), findsNothing);
+      expect(inStep('location', find.text('On')), findsNothing);
+    });
+
     testWidgets('per-step Skip resolves the step without firing any request',
         (tester) async {
       final log = <String>[];

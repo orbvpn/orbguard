@@ -72,14 +72,37 @@ abstract final class UniversalPermissions {
   static Future<bool> requestLocation() async {
     try {
       if (PlatformInfo.isMacOS) {
-        final p = await Geolocator.requestPermission();
-        return p == LocationPermission.whileInUse ||
-            p == LocationPermission.always;
+        return requestMacLocation(
+          servicesOn: Geolocator.isLocationServiceEnabled,
+          request: Geolocator.requestPermission,
+        );
       }
       return (await Permission.location.request()).isGranted;
     } catch (e) {
       debugPrint('[OrbGuard] location request failed: ${e.runtimeType}');
       return false;
     }
+  }
+
+  /// How long the Mac location question may stay open before the app stops
+  /// waiting for it.
+  static const Duration macLocationWait = Duration(seconds: 60);
+
+  /// The Mac location request. macOS shows no question while Location
+  /// Services is off for the whole Mac, and the plugin then waits for an
+  /// answer that never comes: the button spun with no response (App Review,
+  /// 2.1(a), September 2026). So it does not ask when Location Services is
+  /// off, and it stops waiting after [wait]. Either way it reports "not
+  /// granted", and the step the person pressed ends.
+  static Future<bool> requestMacLocation({
+    required Future<bool> Function() servicesOn,
+    required Future<LocationPermission> Function() request,
+    Duration wait = macLocationWait,
+  }) async {
+    if (!await servicesOn()) return false;
+    final LocationPermission p =
+        await request().timeout(wait, onTimeout: () => LocationPermission.denied);
+    return p == LocationPermission.whileInUse ||
+        p == LocationPermission.always;
   }
 }
