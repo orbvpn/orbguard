@@ -1,6 +1,7 @@
 // Renders the store screenshots: five frames, each a caption over a real
-// screen of the shell, for the App Store (1290 by 2796) and Google Play
-// (1080 by 2160), in both themes.
+// screen of the shell, for the App Store (1290 by 2796), Google Play
+// (1080 by 2160) and the Amazon Appstore (1080 by 1920, the one phone
+// size on Amazon's list), in both themes.
 //
 // Every screen is the real shell (lib/main.dart's HomeScreen) mounted through
 // the same harness the shell tests use, with the real fonts. Nobody is signed
@@ -44,6 +45,8 @@ const List<_Store> _stores = [
   _Store('appstore', Size(430, 932), TargetPlatform.iOS, Size(430, 932),
       EdgeInsets.only(top: 59, bottom: 34)),
   _Store('play', Size(360, 720), TargetPlatform.android, Size(412, 915),
+      EdgeInsets.only(top: 36, bottom: 16)),
+  _Store('amazon', Size(360, 640), TargetPlatform.android, Size(412, 915),
       EdgeInsets.only(top: 36, bottom: 16)),
 ];
 
