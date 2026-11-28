@@ -260,7 +260,114 @@ func TestSlowUploadOutlastsTheServerTimeouts(t *testing.T) {
 			if len(answer) == 0 {
 				t.Fatalf("no answer, status %d", res.StatusCode)
 			}
+			if held := len(h.longUploads); held != 0 {
+				t.Fatalf("a finished upload still holds %d of the upload places", held)
+			}
 		})
+	}
+}
+
+// A client that stops sending is cut off after UploadIdle, not left to hold
+// the connection for the whole upload budget.
+func TestStalledUploadIsCutOff(t *testing.T) {
+	const serverTimeout = 300 * time.Millisecond
+	h := budgetHandler(time.Minute)
+	h.UploadIdle = 200 * time.Millisecond
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(h.UploadSysdiagnose))
+	srv.Config.ReadTimeout = serverTimeout
+	srv.Config.WriteTimeout = serverTimeout
+	srv.Start()
+	defer func() {
+		srv.CloseClientConnections()
+		srv.Close()
+	}()
+
+	body, contentType := multipartBody(t, "s.tar.gz", budgetTarGz(t))
+	raw := body.Bytes()
+	pr, pw := io.Pipe()
+	defer pw.Close()
+	go pw.Write(raw[:len(raw)/2]) // and then nothing more
+	req, err := http.NewRequest(http.MethodPost, srv.URL, pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	// The client gives up after 3 s. The transport waits on a body read
+	// that never returns, so ending the body is what ends the request.
+	giveUp := time.AfterFunc(3*time.Second, func() { pw.CloseWithError(errors.New("client gave up")) })
+	defer giveUp.Stop()
+	started := time.Now()
+	res, err := srv.Client().Do(req)
+	if err == nil {
+		answer, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode == http.StatusOK {
+			t.Fatalf("a stalled upload was analysed: %s", answer)
+		}
+	}
+	if waited := time.Since(started); waited > 2*time.Second {
+		t.Fatalf("the stalled upload held the connection for %s", waited)
+	}
+}
+
+func TestArchiveUploadsAreCapped(t *testing.T) {
+	h := budgetHandler(time.Minute)
+	for i := 0; i < maxLongUploads; i++ {
+		h.longUploads <- struct{}{}
+	}
+	for name, serve := range map[string]http.HandlerFunc{
+		"sysdiagnose": h.UploadSysdiagnose,
+		"bugreport":   h.UploadBugreport,
+		"backup":      h.UploadIOSBackup,
+	} {
+		t.Run(name, func(t *testing.T) {
+			body, contentType := multipartBody(t, "s.zip", smallZip(t, "Manifest.db", "x"))
+			req := httptest.NewRequest(http.MethodPost, "/u", body)
+			req.Header.Set("Content-Type", contentType)
+			rec := httptest.NewRecorder()
+			serve(rec, req)
+			if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"code":"analysis_busy"`) {
+				t.Fatalf("want the busy answer, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+	if held := len(h.longUploads); held != maxLongUploads {
+		t.Fatalf("a refused upload changed the places held: %d", held)
+	}
+}
+
+// After the body, the read deadline goes back to the end of the budget: the
+// server keeps reading the connection to notice a client that leaves, and a
+// deadline that fires there cancels the analysis.
+func TestProgressDeadlineRestoresTheEndAfterTheBody(t *testing.T) {
+	end := time.Now().Add(time.Hour)
+	var set []time.Time
+	p := &progressDeadline{
+		body: io.NopCloser(strings.NewReader("abc")),
+		idle: time.Second,
+		end:  end,
+		set:  func(at time.Time) { set = append(set, at) },
+	}
+	if _, err := io.ReadAll(p); err != nil {
+		t.Fatal(err)
+	}
+	if len(set) < 2 {
+		t.Fatalf("deadlines set: %v", set)
+	}
+	if first := set[0]; !first.Before(end.Add(-time.Minute)) {
+		t.Fatalf("a read must move the deadline only idle ahead, got %s", first)
+	}
+	if last := set[len(set)-1]; !last.Equal(end) {
+		t.Fatalf("after the body the deadline must be the end, got %s", last)
+	}
+
+	near := time.Now().Add(10 * time.Millisecond)
+	set = nil
+	p = &progressDeadline{body: io.NopCloser(strings.NewReader("a")), idle: time.Hour, end: near,
+		set: func(at time.Time) { set = append(set, at) }}
+	p.Read(make([]byte, 1))
+	if set[0].After(near) {
+		t.Fatalf("a read must never move the deadline past the end: %s", set[0])
 	}
 }
 

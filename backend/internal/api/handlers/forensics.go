@@ -57,6 +57,16 @@ const (
 	// forensicAnswerMargin is the time a request keeps after its budget to
 	// finish and respond.
 	forensicAnswerMargin = 4 * time.Second
+
+	// forensicUploadIdle is how long an archive upload may go without
+	// sending a byte before the connection is closed. A slow upload keeps
+	// its minutes; a stalled one cannot hold the connection for them.
+	forensicUploadIdle = 30 * time.Second
+
+	// maxLongUploads is how many archive uploads one server takes at once.
+	// Each may store up to maxForensicUploadBytes on a 2 GiB disk; the next
+	// one is told the service is busy and to try again shortly.
+	maxLongUploads = 2
 )
 
 // ForensicsHandler handles forensic analysis endpoints
@@ -68,6 +78,10 @@ type ForensicsHandler struct {
 	AnalysisBudget time.Duration
 	// UploadBudget is the same for an archive upload, upload included.
 	UploadBudget time.Duration
+	// UploadIdle is how long an archive upload may send nothing.
+	UploadIdle time.Duration
+	// longUploads holds one token for each archive upload in progress.
+	longUploads chan struct{}
 }
 
 // NewForensicsHandler creates a new ForensicsHandler
@@ -77,6 +91,8 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 		logger:         log.WithComponent("forensics-handler"),
 		AnalysisBudget: forensicAnalysisBudget,
 		UploadBudget:   forensicUploadBudget,
+		UploadIdle:     forensicUploadIdle,
+		longUploads:    make(chan struct{}, maxLongUploads),
 	}
 }
 
@@ -86,26 +102,75 @@ func (h *ForensicsHandler) analysisContext(r *http.Request) (context.Context, co
 }
 
 // uploadContext is analysisContext for an archive upload: it ends at the
-// upload budget, and the connection stays open long enough to answer.
-func (h *ForensicsHandler) uploadContext(w http.ResponseWriter, r *http.Request) (context.Context, context.CancelFunc) {
-	h.extendUploadDeadlines(w)
-	return context.WithTimeout(r.Context(), h.UploadBudget)
+// upload budget, and the connection stays open long enough to answer. When
+// the server already takes as many archive uploads as it can, it answers
+// that the service is busy and returns ok false.
+func (h *ForensicsHandler) uploadContext(w http.ResponseWriter, r *http.Request) (ctx context.Context, cancel context.CancelFunc, ok bool) {
+	done, ok := h.startLongUpload(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+	ctx, end := context.WithTimeout(r.Context(), h.UploadBudget)
+	return ctx, func() { end(); done() }, true
 }
 
-// extendUploadDeadlines moves this connection's read and write deadlines
-// from the server's 15 s to the end of the upload budget plus the answer
-// margin. Without it a slow upload is cut off at 15 s, or its answer is
-// thrown away.
-func (h *ForensicsHandler) extendUploadDeadlines(w http.ResponseWriter) {
-	deadline := time.Now().Add(h.UploadBudget + forensicAnswerMargin)
-	rc := http.NewResponseController(w)
-	if err := rc.SetReadDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		h.logger.Warn().Err(err).Msg("could not extend the upload read deadline")
+// startLongUpload lets an archive upload outlast the server's 15 s read and
+// write timeouts. The write deadline moves to the end of the upload budget
+// plus the answer margin. The read deadline moves forward with each read of
+// the body, never more than UploadIdle ahead, so a stalled client is cut
+// off. Call done when the request ends. When the server already takes
+// maxLongUploads, it answers busy and returns ok false.
+func (h *ForensicsHandler) startLongUpload(w http.ResponseWriter, r *http.Request) (done func(), ok bool) {
+	select {
+	case h.longUploads <- struct{}{}:
+	default:
+		respondUnexamined(w, forensics.ErrAnalysisBusy)
+		return nil, false
 	}
-	if err := rc.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		h.logger.Warn().Err(err).Msg("could not extend the upload write deadline")
+	end := time.Now().Add(h.UploadBudget + forensicAnswerMargin)
+	rc := http.NewResponseController(w)
+	h.setDeadline("write", rc.SetWriteDeadline, end)
+	r.Body = &progressDeadline{
+		body: r.Body,
+		idle: h.UploadIdle,
+		end:  end,
+		set:  func(t time.Time) { h.setDeadline("read", rc.SetReadDeadline, t) },
+	}
+	return func() { <-h.longUploads }, true
+}
+
+func (h *ForensicsHandler) setDeadline(which string, set func(time.Time) error, t time.Time) {
+	if err := set(t); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		h.logger.Warn().Err(err).Str("deadline", which).Msg("could not move the upload deadline")
 	}
 }
+
+// progressDeadline moves the read deadline to idle from now before each
+// read, never past end. Once the body is read to its end, or fails, the
+// deadline goes back to end: the server keeps reading the connection after
+// the body to notice a client that leaves, and an early deadline there would
+// cancel the analysis that is still running.
+type progressDeadline struct {
+	body io.ReadCloser
+	idle time.Duration
+	end  time.Time
+	set  func(time.Time)
+}
+
+func (p *progressDeadline) Read(b []byte) (int, error) {
+	next := time.Now().Add(p.idle)
+	if next.After(p.end) {
+		next = p.end
+	}
+	p.set(next)
+	n, err := p.body.Read(b)
+	if err != nil {
+		p.set(p.end)
+	}
+	return n, err
+}
+
+func (p *progressDeadline) Close() error { return p.body.Close() }
 
 // readCapped reads at most limit bytes and reports whether r held more.
 func readCapped(r io.Reader, limit int64) ([]byte, bool, error) {
@@ -724,7 +789,11 @@ func locateBackupRoot(extractedRoot string) string {
 // (+ optional device_id field), extracts it server-side, runs the existing
 // backup parser and deletes the temp files.
 func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Request) {
-	h.extendUploadDeadlines(w)
+	done, ok := h.startLongUpload(w, r)
+	if !ok {
+		return
+	}
+	defer done()
 	artifact, ok := h.receiveUpload(w, r, map[string]string{".zip": ".zip"})
 	if !ok {
 		return
@@ -769,7 +838,10 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 // (+ optional device_id field); the existing sysdiagnose parser performs the
 // extraction itself.
 func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := h.uploadContext(w, r)
+	ctx, cancel, ok := h.uploadContext(w, r)
+	if !ok {
+		return
+	}
 	defer cancel()
 
 	artifact, ok := h.receiveUpload(w, r, map[string]string{
@@ -857,7 +929,10 @@ func openBugreportText(archivePath string) (io.ReadCloser, error) {
 // field) — either the bugreport zip produced by `adb bugreport` or the plain
 // bugreport .txt — and runs the existing logcat/bugreport parser on it.
 func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := h.uploadContext(w, r)
+	ctx, cancel, ok := h.uploadContext(w, r)
+	if !ok {
+		return
+	}
 	defer cancel()
 
 	artifact, ok := h.receiveUpload(w, r, map[string]string{

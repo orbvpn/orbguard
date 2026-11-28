@@ -103,8 +103,9 @@ Future<void> finishCheck(WidgetTester tester) async {
 
 /// Mounts the shell for someone who finished priming, signed out.
 ///
-/// [checked] seeds a clean check from two hours ago. [found] seeds a check
-/// from two hours ago that found these things. [autoCheckSpent] says the one
+/// [checked] seeds a clean check from two hours ago (from midnight in the
+/// first two hours of a day). [found] seeds a check from then that found
+/// these things. [autoCheckSpent] says the one
 /// automatic first check already had its turn. [freeCheckUsed] says the free
 /// check a person starts is gone; left out, it is gone when a check was
 /// seeded, as if that person started it. [keepFound] is whether the
@@ -173,8 +174,13 @@ Future<ShellUnderTest> mountShell(
   });
 
   final DateTime now = DateTime.now();
+  // Two hours ago, but never before today's midnight: Home calls a check
+  // from yesterday "Latest", not "Today", and CI also runs just after
+  // midnight.
+  final DateTime midnight = DateTime(now.year, now.month, now.day);
+  final DateTime seededAt = now.subtract(const Duration(hours: 2));
   final String twoHoursAgo =
-      now.subtract(const Duration(hours: 2)).toIso8601String();
+      (seededAt.isBefore(midnight) ? midnight : seededAt).toIso8601String();
   SharedPreferences.setMockInitialValues(<String, Object>{
     'onboarding_complete': true,
     'permissions_primed': true,
