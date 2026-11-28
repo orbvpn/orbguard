@@ -87,6 +87,17 @@ NATIVE_LIB_PATTERN = re.compile(
 
 FORBIDDEN_PERMISSIONS = re.compile(r"AD_ID|ADSERVICES|com\.android\.vending\.BILLING")
 
+# Hardware the app can work without. A Fire tablet has no GPS, and a
+# required camera or microphone would cut out more devices.
+OPTIONAL_HARDWARE = {
+    "android.hardware.location",
+    "android.hardware.location.gps",
+    "android.hardware.location.network",
+    "android.hardware.camera",
+    "android.hardware.camera.any",
+    "android.hardware.microphone",
+}
+
 # Words only the credits sheet and the pricing screen use. kAmazonBuild
 # leaves both out of the Amazon binary, so none may be there.
 COMPILED_OUT = [
@@ -178,6 +189,26 @@ def check_permissions(apk_path, build_tools, report):
     if not bad:
         report.ok("no AD_ID, AdServices or BILLING permission")
     report.info(f"{len(perms)} permissions: {', '.join(perms)}")
+
+
+def check_features(apk_path, build_tools, report):
+    """No Fire tablet has GPS, and Amazon reads a required GPS (or one a
+    location permission implies) as "incompatible with every tablet"."""
+    print("required hardware (aapt2)")
+    out = subprocess.run(
+        [f"{build_tools}/aapt2", "dump", "badging", apk_path],
+        capture_output=True, text=True,
+    )
+    if out.returncode != 0:
+        report.fail(f"aapt2 dump badging failed: {out.stderr.strip()}")
+        return
+    required = set(re.findall(r"^\s*uses-(?:implied-)?feature: name='([^']+)'",
+                              out.stdout, re.M))
+    bad = sorted(f for f in required if f in OPTIONAL_HARDWARE)
+    for f in bad:
+        report.fail(f"requires {f}, which Fire tablets lack or Amazon checks")
+    if not bad:
+        report.ok("GPS, location, camera and microphone are all optional")
 
 
 def check_app_ads(apk, report):
@@ -292,6 +323,7 @@ def main():
         check_app_ads(apk, report)
         check_libapp(apk, report)
     check_permissions(args.apk, args.build_tools, report)
+    check_features(args.apk, args.build_tools, report)
     check_signer(args.apk, args.build_tools, report)
 
     print("VERIFY FAILED" if report.failed else "VERIFY PASSED")

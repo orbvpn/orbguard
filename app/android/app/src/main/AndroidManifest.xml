@@ -85,6 +85,18 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
+    <!-- Hardware OrbGuard uses but does not need. Without these lines the
+         location, camera and microphone permissions mark that hardware as
+         required, and the Amazon Appstore then lists every Fire tablet as
+         incompatible, because none of them has GPS. The camera plugin
+         declares camera.any as required, so that line replaces its value. -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false"
+        tools:replace="android:required" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <!-- ============================================ -->
     <!-- DEVICE ADMIN (For threat removal) -->
     <!-- ============================================ -->
