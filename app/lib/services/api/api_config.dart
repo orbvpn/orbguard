@@ -25,6 +25,13 @@ class ApiConfig {
     sendTimeout = ms;
   }
 
+  /// How long a forensic archive upload (a sysdiagnose, a bug report, a
+  /// backup) may take to send, and then to be answered. The server gives
+  /// these uploads 220 s plus 4 s to answer, inside the 240 s its host allows
+  /// any request. The 30 s default cut off a large archive on a phone's
+  /// uplink before the server could read it.
+  static const Duration forensicUploadTimeout = Duration(minutes: 4);
+
   /// Retry configuration
   static const int maxRetries = 3;
   static const int retryDelayMs = 1000;

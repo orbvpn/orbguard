@@ -40,6 +40,7 @@ func budgetHandler(budget time.Duration) *ForensicsHandler {
 	log := logger.NewDefault()
 	h := NewForensicsHandler(forensics.NewService(log), log)
 	h.AnalysisBudget = budget
+	h.UploadBudget = budget
 	return h
 }
 
@@ -195,6 +196,71 @@ func TestDefaultBudgetFitsTheWriteTimeout(t *testing.T) {
 	log := logger.NewDefault()
 	if got := NewForensicsHandler(forensics.NewService(log), log).AnalysisBudget; got != forensicAnalysisBudget {
 		t.Fatalf("the handler must start with the default budget, got %s", got)
+	}
+}
+
+// Azure Container Apps ends every request at 240 s.
+func TestUploadBudgetEndsBeforeTheIngressLimit(t *testing.T) {
+	if forensicUploadBudget+forensicAnswerMargin >= 240*time.Second {
+		t.Fatalf("an upload must answer before 240 s: %s + %s", forensicUploadBudget, forensicAnswerMargin)
+	}
+	if forensicUploadBudget < 3*time.Minute {
+		t.Fatalf("a phone on a slow uplink needs minutes to send an archive: %s", forensicUploadBudget)
+	}
+	log := logger.NewDefault()
+	if got := NewForensicsHandler(forensics.NewService(log), log).UploadBudget; got != forensicUploadBudget {
+		t.Fatalf("the handler must start with the default upload budget, got %s", got)
+	}
+}
+
+// An archive upload that takes longer than the server's read and write
+// timeouts still arrives and still gets its answer.
+func TestSlowUploadOutlastsTheServerTimeouts(t *testing.T) {
+	const serverTimeout = 300 * time.Millisecond
+	h := budgetHandler(time.Minute)
+	for name, c := range map[string]struct {
+		serve    http.HandlerFunc
+		filename string
+		content  []byte
+	}{
+		"sysdiagnose": {h.UploadSysdiagnose, "s.tar.gz", budgetTarGz(t)},
+		"bugreport":   {h.UploadBugreport, "bugreport.txt", []byte(budgetLogcat)},
+		"backup":      {h.UploadIOSBackup, "backup.zip", smallZip(t, "Manifest.db", "x")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewUnstartedServer(c.serve)
+			srv.Config.ReadTimeout = serverTimeout
+			srv.Config.WriteTimeout = serverTimeout
+			srv.Start()
+			defer srv.Close()
+
+			body, contentType := multipartBody(t, c.filename, c.content)
+			raw := body.Bytes()
+			pr, pw := io.Pipe()
+			go func() {
+				pw.Write(raw[:len(raw)/2])
+				time.Sleep(3 * serverTimeout)
+				pw.Write(raw[len(raw)/2:])
+				pw.Close()
+			}()
+			req, err := http.NewRequest(http.MethodPost, srv.URL, pr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", contentType)
+			res, err := srv.Client().Do(req)
+			if err != nil {
+				t.Fatalf("the upload was cut off: %v", err)
+			}
+			defer res.Body.Close()
+			answer, _ := io.ReadAll(res.Body)
+			if res.StatusCode == http.StatusBadRequest && strings.Contains(string(answer), "multipart") {
+				t.Fatalf("the server stopped reading the upload: %s", answer)
+			}
+			if len(answer) == 0 {
+				t.Fatalf("no answer, status %d", res.StatusCode)
+			}
+		})
 	}
 }
 

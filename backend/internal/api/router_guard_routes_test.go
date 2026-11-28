@@ -44,6 +44,7 @@ func newGuardRouter(t *testing.T) http.Handler {
 	// Results here must not depend on how busy the test machine is.
 	forensicsHandler := handlers.NewForensicsHandler(forensics.NewService(log), log)
 	forensicsHandler.AnalysisBudget = time.Hour
+	forensicsHandler.UploadBudget = time.Hour
 	h := &handlers.Handlers{
 		DarkWeb:   handlers.NewDarkWebHandler(services.NewDarkWebMonitor(nil, nil, nil, nil, nil, log), log),
 		OrbNet:    handlers.NewOrbNetHandler(services.NewOrbNetService(nil, nil, log), log),

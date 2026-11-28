@@ -752,6 +752,10 @@ class OrbGuardApiClient {
         endpoint,
         data: formData,
         onSendProgress: onSendProgress,
+        options: Options(
+          sendTimeout: ApiConfig.forensicUploadTimeout,
+          receiveTimeout: ApiConfig.forensicUploadTimeout,
+        ),
       );
       return response.data as Map<String, dynamic>? ?? {};
     } on DioException catch (e) {

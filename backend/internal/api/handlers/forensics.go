@@ -47,6 +47,16 @@ const (
 	// answer with what it has. It counts from the handler's start, as the
 	// server's 15 s write timeout does, and leaves 4 s to finish and respond.
 	forensicAnalysisBudget = 11 * time.Second
+
+	// forensicUploadBudget is the same for an archive upload (a sysdiagnose,
+	// a bug report, a backup), upload included. A phone on a slow uplink
+	// needs minutes to send one. Azure Container Apps ends every request at
+	// 240 s, so this budget and the answer margin end well before that.
+	forensicUploadBudget = 220 * time.Second
+
+	// forensicAnswerMargin is the time a request keeps after its budget to
+	// finish and respond.
+	forensicAnswerMargin = 4 * time.Second
 )
 
 // ForensicsHandler handles forensic analysis endpoints
@@ -56,6 +66,8 @@ type ForensicsHandler struct {
 	// AnalysisBudget is how long one request may spend before it answers with
 	// what it has.
 	AnalysisBudget time.Duration
+	// UploadBudget is the same for an archive upload, upload included.
+	UploadBudget time.Duration
 }
 
 // NewForensicsHandler creates a new ForensicsHandler
@@ -64,12 +76,35 @@ func NewForensicsHandler(service *forensics.Service, log *logger.Logger) *Forens
 		service:        service,
 		logger:         log.WithComponent("forensics-handler"),
 		AnalysisBudget: forensicAnalysisBudget,
+		UploadBudget:   forensicUploadBudget,
 	}
 }
 
 // analysisContext ends at the analysis budget or when the client goes away.
 func (h *ForensicsHandler) analysisContext(r *http.Request) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(r.Context(), h.AnalysisBudget)
+}
+
+// uploadContext is analysisContext for an archive upload: it ends at the
+// upload budget, and the connection stays open long enough to answer.
+func (h *ForensicsHandler) uploadContext(w http.ResponseWriter, r *http.Request) (context.Context, context.CancelFunc) {
+	h.extendUploadDeadlines(w)
+	return context.WithTimeout(r.Context(), h.UploadBudget)
+}
+
+// extendUploadDeadlines moves this connection's read and write deadlines
+// from the server's 15 s to the end of the upload budget plus the answer
+// margin. Without it a slow upload is cut off at 15 s, or its answer is
+// thrown away.
+func (h *ForensicsHandler) extendUploadDeadlines(w http.ResponseWriter) {
+	deadline := time.Now().Add(h.UploadBudget + forensicAnswerMargin)
+	rc := http.NewResponseController(w)
+	if err := rc.SetReadDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		h.logger.Warn().Err(err).Msg("could not extend the upload read deadline")
+	}
+	if err := rc.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		h.logger.Warn().Err(err).Msg("could not extend the upload write deadline")
+	}
 }
 
 // readCapped reads at most limit bytes and reports whether r held more.
@@ -689,6 +724,7 @@ func locateBackupRoot(extractedRoot string) string {
 // (+ optional device_id field), extracts it server-side, runs the existing
 // backup parser and deletes the temp files.
 func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Request) {
+	h.extendUploadDeadlines(w)
 	artifact, ok := h.receiveUpload(w, r, map[string]string{".zip": ".zip"})
 	if !ok {
 		return
@@ -733,7 +769,7 @@ func (h *ForensicsHandler) UploadIOSBackup(w http.ResponseWriter, r *http.Reques
 // (+ optional device_id field); the existing sysdiagnose parser performs the
 // extraction itself.
 func (h *ForensicsHandler) UploadSysdiagnose(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := h.analysisContext(r)
+	ctx, cancel := h.uploadContext(w, r)
 	defer cancel()
 
 	artifact, ok := h.receiveUpload(w, r, map[string]string{
@@ -821,7 +857,7 @@ func openBugreportText(archivePath string) (io.ReadCloser, error) {
 // field) — either the bugreport zip produced by `adb bugreport` or the plain
 // bugreport .txt — and runs the existing logcat/bugreport parser on it.
 func (h *ForensicsHandler) UploadBugreport(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := h.analysisContext(r)
+	ctx, cancel := h.uploadContext(w, r)
 	defer cancel()
 
 	artifact, ok := h.receiveUpload(w, r, map[string]string{

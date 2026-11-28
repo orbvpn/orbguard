@@ -56,7 +56,7 @@ func (r *Router) Setup() http.Handler {
 	router.Use(middleware.RealIP)
 	router.Use(apimiddleware.Logger(r.logger))
 	router.Use(middleware.Recoverer)
-	router.Use(middleware.Timeout(60 * time.Second))
+	router.Use(requestTimeout(60 * time.Second))
 
 	// CORS
 	router.Use(cors.Handler(cors.Options{
@@ -886,4 +886,29 @@ func (r *Router) Setup() http.Handler {
 	router.Get("/api/v1/streaming/stats", r.handlers.Streaming.GetStats)
 
 	return router
+}
+
+// longUploadPaths are the archive uploads that may take about four minutes
+// (the forensics upload budget) instead of the usual 60 s: a phone on a slow
+// uplink needs that long to send a sysdiagnose or a bug report. Their
+// handlers end themselves at that budget.
+var longUploadPaths = map[string]bool{
+	"/api/v1/forensics/ios/backup/upload":        true,
+	"/api/v1/forensics/ios/sysdiagnose/upload":   true,
+	"/api/v1/forensics/android/bugreport/upload": true,
+}
+
+// requestTimeout ends every request at d, except the long archive uploads.
+func requestTimeout(d time.Duration) func(http.Handler) http.Handler {
+	limit := middleware.Timeout(d)
+	return func(next http.Handler) http.Handler {
+		limited := limit(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && longUploadPaths[r.URL.Path] {
+				next.ServeHTTP(w, r)
+				return
+			}
+			limited.ServeHTTP(w, r)
+		})
+	}
 }
