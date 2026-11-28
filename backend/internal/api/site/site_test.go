@@ -24,11 +24,14 @@ func newRouter() chi.Router {
 	return r
 }
 
-var storeVars = []string{"ORBGUARD_STORE_IOS", "ORBGUARD_STORE_ANDROID", "ORBGUARD_STORE_MAC", "ORBGUARD_STORE_WINDOWS"}
+var storeVars = []string{"ORBGUARD_STORE_IOS", "ORBGUARD_STORE_ANDROID", "ORBGUARD_STORE_MAC", "ORBGUARD_STORE_WINDOWS", "ORBGUARD_STORE_LINUX"}
 
-// noStores pins every store variable empty so the host environment cannot leak in.
+var downloadVars = []string{"ORBGUARD_DOWNLOAD_LINUX_DEB", "ORBGUARD_DOWNLOAD_LINUX_TAR"}
+
+// noStores pins every store and download variable empty so the host
+// environment cannot leak in.
 func noStores(t *testing.T) {
-	for _, v := range storeVars {
+	for _, v := range append(append([]string{}, storeVars...), downloadVars...) {
 		t.Setenv(v, "")
 	}
 }
@@ -102,12 +105,12 @@ func TestHomeWithoutStores(t *testing.T) {
 	if !strings.Contains(body, "Store links appear here as each listing goes live.") {
 		t.Error("missing the not-yet-listed sentence")
 	}
-	for _, name := range []string{"iPhone", "Android", "Mac", "Windows"} {
+	for _, name := range []string{"iPhone", "Android", "Mac", "Windows", "Linux"} {
 		if !strings.Contains(body, "<b>"+name+"</b>") {
 			t.Errorf("get section does not name %s", name)
 		}
 	}
-	for _, s := range []string{`class="row" href=`, "Available on", "Not listed yet"} {
+	for _, s := range []string{`class="row" href=`, "Available on", "Not listed yet", `class="dl"`} {
 		if strings.Contains(body, s) {
 			t.Errorf("unexpected %q with no stores configured", s)
 		}
@@ -144,17 +147,52 @@ func TestHomeWithSomeStores(t *testing.T) {
 }
 
 func TestHomeWithAllStores(t *testing.T) {
+	noStores(t)
 	for _, v := range storeVars {
 		t.Setenv(v, "https://store.example.test/"+strings.ToLower(v))
 	}
 	body := get(t, newRouter(), "/").Body.String()
-	if !strings.Contains(body, "Available on iPhone, Android, Mac and Windows.") {
-		t.Error("platform line does not name all four platforms")
+	if !strings.Contains(body, "Available on iPhone, Android, Mac, Windows and Linux.") {
+		t.Error("platform line does not name all five platforms")
 	}
 	for _, s := range []string{"Store links appear here", "Not listed yet"} {
 		if strings.Contains(body, s) {
 			t.Errorf("unexpected %q with every store configured", s)
 		}
+	}
+}
+
+func TestHomeLinuxDownloads(t *testing.T) {
+	noStores(t)
+	t.Setenv("ORBGUARD_STORE_LINUX", "https://snap.example.test/orbguard")
+	t.Setenv("ORBGUARD_DOWNLOAD_LINUX_DEB", "https://files.example.test/orbguard_latest_amd64.deb")
+	t.Setenv("ORBGUARD_DOWNLOAD_LINUX_TAR", "https://files.example.test/OrbGuard-latest-linux-x64.tar.gz")
+	body := get(t, newRouter(), "/").Body.String()
+	for _, want := range []string{
+		`href="https://snap.example.test/orbguard"`,
+		"<span>Snap Store</span>",
+		`Also as a <a href="https://files.example.test/orbguard_latest_amd64.deb" rel="noopener">.deb</a> or <a href="https://files.example.test/OrbGuard-latest-linux-x64.tar.gz" rel="noopener">.tar.gz</a> download`,
+		"Available on Linux.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if n := strings.Count(body, `class="dl"`); n != 1 {
+		t.Errorf("want 1 download line, got %d", n)
+	}
+}
+
+func TestHomeLinuxDownloadRejected(t *testing.T) {
+	noStores(t)
+	t.Setenv("ORBGUARD_DOWNLOAD_LINUX_DEB", "http://files.example.test/orbguard.deb") // not https: ignored
+	t.Setenv("ORBGUARD_DOWNLOAD_LINUX_TAR", "https://files.example.test/orbguard.tar.gz")
+	body := get(t, newRouter(), "/").Body.String()
+	if strings.Contains(body, "orbguard.deb") {
+		t.Error("rendered a non-https download")
+	}
+	if !strings.Contains(body, `Also as a <a href="https://files.example.test/orbguard.tar.gz" rel="noopener">.tar.gz</a> download`) {
+		t.Error("missing the one accepted download")
 	}
 }
 

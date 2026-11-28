@@ -66,24 +66,48 @@ func Register(r chi.Router) {
 // platform is one place OrbGuard can be installed from. URL is empty until
 // the listing is live and its env var is set.
 type platform struct {
-	Name  string // as the page names the device
-	Store string // the store the link opens
+	Name      string // as the page names the device
+	Store     string // the store the link opens
+	URL       string
+	Downloads []download // direct downloads offered beside the store, if any
+}
+
+// download is a file served straight from our own storage, such as the
+// Linux .deb, for people who do not use the platform's store.
+type download struct {
+	Label string // the file type as the page shows it, ".deb"
 	URL   string
 }
 
+type downloadEnv struct{ label, env string }
+
 // storeEnv lists the platforms in page order with the env var holding each
-// store URL. Only https URLs are accepted; anything else is ignored.
-var storeEnv = []struct{ name, store, env string }{
-	{"iPhone", "App Store", "ORBGUARD_STORE_IOS"},
-	{"Android", "Google Play", "ORBGUARD_STORE_ANDROID"},
-	{"Mac", "Mac App Store", "ORBGUARD_STORE_MAC"},
-	{"Windows", "Microsoft Store", "ORBGUARD_STORE_WINDOWS"},
+// store URL, and each direct download's env var. Only https URLs are
+// accepted; anything else is ignored.
+var storeEnv = []struct {
+	name, store, env string
+	downloads        []downloadEnv
+}{
+	{"iPhone", "App Store", "ORBGUARD_STORE_IOS", nil},
+	{"Android", "Google Play", "ORBGUARD_STORE_ANDROID", nil},
+	{"Mac", "Mac App Store", "ORBGUARD_STORE_MAC", nil},
+	{"Windows", "Microsoft Store", "ORBGUARD_STORE_WINDOWS", nil},
+	{"Linux", "Snap Store", "ORBGUARD_STORE_LINUX", []downloadEnv{
+		{".deb", "ORBGUARD_DOWNLOAD_LINUX_DEB"},
+		{".tar.gz", "ORBGUARD_DOWNLOAD_LINUX_TAR"},
+	}},
 }
 
 func stores() []platform {
 	out := make([]platform, 0, len(storeEnv))
 	for _, s := range storeEnv {
-		out = append(out, platform{Name: s.name, Store: s.store, URL: httpsURL(os.Getenv(s.env))})
+		p := platform{Name: s.name, Store: s.store, URL: httpsURL(os.Getenv(s.env))}
+		for _, d := range s.downloads {
+			if u := httpsURL(os.Getenv(d.env)); u != "" {
+				p.Downloads = append(p.Downloads, download{Label: d.label, URL: u})
+			}
+		}
+		out = append(out, p)
 	}
 	return out
 }
