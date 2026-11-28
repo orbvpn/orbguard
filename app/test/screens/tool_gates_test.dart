@@ -79,10 +79,8 @@ class _Forensics extends ForensicsProvider {
   @override
   Future<void> init() async {}
   @override
-  Future<ForensicAnalysisResult?> runFullAnalysis({
-    String? shutdownLog,
-    String? logcatData,
-  }) async {
+  Future<ForensicAnalysisResult?> uploadAndroidBugreport(
+      String filePath) async {
     runs++;
     return null;
   }
@@ -332,13 +330,24 @@ void main() {
     'the Spyware shield (forensics)',
     mount: (tester, user) async {
       final _Forensics forensics = _Forensics();
-      await _pump(tester, user,
-          const ForensicsScreen(platform: TargetPlatform.android), extra: [
-        ChangeNotifierProvider<ForensicsProvider>.value(value: forensics)
-      ]);
+      await _pump(
+          tester,
+          user,
+          ForensicsScreen(
+            platform: TargetPlatform.android,
+            pickFile: (_) async => '/downloads/bugreport.zip',
+          ),
+          extra: [
+            ChangeNotifierProvider<ForensicsProvider>.value(value: forensics)
+          ]);
       return () => forensics.runs;
     },
-    start: (tester) => _tap(tester, find.text('Full Forensic Scan')),
+    // The scan opens its steps first; the check starts once the bug report
+    // is chosen.
+    start: (tester) async {
+      await _tap(tester, find.text('Full Forensic Scan'));
+      await _tap(tester, find.text('Choose the bug report'));
+    },
   );
 
   _gated(

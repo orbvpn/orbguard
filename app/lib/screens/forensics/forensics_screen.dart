@@ -9,18 +9,21 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/theme/colors.dart';
 import '../../presentation/theme/glass_theme.dart';
+import '../../presentation/widgets/app_sheet.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/glass_tab_page.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/forensics_provider.dart';
 import '../../utils/host_platform.dart';
 import '../../widgets/scan_credits/scan_gate.dart';
+import 'forensic_guide_sheet.dart';
 
 class ForensicsScreen extends StatefulWidget {
   const ForensicsScreen({
     super.key,
     this.title = 'Forensic Analysis',
     this.platform,
+    this.pickFile,
   });
 
   /// The name in the header. A shield passes its own, so the sheet reads
@@ -29,6 +32,10 @@ class ForensicsScreen extends StatefulWidget {
 
   /// The device the screen is drawn for; null is this one.
   final TargetPlatform? platform;
+
+  /// Stands in for the file picker, for tests: given the extensions offered
+  /// (none is every file), the path chosen, or null when nothing was.
+  final Future<String?> Function(List<String> allowedExtensions)? pickFile;
 
   @override
   State<ForensicsScreen> createState() => _ForensicsScreenState();
@@ -115,19 +122,25 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Full scan button. A computer has nothing of its own to send
-          // it, so there the analysis starts from a file instead. Each
-          // analysis here is a check a person starts, so each goes through
-          // the scan-credit gate first.
-          if (!_onComputer) ...[
+          // Full scan button, on a phone. No app can read its phone's system
+          // logs, so the scan reads the file the phone's own system makes:
+          // a sheet says how to make it, then the file is chosen and sent.
+          // A computer has its own buttons below. Each analysis here is a
+          // check a person starts, so each goes through the scan-credit gate
+          // once a file is chosen.
+          if (ForensicGuide.of(_on) case final ForensicGuide guide) ...[
             _buildAnalysisButton(
               icon: 'shield_check',
               title: 'Full Forensic Scan',
-              description: 'Comprehensive analysis for all known spyware',
+              description: guide == ForensicGuide.iphone
+                  ? 'Make a sysdiagnose, and OrbGuard looks through this '
+                      'iPhone\'s logs for known spyware.'
+                  : 'Make a bug report, and OrbGuard looks through this '
+                      'phone\'s logs for known spyware.',
               color: AppColors.accentInk,
               onTap: provider.isAnalyzing
                   ? null
-                  : () => runGatedCheck(context, provider.runFullAnalysis),
+                  : () => _startFullScan(context, provider, guide),
             ),
             const SizedBox(height: 12),
           ],
@@ -1108,16 +1121,41 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
     );
   }
 
-  /// Opens a real file picker and uploads the chosen artifact through the
-  /// provider's multipart upload flow. Upload progress comes from dio's
-  /// onSendProgress and is rendered by the progress card.
-  Future<void> _pickAndUpload(
+  /// The Full Forensic Scan on a phone: the steps for making the file, and
+  /// when the person goes on, the file picker and the upload. Closing the
+  /// sheet, or picking nothing, costs nothing.
+  Future<void> _startFullScan(
     BuildContext context,
-    ForensicsProvider provider, {
-    required List<String> allowedExtensions,
-    required List<String> serverAcceptedSuffixes,
-    required Future<ForensicAnalysisResult?> Function(String path) upload,
-  }) async {
+    ForensicsProvider provider,
+    ForensicGuide guide,
+  ) async {
+    final bool? choose = await showAppSheet<bool>(
+      context,
+      child: ForensicGuideSheet(guide: guide),
+    );
+    if (choose != true || !context.mounted) return;
+    await _pickAndUpload(
+      context,
+      provider,
+      // Every file: see ForensicGuide.choose.
+      allowedExtensions: const [],
+      serverAcceptedSuffixes: guide.acceptedSuffixes,
+      wrongFile: guide.wrongFile,
+      upload: guide == ForensicGuide.iphone
+          ? provider.uploadSysdiagnose
+          : provider.uploadAndroidBugreport,
+    );
+  }
+
+  /// The system file picker. No extensions means every file. Some platforms
+  /// reject uncommon extension filters (e.g. tgz/gz on iOS); then it opens
+  /// unfiltered. Either way the caller checks the name.
+  Future<String?> _systemPick(List<String> allowedExtensions) async {
+    if (allowedExtensions.isEmpty) {
+      final FilePickerResult? any =
+          await FilePicker.platform.pickFiles(type: FileType.any);
+      return any?.files.single.path;
+    }
     FilePickerResult? picked;
     try {
       picked = await FilePicker.platform.pickFiles(
@@ -1125,14 +1163,27 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
         allowedExtensions: allowedExtensions,
       );
     } on PlatformException catch (_) {
-      // Some platforms reject uncommon extension filters (e.g. tgz/gz on
-      // iOS); fall back to an unfiltered picker and validate below.
       picked = await FilePicker.platform.pickFiles(type: FileType.any);
     } on ArgumentError catch (_) {
       picked = await FilePicker.platform.pickFiles(type: FileType.any);
     }
+    return picked?.files.single.path;
+  }
 
-    final path = picked?.files.single.path;
+  /// Opens a real file picker and uploads the chosen artifact through the
+  /// provider's multipart upload flow. Upload progress comes from dio's
+  /// onSendProgress and is rendered by the progress card. [wrongFile] is
+  /// said when the chosen file is not one the server reads.
+  Future<void> _pickAndUpload(
+    BuildContext context,
+    ForensicsProvider provider, {
+    required List<String> allowedExtensions,
+    required List<String> serverAcceptedSuffixes,
+    required Future<ForensicAnalysisResult?> Function(String path) upload,
+    String? wrongFile,
+  }) async {
+    final String? path =
+        await (widget.pickFile ?? _systemPick)(allowedExtensions);
     if (path == null) return; // user cancelled
 
     final lowerName = path.split(PlatformInfo.pathSeparator).last.toLowerCase();
@@ -1143,8 +1194,9 @@ class _ForensicsScreenState extends State<ForensicsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Unsupported file type "$lowerName". Expected: '
-              '${serverAcceptedSuffixes.join(', ')}',
+              wrongFile ??
+                  'Unsupported file type "$lowerName". Expected: '
+                      '${serverAcceptedSuffixes.join(', ')}',
             ),
             backgroundColor: AppColors.error,
           ),

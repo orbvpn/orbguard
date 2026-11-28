@@ -71,6 +71,30 @@ void main() {
       expect(said, contains('Choose'));
     });
 
+    test('a file read only in part is not called clean', () {
+      final String said = ForensicsProvider.plainError(ApiError(
+          statusCode: 422,
+          code: 'partly_examined',
+          message: 'Part of this could not be read'));
+      expect(said, contains('not an all-clear'));
+      expect(said, isNot(contains('Choose')),
+          reason: 'a file was chosen; part of it was read');
+    });
+
+    test('a busy server is not an all-clear', () {
+      final String said = ForensicsProvider.plainError(ApiError(
+          statusCode: 503, code: 'analysis_busy', message: 'busy'));
+      expect(said, contains('busy'));
+      expect(said, contains('not an all-clear'));
+    });
+
+    test('a file that did not arrive in full says so', () {
+      final String said = ForensicsProvider.plainError(
+          ApiError(statusCode: 413, message: 'failed to read multipart body'));
+      expect(said, contains('did not reach OrbGuard in full'));
+      expect(said, isNot(contains('multipart')));
+    });
+
     test('no connection says so', () {
       final String said = ForensicsProvider.plainError(
           ApiError(message: 'Unable to connect', code: 'CONNECTION_ERROR'));
