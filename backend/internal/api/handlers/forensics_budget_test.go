@@ -534,3 +534,61 @@ func TestBugreportStopsAtItsParseLimit(t *testing.T) {
 	budgetHandler(10*time.Minute).UploadBugreport(rec, req)
 	assertPartly(t, rec, logcatStopNote)
 }
+
+// trickle sends one byte at a time, each after a pause.
+type trickle struct {
+	r     io.Reader
+	pause time.Duration
+}
+
+func (t *trickle) Read(p []byte) (int, error) {
+	time.Sleep(t.pause)
+	if len(p) > 1 {
+		p = p[:1]
+	}
+	return t.r.Read(p)
+}
+
+// A client that keeps its place by sending a byte now and then is let go
+// once the idle time has passed, and told plainly that nothing was checked.
+func TestTrickledUploadIsLetGo(t *testing.T) {
+	h := budgetHandler(time.Minute)
+	h.UploadIdle = 50 * time.Millisecond
+	body, contentType := multipartBody(t, "s.tar.gz", budgetTarGz(t))
+	req := httptest.NewRequest(http.MethodPost, "/s", &trickle{r: body, pause: 10 * time.Millisecond})
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	h.UploadSysdiagnose(rec, req)
+	if rec.Code != http.StatusRequestTimeout || !strings.Contains(rec.Body.String(), "nothing was checked") {
+		t.Fatalf("want 408 saying nothing was checked, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if held := len(h.longUploads); held != 0 {
+		t.Fatalf("the refused upload still holds %d places", held)
+	}
+}
+
+func TestProgressDeadlineKeepsAMinimumRate(t *testing.T) {
+	end := time.Now().Add(time.Hour)
+	var last time.Time
+	p := &progressDeadline{
+		body:    io.NopCloser(strings.NewReader("abcdef")),
+		idle:    time.Second,
+		end:     end,
+		minRate: 1 << 10,
+		set:     func(at time.Time) { last = at },
+	}
+	if _, err := p.Read(make([]byte, 1)); err != nil {
+		t.Fatalf("within the idle time any rate is fine: %v", err)
+	}
+	p.started = time.Now().Add(-3 * time.Second) // 1 byte in 3 s
+	if _, err := p.Read(make([]byte, 1)); !errors.Is(err, errUploadTooSlow) {
+		t.Fatalf("want errUploadTooSlow, got %v", err)
+	}
+	if !last.Equal(end) {
+		t.Fatalf("a refused body must leave the deadline at the end, got %s", last)
+	}
+	p.read = 10 << 10 // 10 KiB in 3 s is over 1 KiB/s
+	if _, err := p.Read(make([]byte, 1)); err != nil {
+		t.Fatalf("a fast enough body must keep reading: %v", err)
+	}
+}

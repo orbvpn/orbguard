@@ -63,6 +63,12 @@ const (
 	// its minutes; a stalled one cannot hold the connection for them.
 	forensicUploadIdle = 30 * time.Second
 
+	// minUploadRate is the slowest average an archive upload may keep, in
+	// bytes a second, once forensicUploadIdle has passed. Slower than this,
+	// no archive worth reading arrives within the budget, and a client that
+	// trickles bytes to keep its place is let go.
+	minUploadRate = 32 << 10
+
 	// maxLongUploads is how many archive uploads one server takes at once.
 	// Each may store up to maxForensicUploadBytes on a 2 GiB disk; the next
 	// one is told the service is busy and to try again shortly.
@@ -131,10 +137,11 @@ func (h *ForensicsHandler) startLongUpload(w http.ResponseWriter, r *http.Reques
 	rc := http.NewResponseController(w)
 	h.setDeadline("write", rc.SetWriteDeadline, end)
 	r.Body = &progressDeadline{
-		body: r.Body,
-		idle: h.UploadIdle,
-		end:  end,
-		set:  func(t time.Time) { h.setDeadline("read", rc.SetReadDeadline, t) },
+		body:    r.Body,
+		idle:    h.UploadIdle,
+		end:     end,
+		minRate: minUploadRate,
+		set:     func(t time.Time) { h.setDeadline("read", rc.SetReadDeadline, t) },
 	}
 	return func() { <-h.longUploads }, true
 }
@@ -145,25 +152,48 @@ func (h *ForensicsHandler) setDeadline(which string, set func(time.Time) error, 
 	}
 }
 
+// tooSlowMessage answers an upload ended by errUploadTooSlow.
+const tooSlowMessage = "The upload was too slow to finish in time, so nothing was checked. Try again on a faster connection."
+
+// errUploadTooSlow ends an archive upload that sends more slowly than
+// minUploadRate.
+var errUploadTooSlow = errors.New("the upload is too slow to finish in time")
+
 // progressDeadline moves the read deadline to idle from now before each
-// read, never past end. Once the body is read to its end, or fails, the
-// deadline goes back to end: the server keeps reading the connection after
-// the body to notice a client that leaves, and an early deadline there would
-// cancel the analysis that is still running.
+// read, never past end, and ends the body with errUploadTooSlow when the
+// average since the first read falls under minRate once idle has passed.
+// Once the body is read to its end, or fails, the deadline goes back to end:
+// the server keeps reading the connection after the body to notice a client
+// that leaves, and an early deadline there would cancel the analysis that is
+// still running.
 type progressDeadline struct {
-	body io.ReadCloser
-	idle time.Duration
-	end  time.Time
-	set  func(time.Time)
+	body    io.ReadCloser
+	idle    time.Duration
+	end     time.Time
+	minRate int64
+	set     func(time.Time)
+
+	started time.Time
+	read    int64
 }
 
 func (p *progressDeadline) Read(b []byte) (int, error) {
-	next := time.Now().Add(p.idle)
+	now := time.Now()
+	if p.started.IsZero() {
+		p.started = now
+	}
+	if elapsed := now.Sub(p.started); p.minRate > 0 && elapsed > p.idle &&
+		float64(p.read) < float64(p.minRate)*elapsed.Seconds() {
+		p.set(p.end)
+		return 0, errUploadTooSlow
+	}
+	next := now.Add(p.idle)
 	if next.After(p.end) {
 		next = p.end
 	}
 	p.set(next)
 	n, err := p.body.Read(b)
+	p.read += int64(n)
 	if err != nil {
 		p.set(p.end)
 	}
@@ -627,6 +657,9 @@ func (h *ForensicsHandler) receiveUpload(w http.ResponseWriter, r *http.Request,
 		if errors.Is(err, io.EOF) {
 			break
 		}
+		if errors.Is(err, errUploadTooSlow) {
+			return fail(http.StatusRequestTimeout, tooSlowMessage)
+		}
 		if err != nil {
 			// MaxBytesReader trips mid-stream as a read error.
 			return fail(http.StatusRequestEntityTooLarge, fmt.Sprintf("failed to read multipart body (uploads are capped at %d bytes)", int64(maxForensicUploadBytes)))
@@ -666,6 +699,9 @@ func (h *ForensicsHandler) receiveUpload(w http.ResponseWriter, r *http.Request,
 			written, copyErr := io.Copy(dst, part)
 			closeErr := dst.Close()
 			part.Close()
+			if errors.Is(copyErr, errUploadTooSlow) {
+				return fail(http.StatusRequestTimeout, tooSlowMessage)
+			}
 			if copyErr != nil {
 				return fail(http.StatusRequestEntityTooLarge, fmt.Sprintf("failed to store uploaded file (uploads are capped at %d bytes)", int64(maxForensicUploadBytes)))
 			}
