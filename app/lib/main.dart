@@ -132,6 +132,7 @@ import 'services/ads/rewarded_ad_service.dart';
 import 'services/orbnet/ad_api.dart';
 import 'services/orbnet/scan_credit_api.dart';
 import 'services/iap/iap_service.dart';
+import 'utils/amazon_build.dart';
 import 'widgets/scan_credits/scan_gate.dart';
 import 'models/app_mode.dart';
 
@@ -287,7 +288,11 @@ class AntiSpywareApp extends StatelessWidget {
             return ScanCreditProvider(
               adApi: AdApi(),
               scanCreditApi: ScanCreditApi(),
-              adService: DefaultRewardedAdService(),
+              // The Amazon build carries no ad network: the constant leaves
+              // every ad network's code out of that binary.
+              adService: kAmazonBuild
+                  ? const NoRewardedAds()
+                  : DefaultRewardedAdService(),
               isLoggedIn: () => account.isLoggedIn,
             );
           },
@@ -316,7 +321,8 @@ class AntiSpywareApp extends StatelessWidget {
                 onEntitlementRefresh: account.refreshEntitlement,
                 isLoggedIn: () => account.isLoggedIn,
               );
-            unawaited(iap.initialize());
+            // The Amazon build sells nothing, so it never opens a store.
+            if (!kAmazonBuild) unawaited(iap.initialize());
             return iap;
           },
         ),

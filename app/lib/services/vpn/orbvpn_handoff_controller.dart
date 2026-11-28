@@ -32,11 +32,16 @@ class OrbVpnHandoffController implements VpnController {
   OrbVpnHandoffController({
     Future<bool> Function(Uri, {LaunchMode mode})? launcher,
     Future<bool> Function(Uri)? canLaunch,
+    this.offersDownload = true,
   })  : _launch = launcher ?? launchUrl,
         _canLaunch = canLaunch ?? canLaunchUrl;
 
   final Future<bool> Function(Uri, {LaunchMode mode}) _launch;
   final Future<bool> Function(Uri) _canLaunch;
+
+  /// Whether a missing OrbVPN app opens the download page. The Amazon build
+  /// names no site, so there it only opens an OrbVPN that is installed.
+  final bool offersDownload;
 
   final _statusController = StreamController<VpnStatus>.broadcast();
   VpnStatus _status = VpnStatus.unavailable;
@@ -67,6 +72,10 @@ class OrbVpnHandoffController implements VpnController {
       // canLaunch/launch of the custom scheme failed — fall through to the
       // download page below.
       debugPrint('OrbVpnHandoffController: deep link unavailable: $e');
+    }
+    if (!offersDownload) {
+      _setStatus(VpnStatus.error);
+      return;
     }
     try {
       await _launch(Uri.parse(OrbVpnLinks.downloadPage),

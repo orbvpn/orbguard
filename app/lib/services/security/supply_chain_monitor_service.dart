@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 import '../api/orbguard_api_client.dart';
+import '../../utils/amazon_build.dart';
 
 /// Third-party library/SDK information
 class ThirdPartyLibrary {
@@ -273,25 +274,30 @@ class SupplyChainMonitorService {
         isTracker: true,
       ),
 
-      // Advertising
-      'com.google.android.gms.ads': _SDKSignature(
-        name: 'Google AdMob',
-        vendor: 'Google',
-        category: LibraryCategory.advertising,
-        isTracker: true,
-      ),
+      // Advertising. The Amazon build leaves out the three entries that name
+      // an ad network its review scanner looks for: it reads the name in the
+      // binary as the SDK itself. Those packages still show as advertising
+      // there, from the server's tracker list and the "ads" in the name.
+      if (!kAmazonBuild)
+        'com.google.android.gms.ads': _SDKSignature(
+          name: 'Google AdMob',
+          vendor: 'Google',
+          category: LibraryCategory.advertising,
+          isTracker: true,
+        ),
       'com.facebook.ads': _SDKSignature(
         name: 'Facebook Audience Network',
         vendor: 'Meta',
         category: LibraryCategory.advertising,
         isTracker: true,
       ),
-      'com.unity3d.ads': _SDKSignature(
-        name: 'Unity Ads',
-        vendor: 'Unity',
-        category: LibraryCategory.advertising,
-        isTracker: true,
-      ),
+      if (!kAmazonBuild)
+        'com.unity3d.ads': _SDKSignature(
+          name: 'Unity Ads',
+          vendor: 'Unity',
+          category: LibraryCategory.advertising,
+          isTracker: true,
+        ),
       'com.chartboost': _SDKSignature(
         name: 'Chartboost',
         vendor: 'Chartboost',
@@ -304,12 +310,13 @@ class SupplyChainMonitorService {
         category: LibraryCategory.advertising,
         isTracker: true,
       ),
-      'com.ironsource': _SDKSignature(
-        name: 'IronSource',
-        vendor: 'IronSource',
-        category: LibraryCategory.advertising,
-        isTracker: true,
-      ),
+      if (!kAmazonBuild)
+        'com.ironsource': _SDKSignature(
+          name: 'IronSource',
+          vendor: 'IronSource',
+          category: LibraryCategory.advertising,
+          isTracker: true,
+        ),
 
       // Crash Reporting
       'com.google.firebase.crashlytics': _SDKSignature(

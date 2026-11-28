@@ -21,6 +21,7 @@ import 'package:orbguard/services/orbnet/ad_api.dart';
 import 'package:orbguard/services/orbnet/models/ad_models.dart';
 import 'package:orbguard/services/orbnet/models/passkey_info.dart';
 import 'package:orbguard/services/orbnet/scan_credit_api.dart';
+import 'package:orbguard/utils/amazon_build.dart';
 
 /// An account a test sets by hand. [signIn] flips it the way a finished
 /// sign-in does: the state changes and listeners hear about it.
@@ -250,7 +251,8 @@ class GateUser {
 /// Wraps [child] the way the app does: the account, the credits, the store,
 /// a theme, and a screen [width] wide. [allowance] is the free check and the
 /// device the paywall is drawn for; left out, an Android phone whose free
-/// check is gone.
+/// check is gone. [amazon] draws it as the Amazon Appstore build does, with
+/// no dart-define needed.
 Future<void> pumpSale(
   WidgetTester tester, {
   required AccountProvider account,
@@ -261,6 +263,7 @@ Future<void> pumpSale(
   bool dark = true,
   CheckAllowance? allowance,
   List<SingleChildWidget> extra = const [],
+  bool amazon = false,
 }) async {
   AppColors.uiBrightness = dark ? Brightness.dark : Brightness.light;
   addTearDown(() => AppColors.uiBrightness = Brightness.dark);
@@ -277,9 +280,12 @@ Future<void> pumpSale(
             value: allowance ?? FakeAllowance()),
         ...extra,
       ],
-      child: MaterialApp(
-        theme: dark ? AppTheme.dark : AppTheme.light,
-        home: Scaffold(body: child),
+      child: AmazonBuildScope(
+        amazon: amazon,
+        child: MaterialApp(
+          theme: dark ? AppTheme.dark : AppTheme.light,
+          home: Scaffold(body: child),
+        ),
       ),
     ),
   );

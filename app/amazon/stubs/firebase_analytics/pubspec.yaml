@@ -1,0 +1,15 @@
+# Amazon Appstore build only: a pure-Dart stand-in for firebase_analytics.
+# No `flutter: plugin:` section and no native code, so the Amazon APK sends
+# no analytics. app/amazon/build_amazon_apk.sh points the app here through
+# pubspec_overrides.yaml for one build, then removes it.
+name: firebase_analytics
+description: Amazon build stand-in, pure Dart, no native code.
+version: 12.4.5
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter

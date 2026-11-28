@@ -1,7 +1,8 @@
 /// The sale line under a check's results: the scan credits left, then
 /// "Go unlimited". The whole row is one press, to the credits sheet.
 ///
-/// A subscriber sees nothing here: there is nothing to count.
+/// A subscriber sees nothing here: there is nothing to count. Nor does the
+/// Amazon build, where no credit can be earned and no plan taken.
 library;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/pressable.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../scan_credits/credits_sheet.dart';
 import 'credit_balance.dart';
 
@@ -21,7 +23,9 @@ class CreditLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AccountProvider account = context.watch<AccountProvider>();
-    if (account.hasPremium) return const SizedBox.shrink();
+    if (account.hasPremium || isAmazonBuild(context)) {
+      return const SizedBox.shrink();
+    }
     final ScanCreditProvider credits = context.watch<ScanCreditProvider>();
 
     // Signed out there is no balance, and until the server has said it the

@@ -9,9 +9,16 @@ import 'package:flutter/material.dart';
 
 import '../../presentation/widgets/app_sheet.dart';
 import '../../screens/pricing/pricing_screen.dart';
+import '../../utils/amazon_build.dart';
 
 /// Presents the plans. Completes when the sheet closes.
-Future<void> showPlansSheet(BuildContext context) => showAppSheet<void>(
+///
+/// The Amazon build sells nothing: there it opens nothing, and the pricing
+/// screen is left out of that binary.
+Future<void> showPlansSheet(BuildContext context) =>
+    kAmazonBuild ? Future<void>.value() : _showPlansSheet(context);
+
+Future<void> _showPlansSheet(BuildContext context) => showAppSheet<void>(
       context,
       heightFactor: 0.94,
       child: const PricingScreen(),

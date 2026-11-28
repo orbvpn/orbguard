@@ -22,6 +22,7 @@ import '../../models/app_mode.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api/orbguard_api_client.dart';
 import '../../services/vpn/orbvpn_handoff_controller.dart';
+import '../../services/vpn/vpn_controller.dart';
 import '../../services/security/desktop_scan_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../trust/device_capabilities_screen.dart';
@@ -37,6 +38,7 @@ import '../../widgets/sale/account_card.dart';
 import '../../widgets/sale/login_sheet.dart';
 import '../../widgets/sale/plan_card.dart';
 import '../../widgets/sale/plans_sheet.dart';
+import '../../utils/amazon_build.dart';
 
 class SettingsScreen extends StatelessWidget {
   /// When true, skips the outer page wrapper (for embedding in other screens)
@@ -56,6 +58,9 @@ class SettingsScreen extends StatelessWidget {
           // the console layout under the floating header.
           final bool guard = !settings.isProMode;
           final bool meTab = embedded && guard;
+          // The Amazon build sells nothing and names no site: no plans, no
+          // store, no server address.
+          final bool amazon = isAmazonBuild(context);
           return ListView(
             // Embedded (tab) mode renders full-bleed behind the bottom nav
             // (and, in Pro mode, the transparent floating header), so the
@@ -283,13 +288,14 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _buildSettingsTile(
-                    context,
-                    'Plans & pricing',
-                    'The price you see is the price that renews',
-                    'wallet',
-                    onTap: () => showPlansSheet(context),
-                  ),
+                  if (!amazon)
+                    _buildSettingsTile(
+                      context,
+                      'Plans & pricing',
+                      'The price you see is the price that renews',
+                      'wallet',
+                      onTap: () => showPlansSheet(context),
+                    ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -334,7 +340,9 @@ class SettingsScreen extends StatelessWidget {
                           settings.isProMode
                               ? 'On. Advanced threat-intelligence & enterprise tools are visible'
                               : locked
-                                  ? 'Premium. Subscribe to unlock the expert console'
+                                  ? (amazon
+                                      ? 'Part of OrbGuard Premium'
+                                      : 'Premium. Subscribe to unlock the expert console')
                                   : 'Off. The simple, consumer Guard experience',
                           style: TextStyle(
                             color: cs.onSurfaceVariant,
@@ -367,18 +375,20 @@ class SettingsScreen extends StatelessWidget {
                 'settings',
                 Theme.of(context).colorScheme.onSurfaceVariant,
                 [
-                  _buildSettingsTile(
-                    context,
-                    'API Configuration',
-                    'Server and connection settings',
-                    'cloud_storage',
-                    onTap: () => Navigator.push(
+                  // It shows the server's address, a site name.
+                  if (!amazon)
+                    _buildSettingsTile(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const ApiSettingsScreen(),
+                      'API Configuration',
+                      'Server and connection settings',
+                      'cloud_storage',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ApiSettingsScreen(),
+                        ),
                       ),
                     ),
-                  ),
                   _buildSettingsTile(
                     context,
                     'Reset Settings',
@@ -527,6 +537,9 @@ class SettingsScreen extends StatelessWidget {
       builder: (context, account, _) {
         final loggedIn = account.isLoggedIn;
         final tier = account.subscriptionTier;
+        // The Amazon build has no purchase path: it shows the plan an
+        // account already has, and nothing to buy, manage or restore.
+        final amazon = isAmazonBuild(context);
         return _buildSettingsSection(
           context,
           'Account',
@@ -537,19 +550,22 @@ class SettingsScreen extends StatelessWidget {
               _buildSettingsTile(
                 context,
                 'Sign in / Account',
-                'Use your OrbVPN account to unlock subscription & remote control',
+                amazon
+                    ? 'Use your OrbVPN account for Premium & remote control'
+                    : 'Use your OrbVPN account to unlock subscription & remote control',
                 'login',
                 onTap: () => showLoginSheet(context),
               ),
               // Subscription: the purchase path must be findable without an
               // account — signing in is only required at checkout.
-              _buildSettingsTile(
-                context,
-                'Subscription',
-                'View plans & subscribe. One subscription covers OrbGuard & OrbVPN',
-                'wallet',
-                onTap: () => showPlansSheet(context),
-              ),
+              if (!amazon)
+                _buildSettingsTile(
+                  context,
+                  'Subscription',
+                  'View plans & subscribe. One subscription covers OrbGuard & OrbVPN',
+                  'wallet',
+                  onTap: () => showPlansSheet(context),
+                ),
             ] else ...[
               if (!compact)
                 _buildSettingsTile(
@@ -568,11 +584,13 @@ class SettingsScreen extends StatelessWidget {
                   'Subscription',
                   account.hasPremium
                       ? '${account.subscriptionLabel}. Unlocks OrbGuard, OrbVPN & OrbBrowser'
-                      : 'Free plan. View plans & subscribe',
+                      : (amazon
+                          ? 'Free plan'
+                          : 'Free plan. View plans & subscribe'),
                   'wallet',
-                  onTap: () => showPlansSheet(context),
+                  onTap: amazon ? null : () => showPlansSheet(context),
                 ),
-              if (account.hasPremium)
+              if (account.hasPremium && !amazon)
                 _buildSettingsTile(
                   context,
                   'Manage subscription',
@@ -581,13 +599,14 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () =>
                       _openStoreSubscriptionManagement(context, account),
                 ),
-              _buildSettingsTile(
-                context,
-                'Restore purchases',
-                'Recover a subscription bought on this store account',
-                'refresh',
-                onTap: () => _restorePurchases(context),
-              ),
+              if (!amazon)
+                _buildSettingsTile(
+                  context,
+                  'Restore purchases',
+                  'Recover a subscription bought on this store account',
+                  'refresh',
+                  onTap: () => _restorePurchases(context),
+                ),
               // Passkeys + account deletion live in Account security.
               _buildSettingsTile(
                 context,
@@ -1504,6 +1523,8 @@ class VpnSettingsScreen extends StatelessWidget {
   /// OrbVPN app (or its download page). See docs/VPN_PORT_PLAN.md.
   Widget _buildOrbVpnHandoffCard(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // The Amazon build names no site, so it offers no download page.
+    final amazon = isAmazonBuild(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1531,8 +1552,12 @@ class VpnSettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'OrbGuard uses the OrbVPN app for the VPN tunnel. Open OrbVPN to '
-            "connect, or download it if you don't have it yet.",
+            amazon
+                ? 'OrbGuard uses the OrbVPN app for the VPN tunnel. Open '
+                    'OrbVPN to connect.'
+                : 'OrbGuard uses the OrbVPN app for the VPN tunnel. Open '
+                    "OrbVPN to connect, or download it if you don't have it "
+                    'yet.',
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 13,
@@ -1544,8 +1569,14 @@ class VpnSettingsScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () async {
-                final controller = OrbVpnHandoffController();
+                final messenger = ScaffoldMessenger.of(context);
+                final controller =
+                    OrbVpnHandoffController(offersDownload: !amazon);
                 await controller.connect();
+                if (amazon && controller.status == VpnStatus.error) {
+                  messenger.showSnackBar(const SnackBar(
+                      content: Text('OrbVPN is not on this device.')));
+                }
                 controller.dispose();
               },
               icon: const Icon(Icons.open_in_new_rounded, size: 18),

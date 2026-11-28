@@ -16,6 +16,8 @@
 //       Mac            : the Premium sheet, whose lime action opens the plans;
 //       Windows, Linux : the Premium sheet with sign-in and a plain link to
 //                        the site. No plan, price or store is shown there.
+//       Amazon build   : the Premium sheet with sign-in only, on any device.
+//                        No plan, price, ad, store or site.
 //
 // Auto/background scans (auto_scan_scheduler, the one-shot first-run check) do
 // NOT call this: the passive safety net is never metered or paywalled.
@@ -34,6 +36,7 @@ import 'package:provider/provider.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/check_allowance.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../../utils/host_platform.dart';
 import '../sale/login_sheet.dart';
 import 'credits_sheet.dart';
@@ -95,7 +98,9 @@ Future<bool> _decide(
   }
   if (!context.mounted) return false;
 
-  return isPhonePlatform(allowance.platform)
+  // The Amazon build has no ad to watch and no plan to take, so a phone
+  // there goes the way Windows and Linux do.
+  return isPhonePlatform(allowance.platform) && !isAmazonBuild(context)
       ? _onPhone(context, account, credits)
       : _onComputer(context, account, credits, allowance.platform);
 }
@@ -135,8 +140,9 @@ Future<bool> _onPhone(
   return false;
 }
 
-/// A computer: no ad can be watched here, so a credit can only be one the
-/// account already holds. Without one the Premium sheet is the way on.
+/// A computer, or any device in the Amazon build: no ad can be watched here,
+/// so a credit can only be one the account already holds. Without one the
+/// Premium sheet is the way on.
 Future<bool> _onComputer(
   BuildContext context,
   AccountProvider account,

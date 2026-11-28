@@ -4,6 +4,9 @@
 ///
 /// The plan name comes from the account's real subscription. No price shows
 /// here: prices come only from the store, on the plans sheet.
+///
+/// The Amazon build has neither way forward: a free account reads that more
+/// checks need OrbGuard Premium, and signed out it offers sign-in.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +19,7 @@ import '../../presentation/widgets/brand_button.dart';
 import '../../presentation/widgets/pressable.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../scan_credits/credits_sheet.dart';
 import 'credit_balance.dart';
 import 'login_sheet.dart';
@@ -41,6 +45,19 @@ class PlanCard extends StatelessWidget {
           ),
         ),
         const _Line('Also unlocks OrbVPN and OrbBrowser premium.'),
+      ];
+    } else if (isAmazonBuild(context)) {
+      // Nothing is earned or sold in the Amazon build: the card says what
+      // more checks need, and signs in an account that already has it.
+      children = [
+        const _Head(title: 'Free plan'),
+        const _Line(
+            'The first check is free. More checks need OrbGuard Premium.'),
+        if (account.isLoggedIn)
+          const _Line('This account has no Premium yet.')
+        else
+          BrandButton(
+              label: 'Sign in', onPressed: () => showLoginSheet(context)),
       ];
     } else if (account.isLoggedIn) {
       final bool known = credits.balanceKnown;

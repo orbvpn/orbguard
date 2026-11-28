@@ -12,6 +12,7 @@ import '../../presentation/theme/app_theme.dart';
 import '../../presentation/theme/brand.dart';
 import '../../presentation/theme/colors.dart';
 import '../../presentation/widgets/glass_app_bar.dart';
+import '../../utils/amazon_build.dart';
 
 enum LegalDoc { terms, privacy }
 
@@ -35,38 +36,44 @@ class LegalScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The Amazon build names no site: its text leaves the web addresses
+    // out, and it has no link to the hosted copy.
+    final bool amazon = isAmazonBuild(context);
     return GlassPage(
       title: _title,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           SelectableText(
-            _body.trim(),
+            (amazon ? LegalDocs.forAmazon(_body) : _body).trim(),
             style: BrandText.body(
               color: context.colors.onSurface,
               size: 13,
             ).copyWith(height: 1.5),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'The current version of this document is also published online.',
-            style: BrandText.body(
-                color: context.colors.onSurfaceVariant, size: 12),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _openHosted,
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              alignment: Alignment.centerLeft,
+          if (!amazon) ...[
+            const SizedBox(height: 20),
+            Text(
+              'The current version of this document is also published '
+              'online.',
+              style: BrandText.body(
+                  color: context.colors.onSurfaceVariant, size: 12),
             ),
-            child: Text(
-              _isTerms
-                  ? 'Open Terms of Service on the web'
-                  : 'Open Privacy Policy on the web',
-              style: BrandText.title(color: AppColors.accentInk, size: 14),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _openHosted,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                alignment: Alignment.centerLeft,
+              ),
+              child: Text(
+                _isTerms
+                    ? 'Open Terms of Service on the web'
+                    : 'Open Privacy Policy on the web',
+                style: BrandText.title(color: AppColors.accentInk, size: 14),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

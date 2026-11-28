@@ -1,0 +1,11 @@
+# Amazon Appstore build only: a pure-Dart stand-in for yandex_mobileads. No
+# `flutter: plugin:` section and no android/ or ios/ code, so the Amazon APK
+# carries none of the SDK. app/amazon/build_amazon_apk.sh points the app here
+# through pubspec_overrides.yaml for one build, then removes it.
+name: yandex_mobileads
+description: Amazon build stand-in, pure Dart, no native code.
+version: 7.18.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"

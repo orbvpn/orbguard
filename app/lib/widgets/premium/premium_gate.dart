@@ -21,6 +21,7 @@ import '../../presentation/widgets/duotone_icon.dart';
 import '../../presentation/widgets/glass_widgets.dart';
 import '../../presentation/widgets/sheet_panel.dart';
 import '../../providers/account_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../sale/login_sheet.dart';
 import '../sale/plans_sheet.dart';
 
@@ -53,10 +54,24 @@ class PremiumGate {
     String? feature,
   }) {
     final loggedIn = account.isLoggedIn;
+    // The Amazon build sells nothing and shows no ads: the sheet says what
+    // the feature needs, and signs in an account that already has it.
+    final amazon = isAmazonBuild(context);
     final cs = Theme.of(context).colorScheme;
     final what = (feature == null || feature.isEmpty)
         ? 'This feature'
         : feature;
+
+    final String closing;
+    if (amazon) {
+      closing = loggedIn
+          ? 'This account has no Premium yet.'
+          : 'Already have Premium? Sign in and it works here too.';
+    } else {
+      closing = loggedIn
+          ? "You're signed in. Choose a plan to subscribe."
+          : 'Sign in with your OrbVPN account to subscribe.';
+    }
 
     showAppSheet(
       context,
@@ -71,12 +86,14 @@ class PremiumGate {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$what is part of OrbGuard premium. A subscription unlocks it, '
-              'along with everything else.',
+              amazon
+                  ? '$what is part of OrbGuard Premium, along with:'
+                  : '$what is part of OrbGuard premium. A subscription '
+                      'unlocks it, along with everything else.',
               style: BrandText.body(color: cs.onSurfaceVariant, size: 14.5),
             ),
             const SizedBox(height: 16),
-            const _Benefit('Ad-free: no watching ads for credits'),
+            if (!amazon) const _Benefit('Ad-free: no watching ads for credits'),
             const _Benefit(
               'Expert (Pro) console: threat intel & enterprise tools',
             ),
@@ -84,21 +101,20 @@ class PremiumGate {
             const _Benefit('Remote control & camera for a lost device'),
             const SizedBox(height: 12),
             Text(
-              loggedIn
-                  ? "You're signed in. Choose a plan to subscribe."
-                  : 'Sign in with your OrbVPN account to subscribe.',
+              closing,
               style: BrandText.body(color: cs.onSurfaceVariant, size: 13),
             ),
           ],
         ),
-        secondaryLabel: 'Not now',
-        primaryLabel: loggedIn ? 'See plans' : 'Sign in',
+        // Signed in to the Amazon build there is nothing to do but close.
+        secondaryLabel: amazon && loggedIn ? null : 'Not now',
+        primaryLabel: loggedIn ? (amazon ? 'Got it' : 'See plans') : 'Sign in',
         onPrimary: () {
           if (!context.mounted) return;
-          if (loggedIn) {
-            showPlansSheet(context);
-          } else {
+          if (!loggedIn) {
             showLoginSheet(context);
+          } else if (!amazon) {
+            showPlansSheet(context);
           }
         },
       ),

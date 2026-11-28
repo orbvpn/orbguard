@@ -25,6 +25,7 @@ import '../services/orbnet/models/passkey_info.dart';
 import '../services/orbnet/models/subscription_status.dart';
 import '../services/orbnet/models/two_factor_challenge.dart';
 import '../services/orbnet/models/user.dart';
+import '../utils/amazon_build.dart';
 
 /// The sign-in method that left a second factor pending. Completion has to
 /// finish the way that method finishes: for a magic link that includes
@@ -74,6 +75,12 @@ class AccountProvider extends ChangeNotifier {
   static const int _minTwoFactorCodeLength = 6;
   static const int _maxTwoFactorCodeLength = 64;
 
+  /// Whether an email sign-in link may create an account for an address
+  /// that has none. The Amazon build creates no accounts: there the server
+  /// mails a link only to an existing account, and answers the same either
+  /// way.
+  final bool allowRegistration;
+
   /// [enableProactiveRefresh] can be turned off in tests to avoid background
   /// timers. Inject [authRepository]/[tokenService] for testing, and [clock]
   /// to move time past a pending sign-in's deadline.
@@ -82,6 +89,7 @@ class AccountProvider extends ChangeNotifier {
     TokenService? tokenService,
     bool enableProactiveRefresh = true,
     DateTime Function()? clock,
+    this.allowRegistration = !kAmazonBuild,
   }) {
     _enableProactiveRefresh = enableProactiveRefresh;
     _now = clock ?? DateTime.now;
@@ -252,7 +260,8 @@ class AccountProvider extends ChangeNotifier {
     // Asking for a fresh link starts over; a code step still open is moot.
     _pendingTwoFactor = null;
     try {
-      await _repo.requestMagicLink(email);
+      await _repo.requestMagicLink(email,
+          allowRegistration: allowRegistration);
       _busy = false;
       notifyListeners();
       return true;

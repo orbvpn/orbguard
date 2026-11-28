@@ -20,6 +20,7 @@ import '../../providers/account_provider.dart';
 import '../../services/orbnet/models/passkey_info.dart';
 import '../../services/orbnet/orbnet_api_client.dart'
     show AuthenticationException, NetworkException, ServerException;
+import '../../utils/amazon_build.dart';
 
 class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
@@ -84,9 +85,12 @@ class _SecurityScreenState extends State<SecurityScreen> {
       hint: 'e.g. iPhone Face ID',
       initial: '',
       confirmLabel: 'Create passkey',
-      explainer:
-          'Your device will ask for Face ID, fingerprint, or your device PIN. '
-          'The passkey only works for your account on orbai.world.',
+      // The Amazon build names no site.
+      explainer: isAmazonBuild(context)
+          ? 'Your device will ask for Face ID, fingerprint, or your device '
+              'PIN. The passkey only works for your OrbVPN account.'
+          : 'Your device will ask for Face ID, fingerprint, or your device '
+              'PIN. The passkey only works for your account on orbai.world.',
     );
     if (name == null || !mounted) return;
 
@@ -168,6 +172,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
     // Strong confirmation: the backend hard-deletes everything immediately with
     // no grace period, so require typing DELETE.
+    // The Amazon build names no store.
+    final String manage = isAmazonBuild(context)
+        ? 'manage it where you subscribed'
+        : 'manage it in your App Store / Google Play subscription settings';
     final typed = await _promptForName(
       title: 'Delete account?',
       hint: 'Type DELETE to confirm',
@@ -178,8 +186,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
           'history, devices, credits, and passkeys, for BOTH OrbGuard and '
           'OrbVPN (they share this account). This cannot be undone.\n\n'
           'An active subscription is NOT cancelled by deleting your account: '
-          'manage it in your App Store / Google Play subscription settings, '
-          'or it will keep renewing.\n\n'
+          '$manage, or it will keep renewing.\n\n'
           'Type DELETE below to confirm.',
     );
     if (typed == null || !mounted) return;

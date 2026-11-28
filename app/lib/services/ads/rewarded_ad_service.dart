@@ -62,6 +62,21 @@ abstract class RewardedAdService {
   Future<bool> showRewardedAd();
 }
 
+/// The Amazon build's service: it has no ad network, so nothing is ever
+/// configured and no ad ever plays.
+class NoRewardedAds implements RewardedAdService {
+  const NoRewardedAds();
+
+  @override
+  bool get anyNetworkConfigured => false;
+
+  @override
+  String? get preferredProvider => null;
+
+  @override
+  Future<bool> showRewardedAd() => throw AdsNotConfiguredException();
+}
+
 /// Production implementation backed by the Unity / Adivery / Yandex SDKs.
 class DefaultRewardedAdService implements RewardedAdService {
   // ── Build-time network configuration ──────────────────────────────────────

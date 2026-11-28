@@ -21,12 +21,19 @@ import '../../presentation/widgets/brand_button.dart';
 import '../../presentation/widgets/duotone_icon.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/scan_credit_provider.dart';
+import '../../utils/amazon_build.dart';
 import '../sale/login_sheet.dart';
 import '../sale/plans_sheet.dart';
 
 /// Presents the credits sheet. Completes with true when a credit was earned
 /// before it closed, however it closed.
-Future<bool?> showCreditsSheet(BuildContext context) async {
+///
+/// The Amazon build has no ad to watch and no plan to take, so there it
+/// opens nothing, and the sheet is left out of that binary.
+Future<bool?> showCreditsSheet(BuildContext context) =>
+    kAmazonBuild ? Future<bool?>.value(false) : _showCreditsSheet(context);
+
+Future<bool?> _showCreditsSheet(BuildContext context) async {
   bool earned = false;
   final bool? popped = await showAppSheet<bool>(
     context,
